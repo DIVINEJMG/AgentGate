@@ -58,6 +58,12 @@ Incident resolution never restores execution automatically. Recovery is a separa
 
 Because AppDeploy KV has no transactional compare-and-set, concurrent management transitions cannot be claimed as strongly serialized. Per-target control reads are bounded; ambiguous overflow fails closed rather than assuming execution is active.
 
+## Productization boundary
+
+Foundation 12 keeps commercial state outside runtime authorization. Workspace settings are tenant-scoped; reads require organization membership and writes require `organizations.manage`. Usage analytics use bounded reads and expose truncation instead of claiming exact totals from incomplete windows.
+
+The initial billing boundary is observe-only. No payment processor, checkout flow, billing secret or client-side payment credential is present. Plan state cannot authorize agent actions or override policy, risk, approval, audit or incident controls. Entitlement enforcement must remain disabled until a future billing adapter has verified server-side provider state.
+
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.

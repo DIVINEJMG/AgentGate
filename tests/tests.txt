@@ -1,68 +1,61 @@
 # Tests
 
-## Test 1 - Emergency-stop the organization and block a real gateway request [sanity]
+## Test 1 - Save workspace settings and retain the product profile [sanity]
 Viewport: desktop
-Covers: POST/GET /api/v1/organizations/:organizationId/execution-controls/:targetType/:targetId, organization kill switch, Action Gateway incident-control enforcement, execution restoration
-Description: Verifies the organization emergency stop blocks new agent execution without deleting agent or integration state and can later be restored explicitly.
-
-Setup:
-1. Sign in to an organization with an active agent, copied agent credential, connected public DIVINEJMG/AgentGate repository, declared metadata-read scope and matching ALLOW policy
+Covers: GET /api/v1/organizations/:organizationId/product, PUT /api/v1/organizations/:organizationId/settings, workspace rename, security contact persistence, organization controls
+Description: Verifies an owner/admin can productize the workspace profile and the durable values are reflected after reload.
 
 Steps:
-1. Open Incidents and choose Emergency stop, entering reason `QA organization containment`
-2. Open Actions and run the metadata-read request with the valid agent credential
-3. Return to Incidents and restore organization execution with reason `QA containment cleared`
+1. Open Settings and set workspace name to `AgentGate QA Workspace`, security contact to `security@example.com`, and company URL to `https://example.com`
+2. Save workspace settings
+3. Refresh the page and return to Settings
 
-Expected: The action attempted while stopped is BLOCKED with an incident-control reason; after explicit restoration the organization execution banner returns to ACTIVE and agent/integration configuration remains present.
+Expected: The renamed workspace is shown in the application and Settings retains `security@example.com` and `https://example.com` with a successful readiness update.
 
-## Test 2 - Open an agent incident, suspend only that agent, then resolve independently
+## Test 2 - Show real readiness and bounded usage without enforcing preview limits
 Viewport: desktop
-Covers: POST/GET /api/v1/organizations/:organizationId/incidents, POST incident status, target execution control, incident lifecycle independence from recovery
-Description: Verifies an incident record and an agent kill switch are separate durable states.
+Covers: product readiness derivation, bounded operational analytics, advisory agent limit, existing security-control continuity
+Description: Verifies product analytics reflect current AgentGate state and the preview catalog does not disable existing controls.
 
 Steps:
-1. Open a HIGH incident named `QA Agent Containment` targeting an existing active agent
-2. Select the incident and choose Suspend target with reason `Unexpected QA behavior`, then Acknowledge and Resolve with note `Investigation complete`
-3. Refresh Incidents and inspect the same incident
+1. Open Settings in an organization that already has AgentGate control-plane records
+2. Review readiness, agent/integration/policy/action counts and the 30-day activity metrics
+3. Inspect the current preview-plan note
 
-Expected: The incident remains RESOLVED with its resolution note while the target control can remain SUSPENDED until a separate Restore target action is performed.
+Expected: Readiness and usage are visible from existing records; any truncated window is disclosed, and the UI states that plan limits are observe-only/advisory rather than enforced.
 
-## Test 3 - Block approval-time resume when an integration is suspended
+## Test 3 - Present the commercial catalog without a fake checkout
 Viewport: desktop
-Covers: REQUIRE_APPROVAL held action, integration execution control, approval-time assertExecutionAllowed recheck, fail-closed recovery
-Description: Verifies an approval cannot bypass a kill switch activated while the action waits.
-
-Setup:
-1. Use an active agent and connected GitHub integration with a declared pull-request-read scope and REQUIRE APPROVAL policy
-2. Run the request so it becomes HELD and open an incident targeting that GitHub integration
+Covers: Free/Team/Business/Scale catalog, billing-provider boundary, no-checkout guardrail
+Description: Verifies the product exposes pricing structure while accurately representing that no payment processor is connected.
 
 Steps:
-1. In Incidents suspend the integration target with reason `QA integration containment`
-2. In Approvals approve the already-held action
-3. Inspect the final action and incident control state
+1. Open Settings and scroll to Plans & Billing Boundary
+2. Review Free, Team, Business and Scale pricing cards
+3. Inspect the billing status message
 
-Expected: The approved action becomes BLOCKED rather than reaching GitHub because approval-time reauthorization detects the suspended integration.
+Expected: Four plan cards are visible; the current preview plan is identified, `OBSERVE ONLY` is visible, and there is no active checkout/purchase control.
 
-## Test 4 - Use Incident Controls through API v2 and restore a target
+## Test 4 - Use Foundation 12 through API v2 and persist workspace changes
 Viewport: desktop
-Covers: v2 incidents list/create/status contracts, v2 execution-control read/write normalization, explicit recovery
-Description: Verifies the Foundation 11 compatibility adapter exposes the same canonical incident/control state through API v2.
+Covers: GET /api/v2/organizations/:organizationId/product, PUT /api/v2/organizations/:organizationId/settings, v2 productization adapter
+Description: Verifies v2 exposes the same canonical workspace, readiness, commercial and usage state.
 
 Steps:
-1. Switch Compatibility view to API v2 in Incidents and open a MEDIUM incident targeting an integration or agent
-2. Suspend that target, acknowledge the incident, then restore the target with a recovery reason
-3. Resolve the incident with a resolution note
+1. Switch Settings to API v2
+2. Change the company URL to `https://example.org` and save
+3. Refresh Settings while API v2 remains selected
 
-Expected: API v2 remains selected; target control shows ACTIVE after explicit restoration and the incident shows RESOLVED without contract-shape errors.
+Expected: The updated URL persists, readiness/usage/plans render without contract-shape errors, and API v2 remains usable.
 
-## Test 5 - Manage containment from mobile without destructive configuration changes
+## Test 5 - Use product settings and operator docs on mobile
 Viewport: mobile
-Covers: responsive Incident navigation, mobile emergency control, incident create/detail/lifecycle, target suspension and restoration
-Description: Verifies an operator can perform the critical containment workflow from a phone-sized viewport.
+Covers: responsive Settings navigation, workspace controls, readiness, usage, plans and operator documentation
+Description: Verifies the final productization surface remains usable from a phone-sized viewport.
 
 Steps:
-1. Open mobile navigation and choose Incidents
-2. Open a LOW incident targeting an agent and use Suspend target
-3. Restore the target and resolve the incident
+1. Open mobile navigation and choose Settings
+2. Review readiness and Plans & Billing Boundary
+3. Scroll through workspace settings and Production quick reference
 
-Expected: Kill-switch state, incident lifecycle buttons and detail information remain usable without horizontal clipping, and the agent is not deleted or disabled by the incident-control workflow.
+Expected: Product metrics, forms, plan cards and operator docs remain readable and usable without horizontal clipping.
