@@ -250,6 +250,8 @@ export async function authenticateAgentCredential(organizationId: string, agentI
     return publicAgent(agentId, next);
 }
 
+export async function validateAgentForApprovalResume(organizationId: string, agentId: string, expectedFingerprint: string) { const current = await loadAgent(organizationId, agentId); if (current.organizationId !== organizationId || current.status !== 'active' || current.credentialStatus !== 'active' || !current.credentialRecordId) throw new AgentDomainError('Agent identity is no longer permitted to execute actions.', 403); if (current.credentialFingerprint !== expectedFingerprint) throw new AgentDomainError('Agent credential changed while the action was awaiting approval. Stale authority cannot resume.', 409); const [credential] = await db.get<CredentialRecord>(credentialsTable(organizationId), [current.credentialRecordId]); if (!credential || credential.revokedAt || credential.organizationId !== organizationId || credential.agentId !== agentId || !credential.scopes.includes('agent.authenticate')) throw new AgentDomainError('Agent credential is unavailable or revoked.', 401); if (credential.expiresAt && new Date(credential.expiresAt).getTime() <= Date.now()) throw new AgentDomainError('Agent credential expired while the action was awaiting approval.', 401); return publicAgent(agentId, current); }
+
 export function serializeAgentV2(agent: ReturnType<typeof publicAgent>) {
     return {
         identity: { id: agent.id, name: agent.name, status: agent.status, createdAt: agent.createdAt, updatedAt: agent.updatedAt },
