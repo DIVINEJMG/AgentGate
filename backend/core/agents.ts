@@ -1,0 +1,241 @@
+import { db } from '@appdeploy/sdk';
+import { createHash, randomBytes } from 'node:crypto';
+import { getOrganizationForUser } from './organizations';
+
+export type AgentStatus = 'active' | 'suspended' | 'disabled';
+export type CredentialStatus = 'active' | 'revoked';
+
+interface AgentRecord {
+    organizationId: string;
+    name: string;
+    description: string;
+    ownerUserId: string;
+    status: AgentStatus;
+    credentialRecordId: string;
+    credentialFingerprint: string;
+    credentialStatus: CredentialStatus;
+    credentialVersion: number;
+    credentialScopes: string[];
+    credentialExpiresAt: string | null;
+    credentialLastUsedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+interface CredentialRecord {
+    organizationId: string;
+    agentId: string;
+    credentialHash: string;
+    version: number;
+    scopes: string[];
+    createdAt: string;
+    expiresAt: string | null;
+    lastUsedAt: string | null;
+    revokedAt: string | null;
+}
+
+export class AgentDomainError extends Error {
+    statusCode: number;
+    constructor(message: string, statusCode = 400) { super(message); this.statusCode = statusCode; }
+}
+
+function agentsTable(organizationId: string) { return `agents:${organizationId}`; }
+function credentialsTable(organizationId: string) { return `agent_credentials:${organizationId}`; }
+
+async function requireAgentAccess(userId: string, organizationId: string, permission: 'agents.read' | 'agents.manage') {
+    const organization = await getOrganizationForUser(userId, organizationId);
+    if (!organization) throw new AgentDomainError('Organization not found or access denied.', 404);
+    if (!organization.permissions.includes(permission)) throw new AgentDomainError('Forbidden: your organization role does not grant this agent permission.', 403);
+    return organization;
+}
+
+function generateCredential() {
+    const secret = `agt_sk_${randomBytes(32).toString('base64url')}`;
+    const hash = createHash('sha256').update(secret).digest('hex');
+    return { secret, hash, fingerprint: `sha256:${hash.slice(0, 12)}` };
+}
+
+function publicAgent(id: string, record: AgentRecord) {
+    return {
+        id,
+        organizationId: record.organizationId,
+        name: record.name,
+        description: record.description,
+        ownerUserId: record.ownerUserId,
+        status: record.status,
+        credential: {
+            status: record.credentialStatus,
+            fingerprint: record.credentialFingerprint,
+            version: record.credentialVersion,
+            scopes: record.credentialScopes,
+            expiresAt: record.credentialExpiresAt,
+            lastUsedAt: record.credentialLastUsedAt,
+        },
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
+    };
+}
+
+async function loadAgent(organizationId: string, agentId: string) {
+    const [record] = await db.get<AgentRecord>(agentsTable(organizationId), [agentId]);
+    if (!record) throw new AgentDomainError('Agent identity not found.', 404);
+    return record;
+}
+
+async function updateAgent(organizationId: string, agentId: string, record: AgentRecord) {
+    const [updated] = await db.update(agentsTable(organizationId), [{ id: agentId, record }]);
+    if (!updated) throw new AgentDomainError('Failed to update agent identity.', 500);
+    return publicAgent(agentId, record);
+}
+
+async function markCredentialRevoked(organizationId: string, credentialRecordId: string) {
+    if (!credentialRecordId) return;
+    const [credential] = await db.get<CredentialRecord>(credentialsTable(organizationId), [credentialRecordId]);
+    if (!credential || credential.revokedAt) return;
+    await db.update(credentialsTable(organizationId), [{ id: credentialRecordId, record: { ...credential, revokedAt: new Date().toISOString() } }]);
+}
+
+export async function createAgent(userId: string, organizationId: string, rawName: unknown, rawDescription: unknown) {
+    await requireAgentAccess(userId, organizationId, 'agents.manage');
+    const name = typeof rawName === 'string' ? rawName.trim() : '';
+    const description = typeof rawDescription === 'string' ? rawDescription.trim() : '';
+    if (name.length < 2 || name.length > 80) throw new AgentDomainError('Agent name must be between 2 and 80 characters.');
+    if (description.length > 240) throw new AgentDomainError('Agent description must be 240 characters or fewer.');
+
+    const createdAt = new Date().toISOString();
+    const scopes = ['agent.authenticate'];
+    const initialRecord: AgentRecord = {
+        organizationId,
+        name,
+        description,
+        ownerUserId: userId,
+        status: 'active',
+        credentialRecordId: '',
+        credentialFingerprint: '',
+        credentialStatus: 'active',
+        credentialVersion: 1,
+        credentialScopes: scopes,
+        credentialExpiresAt: null,
+        credentialLastUsedAt: null,
+        createdAt,
+        updatedAt: createdAt,
+    };
+
+    const [agentId] = await db.add(agentsTable(organizationId), [initialRecord]);
+    if (!agentId) throw new AgentDomainError('Failed to register agent identity.', 500);
+
+    const credential = generateCredential();
+    const [credentialRecordId] = await db.add(credentialsTable(organizationId), [{
+        organizationId,
+        agentId,
+        credentialHash: credential.hash,
+        version: 1,
+        scopes,
+        createdAt,
+        expiresAt: null,
+        lastUsedAt: null,
+        revokedAt: null,
+    }]);
+    if (!credentialRecordId) {
+        await db.delete(agentsTable(organizationId), [agentId]);
+        throw new AgentDomainError('Failed to issue agent credential.', 500);
+    }
+
+    const finalRecord = { ...initialRecord, credentialRecordId, credentialFingerprint: credential.fingerprint };
+    const [updated] = await db.update(agentsTable(organizationId), [{ id: agentId, record: finalRecord }]);
+    if (!updated) {
+        await db.delete(credentialsTable(organizationId), [credentialRecordId]);
+        await db.delete(agentsTable(organizationId), [agentId]);
+        throw new AgentDomainError('Failed to finalize agent identity.', 500);
+    }
+
+    return {
+        agent: publicAgent(agentId, finalRecord),
+        credential: { secret: credential.secret, fingerprint: credential.fingerprint, version: 1, scopes, createdAt, expiresAt: null },
+    };
+}
+
+export async function listAgentsForUser(userId: string, organizationId: string) {
+    await requireAgentAccess(userId, organizationId, 'agents.read');
+    const { items } = await db.list<AgentRecord>(agentsTable(organizationId), { limit: 100 });
+    return items.map((item) => publicAgent(item.id, item)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function setAgentStatus(userId: string, organizationId: string, agentId: string, rawStatus: unknown) {
+    await requireAgentAccess(userId, organizationId, 'agents.manage');
+    if (rawStatus !== 'active' && rawStatus !== 'suspended' && rawStatus !== 'disabled') throw new AgentDomainError('Agent status must be active, suspended, or disabled.');
+    const status = rawStatus as AgentStatus;
+    const current = await loadAgent(organizationId, agentId);
+    if (current.status === 'disabled' && status !== 'disabled') throw new AgentDomainError('Disabled agent identities cannot be reactivated.', 409);
+    if (status === 'active' && current.credentialStatus !== 'active') throw new AgentDomainError('Rotate the agent credential before activating this identity.', 409);
+    const updatedAt = new Date().toISOString();
+    const next: AgentRecord = status === 'disabled'
+        ? { ...current, status, credentialStatus: 'revoked', updatedAt }
+        : { ...current, status, updatedAt };
+    const agent = await updateAgent(organizationId, agentId, next);
+    if (status === 'disabled') await markCredentialRevoked(organizationId, current.credentialRecordId);
+    return agent;
+}
+
+export async function rotateAgentCredential(userId: string, organizationId: string, agentId: string) {
+    await requireAgentAccess(userId, organizationId, 'agents.manage');
+    const current = await loadAgent(organizationId, agentId);
+    if (current.status === 'disabled') throw new AgentDomainError('Disabled agent identities cannot receive new credentials.', 409);
+
+    const generated = generateCredential();
+    const version = current.credentialVersion + 1;
+    const createdAt = new Date().toISOString();
+    const scopes = current.credentialScopes.length ? current.credentialScopes : ['agent.authenticate'];
+    const [newCredentialId] = await db.add(credentialsTable(organizationId), [{
+        organizationId,
+        agentId,
+        credentialHash: generated.hash,
+        version,
+        scopes,
+        createdAt,
+        expiresAt: null,
+        lastUsedAt: null,
+        revokedAt: null,
+    }]);
+    if (!newCredentialId) throw new AgentDomainError('Failed to rotate agent credential.', 500);
+
+    const next: AgentRecord = {
+        ...current,
+        credentialRecordId: newCredentialId,
+        credentialFingerprint: generated.fingerprint,
+        credentialStatus: 'active',
+        credentialVersion: version,
+        credentialScopes: scopes,
+        credentialExpiresAt: null,
+        credentialLastUsedAt: null,
+        updatedAt: createdAt,
+    };
+    try {
+        const agent = await updateAgent(organizationId, agentId, next);
+        await markCredentialRevoked(organizationId, current.credentialRecordId);
+        return { agent, credential: { secret: generated.secret, fingerprint: generated.fingerprint, version, scopes, createdAt, expiresAt: null } };
+    } catch (caught) {
+        await db.delete(credentialsTable(organizationId), [newCredentialId]);
+        throw caught;
+    }
+}
+
+export async function revokeAgentCredential(userId: string, organizationId: string, agentId: string) {
+    await requireAgentAccess(userId, organizationId, 'agents.manage');
+    const current = await loadAgent(organizationId, agentId);
+    if (current.credentialStatus === 'revoked') return publicAgent(agentId, current);
+    const updatedAt = new Date().toISOString();
+    const next: AgentRecord = { ...current, status: current.status === 'disabled' ? 'disabled' : 'suspended', credentialStatus: 'revoked', updatedAt };
+    const agent = await updateAgent(organizationId, agentId, next);
+    await markCredentialRevoked(organizationId, current.credentialRecordId);
+    return agent;
+}
+
+export function serializeAgentV2(agent: ReturnType<typeof publicAgent>) {
+    return {
+        identity: { id: agent.id, name: agent.name, status: agent.status, createdAt: agent.createdAt, updatedAt: agent.updatedAt },
+        profile: { description: agent.description },
+        ownership: { organizationId: agent.organizationId, ownerUserId: agent.ownerUserId },
+        credential: agent.credential,
+    };
+}
