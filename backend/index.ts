@@ -7,9 +7,10 @@ import { createOrganization, listOrganizationsForUser, serializeOrganizationsV1,
 import { readCanonicalSystemStatus, serializeV1, serializeV2 } from './core/system';
 import { ActionGatewayDomainError, executeActionForAgent, extractAgentCredential, listActionsForUser, serializeActionV2, testActionForUser } from './core/actionGateway';
 import { ApprovalDomainError, decideApprovalForUser, listApprovalsForUser, serializeApprovalV2 } from './core/approvals';
+import { AuditDomainError, listAuditForUser, serializeAuditV2 } from './core/audit';
 import { realtimeSubscriptionRoutes } from './realtime-subscribers';
 function messageOf(value: unknown) { return value instanceof Error ? value.message : 'Unexpected error.'; }
-function statusOf(value: unknown) { return value instanceof AgentDomainError || value instanceof IntegrationDomainError || value instanceof CapabilityDomainError || value instanceof PolicyDomainError || value instanceof ActionGatewayDomainError || value instanceof ApprovalDomainError ? value.statusCode : 400; }
+function statusOf(value: unknown) { return value instanceof AgentDomainError || value instanceof IntegrationDomainError || value instanceof CapabilityDomainError || value instanceof PolicyDomainError || value instanceof ActionGatewayDomainError || value instanceof ApprovalDomainError || value instanceof AuditDomainError ? value.statusCode : 400; }
 function runtimeStatus(status: string) { return status === 'held' || status === 'processing' ? 202 : status === 'blocked' ? 403 : status === 'failed' ? 502 : 200; }
 export const handler = router({
 'GET /api/_healthcheck':[async()=>json({message:'Success'})],
@@ -65,6 +66,8 @@ export const handler = router({
 'GET /api/v2/organizations/:organizationId/approvals':[requireAuth(),async(ctx)=>{try{const approvals=await listApprovalsForUser(ctx.user!.userId,ctx.params.organizationId);return json({items:approvals.map(serializeApprovalV2),total:approvals.length})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
 'POST /api/v1/organizations/:organizationId/approvals/:approvalId/decision':[requireAuth(),async(ctx)=>{try{const body=ctx.body as{decision?:unknown;note?:unknown};return json({approval:await decideApprovalForUser(ctx.user!.userId,ctx.params.organizationId,ctx.params.approvalId,body?.decision,body?.note)})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
 'POST /api/v2/organizations/:organizationId/approvals/:approvalId/decision':[requireAuth(),async(ctx)=>{try{const body=ctx.body as{decision?:unknown;note?:unknown};return json({data:{approval:serializeApprovalV2(await decideApprovalForUser(ctx.user!.userId,ctx.params.organizationId,ctx.params.approvalId,body?.decision,body?.note))}})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'GET /api/v1/organizations/:organizationId/audit':[requireAuth(),async(ctx)=>{try{const result=await listAuditForUser(ctx.user!.userId,ctx.params.organizationId,ctx.query);return json({events:result.events,summary:result.summary,window:result.window})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'GET /api/v2/organizations/:organizationId/audit':[requireAuth(),async(ctx)=>{try{return json({data:serializeAuditV2(await listAuditForUser(ctx.user!.userId,ctx.params.organizationId,ctx.query))})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
 'POST /api/v1/runtime/organizations/:organizationId/agents/:agentId/actions':[async(ctx)=>{try{const action=await executeActionForAgent(ctx.params.organizationId,ctx.params.agentId,extractAgentCredential(ctx.event),ctx.body);return json({action},runtimeStatus(action.status))}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
 'POST /api/v2/runtime/organizations/:organizationId/agents/:agentId/actions':[async(ctx)=>{try{const action=await executeActionForAgent(ctx.params.organizationId,ctx.params.agentId,extractAgentCredential(ctx.event),ctx.body);return json({data:{action:serializeActionV2(action)}},runtimeStatus(action.status))}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
 ...realtimeSubscriptionRoutes,

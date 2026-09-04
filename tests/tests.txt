@@ -1,79 +1,70 @@
 # Tests
 
-## Test 1 - Approve a held GitHub read and resume execution [sanity]
+## Test 1 - Trace an approval-gated action end to end in Audit [sanity]
 Viewport: desktop
-Covers: POST /api/v1/organizations/:organizationId/action-gateway/tests, automatic approval creation, GET /api/v1/organizations/:organizationId/approvals, POST /api/v1/organizations/:organizationId/approvals/:approvalId/decision, safe held-action resume, GitHub read execution
-Description: Verifies the primary Foundation 8 workflow persists REQUIRE_APPROVAL, waits for a human, revalidates the action and executes only after approval.
+Covers: action.requested/action.held, approval.requested/approved, approved execution audit emission, GET /api/v1/organizations/:organizationId/audit, correlation tracing
+Description: Verifies Foundation 9 reconstructs one approval-gated action through a shared correlation ID.
 
 Setup:
-1. Sign in and create "QA Operations" if no organization exists
-2. Connect public repository "DIVINEJMG/AgentGate" if it is not already connected
-3. Register "QA Approval Agent", copy its one-time credential, and declare `github.repository.metadata.read`
-4. Create an enabled REQUIRE APPROVAL policy named "Review metadata reads" for that agent, repository and scope
+1. Sign in to an organization with a connected public DIVINEJMG/AgentGate repository
+2. Register an active QA Audit Agent and copy its credential
+3. Declare `github.repository.pull_requests.read`
+4. Create a REQUIRE APPROVAL policy for that agent, resource and scope
 
 Steps:
-1. In Actions run `github.repository.metadata.read` with the copied agent credential and a fresh idempotency key
-2. Open Approvals, select the new pending approval and click "Approve & resume"
-3. Inspect the approval decision and execution result
+1. Run the pull-request read through Actions and approve the resulting held request in Approvals
+2. Open Audit and locate the newest action/approval events
+3. Select one correlated event and choose "Trace this correlation"
 
-Expected: The approval becomes APPROVED, execution becomes EXECUTED, the original action receives a GitHub metadata result, and the approval shows a reauthorization outcome that is not DENY.
+Expected: The filtered timeline contains the same correlation ID across the agent action request, held/approval events, human approval and final executed action, with actor/resource/outcome details visible.
 
-## Test 2 - Reject a held action without provider execution
+## Test 2 - Record a blocked action without provider execution
 Viewport: desktop
-Covers: rejection lifecycle, immutable human decision, held-action blocking, provider non-execution
-Description: Verifies a reviewer can permanently reject a pending action and no provider call occurs afterward.
+Covers: action.requested/action.blocked audit events, default-deny observability, severity filtering
+Description: Verifies a denied action produces a warning-level forensic record without a provider result.
 
 Setup:
-1. Use an active QA agent with a copied credential, declared `github.repository.issues.read`, and a matching REQUIRE APPROVAL policy
+1. Use an active agent with a declared GitHub issues-read scope but no matching ALLOW policy
 
 Steps:
-1. Run a fresh issues-read request through Actions so it becomes HELD
-2. Open Approvals, select the pending record, enter "Not needed" and click Reject
-3. Inspect the decision and corresponding action history
+1. Run the issues-read action through the gateway with a valid agent credential
+2. Open Audit and set category to action and severity to warning, then Apply
+3. Select the blocked event
 
-Expected: The approval becomes REJECTED, execution becomes BLOCKED, the decision note is retained, and the action has no provider result.
+Expected: A warning action.blocked event is visible with DENY/default-deny context and the action's correlation ID; no successful provider outcome is claimed.
 
-## Test 3 - Fail closed when the agent credential changes while approval waits
+## Test 3 - Record human policy changes in the audit ledger
 Viewport: desktop
-Covers: approval-time agent revalidation, credential-fingerprint binding, stale-authority protection
-Description: Verifies human approval cannot revive a request authenticated by a credential that was rotated while the action was held.
-
-Setup:
-1. Create a fresh held metadata-read approval using an active QA agent and REQUIRE APPROVAL policy
+Covers: policy.created/policy.updated/policy.status.changed management audit emission, actor attribution, text search
+Description: Verifies policy administration leaves human-attributed audit records.
 
 Steps:
-1. Before deciding the approval, rotate the QA agent credential from the Agents screen
-2. Return to Approvals and click "Approve & resume" on the still-pending record
-3. Inspect the approval execution result and action history
+1. Create a policy named "QA Audit Policy", then edit it and disable it
+2. Open Audit, search for "QA Audit Policy" and Apply
+3. Inspect the matching policy events
 
-Expected: The human decision is APPROVED but execution is BLOCKED because the initiating credential fingerprint changed; no GitHub provider result is created.
+Expected: Policy create/update/status events identify a human actor, the policy resource, revision/outcome metadata and timestamps.
 
-## Test 4 - Refuse to reverse an already decided approval
+## Test 4 - Filter one bounded audit window through API v2
 Viewport: desktop
-Covers: immutable approval decision guardrail, decision retry safety, conflict response
-Description: Verifies a completed human decision cannot be flipped to the opposite outcome.
-
-Setup:
-1. Create a fresh held approval and reject it through the Approvals screen
+Covers: GET /api/v2/organizations/:organizationId/audit, category/severity/search filters, bounded window summary, v1/v2 normalization
+Description: Verifies the current API contract exposes filtered events and operational summary without scanning unbounded history.
 
 Steps:
-1. Confirm the record shows REJECTED
-2. Attempt the opposite approve decision for the same approval through the same v1 decision endpoint/workflow
-3. Refresh the approval queue
+1. Open Audit and switch Compatibility view to API v2
+2. Filter category to approval or action and Apply
+3. Inspect the metric cards and event list
 
-Expected: AgentGate returns a visible conflict/error for the opposite decision, and the persisted approval remains REJECTED with the action still BLOCKED.
+Expected: API v2 remains selected, visible/critical/warning/trace metrics match the filtered event set, and the UI does not require loading all historical pages.
 
-## Test 5 - Review and decide approvals on mobile with API v2
+## Test 5 - Use forensic search and empty-state handling on mobile
 Viewport: mobile
-Covers: GET /api/v2/organizations/:organizationId/approvals, POST /api/v2/organizations/:organizationId/approvals/:approvalId/decision, v1/v2 approval adapters, responsive approval queue/detail, notification opt-in control
-Description: Verifies Foundation 8 remains usable from a phone and exposes push alerts only as an explicit user choice.
-
-Setup:
-1. Sign in with an organization that has a fresh pending approval
+Covers: responsive Audit navigation/detail, audit search guardrail, no-match empty state, mobile trace UX
+Description: Verifies operators can investigate audit history from a phone without a desktop-only layout.
 
 Steps:
-1. On mobile open Approvals and switch Compatibility view to API v2
-2. Inspect the pending approval, the Push alerts control and the held-action details
-3. Reject the pending approval from the mobile decision panel
+1. On mobile open navigation and choose Audit
+2. Search for `definitely-no-such-audit-event` and Apply
+3. Clear the filters and select a real event if one exists
 
-Expected: API v2 remains selected, the approval becomes REJECTED/BLOCKED, the queue and detail panels remain usable at mobile width, and push notification enablement is presented as an explicit control rather than an automatic permission request.
+Expected: The no-match state is clearly visible, Clear restores the recent audit window, and event details/trace controls remain usable without horizontal clipping.

@@ -1,6 +1,7 @@
 import { db } from '@appdeploy/sdk';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { getOrganizationForUser } from './organizations';
+import { appendAuditEventBestEffort } from './audit';
 
 export type AgentStatus = 'active' | 'suspended' | 'disabled';
 export type CredentialStatus = 'active' | 'revoked';
@@ -149,10 +150,7 @@ export async function createAgent(userId: string, organizationId: string, rawNam
         throw new AgentDomainError('Failed to finalize agent identity.', 500);
     }
 
-    return {
-        agent: publicAgent(agentId, finalRecord),
-        credential: { secret: credential.secret, fingerprint: credential.fingerprint, version: 1, scopes, createdAt, expiresAt: null },
-    };
+    const agent=publicAgent(agentId,finalRecord); await appendAuditEventBestEffort({organizationId,eventType:'agent.registered',category:'identity',severity:'info',actor:{type:'human',id:userId,label:null},resource:{type:'agent',id:agentId,name},correlationId:null,outcome:'created',summary:`Agent ${name} registered.`,metadata:{credentialFingerprint:credential.fingerprint}}); return {agent,credential:{secret:credential.secret,fingerprint:credential.fingerprint,version:1,scopes,createdAt,expiresAt:null}};
 }
 
 export async function listAgentsForUser(userId: string, organizationId: string) {
@@ -173,8 +171,7 @@ export async function setAgentStatus(userId: string, organizationId: string, age
         ? { ...current, status, credentialStatus: 'revoked', updatedAt }
         : { ...current, status, updatedAt };
     const agent = await updateAgent(organizationId, agentId, next);
-    if (status === 'disabled') await markCredentialRevoked(organizationId, current.credentialRecordId);
-    return agent;
+    if (status === 'disabled') await markCredentialRevoked(organizationId, current.credentialRecordId); await appendAuditEventBestEffort({organizationId,eventType:'agent.lifecycle.changed',category:'identity',severity:status==='disabled'?'warning':'info',actor:{type:'human',id:userId,label:null},resource:{type:'agent',id:agentId,name:agent.name},correlationId:null,outcome:status,summary:`Agent lifecycle changed to ${status}.`,metadata:{previousStatus:current.status}}); return agent;
 }
 
 export async function rotateAgentCredential(userId: string, organizationId: string, agentId: string) {
@@ -212,8 +209,7 @@ export async function rotateAgentCredential(userId: string, organizationId: stri
     };
     try {
         const agent = await updateAgent(organizationId, agentId, next);
-        await markCredentialRevoked(organizationId, current.credentialRecordId);
-        return { agent, credential: { secret: generated.secret, fingerprint: generated.fingerprint, version, scopes, createdAt, expiresAt: null } };
+        await markCredentialRevoked(organizationId, current.credentialRecordId); await appendAuditEventBestEffort({organizationId,eventType:'agent.credential.rotated',category:'security',severity:'warning',actor:{type:'human',id:userId,label:null},resource:{type:'agent',id:agentId,name:agent.name},correlationId:null,outcome:'rotated',summary:'Agent credential rotated.',metadata:{version,fingerprint:generated.fingerprint}}); return { agent, credential: { secret: generated.secret, fingerprint: generated.fingerprint, version, scopes, createdAt, expiresAt: null } };
     } catch (caught) {
         await db.delete(credentialsTable(organizationId), [newCredentialId]);
         throw caught;
@@ -227,8 +223,7 @@ export async function revokeAgentCredential(userId: string, organizationId: stri
     const updatedAt = new Date().toISOString();
     const next: AgentRecord = { ...current, status: current.status === 'disabled' ? 'disabled' : 'suspended', credentialStatus: 'revoked', updatedAt };
     const agent = await updateAgent(organizationId, agentId, next);
-    await markCredentialRevoked(organizationId, current.credentialRecordId);
-    return agent;
+    await markCredentialRevoked(organizationId, current.credentialRecordId); await appendAuditEventBestEffort({organizationId,eventType:'agent.credential.revoked',category:'security',severity:'warning',actor:{type:'human',id:userId,label:null},resource:{type:'agent',id:agentId,name:agent.name},correlationId:null,outcome:'revoked',summary:'Agent credential revoked; identity suspended.',metadata:{fingerprint:current.credentialFingerprint}}); return agent;
 }
 
 export async function authenticateAgentCredential(organizationId: string, agentId: string, rawSecret: unknown) {
