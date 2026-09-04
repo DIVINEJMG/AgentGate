@@ -15,8 +15,9 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 6 — Policy engine: complete
 - Foundation 7 — Action gateway: complete
 - Foundation 8 — Human approvals: complete
-- Foundation 9 — Audit & observability: implemented
-- Foundation 10 — Risk engine: next
+- Foundation 9 — Audit & observability: complete
+- Foundation 10 — Risk engine: implemented
+- Foundation 11 — Incident controls: next
 
 ## Foundation 6
 
@@ -45,6 +46,14 @@ AppDeploy's current key-value store does not provide a transactional compare-and
 Audit & Observability adds an application-level append-only event ledger. Critical action execution establishes an audit path before provider invocation; action, approval, agent, integration and policy events are correlated and tenant-scoped. The Audit UI provides bounded search, severity/category filters, correlation tracing and operational summaries across the most recent 200 scanned events.
 
 No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative mutation and audit writes cannot be transactionally committed together on the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
+
+## Foundation 10
+
+The Risk Engine deterministically combines a provider capability's baseline risk with bounded recent AgentGate behavior. Burst requests, repeated blocks, repeated provider failures, approval pressure and truncated history can each raise risk by one level, capped at `critical`. Risk never silently lowers the provider baseline.
+
+The effective risk is evaluated before policy matching in both Decision Lab and the Action Gateway. Approved held actions recompute risk during reauthorization, so changed behavior can invalidate stale authority. Risk assessment failures fail closed in the execution path. Runtime risk assessments are stored on action records and emitted into the correlated audit stream.
+
+The current behavior window scans at most 100 action records. If that bounded window is truncated, uncertainty itself raises risk one level rather than allowing an incomplete sample to underestimate exposure.
 
 ## Architecture rules
 
