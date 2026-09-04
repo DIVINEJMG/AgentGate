@@ -1,82 +1,79 @@
 # Tests
 
-## Test 1 - Execute an allowed GitHub read through the Action Gateway [sanity]
+## Test 1 - Approve a held GitHub read and resume execution [sanity]
 Viewport: desktop
-Covers: POST /api/v1/organizations/:organizationId/action-gateway/tests, shared agent credential validation, idempotency establishment, capability resolution, Policy Engine enforcement, GitHub adapter read execution, GET /api/v1/organizations/:organizationId/actions
-Description: Verifies the primary Foundation 7 path reaches GitHub only after an authenticated agent receives ALLOW.
+Covers: POST /api/v1/organizations/:organizationId/action-gateway/tests, automatic approval creation, GET /api/v1/organizations/:organizationId/approvals, POST /api/v1/organizations/:organizationId/approvals/:approvalId/decision, safe held-action resume, GitHub read execution
+Description: Verifies the primary Foundation 8 workflow persists REQUIRE_APPROVAL, waits for a human, revalidates the action and executes only after approval.
 
 Setup:
 1. Sign in and create "QA Operations" if no organization exists
 2. Connect public repository "DIVINEJMG/AgentGate" if it is not already connected
-3. Register "QA Gateway Agent", copy its one-time agent credential, and keep that value for this test
-4. Declare `github.repository.metadata.read` for "QA Gateway Agent"
-5. Create an enabled ALLOW policy named "Allow gateway metadata" for that agent, the AgentGate repository and `github.repository.metadata.read`
+3. Register "QA Approval Agent", copy its one-time credential, and declare `github.repository.metadata.read`
+4. Create an enabled REQUIRE APPROVAL policy named "Review metadata reads" for that agent, repository and scope
 
 Steps:
-1. Open Actions, select "QA Gateway Agent", the AgentGate repository and `github.repository.metadata.read`
-2. Paste the copied agent credential and run the generated idempotency key through the gateway
-3. Inspect the resulting Action Detail and recent action history
+1. In Actions run `github.repository.metadata.read` with the copied agent credential and a fresh idempotency key
+2. Open Approvals, select the new pending approval and click "Approve & resume"
+3. Inspect the approval decision and execution result
 
-Expected: The action status is EXECUTED, policy outcome is ALLOW, a GitHub repository metadata summary/result is visible, and the action shows a correlation ID plus hashed idempotency identifier.
+Expected: The approval becomes APPROVED, execution becomes EXECUTED, the original action receives a GitHub metadata result, and the approval shows a reauthorization outcome that is not DENY.
 
-## Test 2 - Block a request when policy does not allow it
+## Test 2 - Reject a held action without provider execution
 Viewport: desktop
-Covers: default-deny enforcement, provider non-execution on DENY, persisted blocked action state
-Description: Verifies a valid agent credential and capability declaration cannot bypass the Policy Engine.
+Covers: rejection lifecycle, immutable human decision, held-action blocking, provider non-execution
+Description: Verifies a reviewer can permanently reject a pending action and no provider call occurs afterward.
 
 Setup:
-1. Use an active QA agent with a copied credential and connected AgentGate repository
-2. Declare `github.repository.issues.read` for the agent but do not create an enabled matching issues policy
+1. Use an active QA agent with a copied credential, declared `github.repository.issues.read`, and a matching REQUIRE APPROVAL policy
 
 Steps:
-1. Open Actions and select the QA agent, AgentGate repository and `github.repository.issues.read`
-2. Paste the valid agent credential, generate a fresh idempotency key and run through the gateway
-3. Inspect Action Detail
+1. Run a fresh issues-read request through Actions so it becomes HELD
+2. Open Approvals, select the pending record, enter "Not needed" and click Reject
+3. Inspect the decision and corresponding action history
 
-Expected: The action is BLOCKED with policy outcome DENY/default deny, no provider result is shown, and the blocked attempt appears in recent action history.
+Expected: The approval becomes REJECTED, execution becomes BLOCKED, the decision note is retained, and the action has no provider result.
 
-## Test 3 - Hold REQUIRE_APPROVAL without provider execution
+## Test 3 - Fail closed when the agent credential changes while approval waits
 Viewport: desktop
-Covers: REQUIRE_APPROVAL enforcement, held action persistence, approval handoff boundary
-Description: Verifies an approval-gated policy cannot accidentally execute before Foundation 8 supplies a human decision.
+Covers: approval-time agent revalidation, credential-fingerprint binding, stale-authority protection
+Description: Verifies human approval cannot revive a request authenticated by a credential that was rotated while the action was held.
 
 Setup:
-1. Use an active QA agent with copied credential and declare `github.repository.pull_requests.read`
-2. Create an enabled REQUIRE APPROVAL policy named "Review PR reads" for that agent/repository/scope
+1. Create a fresh held metadata-read approval using an active QA agent and REQUIRE APPROVAL policy
 
 Steps:
-1. Open Actions, select the QA agent, AgentGate repository and `github.repository.pull_requests.read`
-2. Paste the valid credential and run a fresh idempotency key
-3. Inspect Action Detail and recent actions
+1. Before deciding the approval, rotate the QA agent credential from the Agents screen
+2. Return to Approvals and click "Approve & resume" on the still-pending record
+3. Inspect the approval execution result and action history
 
-Expected: The action is HELD with policy outcome REQUIRE APPROVAL, no GitHub result is present, and the UI states that approval execution belongs to Foundation 8.
+Expected: The human decision is APPROVED but execution is BLOCKED because the initiating credential fingerprint changed; no GitHub provider result is created.
 
-## Test 4 - Replay the same idempotent request without a second provider action
+## Test 4 - Refuse to reverse an already decided approval
 Viewport: desktop
-Covers: idempotency replay, request fingerprint conflict protection, durable action identity
-Description: Verifies sequential retries with the same agent, resource, scope and idempotency key return the original action record.
+Covers: immutable approval decision guardrail, decision retry safety, conflict response
+Description: Verifies a completed human decision cannot be flipped to the opposite outcome.
 
 Setup:
-1. Use the allowed metadata-read setup from the primary workflow and keep the same agent credential available
+1. Create a fresh held approval and reject it through the Approvals screen
 
 Steps:
-1. Execute an allowed metadata read and note its action ID/correlation ID while keeping the idempotency key unchanged
-2. Paste the same agent credential again and submit the exact same request with the unchanged idempotency key
-3. Inspect the selected history item
+1. Confirm the record shows REJECTED
+2. Attempt the opposite approve decision for the same approval through the same v1 decision endpoint/workflow
+3. Refresh the approval queue
 
-Expected: AgentGate returns the same action record/correlation state instead of creating a second provider execution; reusing that key for a different scope is rejected.
+Expected: AgentGate returns a visible conflict/error for the opposite decision, and the persisted approval remains REJECTED with the action still BLOCKED.
 
-## Test 5 - Reject an invalid agent credential on mobile while API v2 remains compatible
+## Test 5 - Review and decide approvals on mobile with API v2
 Viewport: mobile
-Covers: agent-authentication guardrail, responsive Action Gateway form/history, POST /api/v2/organizations/:organizationId/action-gateway/tests, GET /api/v2/organizations/:organizationId/actions, v1/v2 action adapters
-Description: Verifies mobile operators cannot execute using an invalid non-human credential and the same action model is readable through API v2.
+Covers: GET /api/v2/organizations/:organizationId/approvals, POST /api/v2/organizations/:organizationId/approvals/:approvalId/decision, v1/v2 approval adapters, responsive approval queue/detail, notification opt-in control
+Description: Verifies Foundation 8 remains usable from a phone and exposes push alerts only as an explicit user choice.
 
 Setup:
-1. Sign in with an organization containing an active agent and connected GitHub resource
+1. Sign in with an organization that has a fresh pending approval
 
 Steps:
-1. On mobile open Actions and switch Compatibility view to API v2
-2. Select an agent/resource/scope, enter `agt_sk_invalidcredentialvalue1234567890` and run a fresh idempotency key
-3. Observe the error and action history
+1. On mobile open Approvals and switch Compatibility view to API v2
+2. Inspect the pending approval, the Push alerts control and the held-action details
+3. Reject the pending approval from the mobile decision panel
 
-Expected: A visible invalid-agent-credential error is shown, no provider result is created from the invalid credential, API v2 remains selected, and the Actions layout remains usable on mobile.
+Expected: API v2 remains selected, the approval becomes REJECTED/BLOCKED, the queue and detail panels remain usable at mobile width, and push notification enablement is presented as an explicit control rather than an automatic permission request.

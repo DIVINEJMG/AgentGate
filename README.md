@@ -13,8 +13,9 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 4 — Integration framework: complete
 - Foundation 5 — Capability model: complete
 - Foundation 6 — Policy engine: complete
-- Foundation 7 — Action gateway: implemented
-- Foundation 8 — Human approvals: next
+- Foundation 7 — Action gateway: complete
+- Foundation 8 — Human approvals: implemented
+- Foundation 9 — Audit & observability: next
 
 ## Foundation 6
 
@@ -28,7 +29,15 @@ Policies are revisioned and may be enabled or disabled without being hard-delete
 
 The Action Gateway is now the only agent-triggered provider execution boundary. It authenticates the agent's non-human credential, establishes idempotency and correlation state, resolves the canonical capability, evaluates policy, and maps the result to `executed`, `blocked`, or `held`.
 
-Only `ALLOW` can invoke an integration adapter. `DENY` never reaches the provider. `REQUIRE_APPROVAL` remains held until Foundation 8. Foundation 7 deliberately enables only read-only GitHub metadata, issue and pull-request operations; provider writes remain unavailable.
+Only `ALLOW` can invoke an integration adapter. `DENY` never reaches the provider. `REQUIRE_APPROVAL` creates a held action bound to a human approval record. Foundation 7 deliberately enables only read-only GitHub metadata, issue and pull-request operations; provider writes remain unavailable.
+
+## Foundation 8
+
+Human Approvals turns held actions into an explicit reviewer workflow. Roles with `approvals.review` can inspect pending requests and record an immutable approve or reject decision through API v1 or v2 and the responsive Approvals control-plane surface.
+
+Approve does not blindly execute stale authority: AgentGate revalidates the original agent credential fingerprint, agent lifecycle, integration, declared scope, provider operation and current policy before resuming the exact held action. Reject permanently blocks it. Approval requests may send a best-effort push alert to an eligible agent owner who has enabled notifications.
+
+AppDeploy's current key-value store does not provide a transactional compare-and-set primitive, so provider writes remain disabled and concurrent approval serialization is not claimed as exactly-once.
 
 ## Architecture rules
 
