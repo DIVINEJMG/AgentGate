@@ -35,3 +35,11 @@ Policies are revisioned and can be disabled without deleting their history.
 Foundation 7 places deterministic decisions in the runtime execution path. External agent routes require the agent's separate bearer credential; human AppDeploy sessions do not satisfy agent authentication. Every accepted request establishes an idempotency key hash and correlation ID before provider execution. `DENY` never calls an adapter, `REQUIRE_APPROVAL` is held without execution, and only `ALLOW` can invoke a provider operation.
 
 The first executable provider surface is intentionally read-only GitHub metadata, issue and pull-request retrieval. Provider writes remain unavailable. Agent secrets are never persisted by the gateway or test harness, integration tokens remain decrypted only inside the backend credential boundary, and provider failures are recorded as failures rather than converted into successful authorization.
+
+## Human approval boundary
+
+Foundation 8 persists a pending approval before a `REQUIRE_APPROVAL` action becomes reviewable. Only a same-tenant human with `approvals.review` may decide it. Decisions are immutable once persisted: an approved record cannot later become rejected and a rejected record cannot later become approved.
+
+Approval does not reuse stale authority. Before provider execution, AgentGate verifies that the initiating agent is still active, the same credential fingerprint is still current and valid, the integration remains connected, the exact provider operation still exists, the agent still declares the scope, and current policy does not resolve to `DENY`. Any failed revalidation blocks execution. Push notification delivery is best-effort and never changes authorization state.
+
+Because the current AppDeploy key-value store exposes no transactional compare-and-set primitive, AgentGate does not claim strong serialization for simultaneous competing approval clicks. Provider execution remains read-only until a storage boundary suitable for atomic decision/idempotency locking is available.
