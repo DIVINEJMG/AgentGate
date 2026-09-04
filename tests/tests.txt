@@ -1,3 +1,73 @@
 # Tests
 
-Foundation 2 QA covers: authentication gate, first organization creation/persistence, API v1/v2 organization compatibility, mobile validation, and sign-out removing private organization state.
+## Test 1 - Require human authentication before agent access [sanity]
+Viewport: desktop
+Covers: human authentication gate, protected organization and agent APIs, anonymous access denial, SOT product identity
+Description: Verifies an anonymous visitor cannot reach organization or non-human identity data.
+
+Steps:
+1. Open AgentGate while signed out
+2. Confirm the secure sign-in screen is shown
+3. Confirm the screen identifies the product as "AgentGate" and "An SOT Product"
+
+Expected: The control plane, organization data, Agents navigation, and agent registry are not accessible until secure human sign in is completed.
+
+## Test 2 - Register and retain an agent identity through API v1
+Viewport: desktop
+Covers: Agents navigation, GET /api/v1/organizations/:organizationId/agents, POST /api/v1/organizations/:organizationId/agents, database persistence, owner assignment, one-time credential issuance, hash-only credential design
+Description: Verifies an organization manager can create a durable non-human identity and receives its plaintext credential only at issuance.
+
+Setup:
+1. Sign in to an organization where the current user has agents.manage permission
+
+Steps:
+1. Open Agents and register an agent named "QA Sentinel" with purpose "Monitors test operations"
+2. Copy the issued credential and close the copy-once credential window
+3. Refresh AgentGate and open Agents again
+
+Expected: "QA Sentinel" remains visible as Active and owned by the current user, its credential fingerprint is visible, and the plaintext credential is not displayed again after refresh.
+
+## Test 3 - Suspend, reactivate, and disable an agent through API v1
+Viewport: desktop
+Covers: PUT /api/v1/organizations/:organizationId/agents/:agentId/lifecycle, lifecycle confirmation guardrail, active/suspended/disabled transitions, disabled terminal state
+Description: Verifies lifecycle changes require an explicit confirmation and a disabled identity cannot silently return to active state.
+
+Setup:
+1. Sign in and register an agent named "Lifecycle Agent"
+
+Steps:
+1. Select "Lifecycle Agent", choose Suspend, and confirm; then choose Activate and confirm
+2. Choose Disable and confirm the terminal action
+3. Refresh AgentGate and select "Lifecycle Agent"
+
+Expected: The identity remains Disabled after refresh, its credential is Revoked, and no Activate or Rotate credential action is offered.
+
+## Test 4 - Rotate and revoke credentials through API v1
+Viewport: desktop
+Covers: POST /api/v1/organizations/:organizationId/agents/:agentId/credentials/rotate, POST /api/v1/organizations/:organizationId/agents/:agentId/credentials/revoke, credential versioning, rotation, revocation, automatic suspension
+Description: Verifies credential rotation issues a new copy-once secret and revocation suspends the identity without exposing stored secrets.
+
+Setup:
+1. Sign in and register an agent named "Credential Agent"
+
+Steps:
+1. Select "Credential Agent", rotate its credential, store the newly displayed secret, and close the credential window
+2. Confirm the credential version increased, then choose Revoke credential and confirm
+3. Refresh AgentGate and select "Credential Agent"
+
+Expected: The identity is Suspended, the credential status is Revoked, the latest fingerprint remains visible, and no plaintext credential is recoverable.
+
+## Test 5 - Use the full agent workflow through API v2 on mobile
+Viewport: mobile
+Covers: GET/POST /api/v2/organizations/:organizationId/agents, PUT /api/v2/organizations/:organizationId/agents/:agentId/lifecycle, v2 rotate/revoke credential routes, v1/v2 agent adapters, mobile agent registration and controls
+Description: Verifies the current v2 contract exposes the same canonical agent identity and security controls in the mobile interface.
+
+Setup:
+1. Sign in on mobile to an organization where the current user has agents.manage permission
+
+Steps:
+1. Switch Compatibility view to API v2, open Agents, and register "Mobile Agent"
+2. Close the copy-once credential after storing it, suspend the agent, rotate its credential, then revoke that credential
+3. Refresh and reopen "Mobile Agent"
+
+Expected: API v2 remains compatible with the canonical model; "Mobile Agent" is visible on mobile as Suspended with a Revoked credential and all controls fit without horizontal clipping.

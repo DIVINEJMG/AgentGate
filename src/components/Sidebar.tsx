@@ -1,3 +1,17 @@
 import { Bot, CheckSquare2, FileKey2, LayoutDashboard, PlugZap, ScrollText, Settings2, ShieldCheck, X } from 'lucide-react';
-const futureItems=[{label:'Agents',icon:Bot,foundation:'F3'},{label:'Policies',icon:FileKey2,foundation:'F6'},{label:'Approvals',icon:CheckSquare2,foundation:'F8'},{label:'Audit',icon:ScrollText,foundation:'F9'},{label:'Integrations',icon:PlugZap,foundation:'F4'},{label:'Settings',icon:Settings2,foundation:'F2'}];
-export default function Sidebar({open,onClose}:{open:boolean;onClose:()=>void}){return <><aside className={`sidebar ${open?'open':''}`}><div className="brand-block"><div className="brand-mark"><ShieldCheck size={17}/></div><div className="brand-copy"><strong>AgentGate</strong><span>An SOT Product</span></div><button className="icon-button sidebar-close" onClick={onClose}><X size={17}/></button></div><div className="nav-label">CONTROL PLANE</div><nav className="sidebar-nav"><button className="nav-item active"><LayoutDashboard size={16}/><span>Overview</span></button>{futureItems.map(({label,icon:Icon,foundation})=><button key={label} className="nav-item future" disabled><Icon size={16}/><span>{label}</span><span className="nav-badge">{foundation}</span></button>)}</nav><div className="sidebar-foot"><p>Architecture track</p><strong>Modular monolith · v0.2</strong></div></aside>{open&&<button className="sidebar-overlay" onClick={onClose}/>}</>;}
+
+export type AppView = 'overview' | 'agents';
+interface SidebarProps { open: boolean; onClose: () => void; activeView: AppView; onNavigate: (view: AppView) => void; }
+
+const futureItems = [
+    { label: 'Integrations', icon: PlugZap, foundation: 'F4' },
+    { label: 'Policies', icon: FileKey2, foundation: 'F6' },
+    { label: 'Approvals', icon: CheckSquare2, foundation: 'F8' },
+    { label: 'Audit', icon: ScrollText, foundation: 'F9' },
+    { label: 'Settings', icon: Settings2, foundation: 'F12' },
+];
+
+export default function Sidebar({ open, onClose, activeView, onNavigate }: SidebarProps) {
+    function navigate(view: AppView) { onNavigate(view); onClose(); }
+    return <><aside className={`sidebar ${open ? 'open' : ''}`} aria-label="Primary navigation"><div className="brand-block"><div className="brand-mark"><ShieldCheck size={17} strokeWidth={1.8} /></div><div className="brand-copy"><strong>AgentGate</strong><span>An SOT Product</span></div><button className="icon-button sidebar-close" aria-label="Close navigation" onClick={onClose}><X size={17} /></button></div><div className="nav-label">CONTROL PLANE</div><nav className="sidebar-nav"><button className={`nav-item ${activeView === 'overview' ? 'active' : ''}`} onClick={() => navigate('overview')}><LayoutDashboard size={16} /><span>Overview</span></button><button className={`nav-item ${activeView === 'agents' ? 'active' : ''}`} onClick={() => navigate('agents')}><Bot size={16} /><span>Agents</span></button>{futureItems.map(({ label, icon: Icon, foundation }) => <button key={label} className="nav-item future" disabled title={`Available in Foundation ${foundation.slice(1)}`}><Icon size={16} /><span>{label}</span><span className="nav-badge">{foundation}</span></button>)}</nav><div className="sidebar-foot"><p>Architecture track</p><strong>Modular monolith · v0.3</strong></div></aside>{open && <button className="sidebar-overlay" aria-label="Close navigation overlay" onClick={onClose} />}</>;
+}
