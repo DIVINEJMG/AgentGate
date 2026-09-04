@@ -49,3 +49,9 @@ Because the current AppDeploy key-value store exposes no transactional compare-a
 Foundation 9 exposes no audit update or delete API. Events are appended to a tenant-scoped ledger and can be read only by humans with `audit.read`. Correlation IDs connect agent requests, authorization outcomes, approvals and provider results. New provider execution is denied when its required pre-execution audit event cannot be persisted.
 
 Administrative domain mutations and audit events cannot be atomically committed together with the current AppDeploy KV store. Those management events are therefore best-effort and failures are surfaced to backend observability logs. AgentGate does not claim database-level WORM guarantees or transactional audit completeness until a storage boundary supporting atomic mutation/outbox semantics is available.
+
+## Risk boundary
+
+Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.
+
+Policy evaluation and runtime execution consume effective risk. Approval-time reauthorization recomputes risk instead of reusing the held snapshot. If risk assessment cannot be completed, the execution path fails closed. The behavior read is bounded to 100 action records; when that window is truncated, uncertainty conservatively raises risk rather than silently underestimating it.

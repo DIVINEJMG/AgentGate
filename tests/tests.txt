@@ -1,70 +1,84 @@
 # Tests
 
-## Test 1 - Trace an approval-gated action end to end in Audit [sanity]
+## Test 1 - Assess a fresh agent without lowering capability risk [sanity]
 Viewport: desktop
-Covers: action.requested/action.held, approval.requested/approved, approved execution audit emission, GET /api/v1/organizations/:organizationId/audit, correlation tracing
-Description: Verifies Foundation 9 reconstructs one approval-gated action through a shared correlation ID.
+Covers: GET /api/v1/organizations/:organizationId/risk, POST /api/v1/organizations/:organizationId/risk-assessments, baseline/effective risk invariant, Risk UI
+Description: Verifies a fresh agent receives an explainable deterministic assessment and risk never drops below the provider capability baseline.
 
 Setup:
 1. Sign in to an organization with a connected public DIVINEJMG/AgentGate repository
-2. Register an active QA Audit Agent and copy its credential
-3. Declare `github.repository.pull_requests.read`
-4. Create a REQUIRE APPROVAL policy for that agent, resource and scope
+2. Register a fresh active agent named "QA Risk Fresh" and declare `github.repository.metadata.read`
 
 Steps:
-1. Run the pull-request read through Actions and approve the resulting held request in Approvals
-2. Open Audit and locate the newest action/approval events
-3. Select one correlated event and choose "Trace this correlation"
+1. Open Risk and select QA Risk Fresh, the connected repository and metadata-read scope
+2. Choose "Assess risk"
+3. Inspect the transition and signal list
 
-Expected: The filtered timeline contains the same correlation ID across the agent action request, held/approval events, human approval and final executed action, with actor/resource/outcome details visible.
+Expected: The result shows baseline low and effective risk low or higher, never lower than baseline, with each signal showing its count, threshold and reason; no GitHub provider action is executed by the dry run.
 
-## Test 2 - Record a blocked action without provider execution
+## Test 2 - Escalate burst activity into policy enforcement
 Viewport: desktop
-Covers: action.requested/action.blocked audit events, default-deny observability, severity filtering
-Description: Verifies a denied action produces a warning-level forensic record without a provider result.
+Covers: runtime behavior scoring, burst_activity threshold, effective risk passed to Policy Engine, Action Gateway block path, risk.assessed audit emission
+Description: Verifies repeated requests can raise a low capability to medium and change the authorization outcome.
 
 Setup:
-1. Use an active agent with a declared GitHub issues-read scope but no matching ALLOW policy
+1. Register a fresh active agent named "QA Risk Burst", copy its credential and declare `github.repository.metadata.read`
+2. Create an ALLOW policy matching QA Risk Burst, the repository, metadata-read scope and risk `low` only
 
 Steps:
-1. Run the issues-read action through the gateway with a valid agent credential
-2. Open Audit and set category to action and severity to warning, then Apply
-3. Select the blocked event
+1. Run four metadata-read gateway requests with unique idempotency keys
+2. Run a fifth metadata-read request inside ten minutes with another unique idempotency key
+3. Open Risk and inspect the newest QA Risk Burst assessment
 
-Expected: A warning action.blocked event is visible with DENY/default-deny context and the action's correlation ID; no successful provider outcome is claimed.
+Expected: The fifth assessment activates burst activity at 5/5, effective risk is medium, the low-only ALLOW policy no longer matches and the fifth action is blocked by default deny; the assessment is visible in Risk and correlated audit history.
 
-## Test 3 - Record human policy changes in the audit ledger
+## Test 3 - Make Decision Lab use effective behavioral risk
 Viewport: desktop
-Covers: policy.created/policy.updated/policy.status.changed management audit emission, actor attribution, text search
-Description: Verifies policy administration leaves human-attributed audit records.
+Covers: POST /api/v1/organizations/:organizationId/policy-evaluations, risk-aware policy dry run, explainable risk in Policy Decision Lab
+Description: Verifies human policy dry runs use the same deterministic effective-risk calculation as runtime execution.
+
+Setup:
+1. Use an agent with an active behavior signal and a declared GitHub scope
 
 Steps:
-1. Create a policy named "QA Audit Policy", then edit it and disable it
-2. Open Audit, search for "QA Audit Policy" and Apply
-3. Inspect the matching policy events
+1. Open Policies and select the agent, connected repository and declared scope in Decision Lab
+2. Choose Evaluate
+3. Inspect the decision card
 
-Expected: Policy create/update/status events identify a human actor, the policy resource, revision/outcome metadata and timestamps.
+Expected: The decision card shows baseline → effective risk and active signal names, and policy matching reflects the effective risk rather than only the static provider baseline.
 
-## Test 4 - Filter one bounded audit window through API v2
+## Test 4 - Read and dry-run risk through API v2
 Viewport: desktop
-Covers: GET /api/v2/organizations/:organizationId/audit, category/severity/search filters, bounded window summary, v1/v2 normalization
-Description: Verifies the current API contract exposes filtered events and operational summary without scanning unbounded history.
+Covers: GET /api/v2/organizations/:organizationId/risk, POST /api/v2/organizations/:organizationId/risk-assessments, v1/v2 normalization, risk summary metrics
+Description: Verifies the current API contract preserves the same canonical risk result through the v2 adapter.
 
 Steps:
-1. Open Audit and switch Compatibility view to API v2
-2. Filter category to approval or action and Apply
-3. Inspect the metric cards and event list
+1. Open Risk and switch Compatibility view to API v2
+2. Select a valid agent, repository and scope, then choose Assess risk
+3. Compare the dry-run result with the summary/recent assessment surface
 
-Expected: API v2 remains selected, visible/critical/warning/trace metrics match the filtered event set, and the UI does not require loading all historical pages.
+Expected: API v2 remains selected, the risk transition and signal details render normally, and summary metrics continue to show assessed/elevated/high-or-critical/signal counts without contract drift.
 
-## Test 5 - Use forensic search and empty-state handling on mobile
+## Test 5 - Use Risk safely on mobile and surface assessment failure
 Viewport: mobile
-Covers: responsive Audit navigation/detail, audit search guardrail, no-match empty state, mobile trace UX
-Description: Verifies operators can investigate audit history from a phone without a desktop-only layout.
+Covers: responsive Risk navigation/lab/detail, risk assessment API failure handling, mobile guardrail
+Description: Verifies phone users can inspect risk and that assessment failures are visible rather than treated as low risk.
+
+QA Faults:
+```json
+[
+  {
+    "method": "POST",
+    "path": "/api/v1/organizations/*/risk-assessments",
+    "status": 503,
+    "body_json": { "error": "simulated_risk_unavailable" }
+  }
+]
+```
 
 Steps:
-1. On mobile open navigation and choose Audit
-2. Search for `definitely-no-such-audit-event` and Apply
-3. Clear the filters and select a real event if one exists
+1. On mobile open navigation and choose Risk
+2. Select a valid agent, resource and scope and choose Assess risk
+3. Inspect the resulting error state and existing risk history layout
 
-Expected: The no-match state is clearly visible, Clear restores the recent audit window, and event details/trace controls remain usable without horizontal clipping.
+Expected: A visible risk-assessment error is shown instead of a successful/low result, and metrics, runtime assessment list and detail/lab controls remain usable without horizontal clipping.
