@@ -1,61 +1,76 @@
 # Tests
 
-## Test 1 - Require authentication before organization access [sanity]
+## Test 1 - Discover canonical capabilities from a connected GitHub repository [sanity]
 Viewport: desktop
-Covers: authentication gate, protected organization and integration APIs, anonymous access denial, SOT product identity
-Description: Verifies anonymous visitors cannot reach tenant or integration state.
+Covers: GET /api/v1/organizations/:organizationId/capabilities, GitHub capability projection, canonical resources/actions/scopes, live-integration filtering
+Description: Verifies a real connected GitHub repository becomes a canonical resource with version-neutral action and scope descriptors.
 
-Steps:
-1. Open AgentGate while signed out
-2. Confirm the secure sign-in screen is shown
-3. Confirm the screen identifies the product as "AgentGate" and "An SOT Product"
-
-Expected: Organization, agent and integration data are not visible until secure sign in is completed.
-
-## Test 2 - Retain organization and agent identity state
-Viewport: desktop
-Covers: organization membership boundary, agent registry, database persistence, human/agent identity separation
-Description: Verifies prior foundations remain intact while the integration framework is added.
-
-Steps:
+Setup:
 1. Sign in and create "QA Operations" if no organization exists
-2. Open Agents and register "QA Research Agent" if it does not already exist
-3. Refresh and return to Agents
-
-Expected: The organization and "QA Research Agent" remain visible after refresh and the agent retains its independent credential/lifecycle metadata.
-
-## Test 3 - Connect and health-check a public GitHub repository
-Viewport: desktop
-Covers: GitHub adapter validateConnection, POST /api/v1/organizations/:organizationId/integrations/github, GET integration list, provider health check, database persistence, no-credential public mode
-Description: Verifies the first real provider adapter validates and persists a public GitHub repository without storing a provider credential.
+2. In Integrations, connect public repository "DIVINEJMG/AgentGate" if it is not already connected
 
 Steps:
-1. Open Integrations and choose "Connect GitHub"
-2. Enter "DIVINEJMG/AgentGate" and leave the optional token empty, then validate and connect
-3. Select the connection, run "Check health", then refresh the page
+1. Open Capabilities
+2. Select "DIVINEJMG/AgentGate" in the Resource catalog
+3. Inspect its Action surface
 
-Expected: "DIVINEJMG/AgentGate" remains visible as CONNECTED, health states the repository is reachable, and credential mode is shown as public/no credential.
+Expected: One reachable GitHub repository resource is visible with read actions for metadata, issues and pull requests, including scopes `github.repository.metadata.read`, `github.repository.issues.read`, and `github.repository.pull_requests.read`.
 
-## Test 4 - Consume integration state through API v2
+## Test 2 - Declare capability scopes for an agent and retain them
 Viewport: desktop
-Covers: GET /api/v2 integration routes, v1/v2 integration adapters, canonical integration domain, API evolution
-Description: Verifies API v2 presents the same provider connection through its newer response contract.
+Covers: GET and PUT /api/v1/organizations/:organizationId/agents/:agentId/capabilities, capability declaration persistence, scope validation against live tenant catalog
+Description: Verifies an agent can declare supported scopes without receiving authorization and the declaration persists after refresh.
+
+Setup:
+1. Sign in with "QA Operations"
+2. Register "QA Research Agent" in Agents if it does not already exist
+3. Ensure public repository "DIVINEJMG/AgentGate" is connected
 
 Steps:
-1. Sign in with an organization containing a GitHub connection
-2. Open Integrations and switch Compatibility view to "API v2"
-3. Select the GitHub connection and inspect provider, health and credential posture
+1. Open Capabilities and select "QA Research Agent"
+2. Check `github.repository.metadata.read` and `github.repository.issues.read`, then save the declaration
+3. Refresh, return to Capabilities, and select "QA Research Agent"
 
-Expected: The same GitHub connection remains visible and its provider, resource, health and credential boundary are unchanged under API v2.
+Expected: Both scopes remain checked after refresh and the page still states authorization is unresolved / no execution is enabled.
 
-## Test 5 - Reject invalid GitHub repository coordinates on mobile
+## Test 3 - Consume and update the same capability profile through API v2
+Viewport: desktop
+Covers: GET /api/v2/organizations/:organizationId/capabilities, GET and PUT /api/v2/organizations/:organizationId/agents/:agentId/capabilities, v1/v2 capability adapters
+Description: Verifies the current v2 contract resolves to the same canonical resources and agent declaration as v1.
+
+Setup:
+1. Sign in with an organization containing a GitHub connection and at least one agent
+
+Steps:
+1. Open Capabilities and switch Compatibility view to "API v2"
+2. Select the agent and add `github.repository.pull_requests.read`
+3. Save the declaration and inspect the selected resource
+
+Expected: API v2 remains selected, the same resource/actions are visible, the new pull-request scope is checked, and authorization remains unresolved.
+
+## Test 4 - Remove disconnected resources from the live capability catalog
 Viewport: mobile
-Covers: GitHub adapter validation guardrail, mobile integration form, SSRF-resistant fixed-provider input boundary
-Description: Verifies the mobile connection form rejects arbitrary URLs instead of treating them as provider endpoints.
+Covers: live capability filtering, disconnected integration guardrail, mobile Capabilities behavior
+Description: Verifies AgentGate does not advertise technical capability from a provider connection that is no longer reachable.
+
+Setup:
+1. Sign in with an organization containing a GitHub connection
 
 Steps:
-1. Open Integrations on mobile and tap "Connect GitHub"
-2. Enter "https://example.com/private/repo" as Repository
-3. Tap "Validate & connect"
+1. On mobile, open Integrations, select the GitHub connection, tap Disconnect, and confirm
+2. Open Capabilities
+3. Inspect the Resource catalog and any existing agent declaration
 
-Expected: A visible error says the repository must use owner/repository format and no integration is created.
+Expected: The disconnected repository is absent from reachable resources; any previously declared scopes backed only by that resource are shown as stale rather than active.
+
+## Test 5 - Sign out hides private capability state
+Viewport: desktop
+Covers: authentication boundary, protected capability APIs, private capability declarations
+Description: Verifies capability catalog and agent declaration state remain behind authenticated organization membership.
+
+Steps:
+1. Sign in with an organization and open Capabilities
+2. Use the account control to sign out
+3. Observe the resulting screen
+
+Expected: The secure sign-in screen is shown and no organization resources, scopes, or agent capability declarations remain visible.

@@ -1,5 +1,7 @@
 export type IntegrationProvider = 'github';
 export type IntegrationCredentialMode = 'none' | 'encrypted_secret';
+export type CapabilityRisk = 'low' | 'medium' | 'high' | 'critical';
+export interface ProviderCapabilityDescriptor { providerOperation: string; resourceType: string; action: string; target: string; scope: string; description: string; risk: CapabilityRisk; }
 export interface ProviderConnectionResult { resourceKey: string; displayName: string; webUrl: string; config: Record<string, string>; metadata: Record<string, string | number | boolean | null>; }
 export interface ProviderHealthResult { state: 'healthy' | 'degraded'; message: string; checkedAt: string; metadata?: Record<string, string | number | boolean | null>; }
-export interface IntegrationAdapter { provider: IntegrationProvider; displayName: string; credentialPolicy: 'optional'; supportedOperations: string[]; validateConnection(config: Record<string, unknown>, credential?: string): Promise<ProviderConnectionResult>; checkHealth(config: Record<string, string>, credential?: string): Promise<ProviderHealthResult>; }
+export interface IntegrationAdapter { provider: IntegrationProvider; displayName: string; credentialPolicy: 'optional'; capabilities: ProviderCapabilityDescriptor[]; supportedOperations: string[]; validateConnection(config: Record<string, unknown>, credential?: string): Promise<ProviderConnectionResult>; checkHealth(config: Record<string, string>, credential?: string): Promise<ProviderHealthResult>; }
