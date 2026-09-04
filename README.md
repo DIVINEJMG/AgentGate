@@ -16,8 +16,9 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 7 — Action gateway: complete
 - Foundation 8 — Human approvals: complete
 - Foundation 9 — Audit & observability: complete
-- Foundation 10 — Risk engine: implemented
-- Foundation 11 — Incident controls: next
+- Foundation 10 — Risk engine: complete
+- Foundation 11 — Incident controls: implemented
+- Foundation 12 — Productization: next
 
 ## Foundation 6
 
@@ -54,6 +55,12 @@ The Risk Engine deterministically combines a provider capability's baseline risk
 The effective risk is evaluated before policy matching in both Decision Lab and the Action Gateway. Approved held actions recompute risk during reauthorization, so changed behavior can invalidate stale authority. Risk assessment failures fail closed in the execution path. Runtime risk assessments are stored on action records and emitted into the correlated audit stream.
 
 The current behavior window scans at most 100 action records. If that bounded window is truncated, uncertainty itself raises risk one level rather than allowing an incomplete sample to underestimate exposure.
+
+## Foundation 11
+
+Incident Controls adds independent execution kill switches for the organization, individual agents and integrations without deleting identities, credentials or provider configuration. Fresh Action Gateway requests and approval-time resume both re-check these controls before provider execution.
+
+Incident lifecycle is `open → acknowledged → resolved`. Resolution does not automatically restore execution; recovery is a separate explicit human action with reason and audit attribution. The organization emergency stop does not erase lower-level target suspensions.
 
 ## Architecture rules
 
