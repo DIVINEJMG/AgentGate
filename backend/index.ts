@@ -1,12 +1,13 @@
 import { error, json, requireAuth, router } from '@appdeploy/sdk';
 import { AgentDomainError, createAgent, listAgentsForUser, revokeAgentCredential, rotateAgentCredential, serializeAgentV2, setAgentStatus } from './core/agents';
 import { CapabilityDomainError, getAgentCapabilityProfile, listCapabilityCatalog, serializeCapabilityCatalogV2, serializeCapabilityProfileV2, setAgentCapabilityProfile } from './core/capabilities';
+import { createPolicy, evaluatePolicyForUser, listPoliciesForUser, PolicyDomainError, serializePolicyDecisionV2, serializePolicyV2, setPolicyStatus, updatePolicy } from './core/policies';
 import { checkIntegrationHealth, connectGitHub, disconnectIntegration, getIntegrationSecurityStatus, IntegrationDomainError, listIntegrationsForUser, serializeIntegrationV2 } from './core/integrations';
 import { createOrganization, listOrganizationsForUser, serializeOrganizationsV1, serializeOrganizationsV2 } from './core/organizations';
 import { readCanonicalSystemStatus, serializeV1, serializeV2 } from './core/system';
 import { realtimeSubscriptionRoutes } from './realtime-subscribers';
 function messageOf(value: unknown) { return value instanceof Error ? value.message : 'Unexpected error.'; }
-function statusOf(value: unknown) { return value instanceof AgentDomainError || value instanceof IntegrationDomainError || value instanceof CapabilityDomainError ? value.statusCode : 400; }
+function statusOf(value: unknown) { return value instanceof AgentDomainError || value instanceof IntegrationDomainError || value instanceof CapabilityDomainError || value instanceof PolicyDomainError ? value.statusCode : 400; }
 export const handler = router({
 'GET /api/_healthcheck':[async()=>json({message:'Success'})],
 'GET /api/v1/system/status':[async()=>json(serializeV1(readCanonicalSystemStatus()))],
@@ -43,5 +44,15 @@ export const handler = router({
 'GET /api/v2/organizations/:organizationId/agents/:agentId/capabilities':[requireAuth(),async(ctx)=>{try{return json({data:serializeCapabilityProfileV2(await getAgentCapabilityProfile(ctx.user!.userId,ctx.params.organizationId,ctx.params.agentId))})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
 'PUT /api/v1/organizations/:organizationId/agents/:agentId/capabilities':[requireAuth(),async(ctx)=>{try{const body=ctx.body as{scopes?:unknown};return json({profile:await setAgentCapabilityProfile(ctx.user!.userId,ctx.params.organizationId,ctx.params.agentId,body?.scopes)})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
 'PUT /api/v2/organizations/:organizationId/agents/:agentId/capabilities':[requireAuth(),async(ctx)=>{try{const body=ctx.body as{scopes?:unknown};return json({data:serializeCapabilityProfileV2(await setAgentCapabilityProfile(ctx.user!.userId,ctx.params.organizationId,ctx.params.agentId,body?.scopes))})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'GET /api/v1/organizations/:organizationId/policies':[requireAuth(),async(ctx)=>{try{const policies=await listPoliciesForUser(ctx.user!.userId,ctx.params.organizationId);return json({policies,count:policies.length})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'GET /api/v2/organizations/:organizationId/policies':[requireAuth(),async(ctx)=>{try{const policies=await listPoliciesForUser(ctx.user!.userId,ctx.params.organizationId);return json({items:policies.map(serializePolicyV2),total:policies.length})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'POST /api/v1/organizations/:organizationId/policies':[requireAuth(),async(ctx)=>{try{return json({policy:await createPolicy(ctx.user!.userId,ctx.params.organizationId,ctx.body)},201)}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'POST /api/v2/organizations/:organizationId/policies':[requireAuth(),async(ctx)=>{try{return json({data:{policy:serializePolicyV2(await createPolicy(ctx.user!.userId,ctx.params.organizationId,ctx.body))}},201)}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'PUT /api/v1/organizations/:organizationId/policies/:policyId':[requireAuth(),async(ctx)=>{try{return json({policy:await updatePolicy(ctx.user!.userId,ctx.params.organizationId,ctx.params.policyId,ctx.body)})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'PUT /api/v2/organizations/:organizationId/policies/:policyId':[requireAuth(),async(ctx)=>{try{return json({data:{policy:serializePolicyV2(await updatePolicy(ctx.user!.userId,ctx.params.organizationId,ctx.params.policyId,ctx.body))}})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'POST /api/v1/organizations/:organizationId/policies/:policyId/status':[requireAuth(),async(ctx)=>{try{const body=ctx.body as{status?:unknown};return json({policy:await setPolicyStatus(ctx.user!.userId,ctx.params.organizationId,ctx.params.policyId,body?.status)})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'POST /api/v2/organizations/:organizationId/policies/:policyId/status':[requireAuth(),async(ctx)=>{try{const body=ctx.body as{status?:unknown};return json({data:{policy:serializePolicyV2(await setPolicyStatus(ctx.user!.userId,ctx.params.organizationId,ctx.params.policyId,body?.status))}})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'POST /api/v1/organizations/:organizationId/policy-evaluations':[requireAuth(),async(ctx)=>{try{const body=ctx.body as{agentId?:unknown;resourceId?:unknown;scope?:unknown};return json({decision:await evaluatePolicyForUser(ctx.user!.userId,ctx.params.organizationId,body?.agentId,body?.resourceId,body?.scope)})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'POST /api/v2/organizations/:organizationId/policy-evaluations':[requireAuth(),async(ctx)=>{try{const body=ctx.body as{agentId?:unknown;resourceId?:unknown;scope?:unknown};return json({data:serializePolicyDecisionV2(await evaluatePolicyForUser(ctx.user!.userId,ctx.params.organizationId,body?.agentId,body?.resourceId,body?.scope))})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
 ...realtimeSubscriptionRoutes,
 });
