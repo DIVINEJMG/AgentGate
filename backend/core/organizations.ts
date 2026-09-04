@@ -3,12 +3,12 @@ export type OrganizationRole = 'owner' | 'admin' | 'security_manager' | 'operato
 export interface OrganizationRecord { name: string; createdBy: string; createdAt: string; }
 export interface MembershipRecord { organizationId: string; userId: string; role: OrganizationRole; createdAt: string; }
 const ROLE_PERMISSIONS: Record<OrganizationRole, string[]> = {
-    owner: ['organizations.read','organizations.manage','memberships.manage','agents.read','agents.manage','integrations.read','integrations.manage','capabilities.read','capabilities.manage','policies.read','policies.manage','approvals.review','audit.read'],
-    admin: ['organizations.read','organizations.manage','memberships.manage','agents.read','agents.manage','integrations.read','integrations.manage','capabilities.read','capabilities.manage','policies.read','policies.manage','approvals.review','audit.read'],
-    security_manager: ['organizations.read','agents.read','agents.manage','integrations.read','integrations.manage','capabilities.read','capabilities.manage','policies.read','policies.manage','approvals.review','audit.read'],
-    operator: ['organizations.read','agents.read','agents.manage','integrations.read','capabilities.read','capabilities.manage','policies.read','audit.read'],
-    approver: ['organizations.read','agents.read','integrations.read','capabilities.read','policies.read','approvals.review','audit.read'],
-    viewer: ['organizations.read','agents.read','integrations.read','capabilities.read','policies.read','audit.read'],
+    owner: ['organizations.read','organizations.manage','memberships.manage','agents.read','agents.manage','integrations.read','integrations.manage','capabilities.read','capabilities.manage','policies.read','policies.manage','actions.read','actions.manage','approvals.review','audit.read'],
+    admin: ['organizations.read','organizations.manage','memberships.manage','agents.read','agents.manage','integrations.read','integrations.manage','capabilities.read','capabilities.manage','policies.read','policies.manage','actions.read','actions.manage','approvals.review','audit.read'],
+    security_manager: ['organizations.read','agents.read','agents.manage','integrations.read','integrations.manage','capabilities.read','capabilities.manage','policies.read','policies.manage','actions.read','actions.manage','approvals.review','audit.read'],
+    operator: ['organizations.read','agents.read','agents.manage','integrations.read','capabilities.read','capabilities.manage','policies.read','actions.read','actions.manage','audit.read'],
+    approver: ['organizations.read','agents.read','integrations.read','capabilities.read','policies.read','actions.read','approvals.review','audit.read'],
+    viewer: ['organizations.read','agents.read','integrations.read','capabilities.read','policies.read','actions.read','audit.read'],
 };
 function membershipsTable(userId: string) { return `memberships:${userId}`; }
 export async function createOrganization(userId: string, rawName: unknown) { const name = typeof rawName === 'string' ? rawName.trim() : ''; if (name.length < 2 || name.length > 80) throw new Error('Organization name must be between 2 and 80 characters.'); const createdAt = new Date().toISOString(); const [organizationId] = await db.add('organizations', [{ name, createdBy: userId, createdAt }]); if (!organizationId) throw new Error('Failed to create organization.'); const [membershipId] = await db.add(membershipsTable(userId), [{ organizationId, userId, role: 'owner', createdAt }]); if (!membershipId) { await db.delete('organizations', [organizationId]); throw new Error('Failed to create organization membership.'); } return { id: organizationId, name, role: 'owner' as const, permissions: ROLE_PERMISSIONS.owner, createdAt }; }

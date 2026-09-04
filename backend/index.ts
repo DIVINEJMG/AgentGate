@@ -5,9 +5,11 @@ import { createPolicy, evaluatePolicyForUser, listPoliciesForUser, PolicyDomainE
 import { checkIntegrationHealth, connectGitHub, disconnectIntegration, getIntegrationSecurityStatus, IntegrationDomainError, listIntegrationsForUser, serializeIntegrationV2 } from './core/integrations';
 import { createOrganization, listOrganizationsForUser, serializeOrganizationsV1, serializeOrganizationsV2 } from './core/organizations';
 import { readCanonicalSystemStatus, serializeV1, serializeV2 } from './core/system';
+import { ActionGatewayDomainError, executeActionForAgent, extractAgentCredential, listActionsForUser, serializeActionV2, testActionForUser } from './core/actionGateway';
 import { realtimeSubscriptionRoutes } from './realtime-subscribers';
 function messageOf(value: unknown) { return value instanceof Error ? value.message : 'Unexpected error.'; }
-function statusOf(value: unknown) { return value instanceof AgentDomainError || value instanceof IntegrationDomainError || value instanceof CapabilityDomainError || value instanceof PolicyDomainError ? value.statusCode : 400; }
+function statusOf(value: unknown) { return value instanceof AgentDomainError || value instanceof IntegrationDomainError || value instanceof CapabilityDomainError || value instanceof PolicyDomainError || value instanceof ActionGatewayDomainError ? value.statusCode : 400; }
+function runtimeStatus(status: string) { return status === 'held' || status === 'processing' ? 202 : status === 'blocked' ? 403 : status === 'failed' ? 502 : 200; }
 export const handler = router({
 'GET /api/_healthcheck':[async()=>json({message:'Success'})],
 'GET /api/v1/system/status':[async()=>json(serializeV1(readCanonicalSystemStatus()))],
@@ -54,5 +56,11 @@ export const handler = router({
 'POST /api/v2/organizations/:organizationId/policies/:policyId/status':[requireAuth(),async(ctx)=>{try{const body=ctx.body as{status?:unknown};return json({data:{policy:serializePolicyV2(await setPolicyStatus(ctx.user!.userId,ctx.params.organizationId,ctx.params.policyId,body?.status))}})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
 'POST /api/v1/organizations/:organizationId/policy-evaluations':[requireAuth(),async(ctx)=>{try{const body=ctx.body as{agentId?:unknown;resourceId?:unknown;scope?:unknown};return json({decision:await evaluatePolicyForUser(ctx.user!.userId,ctx.params.organizationId,body?.agentId,body?.resourceId,body?.scope)})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
 'POST /api/v2/organizations/:organizationId/policy-evaluations':[requireAuth(),async(ctx)=>{try{const body=ctx.body as{agentId?:unknown;resourceId?:unknown;scope?:unknown};return json({data:serializePolicyDecisionV2(await evaluatePolicyForUser(ctx.user!.userId,ctx.params.organizationId,body?.agentId,body?.resourceId,body?.scope))})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'GET /api/v1/organizations/:organizationId/actions':[requireAuth(),async(ctx)=>{try{const actions=await listActionsForUser(ctx.user!.userId,ctx.params.organizationId);return json({actions,count:actions.length})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'GET /api/v2/organizations/:organizationId/actions':[requireAuth(),async(ctx)=>{try{const actions=await listActionsForUser(ctx.user!.userId,ctx.params.organizationId);return json({items:actions.map(serializeActionV2),total:actions.length})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'POST /api/v1/organizations/:organizationId/action-gateway/tests':[requireAuth(),async(ctx)=>{try{return json({action:await testActionForUser(ctx.user!.userId,ctx.params.organizationId,ctx.body)})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'POST /api/v2/organizations/:organizationId/action-gateway/tests':[requireAuth(),async(ctx)=>{try{return json({data:{action:serializeActionV2(await testActionForUser(ctx.user!.userId,ctx.params.organizationId,ctx.body))}})}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'POST /api/v1/runtime/organizations/:organizationId/agents/:agentId/actions':[async(ctx)=>{try{const action=await executeActionForAgent(ctx.params.organizationId,ctx.params.agentId,extractAgentCredential(ctx.event),ctx.body);return json({action},runtimeStatus(action.status))}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
+'POST /api/v2/runtime/organizations/:organizationId/agents/:agentId/actions':[async(ctx)=>{try{const action=await executeActionForAgent(ctx.params.organizationId,ctx.params.agentId,extractAgentCredential(ctx.event),ctx.body);return json({data:{action:serializeActionV2(action)}},runtimeStatus(action.status))}catch(caught){return error(messageOf(caught),statusOf(caught))}}],
 ...realtimeSubscriptionRoutes,
 });

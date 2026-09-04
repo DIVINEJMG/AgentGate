@@ -12,8 +12,9 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 3 — Agent identity: complete
 - Foundation 4 — Integration framework: complete
 - Foundation 5 — Capability model: complete
-- Foundation 6 — Policy engine: implemented
-- Foundation 7 — Action gateway: next
+- Foundation 6 — Policy engine: complete
+- Foundation 7 — Action gateway: implemented
+- Foundation 8 — Human approvals: next
 
 ## Foundation 6
 
@@ -21,7 +22,13 @@ The Policy Engine evaluates canonical Agent + Resource + Action + Scope + Risk c
 
 Evaluation is fail-closed. Preconditions deny inactive agents, non-live resources, unavailable scopes and undeclared capabilities before policy matching. If no enabled policy matches, the result is `DENY`. Highest priority wins; ties resolve as `DENY > REQUIRE_APPROVAL > ALLOW`.
 
-Policies are revisioned and may be enabled or disabled without being hard-deleted. Foundation 6 is decision-only: dry runs never invoke provider adapters. Foundation 7 adds the Action Gateway that will enforce policy decisions in the runtime path.
+Policies are revisioned and may be enabled or disabled without being hard-deleted.
+
+## Foundation 7
+
+The Action Gateway is now the only agent-triggered provider execution boundary. It authenticates the agent's non-human credential, establishes idempotency and correlation state, resolves the canonical capability, evaluates policy, and maps the result to `executed`, `blocked`, or `held`.
+
+Only `ALLOW` can invoke an integration adapter. `DENY` never reaches the provider. `REQUIRE_APPROVAL` remains held until Foundation 8. Foundation 7 deliberately enables only read-only GitHub metadata, issue and pull-request operations; provider writes remain unavailable.
 
 ## Architecture rules
 

@@ -28,4 +28,10 @@ A capability records what a connected provider can technically expose. An agent 
 
 Policy evaluation is deterministic and fail-closed. Inactive agents, non-live resources, unavailable scopes, and undeclared scopes return `DENY` before policy matching. If no enabled policy matches, the result is `DENY`. Highest priority wins; ties resolve with safety precedence `DENY > REQUIRE_APPROVAL > ALLOW`.
 
-Policies are revisioned and can be disabled without deleting their history. Foundation 6 performs decision-only dry runs and cannot call provider adapters. Foundation 7 is responsible for placing these decisions in the runtime execution path.
+Policies are revisioned and can be disabled without deleting their history.
+
+## Action Gateway boundary
+
+Foundation 7 places deterministic decisions in the runtime execution path. External agent routes require the agent's separate bearer credential; human AppDeploy sessions do not satisfy agent authentication. Every accepted request establishes an idempotency key hash and correlation ID before provider execution. `DENY` never calls an adapter, `REQUIRE_APPROVAL` is held without execution, and only `ALLOW` can invoke a provider operation.
+
+The first executable provider surface is intentionally read-only GitHub metadata, issue and pull-request retrieval. Provider writes remain unavailable. Agent secrets are never persisted by the gateway or test harness, integration tokens remain decrypted only inside the backend credential boundary, and provider failures are recorded as failures rather than converted into successful authorization.
