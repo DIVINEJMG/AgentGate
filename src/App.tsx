@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Bot, GitBranch, KeyRound, LogOut, Menu, PlugZap, Server, ShieldCheck } from 'lucide-react';
+import { Activity, Bot, GitBranch, KeyRound, LogOut, Menu, PlugZap, ShieldCheck } from 'lucide-react';
 import type { AuthUser } from '@appdeploy/client';
 import AgentsPanel from './components/AgentsPanel';
 import CapabilitiesPanel from './components/CapabilitiesPanel';
