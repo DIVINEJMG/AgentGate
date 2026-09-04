@@ -14,8 +14,9 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 5 — Capability model: complete
 - Foundation 6 — Policy engine: complete
 - Foundation 7 — Action gateway: complete
-- Foundation 8 — Human approvals: implemented
-- Foundation 9 — Audit & observability: next
+- Foundation 8 — Human approvals: complete
+- Foundation 9 — Audit & observability: implemented
+- Foundation 10 — Risk engine: next
 
 ## Foundation 6
 
@@ -38,6 +39,12 @@ Human Approvals turns held actions into an explicit reviewer workflow. Roles wit
 Approve does not blindly execute stale authority: AgentGate revalidates the original agent credential fingerprint, agent lifecycle, integration, declared scope, provider operation and current policy before resuming the exact held action. Reject permanently blocks it. Approval requests may send a best-effort push alert to an eligible agent owner who has enabled notifications.
 
 AppDeploy's current key-value store does not provide a transactional compare-and-set primitive, so provider writes remain disabled and concurrent approval serialization is not claimed as exactly-once.
+
+## Foundation 9
+
+Audit & Observability adds an application-level append-only event ledger. Critical action execution establishes an audit path before provider invocation; action, approval, agent, integration and policy events are correlated and tenant-scoped. The Audit UI provides bounded search, severity/category filters, correlation tracing and operational summaries across the most recent 200 scanned events.
+
+No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative mutation and audit writes cannot be transactionally committed together on the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
 
 ## Architecture rules
 

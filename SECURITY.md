@@ -43,3 +43,9 @@ Foundation 8 persists a pending approval before a `REQUIRE_APPROVAL` action beco
 Approval does not reuse stale authority. Before provider execution, AgentGate verifies that the initiating agent is still active, the same credential fingerprint is still current and valid, the integration remains connected, the exact provider operation still exists, the agent still declares the scope, and current policy does not resolve to `DENY`. Any failed revalidation blocks execution. Push notification delivery is best-effort and never changes authorization state.
 
 Because the current AppDeploy key-value store exposes no transactional compare-and-set primitive, AgentGate does not claim strong serialization for simultaneous competing approval clicks. Provider execution remains read-only until a storage boundary suitable for atomic decision/idempotency locking is available.
+
+## Audit boundary
+
+Foundation 9 exposes no audit update or delete API. Events are appended to a tenant-scoped ledger and can be read only by humans with `audit.read`. Correlation IDs connect agent requests, authorization outcomes, approvals and provider results. New provider execution is denied when its required pre-execution audit event cannot be persisted.
+
+Administrative domain mutations and audit events cannot be atomically committed together with the current AppDeploy KV store. Those management events are therefore best-effort and failures are surfaced to backend observability logs. AgentGate does not claim database-level WORM guarantees or transactional audit completeness until a storage boundary supporting atomic mutation/outbox semantics is available.
