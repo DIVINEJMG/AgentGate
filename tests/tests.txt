@@ -1,76 +1,78 @@
 # Tests
 
-## Test 1 - Discover canonical capabilities from a connected GitHub repository [sanity]
+## Test 1 - Create an allow policy and resolve an eligible request [sanity]
 Viewport: desktop
-Covers: GET /api/v1/organizations/:organizationId/capabilities, GitHub capability projection, canonical resources/actions/scopes, live-integration filtering
-Description: Verifies a real connected GitHub repository becomes a canonical resource with version-neutral action and scope descriptors.
+Covers: GET and POST /api/v1/organizations/:organizationId/policies, POST /api/v1/organizations/:organizationId/policy-evaluations, policy persistence, declared-scope precondition, deterministic ALLOW outcome
+Description: Verifies the primary Policy Engine workflow creates a durable rule and returns ALLOW only when the agent, resource and declared scope are eligible.
 
 Setup:
 1. Sign in and create "QA Operations" if no organization exists
-2. In Integrations, connect public repository "DIVINEJMG/AgentGate" if it is not already connected
+2. Connect public repository "DIVINEJMG/AgentGate" if it is not already connected
+3. Register "QA Policy Agent" if it does not already exist and declare `github.repository.metadata.read`
 
 Steps:
-1. Open Capabilities
-2. Select "DIVINEJMG/AgentGate" in the Resource catalog
-3. Inspect its Action surface
+1. Open Policies and create "Allow metadata read" with effect ALLOW, priority 500, agent "QA Policy Agent", resource "DIVINEJMG/AgentGate", and scope `github.repository.metadata.read`
+2. In Decision Lab select the same agent, resource and scope, then evaluate
+3. Refresh, return to Policies, and select "Allow metadata read"
 
-Expected: One reachable GitHub repository resource is visible with read actions for metadata, issues and pull requests, including scopes `github.repository.metadata.read`, `github.repository.issues.read`, and `github.repository.pull_requests.read`.
+Expected: The dry run returns ALLOW with "Allow metadata read" as the winning policy, and the enabled policy remains visible after refresh with priority 500 and revision 1.
 
-## Test 2 - Declare capability scopes for an agent and retain them
+## Test 2 - Default deny when no enabled policy matches
 Viewport: desktop
-Covers: GET and PUT /api/v1/organizations/:organizationId/agents/:agentId/capabilities, capability declaration persistence, scope validation against live tenant catalog
-Description: Verifies an agent can declare supported scopes without receiving authorization and the declaration persists after refresh.
+Covers: policy default-deny guardrail, policy evaluation preconditions, unmatched-scope resolution
+Description: Verifies a valid declared capability is still denied when the policy set does not grant or route that specific request.
 
 Setup:
-1. Sign in with "QA Operations"
-2. Register "QA Research Agent" in Agents if it does not already exist
-3. Ensure public repository "DIVINEJMG/AgentGate" is connected
+1. Sign in with "QA Operations", "QA Policy Agent", and connected "DIVINEJMG/AgentGate"
+2. Declare `github.repository.issues.read` for "QA Policy Agent"
 
 Steps:
-1. Open Capabilities and select "QA Research Agent"
-2. Check `github.repository.metadata.read` and `github.repository.issues.read`, then save the declaration
-3. Refresh, return to Capabilities, and select "QA Research Agent"
+1. Open Policies and choose "QA Policy Agent", "DIVINEJMG/AgentGate", and `github.repository.issues.read` in Decision Lab
+2. Evaluate without creating a matching issues policy
 
-Expected: Both scopes remain checked after refresh and the page still states authorization is unresolved / no execution is enabled.
+Expected: The result is DENY and explains that no enabled policy matched, while Agent active, Resource live, Scope available, and Scope declared all show as satisfied.
 
-## Test 3 - Consume and update the same capability profile through API v2
+## Test 3 - Resolve priority conflicts and disable a stronger deny
 Viewport: desktop
-Covers: GET /api/v2/organizations/:organizationId/capabilities, GET and PUT /api/v2/organizations/:organizationId/agents/:agentId/capabilities, v1/v2 capability adapters
-Description: Verifies the current v2 contract resolves to the same canonical resources and agent declaration as v1.
+Covers: POST/PUT policy writes, POST /policies/:policyId/status, deterministic priority resolution, DENY precedence, policy revision increments
+Description: Verifies stronger policy priority controls the decision and disabling a policy changes future dry-run results without deleting the rule.
 
 Setup:
-1. Sign in with an organization containing a GitHub connection and at least one agent
+1. Ensure the Foundation 6 Test 1 setup exists
 
 Steps:
-1. Open Capabilities and switch Compatibility view to "API v2"
-2. Select the agent and add `github.repository.pull_requests.read`
-3. Save the declaration and inspect the selected resource
+1. Create "Deny metadata override" for the same agent/resource/scope with effect DENY and priority 700, then evaluate metadata read
+2. Edit "Allow metadata read" to priority 600 and save; confirm its revision increases
+3. Select "Deny metadata override", disable it, and evaluate metadata read again
 
-Expected: API v2 remains selected, the same resource/actions are visible, the new pull-request scope is checked, and authorization remains unresolved.
+Expected: The first evaluation returns DENY from the priority-700 rule; the edited allow rule shows a higher revision; after the deny policy is disabled, evaluation returns ALLOW from "Allow metadata read".
 
-## Test 4 - Remove disconnected resources from the live capability catalog
+## Test 4 - Return REQUIRE_APPROVAL from a mobile policy workflow
 Viewport: mobile
-Covers: live capability filtering, disconnected integration guardrail, mobile Capabilities behavior
-Description: Verifies AgentGate does not advertise technical capability from a provider connection that is no longer reachable.
+Covers: responsive Policies UI, REQUIRE_APPROVAL outcome, policy creation, dry-run evaluation without provider execution
+Description: Verifies a mobile administrator can define an approval-gated rule and see the decision without AgentGate executing a provider action.
 
 Setup:
-1. Sign in with an organization containing a GitHub connection
+1. Sign in with an organization containing "QA Policy Agent" and connected "DIVINEJMG/AgentGate"
+2. Declare `github.repository.pull_requests.read` for the agent
 
 Steps:
-1. On mobile, open Integrations, select the GitHub connection, tap Disconnect, and confirm
-2. Open Capabilities
-3. Inspect the Resource catalog and any existing agent declaration
+1. On mobile open Policies and create "Review PR reads" with effect REQUIRE APPROVAL, priority 800, the QA agent, AgentGate repository, and `github.repository.pull_requests.read`
+2. In Decision Lab evaluate that agent/resource/scope
 
-Expected: The disconnected repository is absent from reachable resources; any previously declared scopes backed only by that resource are shown as stale rather than active.
+Expected: The result is REQUIRE APPROVAL, the winning policy is "Review PR reads", and the page still states that the dry run does not call GitHub or any provider.
 
-## Test 5 - Sign out hides private capability state
+## Test 5 - Consume the same policy engine through API v2
 Viewport: desktop
-Covers: authentication boundary, protected capability APIs, private capability declarations
-Description: Verifies capability catalog and agent declaration state remain behind authenticated organization membership.
+Covers: GET/POST/PUT v2 policy routes, POST v2 policy-evaluations, v1/v2 adapters over one canonical policy domain
+Description: Verifies switching compatibility view changes only the external contract, not the persisted policies or decision semantics.
+
+Setup:
+1. Sign in with an organization containing at least one policy, agent, connected resource, and declared scope
 
 Steps:
-1. Sign in with an organization and open Capabilities
-2. Use the account control to sign out
-3. Observe the resulting screen
+1. Open Policies and switch Compatibility view to API v2
+2. Select an existing policy, edit only its description, and save
+3. Run Decision Lab for the request that policy targets
 
-Expected: The secure sign-in screen is shown and no organization resources, scopes, or agent capability declarations remain visible.
+Expected: API v2 remains selected, the same policy persists with an incremented revision, and the decision outcome/winning policy matches the canonical rule semantics used under v1.

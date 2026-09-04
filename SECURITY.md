@@ -24,4 +24,8 @@ Provider credentials use a different boundary from agent authentication. Tenant-
 
 A capability records what a connected provider can technically expose. An agent capability declaration records scopes an agent expects to request. Neither structure authorizes execution. Declared scopes must exist in the organization's current live capability catalog, disconnected integrations advertise no active capabilities, and cross-tenant capability declarations are rejected.
 
-Foundation 6 is responsible for deterministic authorization decisions. Until then, provider action execution remains unavailable.
+## Policy boundary
+
+Policy evaluation is deterministic and fail-closed. Inactive agents, non-live resources, unavailable scopes, and undeclared scopes return `DENY` before policy matching. If no enabled policy matches, the result is `DENY`. Highest priority wins; ties resolve with safety precedence `DENY > REQUIRE_APPROVAL > ALLOW`.
+
+Policies are revisioned and can be disabled without deleting their history. Foundation 6 performs decision-only dry runs and cannot call provider adapters. Foundation 7 is responsible for placing these decisions in the runtime execution path.
