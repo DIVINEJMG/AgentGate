@@ -50,6 +50,14 @@ Foundation 9 exposes no audit update or delete API. Events are appended to a ten
 
 Administrative domain mutations and audit events cannot be atomically committed together with the current AppDeploy KV store. Those management events are therefore best-effort and failures are surfaced to backend observability logs. AgentGate does not claim database-level WORM guarantees or transactional audit completeness until a storage boundary supporting atomic mutation/outbox semantics is available.
 
+## Incident-control boundary
+
+Foundation 11 separates emergency execution state from identity and integration configuration. Organization, agent and integration controls can suspend execution without deleting credentials or changing provider configuration. The Action Gateway checks all three applicable control levels before provider invocation and repeats them before a held action resumes after approval.
+
+Incident resolution never restores execution automatically. Recovery is a separate explicit human operation with `incidents.manage`, a reason and audit attribution. Organization restoration does not override a still-suspended agent or integration. Existing agent lifecycle suspension/disable remains an independent guardrail.
+
+Because AppDeploy KV has no transactional compare-and-set, concurrent management transitions cannot be claimed as strongly serialized. Per-target control reads are bounded; ambiguous overflow fails closed rather than assuming execution is active.
+
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.

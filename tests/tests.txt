@@ -1,84 +1,68 @@
 # Tests
 
-## Test 1 - Assess a fresh agent without lowering capability risk [sanity]
+## Test 1 - Emergency-stop the organization and block a real gateway request [sanity]
 Viewport: desktop
-Covers: GET /api/v1/organizations/:organizationId/risk, POST /api/v1/organizations/:organizationId/risk-assessments, baseline/effective risk invariant, Risk UI
-Description: Verifies a fresh agent receives an explainable deterministic assessment and risk never drops below the provider capability baseline.
+Covers: POST/GET /api/v1/organizations/:organizationId/execution-controls/:targetType/:targetId, organization kill switch, Action Gateway incident-control enforcement, execution restoration
+Description: Verifies the organization emergency stop blocks new agent execution without deleting agent or integration state and can later be restored explicitly.
 
 Setup:
-1. Sign in to an organization with a connected public DIVINEJMG/AgentGate repository
-2. Register a fresh active agent named "QA Risk Fresh" and declare `github.repository.metadata.read`
+1. Sign in to an organization with an active agent, copied agent credential, connected public DIVINEJMG/AgentGate repository, declared metadata-read scope and matching ALLOW policy
 
 Steps:
-1. Open Risk and select QA Risk Fresh, the connected repository and metadata-read scope
-2. Choose "Assess risk"
-3. Inspect the transition and signal list
+1. Open Incidents and choose Emergency stop, entering reason `QA organization containment`
+2. Open Actions and run the metadata-read request with the valid agent credential
+3. Return to Incidents and restore organization execution with reason `QA containment cleared`
 
-Expected: The result shows baseline low and effective risk low or higher, never lower than baseline, with each signal showing its count, threshold and reason; no GitHub provider action is executed by the dry run.
+Expected: The action attempted while stopped is BLOCKED with an incident-control reason; after explicit restoration the organization execution banner returns to ACTIVE and agent/integration configuration remains present.
 
-## Test 2 - Escalate burst activity into policy enforcement
+## Test 2 - Open an agent incident, suspend only that agent, then resolve independently
 Viewport: desktop
-Covers: runtime behavior scoring, burst_activity threshold, effective risk passed to Policy Engine, Action Gateway block path, risk.assessed audit emission
-Description: Verifies repeated requests can raise a low capability to medium and change the authorization outcome.
+Covers: POST/GET /api/v1/organizations/:organizationId/incidents, POST incident status, target execution control, incident lifecycle independence from recovery
+Description: Verifies an incident record and an agent kill switch are separate durable states.
+
+Steps:
+1. Open a HIGH incident named `QA Agent Containment` targeting an existing active agent
+2. Select the incident and choose Suspend target with reason `Unexpected QA behavior`, then Acknowledge and Resolve with note `Investigation complete`
+3. Refresh Incidents and inspect the same incident
+
+Expected: The incident remains RESOLVED with its resolution note while the target control can remain SUSPENDED until a separate Restore target action is performed.
+
+## Test 3 - Block approval-time resume when an integration is suspended
+Viewport: desktop
+Covers: REQUIRE_APPROVAL held action, integration execution control, approval-time assertExecutionAllowed recheck, fail-closed recovery
+Description: Verifies an approval cannot bypass a kill switch activated while the action waits.
 
 Setup:
-1. Register a fresh active agent named "QA Risk Burst", copy its credential and declare `github.repository.metadata.read`
-2. Create an ALLOW policy matching QA Risk Burst, the repository, metadata-read scope and risk `low` only
+1. Use an active agent and connected GitHub integration with a declared pull-request-read scope and REQUIRE APPROVAL policy
+2. Run the request so it becomes HELD and open an incident targeting that GitHub integration
 
 Steps:
-1. Run four metadata-read gateway requests with unique idempotency keys
-2. Run a fifth metadata-read request inside ten minutes with another unique idempotency key
-3. Open Risk and inspect the newest QA Risk Burst assessment
+1. In Incidents suspend the integration target with reason `QA integration containment`
+2. In Approvals approve the already-held action
+3. Inspect the final action and incident control state
 
-Expected: The fifth assessment activates burst activity at 5/5, effective risk is medium, the low-only ALLOW policy no longer matches and the fifth action is blocked by default deny; the assessment is visible in Risk and correlated audit history.
+Expected: The approved action becomes BLOCKED rather than reaching GitHub because approval-time reauthorization detects the suspended integration.
 
-## Test 3 - Make Decision Lab use effective behavioral risk
+## Test 4 - Use Incident Controls through API v2 and restore a target
 Viewport: desktop
-Covers: POST /api/v1/organizations/:organizationId/policy-evaluations, risk-aware policy dry run, explainable risk in Policy Decision Lab
-Description: Verifies human policy dry runs use the same deterministic effective-risk calculation as runtime execution.
-
-Setup:
-1. Use an agent with an active behavior signal and a declared GitHub scope
+Covers: v2 incidents list/create/status contracts, v2 execution-control read/write normalization, explicit recovery
+Description: Verifies the Foundation 11 compatibility adapter exposes the same canonical incident/control state through API v2.
 
 Steps:
-1. Open Policies and select the agent, connected repository and declared scope in Decision Lab
-2. Choose Evaluate
-3. Inspect the decision card
+1. Switch Compatibility view to API v2 in Incidents and open a MEDIUM incident targeting an integration or agent
+2. Suspend that target, acknowledge the incident, then restore the target with a recovery reason
+3. Resolve the incident with a resolution note
 
-Expected: The decision card shows baseline → effective risk and active signal names, and policy matching reflects the effective risk rather than only the static provider baseline.
+Expected: API v2 remains selected; target control shows ACTIVE after explicit restoration and the incident shows RESOLVED without contract-shape errors.
 
-## Test 4 - Read and dry-run risk through API v2
-Viewport: desktop
-Covers: GET /api/v2/organizations/:organizationId/risk, POST /api/v2/organizations/:organizationId/risk-assessments, v1/v2 normalization, risk summary metrics
-Description: Verifies the current API contract preserves the same canonical risk result through the v2 adapter.
-
-Steps:
-1. Open Risk and switch Compatibility view to API v2
-2. Select a valid agent, repository and scope, then choose Assess risk
-3. Compare the dry-run result with the summary/recent assessment surface
-
-Expected: API v2 remains selected, the risk transition and signal details render normally, and summary metrics continue to show assessed/elevated/high-or-critical/signal counts without contract drift.
-
-## Test 5 - Use Risk safely on mobile and surface assessment failure
+## Test 5 - Manage containment from mobile without destructive configuration changes
 Viewport: mobile
-Covers: responsive Risk navigation/lab/detail, risk assessment API failure handling, mobile guardrail
-Description: Verifies phone users can inspect risk and that assessment failures are visible rather than treated as low risk.
-
-QA Faults:
-```json
-[
-  {
-    "method": "POST",
-    "path": "/api/v1/organizations/*/risk-assessments",
-    "status": 503,
-    "body_json": { "error": "simulated_risk_unavailable" }
-  }
-]
-```
+Covers: responsive Incident navigation, mobile emergency control, incident create/detail/lifecycle, target suspension and restoration
+Description: Verifies an operator can perform the critical containment workflow from a phone-sized viewport.
 
 Steps:
-1. On mobile open navigation and choose Risk
-2. Select a valid agent, resource and scope and choose Assess risk
-3. Inspect the resulting error state and existing risk history layout
+1. Open mobile navigation and choose Incidents
+2. Open a LOW incident targeting an agent and use Suspend target
+3. Restore the target and resolve the incident
 
-Expected: A visible risk-assessment error is shown instead of a successful/low result, and metrics, runtime assessment list and detail/lab controls remain usable without horizontal clipping.
+Expected: Kill-switch state, incident lifecycle buttons and detail information remain usable without horizontal clipping, and the agent is not deleted or disabled by the incident-control workflow.
