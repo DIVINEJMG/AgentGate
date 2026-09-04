@@ -220,3 +220,51 @@ h1 { margin: 0; color: #f1f5fa; font-size: clamp(28px, 3vw, 38px); line-height: 
 @media (max-width: 1180px) { .integrations-layout { grid-template-columns: 1fr 1fr; } .integration-catalog { grid-column: 1 / -1; min-height: auto; } }
 @media (max-width: 760px) { .integrations-layout { grid-template-columns: 1fr; } .integration-catalog, .integration-list-panel, .integration-detail-panel { min-height: auto; } .provider-card { grid-template-columns: 40px minmax(0,1fr); } .provider-card > .status-chip { grid-column: 2; width: fit-content; } .integration-security-strip { align-items: flex-start; } }
 @media (max-width: 460px) { .integration-security-strip { flex-direction: column; } .integration-row { grid-template-columns: 32px minmax(0,1fr); } .integration-row > .status-chip { grid-column: 2; width: fit-content; } }
+.capability-principle { min-height: 54px; display: flex; align-items: center; gap: 11px; margin-bottom: 12px; padding: 10px 14px; border: 1px solid #2a3140; border-left: 3px solid #4c8dff; background: #101722; color: #7fa5d8; }
+.capability-principle > div { flex: 1; }
+.capability-principle strong { display: block; color: #c9d9ee; font-size: 10px; }
+.capability-principle small { display: block; margin-top: 3px; color: #718299; font-size: 9px; line-height: 1.45; }
+.capability-metrics { margin-bottom: 12px; }
+.capability-metric { min-height: 112px; }
+.capability-metric .metric-value { margin-top: 13px; }
+.capabilities-layout { display: grid; grid-template-columns: .78fr 1.12fr 1.1fr; gap: 12px; }
+.capability-resource-panel, .capability-action-panel, .capability-agent-panel { min-height: 580px; }
+.capability-resource-list { display: grid; margin-top: 4px; }
+.capability-resource-row { width: 100%; min-height: 66px; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 10px 8px; border: 0; border-bottom: 1px solid #1c222b; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.capability-resource-row:hover { background: #121922; }
+.capability-resource-row.selected { background: #151e2a; box-shadow: inset 2px 0 0 #4c8dff; }
+.capability-resource-row strong { display: block; overflow: hidden; color: #d5dde8; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.capability-resource-row span:not(.resource-scope-count) { display: block; margin-top: 4px; color: #687587; font-size: 8px; }
+.resource-scope-count { min-width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid #2b3542; border-radius: 6px; color: #8290a2; font-size: 9px; }
+.capability-action-list { display: grid; margin-top: 4px; }
+.capability-action-row { display: grid; grid-template-columns: 48px minmax(0,1fr) auto; gap: 11px; align-items: start; padding: 14px 4px; border-bottom: 1px solid #1c222b; }
+.action-verb { padding: 5px 6px; border: 1px solid #254470; border-radius: 4px; background: #101d30; color: #88b5fa; font-size: 8px; font-weight: 760; text-align: center; }
+.action-copy strong { color: #cbd4df; font-size: 10px; text-transform: capitalize; }
+.action-copy p { margin: 4px 0 7px; color: #647184; font-size: 9px; line-height: 1.5; }
+.action-copy code { color: #899bb2; font-size: 8px; word-break: break-all; }
+.risk-badge { padding: 3px 5px; border-radius: 4px; font-size: 7px; font-weight: 760; letter-spacing: .07em; text-transform: uppercase; }
+.risk-badge.low { color: #7fe3ad; background: #10251b; border: 1px solid #1e4932; }
+.risk-badge.medium { color: #f6c96f; background: #251f11; border: 1px solid #55461f; }
+.risk-badge.high, .risk-badge.critical { color: #ff9da5; background: #271418; border: 1px solid #5c2b33; }
+.capability-profile { padding-top: 16px; }
+.capability-profile > label { display: block; margin-bottom: 7px; color: #8e9aac; font-size: 9px; font-weight: 650; }
+.capability-profile select { width: 100%; min-height: 38px; padding: 0 10px; border: 1px solid #2a3442; border-radius: 6px; background: #0c1118; color: #dce4ee; font-size: 10px; outline: none; }
+.capability-profile select:focus { border-color: #4c8dff; box-shadow: 0 0 0 3px rgba(76,141,255,.1); }
+.declaration-note { display: flex; gap: 9px; margin: 13px 0; padding: 11px; border: 1px solid #29384b; background: #101a27; color: #7298ca; }
+.declaration-note strong { display: block; color: #b8cbe4; font-size: 9px; }
+.declaration-note small { display: block; margin-top: 3px; color: #708198; font-size: 8px; line-height: 1.45; }
+.scope-check-list { display: grid; max-height: 300px; overflow: auto; margin-bottom: 13px; border: 1px solid #202832; }
+.scope-check { display: grid; grid-template-columns: 20px minmax(0,1fr); gap: 9px; align-items: center; min-height: 58px; padding: 9px 10px; border-bottom: 1px solid #1c222b; cursor: pointer; }
+.scope-check:last-child { border-bottom: 0; }
+.scope-check input { position: absolute; opacity: 0; pointer-events: none; }
+.fake-check { width: 18px; height: 18px; display: grid; place-items: center; border: 1px solid #344150; border-radius: 4px; background: #0d131a; color: #d9e7fb; }
+.scope-check input:checked + .fake-check { border-color: #4c8dff; background: #235eb9; }
+.scope-check input:disabled + .fake-check { opacity: .45; }
+.scope-check-copy strong { display: block; color: #aebaca; font-size: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+.scope-check-copy small { display: block; margin-top: 4px; color: #5f6c7d; font-size: 8px; text-transform: capitalize; }
+.stale-scope-warning { margin: 0 0 12px; padding: 10px; border: 1px solid #5b4c27; background: #201b10; }
+.stale-scope-warning strong { display: block; color: #e7c875; font-size: 9px; }
+.stale-scope-warning span { display: block; margin-top: 3px; color: #96855d; font-size: 8px; line-height: 1.45; }
+@media (max-width: 1180px) { .capabilities-layout { grid-template-columns: 1fr 1fr; } .capability-resource-panel { grid-column: 1 / -1; min-height: auto; } }
+@media (max-width: 760px) { .capabilities-layout { grid-template-columns: 1fr; } .capability-resource-panel, .capability-action-panel, .capability-agent-panel { min-height: auto; } .capability-principle { align-items: flex-start; } .capability-action-row { grid-template-columns: 44px minmax(0,1fr); } .capability-action-row .risk-badge { grid-column: 2; width: fit-content; } }
+@media (max-width: 460px) { .capability-principle { flex-wrap: wrap; } .capability-principle > .status-chip { margin-left: 28px; } .scope-check-list { max-height: 260px; } }

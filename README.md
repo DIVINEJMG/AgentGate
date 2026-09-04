@@ -10,14 +10,19 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 1 — Application bootstrap: complete
 - Foundation 2 — Identity & organizations: complete
 - Foundation 3 — Agent identity: complete
-- Foundation 4 — Integration framework: implemented
-- Foundation 5 — Capability model: next
+- Foundation 4 — Integration framework: complete
+- Foundation 5 — Capability model: implemented
+- Foundation 6 — Policy engine: next
 
-## Foundation 4
+## Foundation 5
 
-The first provider adapter is GitHub. Public repositories can be connected without credentials. Private-repository tokens are accepted only when the AppDeploy-backed integration credential vault is configured; tokens are encrypted with AES-256-GCM and are never returned by AgentGate APIs.
+Connected integrations are projected into a canonical capability catalog:
 
-A connected integration does not grant any agent authority. Foundation 5 introduces canonical resources, actions and scopes; Foundation 6 introduces policy decisions.
+- **Resource** — the external object AgentGate can reach, such as a GitHub repository.
+- **Action** — the canonical operation technically available on that resource.
+- **Scope** — the stable machine-readable capability string, such as `github.repository.issues.read`.
+
+Agents may declare capability scopes they expect to need. These declarations are descriptive inputs only. They do not grant authority and they cannot trigger provider execution. Foundation 6 introduces deterministic policy decisions.
 
 ## Architecture rules
 
