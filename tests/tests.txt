@@ -1,0 +1,3 @@
+# Tests
+
+Foundation 2 QA covers: authentication gate, first organization creation/persistence, API v1/v2 organization compatibility, mobile validation, and sign-out removing private organization state.
