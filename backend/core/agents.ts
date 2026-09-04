@@ -1,5 +1,5 @@
 import { db } from '@appdeploy/sdk';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { getOrganizationForUser } from './organizations';
 
 export type AgentStatus = 'active' | 'suspended' | 'disabled';
@@ -229,6 +229,25 @@ export async function revokeAgentCredential(userId: string, organizationId: stri
     const agent = await updateAgent(organizationId, agentId, next);
     await markCredentialRevoked(organizationId, current.credentialRecordId);
     return agent;
+}
+
+export async function authenticateAgentCredential(organizationId: string, agentId: string, rawSecret: unknown) {
+    const secret = typeof rawSecret === 'string' ? rawSecret.trim() : '';
+    if (!/^agt_sk_[A-Za-z0-9_-]{20,120}$/.test(secret)) throw new AgentDomainError('Invalid agent credential.', 401);
+    const current = await loadAgent(organizationId, agentId);
+    if (current.organizationId !== organizationId || current.status !== 'active' || current.credentialStatus !== 'active' || !current.credentialRecordId) throw new AgentDomainError('Agent identity is not permitted to execute actions.', 403);
+    const [credential] = await db.get<CredentialRecord>(credentialsTable(organizationId), [current.credentialRecordId]);
+    if (!credential || credential.organizationId !== organizationId || credential.agentId !== agentId || credential.revokedAt || !credential.scopes.includes('agent.authenticate')) throw new AgentDomainError('Agent credential is unavailable or revoked.', 401);
+    if (credential.expiresAt && new Date(credential.expiresAt).getTime() <= Date.now()) throw new AgentDomainError('Agent credential has expired.', 401);
+    const suppliedHash = createHash('sha256').update(secret).digest();
+    const expectedHash = Buffer.from(credential.credentialHash, 'hex');
+    if (suppliedHash.length !== expectedHash.length || !timingSafeEqual(suppliedHash, expectedHash)) throw new AgentDomainError('Invalid agent credential.', 401);
+    const lastUsedAt = new Date().toISOString();
+    const [credentialUpdated] = await db.update(credentialsTable(organizationId), [{ id: current.credentialRecordId, record: { ...credential, lastUsedAt } }]);
+    const next = { ...current, credentialLastUsedAt: lastUsedAt, updatedAt: lastUsedAt };
+    const [agentUpdated] = await db.update(agentsTable(organizationId), [{ id: agentId, record: next }]);
+    if (!credentialUpdated || !agentUpdated) throw new AgentDomainError('Agent authentication metadata could not be persisted. Execution is denied.', 500);
+    return publicAgent(agentId, next);
 }
 
 export function serializeAgentV2(agent: ReturnType<typeof publicAgent>) {

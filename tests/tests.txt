@@ -1,78 +1,82 @@
 # Tests
 
-## Test 1 - Create an allow policy and resolve an eligible request [sanity]
+## Test 1 - Execute an allowed GitHub read through the Action Gateway [sanity]
 Viewport: desktop
-Covers: GET and POST /api/v1/organizations/:organizationId/policies, POST /api/v1/organizations/:organizationId/policy-evaluations, policy persistence, declared-scope precondition, deterministic ALLOW outcome
-Description: Verifies the primary Policy Engine workflow creates a durable rule and returns ALLOW only when the agent, resource and declared scope are eligible.
+Covers: POST /api/v1/organizations/:organizationId/action-gateway/tests, shared agent credential validation, idempotency establishment, capability resolution, Policy Engine enforcement, GitHub adapter read execution, GET /api/v1/organizations/:organizationId/actions
+Description: Verifies the primary Foundation 7 path reaches GitHub only after an authenticated agent receives ALLOW.
 
 Setup:
 1. Sign in and create "QA Operations" if no organization exists
 2. Connect public repository "DIVINEJMG/AgentGate" if it is not already connected
-3. Register "QA Policy Agent" if it does not already exist and declare `github.repository.metadata.read`
+3. Register "QA Gateway Agent", copy its one-time agent credential, and keep that value for this test
+4. Declare `github.repository.metadata.read` for "QA Gateway Agent"
+5. Create an enabled ALLOW policy named "Allow gateway metadata" for that agent, the AgentGate repository and `github.repository.metadata.read`
 
 Steps:
-1. Open Policies and create "Allow metadata read" with effect ALLOW, priority 500, agent "QA Policy Agent", resource "DIVINEJMG/AgentGate", and scope `github.repository.metadata.read`
-2. In Decision Lab select the same agent, resource and scope, then evaluate
-3. Refresh, return to Policies, and select "Allow metadata read"
+1. Open Actions, select "QA Gateway Agent", the AgentGate repository and `github.repository.metadata.read`
+2. Paste the copied agent credential and run the generated idempotency key through the gateway
+3. Inspect the resulting Action Detail and recent action history
 
-Expected: The dry run returns ALLOW with "Allow metadata read" as the winning policy, and the enabled policy remains visible after refresh with priority 500 and revision 1.
+Expected: The action status is EXECUTED, policy outcome is ALLOW, a GitHub repository metadata summary/result is visible, and the action shows a correlation ID plus hashed idempotency identifier.
 
-## Test 2 - Default deny when no enabled policy matches
+## Test 2 - Block a request when policy does not allow it
 Viewport: desktop
-Covers: policy default-deny guardrail, policy evaluation preconditions, unmatched-scope resolution
-Description: Verifies a valid declared capability is still denied when the policy set does not grant or route that specific request.
+Covers: default-deny enforcement, provider non-execution on DENY, persisted blocked action state
+Description: Verifies a valid agent credential and capability declaration cannot bypass the Policy Engine.
 
 Setup:
-1. Sign in with "QA Operations", "QA Policy Agent", and connected "DIVINEJMG/AgentGate"
-2. Declare `github.repository.issues.read` for "QA Policy Agent"
+1. Use an active QA agent with a copied credential and connected AgentGate repository
+2. Declare `github.repository.issues.read` for the agent but do not create an enabled matching issues policy
 
 Steps:
-1. Open Policies and choose "QA Policy Agent", "DIVINEJMG/AgentGate", and `github.repository.issues.read` in Decision Lab
-2. Evaluate without creating a matching issues policy
+1. Open Actions and select the QA agent, AgentGate repository and `github.repository.issues.read`
+2. Paste the valid agent credential, generate a fresh idempotency key and run through the gateway
+3. Inspect Action Detail
 
-Expected: The result is DENY and explains that no enabled policy matched, while Agent active, Resource live, Scope available, and Scope declared all show as satisfied.
+Expected: The action is BLOCKED with policy outcome DENY/default deny, no provider result is shown, and the blocked attempt appears in recent action history.
 
-## Test 3 - Resolve priority conflicts and disable a stronger deny
+## Test 3 - Hold REQUIRE_APPROVAL without provider execution
 Viewport: desktop
-Covers: POST/PUT policy writes, POST /policies/:policyId/status, deterministic priority resolution, DENY precedence, policy revision increments
-Description: Verifies stronger policy priority controls the decision and disabling a policy changes future dry-run results without deleting the rule.
+Covers: REQUIRE_APPROVAL enforcement, held action persistence, approval handoff boundary
+Description: Verifies an approval-gated policy cannot accidentally execute before Foundation 8 supplies a human decision.
 
 Setup:
-1. Ensure the Foundation 6 Test 1 setup exists
+1. Use an active QA agent with copied credential and declare `github.repository.pull_requests.read`
+2. Create an enabled REQUIRE APPROVAL policy named "Review PR reads" for that agent/repository/scope
 
 Steps:
-1. Create "Deny metadata override" for the same agent/resource/scope with effect DENY and priority 700, then evaluate metadata read
-2. Edit "Allow metadata read" to priority 600 and save; confirm its revision increases
-3. Select "Deny metadata override", disable it, and evaluate metadata read again
+1. Open Actions, select the QA agent, AgentGate repository and `github.repository.pull_requests.read`
+2. Paste the valid credential and run a fresh idempotency key
+3. Inspect Action Detail and recent actions
 
-Expected: The first evaluation returns DENY from the priority-700 rule; the edited allow rule shows a higher revision; after the deny policy is disabled, evaluation returns ALLOW from "Allow metadata read".
+Expected: The action is HELD with policy outcome REQUIRE APPROVAL, no GitHub result is present, and the UI states that approval execution belongs to Foundation 8.
 
-## Test 4 - Return REQUIRE_APPROVAL from a mobile policy workflow
+## Test 4 - Replay the same idempotent request without a second provider action
+Viewport: desktop
+Covers: idempotency replay, request fingerprint conflict protection, durable action identity
+Description: Verifies sequential retries with the same agent, resource, scope and idempotency key return the original action record.
+
+Setup:
+1. Use the allowed metadata-read setup from the primary workflow and keep the same agent credential available
+
+Steps:
+1. Execute an allowed metadata read and note its action ID/correlation ID while keeping the idempotency key unchanged
+2. Paste the same agent credential again and submit the exact same request with the unchanged idempotency key
+3. Inspect the selected history item
+
+Expected: AgentGate returns the same action record/correlation state instead of creating a second provider execution; reusing that key for a different scope is rejected.
+
+## Test 5 - Reject an invalid agent credential on mobile while API v2 remains compatible
 Viewport: mobile
-Covers: responsive Policies UI, REQUIRE_APPROVAL outcome, policy creation, dry-run evaluation without provider execution
-Description: Verifies a mobile administrator can define an approval-gated rule and see the decision without AgentGate executing a provider action.
+Covers: agent-authentication guardrail, responsive Action Gateway form/history, POST /api/v2/organizations/:organizationId/action-gateway/tests, GET /api/v2/organizations/:organizationId/actions, v1/v2 action adapters
+Description: Verifies mobile operators cannot execute using an invalid non-human credential and the same action model is readable through API v2.
 
 Setup:
-1. Sign in with an organization containing "QA Policy Agent" and connected "DIVINEJMG/AgentGate"
-2. Declare `github.repository.pull_requests.read` for the agent
+1. Sign in with an organization containing an active agent and connected GitHub resource
 
 Steps:
-1. On mobile open Policies and create "Review PR reads" with effect REQUIRE APPROVAL, priority 800, the QA agent, AgentGate repository, and `github.repository.pull_requests.read`
-2. In Decision Lab evaluate that agent/resource/scope
+1. On mobile open Actions and switch Compatibility view to API v2
+2. Select an agent/resource/scope, enter `agt_sk_invalidcredentialvalue1234567890` and run a fresh idempotency key
+3. Observe the error and action history
 
-Expected: The result is REQUIRE APPROVAL, the winning policy is "Review PR reads", and the page still states that the dry run does not call GitHub or any provider.
-
-## Test 5 - Consume the same policy engine through API v2
-Viewport: desktop
-Covers: GET/POST/PUT v2 policy routes, POST v2 policy-evaluations, v1/v2 adapters over one canonical policy domain
-Description: Verifies switching compatibility view changes only the external contract, not the persisted policies or decision semantics.
-
-Setup:
-1. Sign in with an organization containing at least one policy, agent, connected resource, and declared scope
-
-Steps:
-1. Open Policies and switch Compatibility view to API v2
-2. Select an existing policy, edit only its description, and save
-3. Run Decision Lab for the request that policy targets
-
-Expected: API v2 remains selected, the same policy persists with an incremented revision, and the decision outcome/winning policy matches the canonical rule semantics used under v1.
+Expected: A visible invalid-agent-credential error is shown, no provider result is created from the invalid credential, API v2 remains selected, and the Actions layout remains usable on mobile.
