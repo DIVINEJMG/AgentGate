@@ -1,73 +1,61 @@
 # Tests
 
-## Test 1 - Require human authentication before agent access [sanity]
+## Test 1 - Require authentication before organization access [sanity]
 Viewport: desktop
-Covers: human authentication gate, protected organization and agent APIs, anonymous access denial, SOT product identity
-Description: Verifies an anonymous visitor cannot reach organization or non-human identity data.
+Covers: authentication gate, protected organization and integration APIs, anonymous access denial, SOT product identity
+Description: Verifies anonymous visitors cannot reach tenant or integration state.
 
 Steps:
 1. Open AgentGate while signed out
 2. Confirm the secure sign-in screen is shown
 3. Confirm the screen identifies the product as "AgentGate" and "An SOT Product"
 
-Expected: The control plane, organization data, Agents navigation, and agent registry are not accessible until secure human sign in is completed.
+Expected: Organization, agent and integration data are not visible until secure sign in is completed.
 
-## Test 2 - Register and retain an agent identity through API v1
+## Test 2 - Retain organization and agent identity state
 Viewport: desktop
-Covers: Agents navigation, GET /api/v1/organizations/:organizationId/agents, POST /api/v1/organizations/:organizationId/agents, database persistence, owner assignment, one-time credential issuance, hash-only credential design
-Description: Verifies an organization manager can create a durable non-human identity and receives its plaintext credential only at issuance.
-
-Setup:
-1. Sign in to an organization where the current user has agents.manage permission
+Covers: organization membership boundary, agent registry, database persistence, human/agent identity separation
+Description: Verifies prior foundations remain intact while the integration framework is added.
 
 Steps:
-1. Open Agents and register an agent named "QA Sentinel" with purpose "Monitors test operations"
-2. Copy the issued credential and close the copy-once credential window
-3. Refresh AgentGate and open Agents again
+1. Sign in and create "QA Operations" if no organization exists
+2. Open Agents and register "QA Research Agent" if it does not already exist
+3. Refresh and return to Agents
 
-Expected: "QA Sentinel" remains visible as Active and owned by the current user, its credential fingerprint is visible, and the plaintext credential is not displayed again after refresh.
+Expected: The organization and "QA Research Agent" remain visible after refresh and the agent retains its independent credential/lifecycle metadata.
 
-## Test 3 - Suspend, reactivate, and disable an agent through API v1
+## Test 3 - Connect and health-check a public GitHub repository
 Viewport: desktop
-Covers: PUT /api/v1/organizations/:organizationId/agents/:agentId/lifecycle, lifecycle confirmation guardrail, active/suspended/disabled transitions, disabled terminal state
-Description: Verifies lifecycle changes require an explicit confirmation and a disabled identity cannot silently return to active state.
-
-Setup:
-1. Sign in and register an agent named "Lifecycle Agent"
+Covers: GitHub adapter validateConnection, POST /api/v1/organizations/:organizationId/integrations/github, GET integration list, provider health check, database persistence, no-credential public mode
+Description: Verifies the first real provider adapter validates and persists a public GitHub repository without storing a provider credential.
 
 Steps:
-1. Select "Lifecycle Agent", choose Suspend, and confirm; then choose Activate and confirm
-2. Choose Disable and confirm the terminal action
-3. Refresh AgentGate and select "Lifecycle Agent"
+1. Open Integrations and choose "Connect GitHub"
+2. Enter "DIVINEJMG/AgentGate" and leave the optional token empty, then validate and connect
+3. Select the connection, run "Check health", then refresh the page
 
-Expected: The identity remains Disabled after refresh, its credential is Revoked, and no Activate or Rotate credential action is offered.
+Expected: "DIVINEJMG/AgentGate" remains visible as CONNECTED, health states the repository is reachable, and credential mode is shown as public/no credential.
 
-## Test 4 - Rotate and revoke credentials through API v1
+## Test 4 - Consume integration state through API v2
 Viewport: desktop
-Covers: POST /api/v1/organizations/:organizationId/agents/:agentId/credentials/rotate, POST /api/v1/organizations/:organizationId/agents/:agentId/credentials/revoke, credential versioning, rotation, revocation, automatic suspension
-Description: Verifies credential rotation issues a new copy-once secret and revocation suspends the identity without exposing stored secrets.
-
-Setup:
-1. Sign in and register an agent named "Credential Agent"
+Covers: GET /api/v2 integration routes, v1/v2 integration adapters, canonical integration domain, API evolution
+Description: Verifies API v2 presents the same provider connection through its newer response contract.
 
 Steps:
-1. Select "Credential Agent", rotate its credential, store the newly displayed secret, and close the credential window
-2. Confirm the credential version increased, then choose Revoke credential and confirm
-3. Refresh AgentGate and select "Credential Agent"
+1. Sign in with an organization containing a GitHub connection
+2. Open Integrations and switch Compatibility view to "API v2"
+3. Select the GitHub connection and inspect provider, health and credential posture
 
-Expected: The identity is Suspended, the credential status is Revoked, the latest fingerprint remains visible, and no plaintext credential is recoverable.
+Expected: The same GitHub connection remains visible and its provider, resource, health and credential boundary are unchanged under API v2.
 
-## Test 5 - Use the full agent workflow through API v2 on mobile
+## Test 5 - Reject invalid GitHub repository coordinates on mobile
 Viewport: mobile
-Covers: GET/POST /api/v2/organizations/:organizationId/agents, PUT /api/v2/organizations/:organizationId/agents/:agentId/lifecycle, v2 rotate/revoke credential routes, v1/v2 agent adapters, mobile agent registration and controls
-Description: Verifies the current v2 contract exposes the same canonical agent identity and security controls in the mobile interface.
-
-Setup:
-1. Sign in on mobile to an organization where the current user has agents.manage permission
+Covers: GitHub adapter validation guardrail, mobile integration form, SSRF-resistant fixed-provider input boundary
+Description: Verifies the mobile connection form rejects arbitrary URLs instead of treating them as provider endpoints.
 
 Steps:
-1. Switch Compatibility view to API v2, open Agents, and register "Mobile Agent"
-2. Close the copy-once credential after storing it, suspend the agent, rotate its credential, then revoke that credential
-3. Refresh and reopen "Mobile Agent"
+1. Open Integrations on mobile and tap "Connect GitHub"
+2. Enter "https://example.com/private/repo" as Repository
+3. Tap "Validate & connect"
 
-Expected: API v2 remains compatible with the canonical model; "Mobile Agent" is visible on mobile as Suspended with a Revoked credential and all controls fit without horizontal clipping.
+Expected: A visible error says the repository must use owner/repository format and no integration is created.
