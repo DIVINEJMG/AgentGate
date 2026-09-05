@@ -17,8 +17,8 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 8 — Human approvals: complete
 - Foundation 9 — Audit & observability: complete
 - Foundation 10 — Risk engine: complete
-- Foundation 11 — Incident controls: implemented
-- Foundation 12 — Productization: next
+- Foundation 11 — Incident controls: complete
+- Foundation 12 — Productization: implemented
 
 ## Foundation 6
 
@@ -61,6 +61,12 @@ The current behavior window scans at most 100 action records. If that bounded wi
 Incident Controls adds independent execution kill switches for the organization, individual agents and integrations without deleting identities, credentials or provider configuration. Fresh Action Gateway requests and approval-time resume both re-check these controls before provider execution.
 
 Incident lifecycle is `open → acknowledged → resolved`. Resolution does not automatically restore execution; recovery is a separate explicit human action with reason and audit attribution. The organization emergency stop does not erase lower-level target suspensions.
+
+## Foundation 12
+
+Productization adds workspace settings, onboarding/readiness, bounded operational analytics, an explicit pricing catalog and operator documentation without weakening the security control plane.
+
+Billing begins in `observe_only` mode. Free, Team, Business and Scale are represented as a commercial catalog, but no payment provider is connected, no checkout is exposed and limits are advisory. A future billing adapter can enforce entitlements only after server-side subscription state and verified provider webhooks exist.
 
 ## Architecture rules
 
