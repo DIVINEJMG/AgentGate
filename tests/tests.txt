@@ -1,61 +1,73 @@
 # Tests
 
-## Test 1 - Save workspace settings and retain the product profile [sanity]
+## Test 1 - Create a role and managed worker bound to an Agent Identity [sanity]
 Viewport: desktop
-Covers: GET /api/v1/organizations/:organizationId/product, PUT /api/v1/organizations/:organizationId/settings, workspace rename, security contact persistence, organization controls
-Description: Verifies an owner/admin can productize the workspace profile and the durable values are reflected after reload.
+Covers: GET /api/v1/organizations/:organizationId/workforce, POST /api/v1/organizations/:organizationId/workforce/roles, POST /api/v1/organizations/:organizationId/workforce/workers, Worker↔Agent Identity binding, role defaults, supervisor, working-hours persistence
+Description: Verifies the primary F13 workflow creates a reusable role and a draft business-facing Worker anchored to an existing security identity.
+
+Setup:
+1. In Agents, register an active Agent Identity named `F13 QA Agent`
 
 Steps:
-1. Open Settings and set workspace name to `AgentGate QA Workspace`, security contact to `security@example.com`, and company URL to `https://example.com`
-2. Save workspace settings
-3. Refresh the page and return to Settings
+1. Open Workforce and create role `QA Analyst` with purpose `Review operational quality`, responsibility `Review daily quality signals`, instructions `Prepare concise findings`, and recommended scope `github.repository.metadata.read`
+2. Create worker `Maya QA`, bind `F13 QA Agent`, select `QA Analyst`, set department `Quality`, keep the current signed-in human as supervisor, and save Monday-Friday working hours
+3. Refresh Workforce and select `Maya QA`
 
-Expected: The renamed workspace is shown in the application and Settings retains `security@example.com` and `https://example.com` with a successful readiness update.
+Expected: `Maya QA` persists as DRAFT with role `QA Analyst`, department `Quality`, the current human supervisor, the bound Agent Identity, inherited role responsibility/instructions, and visible working hours; the recommended scope is shown only as role metadata and has not granted a capability.
 
-## Test 2 - Show real readiness and bounded usage without enforcing preview limits
+## Test 2 - Edit a worker and change workforce lifecycle without mutating Agent Identity
 Viewport: desktop
-Covers: product readiness derivation, bounded operational analytics, advisory agent limit, existing security-control continuity
-Description: Verifies product analytics reflect current AgentGate state and the preview catalog does not disable existing controls.
+Covers: PUT /api/v1/organizations/:organizationId/workforce/workers/:workerId, POST /api/v1/organizations/:organizationId/workforce/workers/:workerId/status, worker lifecycle separation from Agent Identity
+Description: Verifies worker management state is durable and remains separate from the security identity lifecycle.
+
+Setup:
+1. Create an active Agent Identity, a workforce role, and a draft worker bound to that identity through the UI
 
 Steps:
-1. Open Settings in an organization that already has AgentGate control-plane records
-2. Review readiness, agent/integration/policy/action counts and the 30-day activity metrics
-3. Inspect the current preview-plan note
+1. Edit the worker department, responsibilities, instructions and working hours and save
+2. Activate the worker, then pause it
+3. Open Agents and inspect the bound Agent Identity
 
-Expected: Readiness and usage are visible from existing records; any truncated window is disclosed, and the UI states that plan limits are observe-only/advisory rather than enforced.
+Expected: Workforce retains the edited profile and PAUSED status while the bound Agent Identity remains ACTIVE; the UI explains that Worker lifecycle does not replace Agent/Incident security controls.
 
-## Test 3 - Present the commercial catalog without a fake checkout
+## Test 3 - Prevent a second managed worker from reusing a bound Agent Identity
 Viewport: desktop
-Covers: Free/Team/Business/Scale catalog, billing-provider boundary, no-checkout guardrail
-Description: Verifies the product exposes pricing structure while accurately representing that no payment processor is connected.
+Covers: one-to-one Worker↔Agent Identity guardrail, POST workforce worker validation, safe identity selection
+Description: Verifies a security Agent Identity cannot silently represent multiple non-archived managed workers.
+
+Setup:
+1. Create `F13 Bound Agent`, a role, and one managed worker bound to that Agent Identity
 
 Steps:
-1. Open Settings and scroll to Plans & Billing Boundary
-2. Review Free, Team, Business and Scale pricing cards
-3. Inspect the billing status message
+1. Open Create worker again
+2. Inspect the Agent Identity selector
+3. Attempt to choose an identity for the second worker
 
-Expected: Four plan cards are visible; the current preview plan is identified, `OBSERVE ONLY` is visible, and there is no active checkout/purchase control.
+Expected: `F13 Bound Agent` is unavailable for the second worker because it is already bound; no duplicate managed-worker binding can be created.
 
-## Test 4 - Use Foundation 12 through API v2 and persist workspace changes
+## Test 4 - Edit roles and workers through API v2 compatibility
 Viewport: desktop
-Covers: GET /api/v2/organizations/:organizationId/product, PUT /api/v2/organizations/:organizationId/settings, v2 productization adapter
-Description: Verifies v2 exposes the same canonical workspace, readiness, commercial and usage state.
+Covers: GET /api/v2/organizations/:organizationId/workforce, PUT /api/v2/organizations/:organizationId/workforce/roles/:roleId, PUT /api/v2/organizations/:organizationId/workforce/workers/:workerId, POST /api/v2/organizations/:organizationId/workforce/workers/:workerId/status, v2 workforce adapters
+Description: Verifies v2 maps to the same canonical Workforce domain.
+
+Setup:
+1. Create a workforce role and draft worker through the UI
 
 Steps:
-1. Switch Settings to API v2
-2. Change the company URL to `https://example.org` and save
-3. Refresh Settings while API v2 remains selected
+1. Switch Workforce to API v2 and edit the role purpose/default instructions
+2. Edit the worker profile and activate it
+3. Refresh Workforce while API v2 remains selected
 
-Expected: The updated URL persists, readiness/usage/plans render without contract-shape errors, and API v2 remains usable.
+Expected: Role and worker changes persist, the worker is ACTIVE, and v2 renders the same business/security binding without contract-shape errors.
 
-## Test 5 - Use product settings and operator docs on mobile
+## Test 5 - Manage the Workforce directory on mobile
 Viewport: mobile
-Covers: responsive Settings navigation, workspace controls, readiness, usage, plans and operator documentation
-Description: Verifies the final productization surface remains usable from a phone-sized viewport.
+Covers: responsive Workforce navigation, worker directory/profile, role catalog, mobile create/edit forms, working-hours controls
+Description: Verifies F13 remains usable from a phone-sized viewport.
 
 Steps:
-1. Open mobile navigation and choose Settings
-2. Review readiness and Plans & Billing Boundary
-3. Scroll through workspace settings and Production quick reference
+1. Open mobile navigation and choose Workforce
+2. Inspect the Worker directory, a Worker profile and the Role catalog
+3. Open the create/edit Worker form and review Agent Identity, role, supervisor and working-hours controls
 
-Expected: Product metrics, forms, plan cards and operator docs remain readable and usable without horizontal clipping.
+Expected: Workforce content and forms remain readable and usable without horizontal clipping, and autonomous execution is clearly shown as not active yet.

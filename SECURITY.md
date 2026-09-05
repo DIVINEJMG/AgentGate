@@ -64,6 +64,12 @@ Foundation 12 keeps commercial state outside runtime authorization. Workspace se
 
 The initial billing boundary is observe-only. No payment processor, checkout flow, billing secret or client-side payment credential is present. Plan state cannot authorize agent actions or override policy, risk, approval, audit or incident controls. Entitlement enforcement must remain disabled until a future billing adapter has verified server-side provider state.
 
+## Workforce boundary
+
+Foundation 13 separates the business-facing Worker from the security-facing Agent Identity. Every non-archived Worker binds to exactly one existing Agent Identity, and a live Agent Identity cannot back multiple managed Workers. The binding is immutable for the life of the Worker.
+
+Roles, responsibilities, instructions, departments, supervisors and working hours are management context only. Role capability recommendations never grant capabilities, Worker instructions never override policy, and Worker lifecycle does not mutate Agent Identity or Incident Controls. Supervisors are validated as same-tenant human members. Foundation 13 performs no autonomous execution.
+
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.
