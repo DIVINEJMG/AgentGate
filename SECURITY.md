@@ -76,6 +76,14 @@ Foundation 14 keeps work definition separate from authority and execution. Job c
 
 `Run now` persists a tenant-scoped Work Item only. The Work Item stores an immutable Job revision snapshot and correlation ID, but Foundation 14 has no scheduler, planner, Run Engine, Step Executor, provider call or autonomous loop. Humans may cancel only queued items. Strong queue claiming, duplicate-run protection, leases and execution idempotency remain explicitly deferred to the durable-execution foundation rather than being falsely claimed on the current key-value store.
 
+## Scheduler and trigger boundary
+
+Foundation 15 treats automation as a queue producer, never an authorization shortcut. Scheduled, internal-event, API and dependency triggers all create the same tenant-scoped Work Items used by manual F14 queueing. Required capabilities, Worker/Agent lifecycle, credential state and organization/agent incident controls are revalidated before a Work Item is admitted.
+
+The public runtime trigger endpoint authenticates with the bound Agent Identity's existing credential; AgentGate does not introduce a second plaintext trigger secret. Schedule slots and optional API idempotency keys receive dedupe keys, but the current key-value store has no transactional compare-and-set, so Foundation 15 does not claim strong exactly-once behavior under concurrent trigger races. The scheduler processes one bounded checkpointed registry page every five minutes and never drains a growing registry in one invocation.
+
+Working-hours and missed-run policies affect when work enters the queue; they never bypass policy, approvals, risk or incident controls. No F15 path creates a Run or calls a provider.
+
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.

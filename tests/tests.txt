@@ -1,77 +1,78 @@
 # Tests
 
-## Test 1 - Create, activate and manually queue a Job [sanity]
+## Test 1 - Configure and retain a recurring Job schedule [sanity]
 Viewport: desktop
-Covers: GET/POST /api/v1/organizations/:organizationId/jobs, POST /api/v1/organizations/:organizationId/jobs/:jobId/status, POST /api/v1/organizations/:organizationId/jobs/:jobId/run-now, GET /api/v1/organizations/:organizationId/work-items, durable Job revision snapshot, manual queue boundary
-Description: Verifies the primary F14 workflow turns a Worker responsibility into a durable queued Work Item without pretending the Managed Runtime exists.
+Covers: GET /api/v1/organizations/:organizationId/triggers, PUT /api/v1/organizations/:organizationId/jobs/:jobId/triggers, recurring schedule persistence, timezone handling, missed-run policy, Worker working-hours policy
+Description: Verifies an operator can configure repeatable scheduled work without creating a Run or provider action.
 
 Setup:
-1. Create an ACTIVE managed Worker named `F14 QA Worker` with responsibility `Prepare daily quality summary` and an active bound Agent Identity
+1. Create and activate a managed Worker and an ACTIVE Job named `F15 Scheduled Brief`
 
 Steps:
-1. Open Jobs and create `Daily Quality Summary` for `F14 QA Worker` with objective `Prepare the daily quality summary`, link the Worker responsibility, choose NORMAL priority, add completion criterion `Summary is ready for supervisor review`, and save
-2. Activate the Job and click `Run now`
-3. Open Work Queue, refresh the page and inspect the queued item
+1. Open Jobs → Triggers and select `F15 Scheduled Brief`
+2. Enable a weekly schedule, choose Africa/Lagos, 08:30, Monday through Friday, `Queue one catch-up`, and `Queue for next working opening`, then save
+3. Refresh the page and inspect the trigger configuration
 
-Expected: The Job persists as ACTIVE and the Work Queue contains a QUEUED item with the Job revision, Worker, priority, correlation ID and `Run not created yet`; no autonomous execution is presented as having occurred.
+Expected: The schedule remains enabled with the same timezone, time, weekdays and policies, a Next due timestamp is visible, and the page states that triggers create Work Items only.
 
-## Test 2 - Block activation when a required capability is not active
+## Test 2 - Internal event creates a durable queued Work Item
 Viewport: desktop
-Covers: required capability validation, activation readiness guardrail, Agent capability separation
-Description: Verifies a Job requirement cannot silently become an Agent permission.
+Covers: POST /api/v1/organizations/:organizationId/triggers/events, internal-event trigger matching, trigger history, durable Work Item creation
+Description: Verifies an authenticated internal event can create work while execution remains absent.
 
 Setup:
-1. Connect a GitHub integration so `github.repository.metadata.read` exists in the capability catalog
-2. Create an ACTIVE Worker whose bound Agent does not declare `github.repository.metadata.read`
+1. Create and activate a managed Worker and ACTIVE Job named `F15 Event Job`
+2. Configure internal event key `support.ticket.created` for the Job
 
 Steps:
-1. Create a DRAFT Job for that Worker requiring `github.repository.metadata.read`
-2. Attempt to activate the Job
-3. Inspect the visible error and the Job state
+1. Open Jobs → Triggers, enter event key `support.ticket.created` and payload `{}`
+2. Emit the event
+3. Open Work Queue and then return to Triggers
 
-Expected: Activation is rejected with a missing-active-capability message, the Job remains DRAFT, and no capability is automatically granted to the Agent.
+Expected: A QUEUED Work Item exists for `F15 Event Job` with trigger type internal_event and Run not created yet, and Trigger History records a QUEUED internal-event outcome.
 
-## Test 3 - Edit, pause and resume a Job while preserving history
+## Test 3 - Dependency trigger reacts to a job.completed event
 Viewport: desktop
-Covers: PUT /api/v1/organizations/:organizationId/jobs/:jobId, Job revisioning, pause/resume lifecycle, Job history
-Description: Verifies edits produce a new Job revision and lifecycle changes do not rewrite earlier queued snapshots.
+Covers: dependency Job configuration, `job.completed` internal event hook, dependency-trigger Work Item creation
+Description: Verifies F15 exposes the completion-event contract that F16 can call after real runtime completion.
 
 Setup:
-1. Create and activate a Job, then use Run now once so revision 1 has a queued history item
+1. Create ACTIVE Jobs named `F15 Upstream` and `F15 Downstream` for active managed Workers
+2. Configure `F15 Downstream` to depend on `F15 Upstream`
 
 Steps:
-1. Edit the Job objective and completion criteria and save
-2. Pause the Job, then resume it
-3. Inspect Job history
+1. Open Jobs → Triggers and enter event key `job.completed`
+2. Choose `F15 Upstream` as Source Job, leave Source Work Item as `qa-source-item`, and emit the event
+3. Open Work Queue
 
-Expected: The Job revision increases, the Job returns to ACTIVE after resume, and the earlier Work Item still shows its original job revision instead of being rewritten by the edit.
+Expected: `F15 Downstream` receives a QUEUED Work Item whose trigger type is dependency; no Run or provider execution is shown.
 
-## Test 4 - Cancel a queued Work Item
+## Test 4 - Persist API trigger and show the credential boundary
 Viewport: desktop
-Covers: POST /api/v1/organizations/:organizationId/work-items/:workItemId/cancel, queue state transition, durable cancellation
-Description: Verifies humans can remove queued work before a runtime claims it.
+Covers: API-trigger configuration, Agent credential boundary, runtime POST /api/v1/runtime/organizations/:organizationId/jobs/:jobId/trigger contract
+Description: Verifies API automation is explicitly opt-in and tied to the bound Agent Identity rather than a second trigger secret. The machine-to-machine runtime endpoint itself is intentionally not invoked by browser QA because its bearer credential is one-time secret material.
 
 Setup:
-1. Create an ACTIVE Job and queue one Work Item using Run now
+1. Create an ACTIVE managed Worker with an ACTIVE Job
 
 Steps:
-1. Open Work Queue
-2. Cancel the QUEUED Work Item
+1. Open Jobs → Triggers and enable authenticated API trigger
+2. Save the trigger configuration
+3. Refresh and inspect the API trigger section
+
+Expected: API trigger remains enabled, the runtime POST endpoint is visible, and the UI states that the bound Agent Identity credential authenticates the trigger.
+
+## Test 5 - Configure triggers through API v2 on mobile
+Viewport: mobile
+Covers: v2 Trigger workspace/config routes, responsive scheduler controls, interval scheduling
+Description: Verifies the v2 adapter maps to the same canonical Scheduler domain on a phone-sized viewport.
+
+Setup:
+1. Create an ACTIVE managed Worker and ACTIVE Job named `F15 Mobile Job`
+
+Steps:
+1. Open mobile navigation → Jobs, switch to API v2, then open Triggers
+2. Select `F15 Mobile Job`, enable an interval schedule every 30 minutes and API trigger, then save
 3. Refresh the page
 
-Expected: The item persists as CANCELLED with its Job/Worker/correlation history intact and can no longer be cancelled again as a queued item.
-
-## Test 5 - Use Jobs and Work Queue through API v2 on mobile
-Viewport: mobile
-Covers: GET/POST/PUT v2 Jobs routes, v2 Work Items routes, responsive Jobs navigation and forms
-Description: Verifies the v2 adapter and phone-sized Jobs experience map to the same canonical domain.
-
-Setup:
-1. Create an ACTIVE managed Worker
-
-Steps:
-1. Open mobile navigation, choose Jobs and switch to API v2
-2. Create a Job, edit it, activate it and use Run now
-3. Switch to Work Queue and inspect the queued item
-
-Expected: The v2 Job changes persist, the queued Work Item is visible with the same canonical fields, and Jobs/Queue controls remain usable without horizontal clipping.
+Expected: The v2 trigger configuration persists, the interval and API settings remain visible, and the trigger controls fit the mobile viewport without horizontal clipping.
