@@ -70,6 +70,12 @@ Foundation 13 separates the business-facing Worker from the security-facing Agen
 
 Roles, responsibilities, instructions, departments, supervisors and working hours are management context only. Role capability recommendations never grant capabilities, Worker instructions never override policy, and Worker lifecycle does not mutate Agent Identity or Incident Controls. Supervisors are validated as same-tenant human members. Foundation 13 performs no autonomous execution.
 
+## Jobs and Work Queue boundary
+
+Foundation 14 keeps work definition separate from authority and execution. Job capability requirements never grant scopes. Job activation/resume and manual queueing revalidate the Worker, bound Agent Identity and current active capability declarations before work can enter the queue.
+
+`Run now` persists a tenant-scoped Work Item only. The Work Item stores an immutable Job revision snapshot and correlation ID, but Foundation 14 has no scheduler, planner, Run Engine, Step Executor, provider call or autonomous loop. Humans may cancel only queued items. Strong queue claiming, duplicate-run protection, leases and execution idempotency remain explicitly deferred to the durable-execution foundation rather than being falsely claimed on the current key-value store.
+
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.

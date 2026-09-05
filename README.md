@@ -19,7 +19,8 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 10 — Risk engine: complete
 - Foundation 11 — Incident controls: complete
 - Foundation 12 — Productization: complete
-- Foundation 13 — Workforce & role model: implemented
+- Foundation 13 — Workforce & role model: complete
+- Foundation 14 — Jobs & work queue: implemented
 
 ## Foundation 6
 
@@ -47,7 +48,7 @@ AppDeploy's current key-value store does not provide a transactional compare-and
 
 Audit & Observability adds an application-level append-only event ledger. Critical action execution establishes an audit path before provider invocation; action, approval, agent, integration and policy events are correlated and tenant-scoped. The Audit UI provides bounded search, severity/category filters, correlation tracing and operational summaries across the most recent 200 scanned events.
 
-No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative domain mutations and audit events cannot be atomically committed together on the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
+No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative mutation and audit writes cannot be transactionally committed together with the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
 
 ## Foundation 10
 
@@ -74,6 +75,12 @@ Billing begins in `observe_only` mode. Free, Team, Business and Scale are repres
 Workforce & Role Model introduces the business-facing managed Worker abstraction. Workers bind one-to-one to existing Agent Identities and carry reusable roles, departments, human supervisors, responsibilities, instructions, working hours and workforce lifecycle state.
 
 Worker status and role recommendations do not grant security authority. Agent Identity, capabilities, policy, risk, approvals, audit and incident controls remain separate and authoritative. Foundation 13 deliberately introduces no autonomous execution; Jobs and the Work Queue begin in Foundation 14.
+
+## Foundation 14
+
+Jobs & Work Queue defines what managed Workers are expected to do. Jobs are revisioned, bound immutably to one Worker, and carry objectives, job instructions, responsibility links, required capability scopes, priority and completion criteria.
+
+Required capabilities remain requirements rather than grants. Activation/resume and manual queueing revalidate Worker/Agent state and active scopes. `Run now` creates a durable queued Work Item containing the exact Job revision snapshot and a correlation ID; it does not create a Run, call an LLM, invoke the Action Gateway or reach a provider. Scheduler/Triggers arrive in Foundation 15 and Managed Runtime execution begins in Foundation 16.
 
 ## Architecture rules
 
