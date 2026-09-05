@@ -20,7 +20,8 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 11 — Incident controls: complete
 - Foundation 12 — Productization: complete
 - Foundation 13 — Workforce & role model: complete
-- Foundation 14 — Jobs & work queue: implemented
+- Foundation 14 — Jobs & work queue: complete
+- Foundation 15 — Scheduler & trigger engine: implemented
 
 ## Foundation 6
 
@@ -80,7 +81,15 @@ Worker status and role recommendations do not grant security authority. Agent Id
 
 Jobs & Work Queue defines what managed Workers are expected to do. Jobs are revisioned, bound immutably to one Worker, and carry objectives, job instructions, responsibility links, required capability scopes, priority and completion criteria.
 
-Required capabilities remain requirements rather than grants. Activation/resume and manual queueing revalidate Worker/Agent state and active scopes. `Run now` creates a durable queued Work Item containing the exact Job revision snapshot and a correlation ID; it does not create a Run, call an LLM, invoke the Action Gateway or reach a provider. Scheduler/Triggers arrive in Foundation 15 and Managed Runtime execution begins in Foundation 16.
+Required capabilities remain requirements rather than grants. Activation/resume and manual queueing revalidate Worker/Agent state and active scopes. `Run now` creates a durable queued Work Item containing the exact Job revision snapshot and a correlation ID; it does not create a Run, call an LLM, invoke the Action Gateway or reach a provider. Foundation 15 now adds recurring and event-driven Work Item creation while Managed Runtime execution still begins in Foundation 16.
+
+## Foundation 15
+
+Scheduler & Trigger Engine allows active Jobs to create durable Work Items from recurring schedules, authenticated internal events, Agent-authenticated API calls and upstream Job completion dependencies. The single scheduler tick runs every five minutes and processes one bounded checkpointed registry page per invocation rather than draining a growing table.
+
+Schedules support daily, weekly and interval recurrence, IANA timezone interpretation, Worker working-hours deferral, and explicit missed-run handling (`skip` or one catch-up queue). Scheduled slots and API idempotency keys are deduplicated within the bounded Work Item window; strong atomic exactly-once claiming remains deferred to the durable-execution foundation.
+
+Triggers still stop at the Work Queue. Foundation 15 creates no Run, planner step, LLM call, Action Gateway request or provider side effect.
 
 ## Architecture rules
 
