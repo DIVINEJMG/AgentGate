@@ -1,73 +1,77 @@
 # Tests
 
-## Test 1 - Create a role and managed worker bound to an Agent Identity [sanity]
+## Test 1 - Create, activate and manually queue a Job [sanity]
 Viewport: desktop
-Covers: GET /api/v1/organizations/:organizationId/workforce, POST /api/v1/organizations/:organizationId/workforce/roles, POST /api/v1/organizations/:organizationId/workforce/workers, Worker↔Agent Identity binding, role defaults, supervisor, working-hours persistence
-Description: Verifies the primary F13 workflow creates a reusable role and a draft business-facing Worker anchored to an existing security identity.
+Covers: GET/POST /api/v1/organizations/:organizationId/jobs, POST /api/v1/organizations/:organizationId/jobs/:jobId/status, POST /api/v1/organizations/:organizationId/jobs/:jobId/run-now, GET /api/v1/organizations/:organizationId/work-items, durable Job revision snapshot, manual queue boundary
+Description: Verifies the primary F14 workflow turns a Worker responsibility into a durable queued Work Item without pretending the Managed Runtime exists.
 
 Setup:
-1. In Agents, register an active Agent Identity named `F13 QA Agent`
+1. Create an ACTIVE managed Worker named `F14 QA Worker` with responsibility `Prepare daily quality summary` and an active bound Agent Identity
 
 Steps:
-1. Open Workforce and create role `QA Analyst` with purpose `Review operational quality`, responsibility `Review daily quality signals`, instructions `Prepare concise findings`, and recommended scope `github.repository.metadata.read`
-2. Create worker `Maya QA`, bind `F13 QA Agent`, select `QA Analyst`, set department `Quality`, keep the current signed-in human as supervisor, and save Monday-Friday working hours
-3. Refresh Workforce and select `Maya QA`
+1. Open Jobs and create `Daily Quality Summary` for `F14 QA Worker` with objective `Prepare the daily quality summary`, link the Worker responsibility, choose NORMAL priority, add completion criterion `Summary is ready for supervisor review`, and save
+2. Activate the Job and click `Run now`
+3. Open Work Queue, refresh the page and inspect the queued item
 
-Expected: `Maya QA` persists as DRAFT with role `QA Analyst`, department `Quality`, the current human supervisor, the bound Agent Identity, inherited role responsibility/instructions, and visible working hours; the recommended scope is shown only as role metadata and has not granted a capability.
+Expected: The Job persists as ACTIVE and the Work Queue contains a QUEUED item with the Job revision, Worker, priority, correlation ID and `Run not created yet`; no autonomous execution is presented as having occurred.
 
-## Test 2 - Edit a worker and change workforce lifecycle without mutating Agent Identity
+## Test 2 - Block activation when a required capability is not active
 Viewport: desktop
-Covers: PUT /api/v1/organizations/:organizationId/workforce/workers/:workerId, POST /api/v1/organizations/:organizationId/workforce/workers/:workerId/status, worker lifecycle separation from Agent Identity
-Description: Verifies worker management state is durable and remains separate from the security identity lifecycle.
+Covers: required capability validation, activation readiness guardrail, Agent capability separation
+Description: Verifies a Job requirement cannot silently become an Agent permission.
 
 Setup:
-1. Create an active Agent Identity, a workforce role, and a draft worker bound to that identity through the UI
+1. Connect a GitHub integration so `github.repository.metadata.read` exists in the capability catalog
+2. Create an ACTIVE Worker whose bound Agent does not declare `github.repository.metadata.read`
 
 Steps:
-1. Edit the worker department, responsibilities, instructions and working hours and save
-2. Activate the worker, then pause it
-3. Open Agents and inspect the bound Agent Identity
+1. Create a DRAFT Job for that Worker requiring `github.repository.metadata.read`
+2. Attempt to activate the Job
+3. Inspect the visible error and the Job state
 
-Expected: Workforce retains the edited profile and PAUSED status while the bound Agent Identity remains ACTIVE; the UI explains that Worker lifecycle does not replace Agent/Incident security controls.
+Expected: Activation is rejected with a missing-active-capability message, the Job remains DRAFT, and no capability is automatically granted to the Agent.
 
-## Test 3 - Prevent a second managed worker from reusing a bound Agent Identity
+## Test 3 - Edit, pause and resume a Job while preserving history
 Viewport: desktop
-Covers: one-to-one Worker↔Agent Identity guardrail, POST workforce worker validation, safe identity selection
-Description: Verifies a security Agent Identity cannot silently represent multiple non-archived managed workers.
+Covers: PUT /api/v1/organizations/:organizationId/jobs/:jobId, Job revisioning, pause/resume lifecycle, Job history
+Description: Verifies edits produce a new Job revision and lifecycle changes do not rewrite earlier queued snapshots.
 
 Setup:
-1. Create `F13 Bound Agent`, a role, and one managed worker bound to that Agent Identity
+1. Create and activate a Job, then use Run now once so revision 1 has a queued history item
 
 Steps:
-1. Open Create worker again
-2. Inspect the Agent Identity selector
-3. Attempt to choose an identity for the second worker
+1. Edit the Job objective and completion criteria and save
+2. Pause the Job, then resume it
+3. Inspect Job history
 
-Expected: `F13 Bound Agent` is unavailable for the second worker because it is already bound; no duplicate managed-worker binding can be created.
+Expected: The Job revision increases, the Job returns to ACTIVE after resume, and the earlier Work Item still shows its original job revision instead of being rewritten by the edit.
 
-## Test 4 - Edit roles and workers through API v2 compatibility
+## Test 4 - Cancel a queued Work Item
 Viewport: desktop
-Covers: GET /api/v2/organizations/:organizationId/workforce, PUT /api/v2/organizations/:organizationId/workforce/roles/:roleId, PUT /api/v2/organizations/:organizationId/workforce/workers/:workerId, POST /api/v2/organizations/:organizationId/workforce/workers/:workerId/status, v2 workforce adapters
-Description: Verifies v2 maps to the same canonical Workforce domain.
+Covers: POST /api/v1/organizations/:organizationId/work-items/:workItemId/cancel, queue state transition, durable cancellation
+Description: Verifies humans can remove queued work before a runtime claims it.
 
 Setup:
-1. Create a workforce role and draft worker through the UI
+1. Create an ACTIVE Job and queue one Work Item using Run now
 
 Steps:
-1. Switch Workforce to API v2 and edit the role purpose/default instructions
-2. Edit the worker profile and activate it
-3. Refresh Workforce while API v2 remains selected
+1. Open Work Queue
+2. Cancel the QUEUED Work Item
+3. Refresh the page
 
-Expected: Role and worker changes persist, the worker is ACTIVE, and v2 renders the same business/security binding without contract-shape errors.
+Expected: The item persists as CANCELLED with its Job/Worker/correlation history intact and can no longer be cancelled again as a queued item.
 
-## Test 5 - Manage the Workforce directory on mobile
+## Test 5 - Use Jobs and Work Queue through API v2 on mobile
 Viewport: mobile
-Covers: responsive Workforce navigation, worker directory/profile, role catalog, mobile create/edit forms, working-hours controls
-Description: Verifies F13 remains usable from a phone-sized viewport.
+Covers: GET/POST/PUT v2 Jobs routes, v2 Work Items routes, responsive Jobs navigation and forms
+Description: Verifies the v2 adapter and phone-sized Jobs experience map to the same canonical domain.
+
+Setup:
+1. Create an ACTIVE managed Worker
 
 Steps:
-1. Open mobile navigation and choose Workforce
-2. Inspect the Worker directory, a Worker profile and the Role catalog
-3. Open the create/edit Worker form and review Agent Identity, role, supervisor and working-hours controls
+1. Open mobile navigation, choose Jobs and switch to API v2
+2. Create a Job, edit it, activate it and use Run now
+3. Switch to Work Queue and inspect the queued item
 
-Expected: Workforce content and forms remain readable and usable without horizontal clipping, and autonomous execution is clearly shown as not active yet.
+Expected: The v2 Job changes persist, the queued Work Item is visible with the same canonical fields, and Jobs/Queue controls remain usable without horizontal clipping.
