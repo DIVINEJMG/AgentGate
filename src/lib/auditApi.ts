@@ -1,6 +1,6 @@
 import { api } from '@appdeploy/client';
 import type { ApiVersion } from './systemApi';
-export type AuditCategory='identity'|'integration'|'policy'|'action'|'approval'|'risk'|'incident'|'security'|'system';export type AuditSeverity='info'|'warning'|'critical';export type AuditActorType='human'|'agent'|'system';
+export type AuditCategory='identity'|'workforce'|'integration'|'policy'|'action'|'approval'|'risk'|'incident'|'security'|'system';export type AuditSeverity='info'|'warning'|'critical';export type AuditActorType='human'|'agent'|'system';
 export interface AuditEvent{id:string;organizationId:string;eventType:string;category:AuditCategory;severity:AuditSeverity;actor:{type:AuditActorType;id:string;label:string|null};resource:{type:string;id:string;name:string|null};correlationId:string|null;outcome:string|null;summary:string;metadata:Record<string,string|number|boolean|null>;occurredAt:string}
 export interface AuditResult{events:AuditEvent[];summary:{visible:number;bySeverity:Record<AuditSeverity,number>;byCategory:Record<AuditCategory,number>;uniqueCorrelations:number;latestAt:string|null};window:{scanned:number;limit:number;truncated:boolean}}
 interface V2Event{identity:{id:string;eventType:string;category:AuditCategory;severity:AuditSeverity;occurredAt:string};actor:AuditEvent['actor'];resource:AuditEvent['resource'];trace:{correlationId:string|null};outcome:string|null;summary:string;metadata:AuditEvent['metadata']}

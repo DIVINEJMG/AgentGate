@@ -18,7 +18,8 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 9 — Audit & observability: complete
 - Foundation 10 — Risk engine: complete
 - Foundation 11 — Incident controls: complete
-- Foundation 12 — Productization: implemented
+- Foundation 12 — Productization: complete
+- Foundation 13 — Workforce & role model: implemented
 
 ## Foundation 6
 
@@ -46,7 +47,7 @@ AppDeploy's current key-value store does not provide a transactional compare-and
 
 Audit & Observability adds an application-level append-only event ledger. Critical action execution establishes an audit path before provider invocation; action, approval, agent, integration and policy events are correlated and tenant-scoped. The Audit UI provides bounded search, severity/category filters, correlation tracing and operational summaries across the most recent 200 scanned events.
 
-No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative mutation and audit writes cannot be transactionally committed together on the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
+No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative domain mutations and audit events cannot be atomically committed together on the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
 
 ## Foundation 10
 
@@ -67,6 +68,12 @@ Incident lifecycle is `open → acknowledged → resolved`. Resolution does not 
 Productization adds workspace settings, onboarding/readiness, bounded operational analytics, an explicit pricing catalog and operator documentation without weakening the security control plane.
 
 Billing begins in `observe_only` mode. Free, Team, Business and Scale are represented as a commercial catalog, but no payment provider is connected, no checkout is exposed and limits are advisory. A future billing adapter can enforce entitlements only after server-side subscription state and verified provider webhooks exist.
+
+## Foundation 13
+
+Workforce & Role Model introduces the business-facing managed Worker abstraction. Workers bind one-to-one to existing Agent Identities and carry reusable roles, departments, human supervisors, responsibilities, instructions, working hours and workforce lifecycle state.
+
+Worker status and role recommendations do not grant security authority. Agent Identity, capabilities, policy, risk, approvals, audit and incident controls remain separate and authoritative. Foundation 13 deliberately introduces no autonomous execution; Jobs and the Work Queue begin in Foundation 14.
 
 ## Architecture rules
 
