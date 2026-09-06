@@ -1,5 +1,7 @@
 # AgentGate
 
+Foundation 21 adds durable execution reliability on the existing AppDeploy database: verified lease claims, worker heartbeats, restart recovery, stable action idempotency, bounded exponential backoff, dead-letter Work Items, and cursor-checkpointed scheduling. No separate PostgreSQL service is required.
+
 **An SOT Product**
 
 AgentGate is the control layer for supervising AI workers inside small and growing organizations. It is built as a security-first modular monolith with a stable canonical core, replaceable provider edges, coexistence-ready API versions, and deterministic authorization as the final authority.
@@ -137,3 +139,4 @@ AgentGate deliberately does not compute an employee quality or productivity scor
 3. Security is architecture, not a pre-launch phase.
 4. Dangerous actions must be attributable and explainable.
 5. AppDeploy is the deployment environment, not the domain boundary.
+
