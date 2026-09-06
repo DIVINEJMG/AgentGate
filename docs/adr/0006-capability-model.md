@@ -1,7 +1,7 @@
 # ADR 0006 — Canonical resources, actions and scopes
 
 ## Context
-Provider adapters expose different operation names and resource models. AgentGate needs a stable vocabulary for policy evaluation without coupling policies to GitHub-specific implementation details or treating connectivity as authorization.
+Provider adapters expose different operation names and resource models. Audoryn needs a stable vocabulary for policy evaluation without coupling policies to GitHub-specific implementation details or treating connectivity as authorization.
 
 ## Decision
 Every active integration projects one or more canonical resources. Provider adapters declare structured capability descriptors containing a canonical action, target, provider operation, stable scope, description and risk class.
@@ -20,3 +20,4 @@ Disconnected integrations are excluded from the live capability catalog. Previou
 
 ## Consequences
 Foundation 6 can evaluate one stable resource/action/scope model regardless of provider. Future adapters add capability descriptors without rewriting the policy domain. Capability declarations remain useful intent metadata while fail-closed authorization is preserved.
+

@@ -1,10 +1,10 @@
-# AgentGate
+# Audoryn
 
 Foundation 21 adds durable execution reliability on the existing AppDeploy database: verified lease claims, worker heartbeats, restart recovery, stable action idempotency, bounded exponential backoff, dead-letter Work Items, and cursor-checkpointed scheduling. No separate PostgreSQL service is required.
 
 **An SOT Product**
 
-AgentGate is the control layer for supervising AI workers inside small and growing organizations. It is built as a security-first modular monolith with a stable canonical core, replaceable provider edges, coexistence-ready API versions, and deterministic authorization as the final authority.
+Audoryn is the control layer for supervising AI workers inside small and growing organizations. It is built as a security-first modular monolith with a stable canonical core, replaceable provider edges, coexistence-ready API versions, and deterministic authorization as the final authority.
 
 ## Current checkpoint
 
@@ -48,7 +48,7 @@ Only `ALLOW` can invoke an integration adapter. `DENY` never reaches the provide
 
 Human Approvals turns held actions into an explicit reviewer workflow. Roles with `approvals.review` can inspect pending requests and record an immutable approve or reject decision through API v1 or v2 and the responsive Approvals control-plane surface.
 
-Approve does not blindly execute stale authority: AgentGate revalidates the original agent credential fingerprint, agent lifecycle, integration, declared scope, provider operation and current policy before resuming the exact held action. Reject permanently blocks it. Approval requests may send a best-effort push alert to an eligible agent owner who has enabled notifications.
+Approve does not blindly execute stale authority: Audoryn revalidates the original agent credential fingerprint, agent lifecycle, integration, declared scope, provider operation and current policy before resuming the exact held action. Reject permanently blocks it. Approval requests may send a best-effort push alert to an eligible agent owner who has enabled notifications.
 
 AppDeploy's current key-value store does not provide a transactional compare-and-set primitive, so provider writes remain disabled and concurrent approval serialization is not claimed as exactly-once.
 
@@ -60,7 +60,7 @@ No synthetic backfill is created for older foundations: audit coverage begins wi
 
 ## Foundation 10
 
-The Risk Engine deterministically combines a provider capability's baseline risk with bounded recent AgentGate behavior. Burst requests, repeated blocks, repeated provider failures, approval pressure and truncated history can each raise risk by one level, capped at `critical`. Risk never silently lowers the provider baseline.
+The Risk Engine deterministically combines a provider capability's baseline risk with bounded recent Audoryn behavior. Burst requests, repeated blocks, repeated provider failures, approval pressure and truncated history can each raise risk by one level, capped at `critical`. Risk never silently lowers the provider baseline.
 
 The effective risk is evaluated before policy matching in both Decision Lab and the Action Gateway. Approved held actions recompute risk during reauthorization, so changed behavior can invalidate stale authority. Risk assessment failures fail closed in the execution path. Runtime risk assessments are stored on action records and emitted into the correlated audit stream.
 
@@ -116,9 +116,9 @@ Successful Runs also persist a JSON result artifact in AppDeploy Storage. Artifa
 
 ## Foundation 18
 
-Workplace Tool Expansion moves AgentGate beyond GitHub with provider adapters for Gmail, Google Drive, Slack and Google Calendar. Each adapter uses a fixed official API origin and exposes bounded read-only operations through the same canonical capability and Action Gateway path used by GitHub.
+Workplace Tool Expansion moves Audoryn beyond GitHub with provider adapters for Gmail, Google Drive, Slack and Google Calendar. Each adapter uses a fixed official API origin and exposes bounded read-only operations through the same canonical capability and Action Gateway path used by GitHub.
 
-Credential-backed workplace providers require AgentGate's encrypted integration vault. F18 validates manually supplied access tokens and encrypts them at rest, but does not claim OAuth refresh lifecycle. Generic REST / MCP remains deliberately guarded: arbitrary outbound URLs cannot be connected or executed until an explicit origin allowlist and stronger egress-validation boundary exist.
+Credential-backed workplace providers require Audoryn's encrypted integration vault. F18 validates manually supplied access tokens and encrypts them at rest, but does not claim OAuth refresh lifecycle. Generic REST / MCP remains deliberately guarded: arbitrary outbound URLs cannot be connected or executed until an explicit origin allowlist and stronger egress-validation boundary exist.
 
 ## Foundation 19
 
@@ -130,7 +130,7 @@ Supervisor interventions are restrictive, not authorizing: a supervisor can canc
 
 Workforce Performance & Operations adds a read-only operational analytics layer over existing managed Workers, Runs, Actions, Approvals, Escalations and Incidents. It reports run success/failure trends, completion counts, approval rate, blocked actions, escalation and incident frequency, run durations, department rollups, tool reliability and recent Worker activity.
 
-AgentGate deliberately does not compute an employee quality or productivity score. Tool reliability counts only actual provider attempts (`executed / (executed + provider-failed)`), while policy blocks and approval holds remain separate governance outcomes. Analytics reads are bounded and surface truncation explicitly rather than presenting incomplete windows as all-time totals.
+Audoryn deliberately does not compute an employee quality or productivity score. Tool reliability counts only actual provider attempts (`executed / (executed + provider-failed)`), while policy blocks and approval holds remain separate governance outcomes. Analytics reads are bounded and surface truncation explicitly rather than presenting incomplete windows as all-time totals.
 
 ## Architecture rules
 
@@ -139,4 +139,5 @@ AgentGate deliberately does not compute an employee quality or productivity scor
 3. Security is architecture, not a pre-launch phase.
 4. Dangerous actions must be attributable and explainable.
 5. AppDeploy is the deployment environment, not the domain boundary.
+
 

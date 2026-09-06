@@ -4,7 +4,7 @@
 Accepted for Foundation 15.
 
 ## Context
-Foundation 14 can create durable Work Items only when a human presses Run now. AgentGate Workforce needs recurring and event-driven work without allowing scheduling to become an execution or authorization bypass.
+Foundation 14 can create durable Work Items only when a human presses Run now. Audoryn Workforce needs recurring and event-driven work without allowing scheduling to become an execution or authorization bypass.
 
 ## Decision
 - One AppDeploy cron invokes the Workforce scheduler every five minutes, the platform minimum.
@@ -19,4 +19,5 @@ Foundation 14 can create durable Work Items only when a human presses Run now. A
 - All trigger types share the F14 readiness checks, Work Item snapshot, correlation ID, audit path and trigger history.
 
 ## Consequences
-AgentGate can now create work automatically without pretending the Managed Runtime exists. The current KV store cannot provide atomic compare-and-set, so concurrent exactly-once guarantees remain out of scope until Foundation 21 durable execution.
+Audoryn can now create work automatically without pretending the Managed Runtime exists. The current KV store cannot provide atomic compare-and-set, so concurrent exactly-once guarantees remain out of scope until Foundation 21 durable execution.
+

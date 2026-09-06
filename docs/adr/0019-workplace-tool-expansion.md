@@ -4,7 +4,7 @@
 Accepted for Foundation 18.
 
 ## Context
-AgentGate's Action Gateway and provider adapter boundary are provider-neutral, but GitHub is the only implemented external system. The workforce runtime needs useful workplace context without introducing direct provider calls, arbitrary outbound URLs, fake OAuth lifecycle claims or a provider-specific authorization path.
+Audoryn's Action Gateway and provider adapter boundary are provider-neutral, but GitHub is the only implemented external system. The workforce runtime needs useful workplace context without introducing direct provider calls, arbitrary outbound URLs, fake OAuth lifecycle claims or a provider-specific authorization path.
 
 ## Decision
 - F18 adds Gmail, Google Drive, Slack and Google Calendar adapters behind the existing `IntegrationAdapter` contract.
@@ -14,7 +14,8 @@ AgentGate's Action Gateway and provider adapter boundary are provider-neutral, b
 - Credential-backed providers require the existing encrypted integration vault. F18 accepts manually supplied provider access tokens, validates them once, encrypts them at rest and makes no claim of implementing provider OAuth refresh lifecycle.
 - Token expiry or revoked scopes surface through the normal degraded health state. Reconnection/replacement is required until a later OAuth lifecycle foundation exists.
 - Provider capabilities remain technical availability, not Agent authority. Every runtime operation still resolves through capability declaration, risk, deterministic policy, approvals when required, audit and incident controls before `executeOperation` runs.
-- Generic REST / MCP is represented as a guarded adapter but cannot connect or execute. Arbitrary URLs remain disabled until AgentGate has explicit outbound-origin allowlisting and egress validation robust enough to address SSRF and DNS-rebinding risk.
+- Generic REST / MCP is represented as a guarded adapter but cannot connect or execute. Arbitrary URLs remain disabled until Audoryn has explicit outbound-origin allowlisting and egress validation robust enough to address SSRF and DNS-rebinding risk.
 
 ## Consequences
-AgentGate moves beyond GitHub with real workplace read surfaces while preserving one authorization path. Write-side workplace actions, token refresh/OAuth app management and generic outbound egress remain explicit future work rather than hidden security debt.
+Audoryn moves beyond GitHub with real workplace read surfaces while preserving one authorization path. Write-side workplace actions, token refresh/OAuth app management and generic outbound egress remain explicit future work rather than hidden security debt.
+

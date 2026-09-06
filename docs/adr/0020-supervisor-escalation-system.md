@@ -4,7 +4,7 @@
 Accepted for Foundation 19.
 
 ## Context
-Managed AgentGate Workers can now plan and execute bounded work through the existing control plane. Autonomous work still needs a normal human operating model when a Job fails, policy demands intervention, or effective risk becomes elevated.
+Managed Audoryn Workers can now plan and execute bounded work through the existing control plane. Autonomous work still needs a normal human operating model when a Job fails, policy demands intervention, or effective risk becomes elevated.
 
 ## Decision
 - Every managed Worker continues to carry one validated human `supervisorUserId`; F19 makes that relationship operational by routing escalation records to the supervisor by default.
@@ -19,3 +19,4 @@ Managed AgentGate Workers can now plan and execute bounded work through the exis
 
 ## Consequences
 Human supervision becomes part of normal autonomous work without creating a second authorization plane. Performance analytics remain deferred to F20 and strong queue/lease atomicity remains deferred to F21.
+

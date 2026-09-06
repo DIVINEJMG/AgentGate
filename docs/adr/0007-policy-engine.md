@@ -1,7 +1,7 @@
 # ADR 0007 — Deterministic policy engine
 
 ## Context
-AgentGate now knows human identities, non-human agents, provider connections, canonical resources, actions and scopes. It needs an authorization decision layer before any action gateway can safely execute provider operations.
+Audoryn now knows human identities, non-human agents, provider connections, canonical resources, actions and scopes. It needs an authorization decision layer before any action gateway can safely execute provider operations.
 
 ## Decision
 Foundation 6 introduces a provider-neutral policy record with an effect (`allow`, `deny`, or `require_approval`), integer priority, enabled/disabled lifecycle state, revision number, and selectors for agents, resources, actions, scopes and capability risk.
@@ -22,3 +22,4 @@ Policy evaluation is side-effect free. Foundation 6 provides dry-run evaluation 
 - A policy record can be disabled without deleting its history; every modification increments its revision.
 - The policy engine remains independent of GitHub or any future provider.
 - Approval decisions can be represented before the approval queue itself exists.
+

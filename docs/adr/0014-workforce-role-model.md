@@ -4,7 +4,7 @@
 Accepted for Foundation 13.
 
 ## Context
-AgentGate F0–F12 established the security control plane. The Workforce Runtime architecture adds a business-facing managed Worker abstraction while preserving Agent Identity as the security-facing identity.
+Audoryn F0–F12 established the security control plane. The Workforce Runtime architecture adds a business-facing managed Worker abstraction while preserving Agent Identity as the security-facing identity.
 
 ## Decision
 - A Worker belongs to exactly one organization and binds immutably to one existing Agent Identity.
@@ -19,3 +19,4 @@ AgentGate F0–F12 established the security control plane. The Workforce Runtime
 
 ## Consequences
 The product can present an understandable AI workforce directory without weakening the existing control plane. Future Jobs and Runtime foundations can reference Worker IDs while all external execution continues through Agent Identity and the Action Gateway.
+

@@ -17,7 +17,7 @@ function table(organizationId: string, correlationId: string) {
 
 export async function markRuntimeCorrelationCancelled(organizationId: string, correlationId: string, runId: string, cancelledBy: string, reason: string) {
   const { items, nextToken } = await db.list<RuntimeCancellationRecord>(table(organizationId, correlationId), { limit: 2 });
-  if (nextToken || items.length > 1) throw new Error('Runtime cancellation state is ambiguous. AgentGate fails closed.');
+  if (nextToken || items.length > 1) throw new Error('Runtime cancellation state is ambiguous. Audoryn fails closed.');
   if (items[0]) return items[0];
   const record: RuntimeCancellationRecord = { organizationId, correlationId, runId, reason: reason.slice(0, 500), cancelledBy, cancelledAt: new Date().toISOString() };
   const [id] = await db.add(table(organizationId, correlationId), [record]);
@@ -30,3 +30,4 @@ export async function assertRuntimeCorrelationAllowed(organizationId: string, co
   if (nextToken || items.length > 1) throw new Error('Runtime cancellation state is ambiguous. Execution is denied.');
   if (items[0]) throw new Error(`Managed Run was cancelled: ${items[0].reason}`);
 }
+
