@@ -249,6 +249,8 @@ export async function validateAgentForApprovalResume(organizationId: string, age
 
 export async function getAgentForRuntime(organizationId: string, agentId: string) { const record = await loadAgent(organizationId, agentId); if (record.organizationId !== organizationId) throw new AgentDomainError('Agent identity not found.', 404); return publicAgent(agentId, record); }
 
+export async function validateAgentForManagedRuntime(organizationId: string, agentId: string) { const current = await loadAgent(organizationId, agentId); if (current.organizationId !== organizationId || current.status !== 'active' || current.credentialStatus !== 'active' || !current.credentialRecordId) throw new AgentDomainError('Managed Runtime Agent Identity is not active.', 403); const [credential] = await db.get<CredentialRecord>(credentialsTable(organizationId), [current.credentialRecordId]); if (!credential || credential.organizationId !== organizationId || credential.agentId !== agentId || credential.revokedAt || !credential.scopes.includes('agent.authenticate')) throw new AgentDomainError('Managed Runtime Agent credential is unavailable or revoked.', 401); if (credential.expiresAt && new Date(credential.expiresAt).getTime() <= Date.now()) throw new AgentDomainError('Managed Runtime Agent credential has expired.', 401); return publicAgent(agentId, current); }
+
 export async function getAgentForUser(userId: string, organizationId: string, agentId: string) { await requireAgentAccess(userId, organizationId, 'agents.read'); return getAgentForRuntime(organizationId, agentId); }
 
 export function serializeAgentV2(agent: ReturnType<typeof publicAgent>) {
