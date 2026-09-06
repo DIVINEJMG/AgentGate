@@ -92,6 +92,14 @@ External action steps invoke the same Action Gateway used by direct Agent reques
 
 Work Item claims use random lease tokens and re-read verification, but the current KV store has no atomic compare-and-set primitive. AgentGate therefore does not claim strong exactly-once execution under a simultaneous claiming race. Action idempotency remains authoritative for provider requests; provider writes remain outside the current read-only adapter surface. Autonomous AI execution is intentionally hourly and limited to one AI Run per cron invocation, while the five-minute scheduler performs no AI work.
 
+## Memory and artifact boundary
+
+Foundation 17 treats memory as untrusted context, never as authorization. Managed Runtime may automatically persist only Run Memory. Worker Memory and Organization Knowledge require a same-tenant human with `memory.manage`; promotion from Run Memory to Worker Memory is an explicit human action.
+
+Context assembly is bounded, excludes archived/expired records and stores the selected memory IDs on the Run for traceability. Memory content is never evaluated as capability state and cannot alter risk, deterministic policy, approvals or incident controls. Expiry means a record is no longer context-eligible; F17 does not claim physical retention deletion.
+
+Successful Run artifacts are stored separately in AppDeploy Storage with tenant-scoped metadata. Access requires `artifacts.read` and is issued through short-lived signed URLs. Provider credentials and Agent credentials are never written into memory or artifacts by this foundation.
+
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.
