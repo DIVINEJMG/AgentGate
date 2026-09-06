@@ -60,9 +60,10 @@ export default function SchedulerPanel({ organization, apiVersion, jobs, workers
         <History loading={loading} history={history} selected={Boolean(selected)}/>
       </section>
     </div>
-    {(data.window.configsTruncated||data.window.historyTruncated) && <p className="audit-window-note">The bounded trigger read window is truncated; AgentGate is not inventing totals beyond the scanned window.</p>}
+    {(data.window.configsTruncated||data.window.historyTruncated) && <p className="audit-window-note">The bounded trigger read window is truncated; Audoryn is not inventing totals beyond the scanned window.</p>}
   </div>;
 }
 function Summary({label,value}:{label:string;value:number}){return <div><span>{label}</span><strong>{value}</strong></div>}
 function History({loading,history,selected}:{loading:boolean;history:TriggerHistory[];selected:boolean}){return <div className="trigger-history"><div className="section-title"><div><p className="panel-kicker">TRIGGER HISTORY</p><h3>{selected?'Selected Job':'Recent triggers'}</h3></div><CheckCircle2 size={17}/></div>{loading?<p>Loading trigger history…</p>:history.length===0?<p>No trigger attempts recorded yet.</p>:history.map((item)=><div className="trigger-history-row" key={item.id}><span className={`trigger-outcome ${item.outcome}`}>{item.outcome}</span><div><strong>{item.triggerType.replace('_',' ')}</strong><span>{new Date(item.occurredAt).toLocaleString()} · {item.key??'no key'}</span>{item.reason&&<small>{item.reason}</small>}</div></div>)}</div>}
 function errorText(value:unknown){const data=value as{response?:{data?:{error?:string}};message?:string};return data.response?.data?.error||data.message||'Trigger request failed.'}
+

@@ -17,4 +17,5 @@ Foundation 16 can execute durable Runs, but each Run starts without durable busi
 - Artifact/memory persistence is part of the completion path; it does not introduce direct provider execution.
 
 ## Consequences
-Workers gain continuity and inspectable durable outputs while authority remains entirely in the existing AgentGate control plane. Long-term self-writing memory, embeddings/vector search, bulk retention deletion and cross-provider knowledge ingestion remain outside F17.
+Workers gain continuity and inspectable durable outputs while authority remains entirely in the existing Audoryn control plane. Long-term self-writing memory, embeddings/vector search, bulk retention deletion and cross-provider knowledge ingestion remain outside F17.
+

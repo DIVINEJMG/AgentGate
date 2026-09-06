@@ -1,10 +1,10 @@
-# AgentGate Security Policy
+# Audoryn Security Policy
 
 ## Durable execution controls
 
-Managed workers use lease fencing and stable Action Gateway idempotency keys. A stale worker cannot renew a superseded lease, expired work is recovered with a bounded retry policy, and repeated expiry is dead-lettered. AppDeploy database does not expose transactional compare-and-swap, so AgentGate documents this as verified at-least-once execution with idempotent external action boundaries rather than claiming strict exactly-once execution.
+Managed workers use lease fencing and stable Action Gateway idempotency keys. A stale worker cannot renew a superseded lease, expired work is recovered with a bounded retry policy, and repeated expiry is dead-lettered. AppDeploy database does not expose transactional compare-and-swap, so Audoryn documents this as verified at-least-once execution with idempotent external action boundaries rather than claiming strict exactly-once execution.
 
-AgentGate is security-sensitive infrastructure. Security controls are architectural requirements.
+Audoryn is security-sensitive infrastructure. Security controls are architectural requirements.
 
 ## Baseline principles
 
@@ -44,15 +44,15 @@ The first executable provider surface is intentionally read-only GitHub metadata
 
 Foundation 8 persists a pending approval before a `REQUIRE_APPROVAL` action becomes reviewable. Only a same-tenant human with `approvals.review` may decide it. Decisions are immutable once persisted: an approved record cannot later become rejected and a rejected record cannot later become approved.
 
-Approval does not reuse stale authority. Before provider execution, AgentGate verifies that the initiating agent is still active, the same credential fingerprint is still current and valid, the integration remains connected, the exact provider operation still exists, the agent still declares the scope, and current policy does not resolve to `DENY`. Any failed revalidation blocks execution. Push notification delivery is best-effort and never changes authorization state.
+Approval does not reuse stale authority. Before provider execution, Audoryn verifies that the initiating agent is still active, the same credential fingerprint is still current and valid, the integration remains connected, the exact provider operation still exists, the agent still declares the scope, and current policy does not resolve to `DENY`. Any failed revalidation blocks execution. Push notification delivery is best-effort and never changes authorization state.
 
-Because the current AppDeploy key-value store exposes no transactional compare-and-set primitive, AgentGate does not claim strong serialization for simultaneous competing approval clicks. Provider execution remains read-only until a storage boundary suitable for atomic decision/idempotency locking is available.
+Because the current AppDeploy key-value store exposes no transactional compare-and-set primitive, Audoryn does not claim strong serialization for simultaneous competing approval clicks. Provider execution remains read-only until a storage boundary suitable for atomic decision/idempotency locking is available.
 
 ## Audit boundary
 
 Foundation 9 exposes no audit update or delete API. Events are appended to a tenant-scoped ledger and can be read only by humans with `audit.read`. Correlation IDs connect agent requests, authorization outcomes, approvals and provider results. New provider execution is denied when its required pre-execution audit event cannot be persisted.
 
-Administrative domain mutations and audit events cannot be atomically committed together with the current AppDeploy KV store. Those management events are therefore best-effort and failures are surfaced to backend observability logs. AgentGate does not claim database-level WORM guarantees or transactional audit completeness until a storage boundary supporting atomic mutation/outbox semantics is available.
+Administrative domain mutations and audit events cannot be atomically committed together with the current AppDeploy KV store. Those management events are therefore best-effort and failures are surfaced to backend observability logs. Audoryn does not claim database-level WORM guarantees or transactional audit completeness until a storage boundary supporting atomic mutation/outbox semantics is available.
 
 ## Incident-control boundary
 
@@ -84,7 +84,7 @@ Foundation 14 keeps work definition separate from authority and execution. Job c
 
 Foundation 15 treats automation as a queue producer, never an authorization shortcut. Scheduled, internal-event, API and dependency triggers all create the same tenant-scoped Work Items used by manual F14 queueing. Required capabilities, Worker/Agent lifecycle, credential state and organization/agent incident controls are revalidated before a Work Item is admitted.
 
-The public runtime trigger endpoint authenticates with the bound Agent Identity's existing credential; AgentGate does not introduce a second plaintext trigger secret. Schedule slots and optional API idempotency keys receive dedupe keys, but the current key-value store has no transactional compare-and-set, so Foundation 15 does not claim strong exactly-once behavior under concurrent trigger races. The scheduler processes one bounded checkpointed registry page every five minutes and never drains a growing registry in one invocation.
+The public runtime trigger endpoint authenticates with the bound Agent Identity's existing credential; Audoryn does not introduce a second plaintext trigger secret. Schedule slots and optional API idempotency keys receive dedupe keys, but the current key-value store has no transactional compare-and-set, so Foundation 15 does not claim strong exactly-once behavior under concurrent trigger races. The scheduler processes one bounded checkpointed registry page every five minutes and never drains a growing registry in one invocation.
 
 Working-hours and missed-run policies affect when work enters the queue; they never bypass policy, approvals, risk or incident controls. No F15 path creates a Run or calls a provider.
 
@@ -94,7 +94,7 @@ Foundation 16 introduces AI planning and Run execution without creating a new au
 
 External action steps invoke the same Action Gateway used by direct Agent requests. The Managed Runtime uses a trusted server-side Agent Identity principal validated against the current credential record; the gateway still enforces capability declaration, deterministic policy, behavior risk, approvals, audit and organization/agent/integration incident controls. Held actions pause the Run rather than allowing the model to continue around an approval requirement.
 
-Work Item claims use random lease tokens and re-read verification, but the current KV store has no atomic compare-and-set primitive. AgentGate therefore does not claim strong exactly-once execution under a simultaneous claiming race. Action idempotency remains authoritative for provider requests; provider writes remain outside the current read-only adapter surface. Autonomous AI execution is intentionally hourly and limited to one AI Run per cron invocation, while the five-minute scheduler performs no AI work.
+Work Item claims use random lease tokens and re-read verification, but the current KV store has no atomic compare-and-set primitive. Audoryn therefore does not claim strong exactly-once execution under a simultaneous claiming race. Action idempotency remains authoritative for provider requests; provider writes remain outside the current read-only adapter surface. Autonomous AI execution is intentionally hourly and limited to one AI Run per cron invocation, while the five-minute scheduler performs no AI work.
 
 ## Memory and artifact boundary
 
@@ -110,7 +110,7 @@ Foundation 18 adds Gmail, Google Drive, Slack and Google Calendar without adding
 
 All F18 executable providers use fixed official API origins. User configuration cannot supply arbitrary outbound URLs. Provider access tokens require the AES-256-GCM integration vault, are never returned after connection, and are decrypted only inside the backend provider boundary. F18 does not claim OAuth refresh-token lifecycle; expired or revoked tokens degrade the connection and require replacement/reconnection.
 
-F18 workplace operations are intentionally read-only. Generic REST / MCP is fail-closed and cannot connect or execute until AgentGate has an explicit outbound-origin allowlist and egress controls strong enough to address SSRF and DNS-rebinding risk.
+F18 workplace operations are intentionally read-only. Generic REST / MCP is fail-closed and cannot connect or execute until Audoryn has an explicit outbound-origin allowlist and egress controls strong enough to address SSRF and DNS-rebinding risk.
 
 ## Supervisor and escalation boundary
 
@@ -124,11 +124,12 @@ Push notifications are best-effort and never become the source of truth. The ten
 
 Foundation 20 is observational only. `performance.read` grants tenant-scoped access to bounded operational analytics but no mutation, execution, capability, policy, approval, incident or provider authority.
 
-Performance metrics are derived from existing canonical records and never feed back into authorization. AgentGate does not create a composite employee quality, productivity or trust score. Provider reliability excludes policy blocks and approval holds from its failure denominator so security controls cannot make a tool appear unreliable. Bounded-source truncation is disclosed instead of hidden.
+Performance metrics are derived from existing canonical records and never feed back into authorization. Audoryn does not create a composite employee quality, productivity or trust score. Provider reliability excludes policy blocks and approval holds from its failure denominator so security controls cannot make a tool appear unreliable. Bounded-source truncation is disclosed instead of hidden.
 
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.
 
 Policy evaluation and runtime execution consume effective risk. Approval-time reauthorization recomputes risk instead of reusing the held snapshot. If risk assessment cannot be completed, the execution path fails closed. The behavior read is bounded to 100 action records; when that window is truncated, uncertainty conservatively raises risk rather than silently underestimating it.
+
 

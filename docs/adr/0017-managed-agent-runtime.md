@@ -4,7 +4,7 @@
 Accepted for Foundation 16.
 
 ## Context
-Foundation 15 can create durable Work Items automatically, but no component owns claiming, planning, Run creation, ordered execution, approval waiting, recovery or completion propagation. The runtime must add useful autonomy without becoming a privileged path around AgentGate security.
+Foundation 15 can create durable Work Items automatically, but no component owns claiming, planning, Run creation, ordered execution, approval waiting, recovery or completion propagation. The runtime must add useful autonomy without becoming a privileged path around Audoryn security.
 
 ## Decision
 - The Managed Runtime consumes the F14/F15 Work Queue through a small global dispatch index; the tenant-scoped Work Item remains the source of truth.
@@ -19,4 +19,5 @@ Foundation 15 can create durable Work Items automatically, but no component owns
 - The existing five-minute scheduler cron remains non-AI. Managed Runtime autonomy uses a separate hourly cron and starts at most one AI Run per cron tick; humans with `jobs.run` may execute a due Work Item immediately.
 
 ## Consequences
-AgentGate now has a real managed execution loop while preserving the control plane as the authority boundary. Strong transactional claiming, distributed leases and write-side exactly-once guarantees remain deferred to the later durable-execution foundation.
+Audoryn now has a real managed execution loop while preserving the control plane as the authority boundary. Strong transactional claiming, distributed leases and write-side exactly-once guarantees remain deferred to the later durable-execution foundation.
+
