@@ -100,6 +100,14 @@ Context assembly is bounded, excludes archived/expired records and stores the se
 
 Successful Run artifacts are stored separately in AppDeploy Storage with tenant-scoped metadata. Access requires `artifacts.read` and is issued through short-lived signed URLs. Provider credentials and Agent credentials are never written into memory or artifacts by this foundation.
 
+## Workplace tool expansion boundary
+
+Foundation 18 adds Gmail, Google Drive, Slack and Google Calendar without adding a second execution path. Provider operations remain behind the existing capability catalog, risk engine, deterministic policy, approval, audit and incident-control chain before an adapter may execute.
+
+All F18 executable providers use fixed official API origins. User configuration cannot supply arbitrary outbound URLs. Provider access tokens require the AES-256-GCM integration vault, are never returned after connection, and are decrypted only inside the backend provider boundary. F18 does not claim OAuth refresh-token lifecycle; expired or revoked tokens degrade the connection and require replacement/reconnection.
+
+F18 workplace operations are intentionally read-only. Generic REST / MCP is fail-closed and cannot connect or execute until AgentGate has an explicit outbound-origin allowlist and egress controls strong enough to address SSRF and DNS-rebinding risk.
+
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.

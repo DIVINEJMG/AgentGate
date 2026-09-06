@@ -23,7 +23,8 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 14 — Jobs & work queue: complete
 - Foundation 15 — Scheduler & trigger engine: complete
 - Foundation 16 — Managed Agent Runtime: complete
-- Foundation 17 — Memory & artifacts: implemented
+- Foundation 17 — Memory & artifacts: complete
+- Foundation 18 — Workplace Tool Expansion: implemented
 
 ## Foundation 6
 
@@ -65,7 +66,7 @@ The current behavior window scans at most 100 action records. If that bounded wi
 
 Incident Controls adds independent execution kill switches for the organization, individual agents and integrations without deleting identities, credentials or provider configuration. Fresh Action Gateway requests and approval-time resume both re-check these controls before provider execution.
 
-Incident lifecycle is `open → acknowledged → resolved`. Resolution does not automatically restore execution; recovery is a separate explicit human action with reason and audit attribution. The organization emergency stop does not erase lower-level target suspensions.
+Incident lifecycle is `open → acknowledged → resolved`. Resolution does not automatically restore execution; recovery is a separate explicit human operation with reason and audit attribution. The organization emergency stop does not erase lower-level target suspensions.
 
 ## Foundation 12
 
@@ -108,6 +109,12 @@ Memory & Artifacts adds three explicit context scopes: automatic short-lived Run
 Memory is never authority. Context is labeled untrusted in AI planning and is not passed into capability, risk, policy, approval or incident-control decisions. Long-term memory cannot be self-written by the model; a human must create it or explicitly promote Run Memory into Worker Memory.
 
 Successful Runs also persist a JSON result artifact in AppDeploy Storage. Artifact metadata remains tenant-scoped in the database and humans with `artifacts.read` receive short-lived signed URLs. F17 retention dates control future context eligibility; physical deletion is not claimed.
+
+## Foundation 18
+
+Workplace Tool Expansion moves AgentGate beyond GitHub with provider adapters for Gmail, Google Drive, Slack and Google Calendar. Each adapter uses a fixed official API origin and exposes bounded read-only operations through the same canonical capability and Action Gateway path used by GitHub.
+
+Credential-backed workplace providers require AgentGate's encrypted integration vault. F18 validates manually supplied access tokens and encrypts them at rest, but does not claim OAuth refresh lifecycle. Generic REST / MCP remains deliberately guarded: arbitrary outbound URLs cannot be connected or executed until an explicit origin allowlist and stronger egress-validation boundary exist.
 
 ## Architecture rules
 
