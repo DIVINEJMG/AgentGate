@@ -116,6 +116,12 @@ Supervisor interventions are monotonic restrictions or incident handoffs. Run ca
 
 Push notifications are best-effort and never become the source of truth. The tenant-scoped escalation inbox is authoritative. Foundation 19 does not claim the ability to undo a provider side effect that completed before a supervisor cancellation request, and does not claim strong exactly-once escalation dedupe until the durable execution work in F21.
 
+## Workforce performance boundary
+
+Foundation 20 is observational only. `performance.read` grants tenant-scoped access to bounded operational analytics but no mutation, execution, capability, policy, approval, incident or provider authority.
+
+Performance metrics are derived from existing canonical records and never feed back into authorization. AgentGate does not create a composite employee quality, productivity or trust score. Provider reliability excludes policy blocks and approval holds from its failure denominator so security controls cannot make a tool appear unreliable. Bounded-source truncation is disclosed instead of hidden.
+
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.

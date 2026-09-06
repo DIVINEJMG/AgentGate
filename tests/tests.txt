@@ -1,76 +1,78 @@
 # Tests
 
-## Test 1 - Route a final managed Job failure to its supervisor [sanity]
+## Test 1 - Show worker run outcomes and duration analytics [sanity]
 Viewport: desktop
-Covers: final Run failure escalation, Worker supervisor routing, escalation inbox persistence, push-attempt state
-Description: Verifies failed autonomous work becomes durable human supervision work instead of disappearing into runtime history.
+Covers: Performance workspace, GET performance route family, Worker summary, run success/failure rates, run durations
+Description: Verifies completed and failed managed Runs become visible operational metrics without creating a worker score.
 
 Setup:
-1. Create an ACTIVE Worker with the signed-in user as supervisor and an ACTIVE Job whose completion criteria cannot be satisfied by its bounded test observations
+1. Create one managed Worker and produce at least one COMPLETED Run and one FAILED Run for that Worker through the existing Jobs/Runtime workflow
 
 Steps:
-1. Run the Job and allow the managed Run to reach its final FAILED state
-2. Open Supervision → Mine
-3. Select the new Job failure escalation and refresh the page
+1. Open Performance
+2. Inspect the top metrics and Worker summary row
+3. Refresh the page
 
-Expected: One OPEN Job failure escalation remains visible after refresh, names the Worker and Run, is assigned to the Worker's supervisor, and shows a durable push delivery state without exposing credentials.
+Expected: The Worker remains visible with the same Run counts, success/failure percentages and duration values after refresh, and the page states that no employee quality score is used.
 
-## Test 2 - Escalate policy intervention and elevated risk without changing authorization
+## Test 2 - Keep governance outcomes separate from provider reliability
 Viewport: desktop
-Covers: policy escalation, HIGH/CRITICAL risk escalation, deterministic escalation rules, Action Gateway boundary
-Description: Verifies autonomous policy/risk attention creates supervisor work while the original security decision remains authoritative.
+Covers: blocked Action analytics, approval rate, tool reliability denominator, read-only performance behavior
+Description: Verifies policy blocks and approval holds are visible but are not incorrectly counted as provider failures.
 
 Setup:
-1. Configure a managed Job action whose policy returns REQUIRE_APPROVAL and whose effective risk reaches HIGH
+1. Produce one managed provider Action that EXECUTES, one Action that is BLOCKED by policy, and one Action that is HELD for approval
+2. Resolve at least one approval decision through the existing Approvals workflow
 
 Steps:
-1. Process the Work Item until the Run waits for approval
-2. Open Supervision → All and inspect the policy and risk escalations for the same Run
-3. Disable the HIGH-risk escalation rule and leave policy escalation enabled
+1. Open Performance
+2. Inspect Approval rate and Blocked actions
+3. Inspect Tool reliability for the connected provider
 
-Expected: The Run remains WAITING_APPROVAL, the policy and initial HIGH-risk escalations are separate durable records, changing an escalation rule does not approve or execute the Action, and future HIGH-risk events stop creating that class while policy escalation remains active.
+Expected: Approval and blocked counts are visible, Tool reliability uses only executed/provider-failed attempts, and blocked or held governance outcomes are displayed separately from provider failures.
 
-## Test 3 - Cancel a waiting Run and block stale approval-time execution
+## Test 3 - Roll up departments and human-supervision signals
 Viewport: desktop
-Covers: supervisor Run cancellation, Work Item cancellation, correlation cancellation guard, approval-time Action Gateway revalidation
-Description: Verifies a supervisor can stop managed work without a stale pending approval later reaching the provider.
+Covers: department overview, escalation rate, incident rate, Worker-to-Agent incident mapping
+Description: Verifies F19/F11 supervision events are summarized as operations data without changing those source records.
 
 Setup:
-1. Create a managed Run that is WAITING_APPROVAL and has a linked policy escalation
+1. Create managed Workers in at least two departments
+2. Produce an escalation for one Worker and an Incident targeting that Worker's Agent Identity
 
 Steps:
-1. Open the escalation, enter a reason, choose Cancel Run, and confirm the destructive action
-2. Approve the previously pending approval from Approvals
-3. Return to Runtime and Supervision
+1. Open Performance
+2. Inspect the Departments panel
+3. Compare the affected Worker/department with the escalation and incident summary metrics
 
-Expected: The Run and Work Item remain CANCELLED, unfinished Run steps are cancelled, the approved held Action is BLOCKED by the managed-run cancellation guard before provider execution, and the escalation records the supervisor intervention.
+Expected: Departments are grouped by their existing Worker department, the affected Worker/department shows its supervision counts, and the source escalation and Incident remain unchanged in their original workspaces.
 
-## Test 4 - Pause a Worker and create an F11 Incident from supervision
+## Test 4 - Filter the recent Worker activity timeline
 Viewport: desktop
-Covers: worker pause intervention, incident handoff, incident linkage, separation of Workforce and Agent Identity
-Description: Verifies supervisors can restrict future managed work and escalate into existing incident controls without silently changing identity credentials.
+Covers: recent activity projection across Runs, Actions, Escalations and Incidents, Worker filter
+Description: Verifies a human can inspect one managed Worker's operational history without a new analytics write model.
 
 Setup:
-1. Have an OPEN escalation for an ACTIVE managed Worker
+1. Produce recent Run and governance activity for two different managed Workers
 
 Steps:
-1. Enter a reason, choose Pause Worker, and confirm
-2. From the same escalation choose Create Incident with a reason
-3. Open Workforce and Incidents
+1. Open Performance
+2. Set the Activity Timeline filter to the first Worker
+3. Change the filter to the second Worker
 
-Expected: The Worker is PAUSED while its Agent Identity binding remains intact, an OPEN Incident targets that Worker's Agent Identity through the existing incident domain, and the escalation displays the linked incident ID plus both intervention records.
+Expected: Each filter shows only activity attributed to the selected Worker, with event kind/status and recent occurrence time visible.
 
-## Test 5 - Use the supervisor inbox and alert enablement on mobile
+## Test 5 - Use Performance with API v2 on mobile
 Viewport: mobile
-Covers: responsive Supervision UI, Mine/All filtering, notes, reassignment validation, explicit notification subscription UX, API v2 normalization
-Description: Verifies supervision remains usable on a phone and push enablement occurs only from explicit user action.
+Covers: API v2 performance normalization, mobile Performance navigation, responsive metrics/worker/tool/activity views, bounded-window warning
+Description: Verifies workforce operations analytics remain usable on a phone and the v2 contract renders the same canonical metrics.
 
 Setup:
-1. Have at least one escalation assigned to the signed-in user and one escalation assigned to another organization member
+1. Have at least one managed Worker with Run and Action history
 
 Steps:
-1. Open mobile navigation → Supervision, switch to API v2, and toggle Mine then All
-2. Add a supervisor note and attempt reassignment to a non-member user ID
-3. Tap Enable mobile alerts
+1. Open mobile navigation → Performance
+2. Switch Compatibility view to API v2
+3. Review metrics, Worker summary, Tool reliability and Activity Timeline
 
-Expected: The mobile inbox has no horizontal clipping, Mine shows only the signed-in user's assignments, the note persists, non-member reassignment is rejected visibly, and alert enablement either grants notifications or surfaces browser/platform guidance without silently subscribing on page load.
+Expected: The same canonical analytics remain visible with no horizontal page clipping; wide Worker data scrolls inside its table container, and any truncated source window is disclosed instead of silently treated as complete history.
