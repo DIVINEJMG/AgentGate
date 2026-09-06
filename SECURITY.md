@@ -108,6 +108,14 @@ All F18 executable providers use fixed official API origins. User configuration 
 
 F18 workplace operations are intentionally read-only. Generic REST / MCP is fail-closed and cannot connect or execute until AgentGate has an explicit outbound-origin allowlist and egress controls strong enough to address SSRF and DNS-rebinding risk.
 
+## Supervisor and escalation boundary
+
+Foundation 19 treats escalation as human supervision work, not authorization. Final Job failures, policy intervention and elevated runtime risk can create a durable supervisor record, but that record cannot grant capabilities, lower risk, change policy outcomes or execute a provider action.
+
+Supervisor interventions are monotonic restrictions or incident handoffs. Run cancellation persists a correlation-level cancellation marker and the Action Gateway checks it both before managed execution and before a held action resumes after approval. Worker pause changes only the Workforce lifecycle and does not mutate Agent Identity, provider credentials or incident controls. Incident creation delegates to the existing F11 incident domain.
+
+Push notifications are best-effort and never become the source of truth. The tenant-scoped escalation inbox is authoritative. Foundation 19 does not claim the ability to undo a provider side effect that completed before a supervisor cancellation request, and does not claim strong exactly-once escalation dedupe until the durable execution work in F21.
+
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.

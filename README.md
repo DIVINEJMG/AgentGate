@@ -24,7 +24,8 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 15 — Scheduler & trigger engine: complete
 - Foundation 16 — Managed Agent Runtime: complete
 - Foundation 17 — Memory & artifacts: complete
-- Foundation 18 — Workplace Tool Expansion: implemented
+- Foundation 18 — Workplace Tool Expansion: complete
+- Foundation 19 — Supervisor & Escalation System: implemented
 
 ## Foundation 6
 
@@ -52,7 +53,7 @@ AppDeploy's current key-value store does not provide a transactional compare-and
 
 Audit & Observability adds an application-level append-only event ledger. Critical action execution establishes an audit path before provider invocation; action, approval, agent, integration and policy events are correlated and tenant-scoped. The Audit UI provides bounded search, severity/category filters, correlation tracing and operational summaries across the most recent 200 scanned events.
 
-No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative mutation and audit writes cannot be transactionally committed together on the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
+No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative mutation and audit writes cannot be transactionally committed together with the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
 
 ## Foundation 10
 
@@ -66,7 +67,7 @@ The current behavior window scans at most 100 action records. If that bounded wi
 
 Incident Controls adds independent execution kill switches for the organization, individual agents and integrations without deleting identities, credentials or provider configuration. Fresh Action Gateway requests and approval-time resume both re-check these controls before provider execution.
 
-Incident lifecycle is `open → acknowledged → resolved`. Resolution does not automatically restore execution; recovery is a separate explicit human operation with reason and audit attribution. The organization emergency stop does not erase lower-level target suspensions.
+Incident lifecycle is `open → acknowledged → resolved`. Resolution does not automatically restore execution; recovery is a separate explicit human action with reason and audit attribution. The organization emergency stop does not erase lower-level target suspensions.
 
 ## Foundation 12
 
@@ -115,6 +116,12 @@ Successful Runs also persist a JSON result artifact in AppDeploy Storage. Artifa
 Workplace Tool Expansion moves AgentGate beyond GitHub with provider adapters for Gmail, Google Drive, Slack and Google Calendar. Each adapter uses a fixed official API origin and exposes bounded read-only operations through the same canonical capability and Action Gateway path used by GitHub.
 
 Credential-backed workplace providers require AgentGate's encrypted integration vault. F18 validates manually supplied access tokens and encrypts them at rest, but does not claim OAuth refresh lifecycle. Generic REST / MCP remains deliberately guarded: arbitrary outbound URLs cannot be connected or executed until an explicit origin allowlist and stronger egress-validation boundary exist.
+
+## Foundation 19
+
+Supervisor & Escalation System turns each managed Worker's human supervisor into an operational control surface. Final Job failures, policy decisions that need human attention, and HIGH/CRITICAL runtime risk create durable tenant-scoped escalations with notes, reassignment, mobile/browser push alerts and explicit lifecycle state.
+
+Supervisor interventions are restrictive, not authorizing: a supervisor can cancel a Run, pause a Worker or create an existing F11 Incident. Run cancellation also writes a correlation-level cancellation guard checked by the Action Gateway on fresh actions and approval-time resume, preventing a cancelled waiting Run from later reaching a provider through stale approval state. Push delivery is best-effort; the durable inbox remains authoritative.
 
 ## Architecture rules
 

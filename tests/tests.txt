@@ -1,75 +1,76 @@
 # Tests
 
-## Test 1 - Connect Gmail and read recent messages only through AgentGate [sanity]
+## Test 1 - Route a final managed Job failure to its supervisor [sanity]
 Viewport: desktop
-Covers: credential-backed provider connect route, Gmail fixed-origin adapter, capability catalog, Action Gateway execution
-Description: Verifies a Gmail token is encrypted after validation and a bounded recent-message read still requires AgentGate authorization.
+Covers: final Run failure escalation, Worker supervisor routing, escalation inbox persistence, push-attempt state
+Description: Verifies failed autonomous work becomes durable human supervision work instead of disappearing into runtime history.
 
 Setup:
-1. Configure the AgentGate integration vault and use a dedicated Gmail test account access token with Gmail read-only access
-2. Create an active Worker/Agent and an ALLOW policy for `gmail.messages.recent.read`
+1. Create an ACTIVE Worker with the signed-in user as supervisor and an ACTIVE Job whose completion criteria cannot be satisfied by its bounded test observations
 
 Steps:
-1. Open Integrations → Gmail, submit the test access token, and confirm the mailbox connection
-2. Grant the Agent the live `gmail.messages.recent.read` capability and execute that exact scope through the Action test surface
-3. Refresh Integrations and Actions
+1. Run the Job and allow the managed Run to reach its final FAILED state
+2. Open Supervision → Mine
+3. Select the new Job failure escalation and refresh the page
 
-Expected: Gmail remains CONNECTED with only an encrypted credential fingerprint visible, the Action is EXECUTED through the Action Gateway, and at most five recent message metadata/snippet records are returned without exposing the token.
+Expected: One OPEN Job failure escalation remains visible after refresh, names the Worker and Run, is assigned to the Worker's supervisor, and shows a durable push delivery state without exposing credentials.
 
-## Test 2 - Drive and Calendar expose bounded read-only workplace capabilities
+## Test 2 - Escalate policy intervention and elevated risk without changing authorization
 Viewport: desktop
-Covers: Google Drive adapter, Google Calendar adapter, provider health checks, fixed official API origins
-Description: Verifies separate Google provider connections expose only their declared bounded read operations.
+Covers: policy escalation, HIGH/CRITICAL risk escalation, deterministic escalation rules, Action Gateway boundary
+Description: Verifies autonomous policy/risk attention creates supervisor work while the original security decision remains authoritative.
 
 Setup:
-1. Configure the integration vault and use dedicated Google test access tokens with Drive metadata-read and Calendar read access
+1. Configure a managed Job action whose policy returns REQUIRE_APPROVAL and whose effective risk reaches HIGH
 
 Steps:
-1. Connect Google Drive and Google Calendar from the provider catalog
-2. Check health on both connections
-3. Inspect PROVIDER OPERATIONS on each connection
+1. Process the Work Item until the Run waits for approval
+2. Open Supervision → All and inspect the policy and risk escalations for the same Run
+3. Disable the HIGH-risk escalation rule and leave policy escalation enabled
 
-Expected: Both connections are healthy, Drive exposes profile/recent-file reads, Calendar exposes primary/upcoming-event reads, and neither connection exposes send/create/write operations.
+Expected: The Run remains WAITING_APPROVAL, the policy and initial HIGH-risk escalations are separate durable records, changing an escalation rule does not approve or execute the Action, and future HIGH-risk events stop creating that class while policy escalation remains active.
 
-## Test 3 - Slack capability remains subject to policy and approval
+## Test 3 - Cancel a waiting Run and block stale approval-time execution
 Viewport: desktop
-Covers: Slack auth.test validation, Slack conversations.list adapter, Action Gateway policy and approval boundary
-Description: Verifies adding Slack does not let the provider adapter bypass REQUIRE_APPROVAL.
+Covers: supervisor Run cancellation, Work Item cancellation, correlation cancellation guard, approval-time Action Gateway revalidation
+Description: Verifies a supervisor can stop managed work without a stale pending approval later reaching the provider.
 
 Setup:
-1. Connect a dedicated Slack test token with channel-read access
-2. Grant an Agent `slack.channels.read` and create a REQUIRE_APPROVAL policy for that scope
+1. Create a managed Run that is WAITING_APPROVAL and has a linked policy escalation
 
 Steps:
-1. Request `slack.channels.read` through the Action test surface
-2. Confirm the Action is HELD and approve it from Approvals
-3. Return to Actions
+1. Open the escalation, enter a reason, choose Cancel Run, and confirm the destructive action
+2. Approve the previously pending approval from Approvals
+3. Return to Runtime and Supervision
 
-Expected: Slack is not called before approval; after reauthorization the same held Action executes and returns only the bounded channel list.
+Expected: The Run and Work Item remain CANCELLED, unfinished Run steps are cancelled, the approved held Action is BLOCKED by the managed-run cancellation guard before provider execution, and the escalation records the supervisor intervention.
 
-## Test 4 - Credential-backed providers and Generic REST/MCP fail closed without safe prerequisites
+## Test 4 - Pause a Worker and create an F11 Incident from supervision
 Viewport: desktop
-Covers: integration vault guardrail, Generic REST/MCP egress guard, no arbitrary URL execution
-Description: Verifies F18 does not weaken credential storage or create an SSRF-style generic connector.
+Covers: worker pause intervention, incident handoff, incident linkage, separation of Workforce and Agent Identity
+Description: Verifies supervisors can restrict future managed work and escalate into existing incident controls without silently changing identity credentials.
+
+Setup:
+1. Have an OPEN escalation for an ACTIVE managed Worker
 
 Steps:
-1. With no `INTEGRATION_MASTER_KEY` configured, open Gmail, Drive, Slack and Calendar cards
-2. Inspect the Generic REST / MCP card
-3. Attempt no GitHub token and connect a public GitHub repository
+1. Enter a reason, choose Pause Worker, and confirm
+2. From the same escalation choose Create Incident with a reason
+3. Open Workforce and Incidents
 
-Expected: Credential-backed workplace providers show VAULT REQUIRED and cannot submit credentials, Generic REST / MCP shows GUARDED with no connect action, while public GitHub remains connectable without weakening either guard.
+Expected: The Worker is PAUSED while its Agent Identity binding remains intact, an OPEN Incident targets that Worker's Agent Identity through the existing incident domain, and the escalation displays the linked incident ID plus both intervention records.
 
-## Test 5 - Inspect the expanded provider catalog through API v2 on mobile
+## Test 5 - Use the supervisor inbox and alert enablement on mobile
 Viewport: mobile
-Covers: v2 integration normalization, responsive multi-provider catalog, provider-specific metadata rendering
-Description: Verifies the expanded integration model remains usable on a phone-sized viewport.
+Covers: responsive Supervision UI, Mine/All filtering, notes, reassignment validation, explicit notification subscription UX, API v2 normalization
+Description: Verifies supervision remains usable on a phone and push enablement occurs only from explicit user action.
 
 Setup:
-1. Have at least one GitHub connection and, when the vault is configured, one credential-backed workplace connection
+1. Have at least one escalation assigned to the signed-in user and one escalation assigned to another organization member
 
 Steps:
-1. Open mobile navigation → Integrations and switch to API v2
-2. Scroll the provider catalog and select each existing connection
-3. Inspect provider name, credential posture, health and provider operations
+1. Open mobile navigation → Supervision, switch to API v2, and toggle Mine then All
+2. Add a supervisor note and attempt reassignment to a non-member user ID
+3. Tap Enable mobile alerts
 
-Expected: GitHub, Gmail, Google Drive, Slack, Google Calendar and guarded Generic REST/MCP cards render without horizontal clipping; connection details use provider-specific names/metadata and continue to label provider operations as NOT AGENT PERMISSIONS.
+Expected: The mobile inbox has no horizontal clipping, Mine shows only the signed-in user's assignments, the note persists, non-member reassignment is rejected visibly, and alert enablement either grants notifications or surfaces browser/platform guidance without silently subscribing on page load.
