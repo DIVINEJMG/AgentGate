@@ -25,7 +25,8 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 16 — Managed Agent Runtime: complete
 - Foundation 17 — Memory & artifacts: complete
 - Foundation 18 — Workplace Tool Expansion: complete
-- Foundation 19 — Supervisor & Escalation System: implemented
+- Foundation 19 — Supervisor & Escalation System: complete
+- Foundation 20 — Workforce Performance & Operations: implemented
 
 ## Foundation 6
 
@@ -53,7 +54,7 @@ AppDeploy's current key-value store does not provide a transactional compare-and
 
 Audit & Observability adds an application-level append-only event ledger. Critical action execution establishes an audit path before provider invocation; action, approval, agent, integration and policy events are correlated and tenant-scoped. The Audit UI provides bounded search, severity/category filters, correlation tracing and operational summaries across the most recent 200 scanned events.
 
-No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative mutation and audit writes cannot be transactionally committed together with the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
+No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative mutation and audit writes cannot be transactionally committed together on the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
 
 ## Foundation 10
 
@@ -122,6 +123,12 @@ Credential-backed workplace providers require AgentGate's encrypted integration 
 Supervisor & Escalation System turns each managed Worker's human supervisor into an operational control surface. Final Job failures, policy decisions that need human attention, and HIGH/CRITICAL runtime risk create durable tenant-scoped escalations with notes, reassignment, mobile/browser push alerts and explicit lifecycle state.
 
 Supervisor interventions are restrictive, not authorizing: a supervisor can cancel a Run, pause a Worker or create an existing F11 Incident. Run cancellation also writes a correlation-level cancellation guard checked by the Action Gateway on fresh actions and approval-time resume, preventing a cancelled waiting Run from later reaching a provider through stale approval state. Push delivery is best-effort; the durable inbox remains authoritative.
+
+## Foundation 20
+
+Workforce Performance & Operations adds a read-only operational analytics layer over existing managed Workers, Runs, Actions, Approvals, Escalations and Incidents. It reports run success/failure trends, completion counts, approval rate, blocked actions, escalation and incident frequency, run durations, department rollups, tool reliability and recent Worker activity.
+
+AgentGate deliberately does not compute an employee quality or productivity score. Tool reliability counts only actual provider attempts (`executed / (executed + provider-failed)`), while policy blocks and approval holds remain separate governance outcomes. Analytics reads are bounded and surface truncation explicitly rather than presenting incomplete windows as all-time totals.
 
 ## Architecture rules
 
