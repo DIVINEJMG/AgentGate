@@ -21,7 +21,8 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 12 — Productization: complete
 - Foundation 13 — Workforce & role model: complete
 - Foundation 14 — Jobs & work queue: complete
-- Foundation 15 — Scheduler & trigger engine: implemented
+- Foundation 15 — Scheduler & trigger engine: complete
+- Foundation 16 — Managed Agent Runtime: implemented
 
 ## Foundation 6
 
@@ -90,6 +91,14 @@ Scheduler & Trigger Engine allows active Jobs to create durable Work Items from 
 Schedules support daily, weekly and interval recurrence, IANA timezone interpretation, Worker working-hours deferral, and explicit missed-run handling (`skip` or one catch-up queue). Scheduled slots and API idempotency keys are deduplicated within the bounded Work Item window; strong atomic exactly-once claiming remains deferred to the durable-execution foundation.
 
 Triggers still stop at the Work Queue. Foundation 15 creates no Run, planner step, LLM call, Action Gateway request or provider side effect.
+
+## Foundation 16
+
+Managed Agent Runtime consumes due Work Items through a bounded dispatch index, establishes a lease-style claim, creates a durable Run and persists up to six ordered Run Steps. Planning and internal reasoning use bounded AI calls; the model never receives provider credentials and never receives direct provider tools.
+
+Action steps execute only through the existing Action Gateway. Managed Runtime derives the trusted server-side Agent principal from the Worker's immutable Agent Identity binding, while the gateway still performs capability, risk, deterministic policy, approval, audit and incident checks. `REQUIRE_APPROVAL` pauses the Run and Work Item until the existing approval workflow resolves the held Action.
+
+Successful Runs assess the Job's completion criteria from recorded observations, complete the Work Item and emit `job.completed` so Foundation 15 dependency triggers can queue downstream Jobs. AI transport failures may retry the same immutable Work Item at most twice. The current KV store still cannot provide atomic compare-and-set, so F16 does not claim strong exactly-once claiming under a simultaneous race. The non-AI scheduler remains five-minute; autonomous AI execution is deliberately limited to one Run per hourly runtime cron, with immediate human execution available from the queue.
 
 ## Architecture rules
 

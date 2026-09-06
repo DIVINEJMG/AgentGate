@@ -84,6 +84,14 @@ The public runtime trigger endpoint authenticates with the bound Agent Identity'
 
 Working-hours and missed-run policies affect when work enters the queue; they never bypass policy, approvals, risk or incident controls. No F15 path creates a Run or calls a provider.
 
+## Managed Runtime boundary
+
+Foundation 16 introduces AI planning and Run execution without creating a new authorization authority. The model receives no Agent credential, provider token or direct provider-execution tool. Planner action proposals are validated against the bound Agent's current live capability/resource catalog before they become durable steps.
+
+External action steps invoke the same Action Gateway used by direct Agent requests. The Managed Runtime uses a trusted server-side Agent Identity principal validated against the current credential record; the gateway still enforces capability declaration, deterministic policy, behavior risk, approvals, audit and organization/agent/integration incident controls. Held actions pause the Run rather than allowing the model to continue around an approval requirement.
+
+Work Item claims use random lease tokens and re-read verification, but the current KV store has no atomic compare-and-set primitive. AgentGate therefore does not claim strong exactly-once execution under a simultaneous claiming race. Action idempotency remains authoritative for provider requests; provider writes remain outside the current read-only adapter surface. Autonomous AI execution is intentionally hourly and limited to one AI Run per cron invocation, while the five-minute scheduler performs no AI work.
+
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.

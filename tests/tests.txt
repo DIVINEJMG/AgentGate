@@ -1,78 +1,84 @@
 # Tests
 
-## Test 1 - Configure and retain a recurring Job schedule [sanity]
+## Test 1 - Execute a text-only Work Item into a durable completed Run [sanity]
 Viewport: desktop
-Covers: GET /api/v1/organizations/:organizationId/triggers, PUT /api/v1/organizations/:organizationId/jobs/:jobId/triggers, recurring schedule persistence, timezone handling, missed-run policy, Worker working-hours policy
-Description: Verifies an operator can configure repeatable scheduled work without creating a Run or provider action.
+Covers: POST /api/v1/organizations/:organizationId/work-items/:workItemId/process, Managed Runtime claim/lease, Run creation, bounded AI planning, reasoning/finish steps, Work Item completion
+Description: Verifies the primary F16 workflow turns queued work into a durable Run without requiring an external provider action.
 
 Setup:
-1. Create and activate a managed Worker and an ACTIVE Job named `F15 Scheduled Brief`
+1. Create and activate a managed Worker
+2. Create and activate a Job named `F16 Internal Brief` with no required capability, objective `Produce a concise internal status brief`, and completion criterion `A concise status brief is produced`
+3. Use Run now to queue one Work Item
 
 Steps:
-1. Open Jobs → Triggers and select `F15 Scheduled Brief`
-2. Enable a weekly schedule, choose Africa/Lagos, 08:30, Monday through Friday, `Queue one catch-up`, and `Queue for next working opening`, then save
-3. Refresh the page and inspect the trigger configuration
-
-Expected: The schedule remains enabled with the same timezone, time, weekdays and policies, a Next due timestamp is visible, and the page states that triggers create Work Items only.
-
-## Test 2 - Internal event creates a durable queued Work Item
-Viewport: desktop
-Covers: POST /api/v1/organizations/:organizationId/triggers/events, internal-event trigger matching, trigger history, durable Work Item creation
-Description: Verifies an authenticated internal event can create work while execution remains absent.
-
-Setup:
-1. Create and activate a managed Worker and ACTIVE Job named `F15 Event Job`
-2. Configure internal event key `support.ticket.created` for the Job
-
-Steps:
-1. Open Jobs → Triggers, enter event key `support.ticket.created` and payload `{}`
-2. Emit the event
-3. Open Work Queue and then return to Triggers
-
-Expected: A QUEUED Work Item exists for `F15 Event Job` with trigger type internal_event and Run not created yet, and Trigger History records a QUEUED internal-event outcome.
-
-## Test 3 - Dependency trigger reacts to a job.completed event
-Viewport: desktop
-Covers: dependency Job configuration, `job.completed` internal event hook, dependency-trigger Work Item creation
-Description: Verifies F15 exposes the completion-event contract that F16 can call after real runtime completion.
-
-Setup:
-1. Create ACTIVE Jobs named `F15 Upstream` and `F15 Downstream` for active managed Workers
-2. Configure `F15 Downstream` to depend on `F15 Upstream`
-
-Steps:
-1. Open Jobs → Triggers and enter event key `job.completed`
-2. Choose `F15 Upstream` as Source Job, leave Source Work Item as `qa-source-item`, and emit the event
-3. Open Work Queue
-
-Expected: `F15 Downstream` receives a QUEUED Work Item whose trigger type is dependency; no Run or provider execution is shown.
-
-## Test 4 - Persist API trigger and show the credential boundary
-Viewport: desktop
-Covers: API-trigger configuration, Agent credential boundary, runtime POST /api/v1/runtime/organizations/:organizationId/jobs/:jobId/trigger contract
-Description: Verifies API automation is explicitly opt-in and tied to the bound Agent Identity rather than a second trigger secret. The machine-to-machine runtime endpoint itself is intentionally not invoked by browser QA because its bearer credential is one-time secret material.
-
-Setup:
-1. Create an ACTIVE managed Worker with an ACTIVE Job
-
-Steps:
-1. Open Jobs → Triggers and enable authenticated API trigger
-2. Save the trigger configuration
-3. Refresh and inspect the API trigger section
-
-Expected: API trigger remains enabled, the runtime POST endpoint is visible, and the UI states that the bound Agent Identity credential authenticates the trigger.
-
-## Test 5 - Configure triggers through API v2 on mobile
-Viewport: mobile
-Covers: v2 Trigger workspace/config routes, responsive scheduler controls, interval scheduling
-Description: Verifies the v2 adapter maps to the same canonical Scheduler domain on a phone-sized viewport.
-
-Setup:
-1. Create an ACTIVE managed Worker and ACTIVE Job named `F15 Mobile Job`
-
-Steps:
-1. Open mobile navigation → Jobs, switch to API v2, then open Triggers
-2. Select `F15 Mobile Job`, enable an interval schedule every 30 minutes and API trigger, then save
+1. Open Work Queue and click Execute on the queued `F16 Internal Brief` Work Item
+2. Open the Runtime tab and select the new Run
 3. Refresh the page
 
-Expected: The v2 trigger configuration persists, the interval and API settings remain visible, and the trigger controls fit the mobile viewport without horizontal clipping.
+Expected: The Run persists as COMPLETED, its ordered reasoning/finish steps remain visible with outputs, the Work Item is COMPLETED, and the same correlation ID is shown on the Run.
+
+## Test 2 - Required external action pauses for the existing approval workflow
+Viewport: desktop
+Covers: Managed Runtime action step, internal Action Gateway principal, deterministic policy, REQUIRE_APPROVAL pause, approval resume, GET/POST Run routes
+Description: Verifies AI planning cannot bypass the Action Gateway and an approval-required provider action pauses the whole Run.
+
+Setup:
+1. Connect a public GitHub repository and activate one read capability on the Worker's bound Agent
+2. Create an enabled policy that returns REQUIRE_APPROVAL for that Agent/resource/scope
+3. Create and activate Job `F16 Approval Job` requiring that capability and instruct it to inspect the connected repository before completing
+4. Queue the Job
+
+Steps:
+1. Execute the queued Work Item and inspect Runtime
+2. Confirm the Run and Work Item show WAITING APPROVAL, then approve the held Action from Approvals
+3. Return to Runtime and click Continue after approval
+
+Expected: The held Action is the same Action shown on the Run step, provider execution occurs only after approval revalidation, and the Run can continue to COMPLETED without exposing an Agent credential.
+
+## Test 3 - Runtime revalidates incident controls after queue admission
+Viewport: desktop
+Covers: execution-time Worker/Agent/capability/incident revalidation, failed Run trace, no provider bypass
+Description: Verifies a Work Item that was valid when queued cannot execute after its Agent is suspended by incident control.
+
+Setup:
+1. Create and queue an ACTIVE Job for an ACTIVE Worker
+2. After the Work Item is queued, suspend execution for the Worker's Agent from Incident Controls
+
+Steps:
+1. Open Work Queue and click Execute
+2. Open Runtime and inspect the created Run
+3. Open Actions and Audit
+
+Expected: The Run and Work Item fail with the suspension reason, no provider action is executed, and the failure is attributable through the Work Item/Run correlation ID.
+
+## Test 4 - Successful Run emits job.completed for a dependency Job
+Viewport: desktop
+Covers: Run completion, F15 job.completed event, dependency trigger, downstream durable Work Item creation
+Description: Verifies F16 completion closes the loop with Foundation 15 dependency automation.
+
+Setup:
+1. Create ACTIVE Jobs `F16 Upstream` and `F16 Downstream` with simple text-only objectives
+2. Configure `F16 Downstream` to depend on `F16 Upstream`
+3. Queue `F16 Upstream`
+
+Steps:
+1. Execute the queued `F16 Upstream` Work Item
+2. Confirm its Run completes in Runtime
+3. Open Work Queue and Triggers
+
+Expected: A new QUEUED Work Item exists for `F16 Downstream` with dependency trigger type and Trigger History records the job.completed-driven queue event.
+
+## Test 5 - Execute and inspect Managed Runtime through API v2 on mobile
+Viewport: mobile
+Covers: v2 Runtime workspace/detail/process adapters, responsive Run timeline, mobile queue execution
+Description: Verifies F16 uses the same canonical Runtime through API v2 and remains usable on a phone-sized viewport.
+
+Setup:
+1. Create and queue an ACTIVE text-only Job named `F16 Mobile Run`
+
+Steps:
+1. Open mobile navigation → Jobs, switch to API v2, and open Work Queue
+2. Execute `F16 Mobile Run`, then open Runtime
+3. Select the resulting Run and inspect its steps
+
+Expected: The Run is visible through the v2 adapter, its plan and ordered steps fit the mobile viewport without horizontal clipping, and terminal status persists after refresh.
