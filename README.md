@@ -22,7 +22,8 @@ AgentGate is the control layer for supervising AI workers inside small and growi
 - Foundation 13 — Workforce & role model: complete
 - Foundation 14 — Jobs & work queue: complete
 - Foundation 15 — Scheduler & trigger engine: complete
-- Foundation 16 — Managed Agent Runtime: implemented
+- Foundation 16 — Managed Agent Runtime: complete
+- Foundation 17 — Memory & artifacts: implemented
 
 ## Foundation 6
 
@@ -50,7 +51,7 @@ AppDeploy's current key-value store does not provide a transactional compare-and
 
 Audit & Observability adds an application-level append-only event ledger. Critical action execution establishes an audit path before provider invocation; action, approval, agent, integration and policy events are correlated and tenant-scoped. The Audit UI provides bounded search, severity/category filters, correlation tracing and operational summaries across the most recent 200 scanned events.
 
-No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative mutation and audit writes cannot be transactionally committed together with the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
+No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative mutation and audit writes cannot be transactionally committed together on the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
 
 ## Foundation 10
 
@@ -99,6 +100,14 @@ Managed Agent Runtime consumes due Work Items through a bounded dispatch index, 
 Action steps execute only through the existing Action Gateway. Managed Runtime derives the trusted server-side Agent principal from the Worker's immutable Agent Identity binding, while the gateway still performs capability, risk, deterministic policy, approval, audit and incident checks. `REQUIRE_APPROVAL` pauses the Run and Work Item until the existing approval workflow resolves the held Action.
 
 Successful Runs assess the Job's completion criteria from recorded observations, complete the Work Item and emit `job.completed` so Foundation 15 dependency triggers can queue downstream Jobs. AI transport failures may retry the same immutable Work Item at most twice. The current KV store still cannot provide atomic compare-and-set, so F16 does not claim strong exactly-once claiming under a simultaneous race. The non-AI scheduler remains five-minute; autonomous AI execution is deliberately limited to one Run per hourly runtime cron, with immediate human execution available from the queue.
+
+## Foundation 17
+
+Memory & Artifacts adds three explicit context scopes: automatic short-lived Run Memory, human-controlled Worker Memory and human-managed Organization Knowledge. Managed Runtime assembles at most eight active, unexpired entries using bounded deterministic lexical relevance and records the selected memory IDs on the Run.
+
+Memory is never authority. Context is labeled untrusted in AI planning and is not passed into capability, risk, policy, approval or incident-control decisions. Long-term memory cannot be self-written by the model; a human must create it or explicitly promote Run Memory into Worker Memory.
+
+Successful Runs also persist a JSON result artifact in AppDeploy Storage. Artifact metadata remains tenant-scoped in the database and humans with `artifacts.read` receive short-lived signed URLs. F17 retention dates control future context eligibility; physical deletion is not claimed.
 
 ## Architecture rules
 
