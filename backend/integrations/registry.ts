@@ -1,4 +1,1 @@
-import { githubAdapter } from './github';
-import type { IntegrationAdapter, IntegrationProvider } from './contracts';
-const adapters: Record<IntegrationProvider, IntegrationAdapter> = { github: githubAdapter };
-export function getIntegrationAdapter(provider: IntegrationProvider) { return adapters[provider]; }
+import{githubAdapter}from'./github';import{gmailAdapter}from'./gmail';import{googleDriveAdapter}from'./googleDrive';import{googleCalendarAdapter}from'./googleCalendar';import{slackAdapter}from'./slack';import{genericMcpAdapter}from'./genericMcp';import type{IntegrationAdapter,IntegrationProvider}from'./contracts';const adapters:Record<IntegrationProvider,IntegrationAdapter>={github:githubAdapter,gmail:gmailAdapter,google_drive:googleDriveAdapter,slack:slackAdapter,google_calendar:googleCalendarAdapter,generic_mcp:genericMcpAdapter};export function getIntegrationAdapter(provider:IntegrationProvider){return adapters[provider]}
