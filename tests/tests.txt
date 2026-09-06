@@ -76,3 +76,33 @@ Steps:
 3. Review metrics, Worker summary, Tool reliability and Activity Timeline
 
 Expected: The same canonical analytics remain visible with no horizontal page clipping; wide Worker data scrolls inside its table container, and any truncated source window is disclosed instead of silently treated as complete history.
+
+## Test 6 - Recover an expired runtime lease
+Viewport: backend
+Covers: durable queue, lease expiry, restart recovery, checkpointed dispatch
+Description: Verifies an interrupted managed Run is recovered without losing its Work Item.
+
+Setup:
+1. Create a due Work Item with an active dispatch and an expired lease
+
+Steps:
+1. Run the managed-runtime cron handler
+2. Read the Work Item and runtime dispatch records
+
+Expected: The Work Item is queued with recoveryCount incremented, claim and heartbeat cleared, lastCheckpoint set to recovered, and the dispatch delayed with bounded backoff.
+
+## Test 7 - Fence stale workers and dead-letter repeated expiry
+Viewport: backend
+Covers: claim verification, heartbeat fencing, duplicate-run protection, dead-letter handling
+Description: Verifies stale workers cannot keep executing and poison work does not retry forever.
+
+Setup:
+1. Create a running Work Item with a superseded claim token
+2. Create another expired Work Item whose recoveryCount is 2
+
+Steps:
+1. Attempt a heartbeat with the old claim token
+2. Run the managed-runtime cron handler for the repeatedly expired Work Item
+
+Expected: The stale heartbeat is rejected with conflict; the repeatedly expired Work Item becomes dead_letter, its dispatch is removed, and a critical audit event is emitted.
+

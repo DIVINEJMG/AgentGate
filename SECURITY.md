@@ -1,5 +1,9 @@
 # AgentGate Security Policy
 
+## Durable execution controls
+
+Managed workers use lease fencing and stable Action Gateway idempotency keys. A stale worker cannot renew a superseded lease, expired work is recovered with a bounded retry policy, and repeated expiry is dead-lettered. AppDeploy database does not expose transactional compare-and-swap, so AgentGate documents this as verified at-least-once execution with idempotent external action boundaries rather than claiming strict exactly-once execution.
+
 AgentGate is security-sensitive infrastructure. Security controls are architectural requirements.
 
 ## Baseline principles
@@ -127,3 +131,4 @@ Performance metrics are derived from existing canonical records and never feed b
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.
 
 Policy evaluation and runtime execution consume effective risk. Approval-time reauthorization recomputes risk instead of reusing the held snapshot. If risk assessment cannot be completed, the execution path fails closed. The behavior read is bounded to 100 action records; when that window is truncated, uncertainty conservatively raises risk rather than silently underestimating it.
+
