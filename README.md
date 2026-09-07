@@ -1,6 +1,6 @@
 # Audoryn
 
-Foundation 21 adds durable execution reliability on the existing AppDeploy database: verified lease claims, worker heartbeats, restart recovery, stable action idempotency, bounded exponential backoff, dead-letter Work Items, and cursor-checkpointed scheduling. No separate PostgreSQL service is required.
+Foundation 23 adds SMB-oriented Workforce Templates on top of the durable F21 runtime and controlled F22 side effects. Templates preconfigure draft workforce structure and setup guidance without granting capabilities, connecting integrations, creating policies, activating work, or approving actions.
 
 **An SOT Product**
 
@@ -28,7 +28,10 @@ Audoryn is the control layer for supervising AI workers inside small and growing
 - Foundation 17 — Memory & artifacts: complete
 - Foundation 18 — Workplace Tool Expansion: complete
 - Foundation 19 — Supervisor & Escalation System: complete
-- Foundation 20 — Workforce Performance & Operations: implemented
+- Foundation 20 — Workforce Performance & Operations: complete
+- Foundation 21 — Reliability & Durable Execution: complete
+- Foundation 22 — Controlled Side-Effect Expansion: complete
+- Foundation 23 — Workforce Templates: complete
 
 ## Foundation 6
 
@@ -132,6 +135,20 @@ Workforce Performance & Operations adds a read-only operational analytics layer 
 
 Audoryn deliberately does not compute an employee quality or productivity score. Tool reliability counts only actual provider attempts (`executed / (executed + provider-failed)`), while policy blocks and approval holds remain separate governance outcomes. Analytics reads are bounded and surface truncation explicitly rather than presenting incomplete windows as all-time totals.
 
+## Foundation 21
+
+Reliability & Durable Execution hardens managed work on the existing AppDeploy database with verified lease fencing, heartbeats, execution checkpoints, bounded recovery/backoff, dead-letter Work Items, stable per-Work-Item Action Gateway idempotency and cursor-checkpointed scheduling. Audoryn documents at-least-once processing with idempotent external action boundaries rather than claiming transactional exactly-once execution.
+
+## Foundation 22
+
+Controlled Side-Effect Expansion introduces bounded GitHub issue creation and Slack message creation through the existing Action Gateway. Both write surfaces require credentials, use payload-aware idempotency, preserve the exact approval payload and remain subject to current capability, risk, deterministic policy, human approval, audit and incident controls before provider execution.
+
+## Foundation 23
+
+Workforce Templates adds six built-in SMB blueprints: Customer Support Assistant, Marketing Coordinator, Research Assistant, Sales Assistant, Operations Assistant and Developer Assistant. Templates describe roles, responsibilities, example Jobs, required integrations, suggested capabilities, policy recommendations and approval defaults.
+
+Applying a template creates only DRAFT management records. Missing integrations or capability surfaces block dependent example Jobs instead of weakening requirements. Templates never connect tools, declare Agent capabilities, create policies, approve Actions, activate Workers/Jobs or execute providers.
+
 ## Architecture rules
 
 1. Stable canonical domain; replaceable adapters.
@@ -139,5 +156,3 @@ Audoryn deliberately does not compute an employee quality or productivity score.
 3. Security is architecture, not a pre-launch phase.
 4. Dangerous actions must be attributable and explainable.
 5. AppDeploy is the deployment environment, not the domain boundary.
-
-

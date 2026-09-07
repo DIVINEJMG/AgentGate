@@ -1,6 +1,6 @@
 # ADR 0022: Controlled side-effect expansion
 
-Status: Proposed
+Status: Accepted for Foundation 22
 
 ## Decision
 

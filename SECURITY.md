@@ -126,10 +126,16 @@ Foundation 20 is observational only. `performance.read` grants tenant-scoped acc
 
 Performance metrics are derived from existing canonical records and never feed back into authorization. Audoryn does not create a composite employee quality, productivity or trust score. Provider reliability excludes policy blocks and approval holds from its failure denominator so security controls cannot make a tool appear unreliable. Bounded-source truncation is disclosed instead of hidden.
 
+## Workforce template boundary
+
+Foundation 23 treats templates as setup guidance, never as authority bundles. A template may describe roles, responsibilities, example Jobs, required integrations, suggested capability scopes, recommended policy rules and approval defaults, but application creates only DRAFT management records.
+
+Templates never connect an integration, change an Agent capability declaration, create or enable a Policy, approve an Action, activate a Worker or Job, queue work, or execute a provider operation. Example Jobs are created only when every required scope already exists in the tenant's live capability catalog; otherwise the Job remains explicitly blocked in the template result with its missing requirements intact.
+
+Template application reuses the existing tenant, Workforce and Jobs permission boundaries and validates the selected Agent Identity and human supervisor. AppDeploy does not provide a multi-record transaction, so F23 preflights known blockers and does not claim all-or-nothing provisioning across Role, Worker and Job records.
+
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.
 
 Policy evaluation and runtime execution consume effective risk. Approval-time reauthorization recomputes risk instead of reusing the held snapshot. If risk assessment cannot be completed, the execution path fails closed. The behavior read is bounded to 100 action records; when that window is truncated, uncertainty conservatively raises risk rather than silently underestimating it.
-
-
