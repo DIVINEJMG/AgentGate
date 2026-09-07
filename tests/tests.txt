@@ -249,4 +249,27 @@ Steps:
 
 Expected: The bottom navigation contains Home, Workforce, Operations, and More; More opens the six-destination product navigation; section tabs scroll independently when needed; the page content remains readable without horizontal clipping.
 
+## Test 18 - Review compact R2 operational hierarchy
+Viewport: desktop
+Covers: R2 operational page-title scale, customer-facing Foundation-label removal, existing section navigation
+Description: Verifies operational workspaces use a compact professional heading scale without exposing internal foundation numbering.
+
+Steps:
+1. Open Operations → Supervision
+2. Open Workforce → Jobs
+3. Open Governance → Risk
+
+Expected: Each workspace keeps its section navigation and readable purpose text, application page titles are materially smaller than the Home hero, and no Foundation/F-number label appears in the reviewed customer-facing headings or supporting copy.
+
+## Test 19 - Keep the R2 palette neutral on mobile
+Viewport: mobile
+Covers: R2 legacy palette cleanup, neutral information surfaces, semantic status colors, responsive layout
+Description: Verifies the final palette sweep removes dark-blue containers while preserving semantic success, warning, and danger signals.
+
+Steps:
+1. Open Operations → Supervision and inspect notice/status surfaces
+2. Open Organization → Usage & billing and inspect metrics/invitations
+3. Open Governance → Audit and inspect filters/trace surfaces
+
+Expected: Surfaces use warm neutrals, white, or Audoryn Deep rather than legacy navy/SaaS blue; semantic green, amber, and red remain reserved for meaningful states; no horizontal page clipping is introduced.
 

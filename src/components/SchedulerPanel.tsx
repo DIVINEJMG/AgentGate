@@ -31,7 +31,7 @@ export default function SchedulerPanel({ organization, apiVersion, jobs, workers
         <label>Job<select value={selectedId} onChange={(event)=>setSelectedId(event.target.value)}>{availableJobs.map((job)=><option key={job.id} value={job.id}>{job.name} · {job.status}</option>)}</select></label>
         {!selected && <p className="trigger-help">Create a non-archived Job before configuring triggers.</p>}
         {selected && <div className="trigger-config-body">
-          <div className="trigger-boundary"><ShieldCheck size={16}/><span>Triggers create Work Items only. F16 will own Run creation and execution.</span></div>
+          <div className="trigger-boundary"><ShieldCheck size={16}/><span>Triggers create Work Items only. Managed Runtime owns Run creation and execution.</span></div>
           <label className="toggle-line"><input type="checkbox" checked={form.schedule.enabled} onChange={(event)=>setForm({...form,schedule:{...form.schedule,enabled:event.target.checked}})}/><span>Enable recurring schedule</span></label>
           {form.schedule.enabled && <div className="schedule-fields">
             <label>Cadence<select value={form.schedule.cadence} onChange={(event)=>setCadence(event.target.value)}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="interval">Interval</option></select></label>
@@ -52,7 +52,7 @@ export default function SchedulerPanel({ organization, apiVersion, jobs, workers
       </section>
       <section className="trigger-card">
         <div className="section-title"><div><p className="panel-kicker">INTERNAL EVENT INGESTION</p><h2>Emit an event</h2></div><Radio size={18}/></div>
-        <p className="trigger-help">This is the authenticated internal-event surface. job.completed is also the dependency hook F16 will call automatically.</p>
+        <p className="trigger-help">This is the authenticated internal-event surface. job.completed is also the dependency hook Managed Runtime calls automatically.</p>
         <label>Event key<input value={eventKey} placeholder="support.ticket.created" onChange={(event)=>setEventKey(event.target.value)}/></label>
         {eventKey==='job.completed' && <div className="schedule-fields"><label>Source Job<select value={sourceJobId} onChange={(event)=>setSourceJobId(event.target.value)}><option value="">Select upstream Job</option>{availableJobs.map((job)=><option key={job.id} value={job.id}>{job.name}</option>)}</select></label><label>Source Work Item<input value={sourceWorkItemId} onChange={(event)=>setSourceWorkItemId(event.target.value)}/></label></div>}
         <label>Payload JSON<textarea value={eventPayload} onChange={(event)=>setEventPayload(event.target.value)}/></label>
@@ -66,4 +66,3 @@ export default function SchedulerPanel({ organization, apiVersion, jobs, workers
 function Summary({label,value}:{label:string;value:number}){return <div><span>{label}</span><strong>{value}</strong></div>}
 function History({loading,history,selected}:{loading:boolean;history:TriggerHistory[];selected:boolean}){return <div className="trigger-history"><div className="section-title"><div><p className="panel-kicker">TRIGGER HISTORY</p><h3>{selected?'Selected Job':'Recent triggers'}</h3></div><CheckCircle2 size={17}/></div>{loading?<p>Loading trigger history…</p>:history.length===0?<p>No trigger attempts recorded yet.</p>:history.map((item)=><div className="trigger-history-row" key={item.id}><span className={`trigger-outcome ${item.outcome}`}>{item.outcome}</span><div><strong>{item.triggerType.replace('_',' ')}</strong><span>{new Date(item.occurredAt).toLocaleString()} · {item.key??'no key'}</span>{item.reason&&<small>{item.reason}</small>}</div></div>)}</div>}
 function errorText(value:unknown){const data=value as{response?:{data?:{error?:string}};message?:string};return data.response?.data?.error||data.message||'Trigger request failed.'}
-
