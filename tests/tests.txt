@@ -180,3 +180,47 @@ Steps:
 3. Review the Workforce Templates cards and open one template
 
 Expected: All six templates remain available without horizontal page clipping, connected/missing integrations and available/unavailable suggested capabilities are visible, and the template states that setup is draft-only with no automatic grants.
+
+## Test 13 - Enforce the Free worker entitlement
+Viewport: desktop
+Covers: F24 commercial snapshot route family, server-side plan entitlement, Worker creation capacity guard, Commercial workspace
+Description: Verifies an organization cannot provision more managed Workers than the server-authoritative plan allows.
+
+Setup:
+1. On the default Free plan, create two non-archived managed Workers through the normal Workforce flow
+2. Register one additional unbound active Agent Identity
+
+Steps:
+1. Open Commercial and confirm the Free plan shows 2/2 Workers
+2. Open Workforce and attempt to create a third managed Worker
+3. Return to Commercial
+
+Expected: The third Worker is rejected with the plan-capacity error, the Worker count remains 2/2, and no existing Worker is disabled.
+
+## Test 14 - Invite and join a human organization member
+Viewport: desktop
+Covers: F24 organization invitation create/resolve/join routes, email allow-list, membership creation, tenant role boundary
+Description: Verifies authenticated organization collaboration uses a real invite lifecycle rather than a client-generated token.
+
+Setup:
+1. Actor A is an organization owner
+2. Actor B has a separate Audoryn account using a different email address
+
+Steps:
+1. Actor A opens Commercial and creates an Operator invitation for Actor B's email
+2. Actor B opens the generated invitation link and signs in with the allow-listed account
+3. Actor B accepts the invitation
+
+Expected: Actor B joins the organization as Operator, the invitation is recorded as joined, and no Agent capability, Policy, approval or provider credential is created by joining.
+
+## Test 15 - Review production readiness on mobile with API v2
+Viewport: mobile
+Covers: API v2 commercial adapter, job/run usage accounting, onboarding, production monitoring, responsive Commercial workspace
+Description: Verifies an SMB operator can inspect workforce commercial readiness and operational signals from a phone.
+
+Steps:
+1. Open mobile navigation → Commercial
+2. Switch Compatibility view to API v2
+3. Review plan capacity, monthly usage, onboarding checklist, production signals and recent invitations
+
+Expected: Commercial data remains usable without horizontal page clipping; bounded-window truncation is disclosed; billing state does not claim checkout when no verified provider is connected.

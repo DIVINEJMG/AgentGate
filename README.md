@@ -1,6 +1,6 @@
 # Audoryn
 
-Foundation 23 adds SMB-oriented Workforce Templates on top of the durable F21 runtime and controlled F22 side effects. Templates preconfigure draft workforce structure and setup guidance without granting capabilities, connecting integrations, creating policies, activating work, or approving actions.
+Foundation 24 productionizes the Audoryn workforce with server-side plan entitlements, worker-capacity enforcement, bounded job/run usage accounting, organization invitations, onboarding, billing-adapter separation and production monitoring. Commercial state limits product capacity but never authorizes AI execution.
 
 **An SOT Product**
 
@@ -32,6 +32,7 @@ Audoryn is the control layer for supervising AI workers inside small and growing
 - Foundation 21 — Reliability & Durable Execution: complete
 - Foundation 22 — Controlled Side-Effect Expansion: complete
 - Foundation 23 — Workforce Templates: complete
+- Foundation 24 — Workforce Productionization: complete
 
 ## Foundation 6
 
@@ -59,7 +60,7 @@ AppDeploy's current key-value store does not provide a transactional compare-and
 
 Audit & Observability adds an application-level append-only event ledger. Critical action execution establishes an audit path before provider invocation; action, approval, agent, integration and policy events are correlated and tenant-scoped. The Audit UI provides bounded search, severity/category filters, correlation tracing and operational summaries across the most recent 200 scanned events.
 
-No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative mutation and audit writes cannot be transactionally committed together on the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
+No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative domain mutations and audit events cannot be atomically committed together with the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
 
 ## Foundation 10
 
@@ -148,6 +149,12 @@ Controlled Side-Effect Expansion introduces bounded GitHub issue creation and Sl
 Workforce Templates adds six built-in SMB blueprints: Customer Support Assistant, Marketing Coordinator, Research Assistant, Sales Assistant, Operations Assistant and Developer Assistant. Templates describe roles, responsibilities, example Jobs, required integrations, suggested capabilities, policy recommendations and approval defaults.
 
 Applying a template creates only DRAFT management records. Missing integrations or capability surfaces block dependent example Jobs instead of weakening requirements. Templates never connect tools, declare Agent capabilities, create policies, approve Actions, activate Workers/Jobs or execute providers.
+
+## Foundation 24
+
+Workforce Productionization adds server-side plan entitlements, enforced non-archived Worker capacity, bounded monthly Job/Run usage, a production-shaped billing adapter boundary, authenticated organization invitations, commercial onboarding and operational monitoring over dead-letter work, failed Runs/Actions, escalations and critical Incidents.
+
+The initial billing adapter defaults organizations to Free unless verified external subscription state exists. No checkout or paid upgrade is fabricated. Billing limits how much workforce capacity an organization can provision; the existing Agent Identity → Capability → Risk → Policy → Approval → Action Gateway chain remains the only execution authority.
 
 ## Architecture rules
 
