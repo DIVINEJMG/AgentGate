@@ -224,3 +224,29 @@ Steps:
 3. Review plan capacity, monthly usage, onboarding checklist, production signals and recent invitations
 
 Expected: Commercial data remains usable without horizontal page clipping; bounded-window truncation is disclosed; billing state does not claim checkout when no verified provider is connected.
+
+## Test 16 - Navigate the R1 information architecture
+Viewport: desktop
+Covers: R1 primary navigation, section-level secondary navigation, preservation of Workforce/Operations/Governance/Connections/Organization destinations
+Description: Verifies the redesign replaces the legacy 17-item global sidebar with six product-level destinations while keeping the existing workspaces reachable.
+
+Steps:
+1. Sign in and inspect the primary navigation
+2. Open Workforce and switch between Workers, Jobs, and Memory using the section navigation
+3. Open Governance, Connections, and Organization from the primary navigation
+
+Expected: The primary navigation shows Home, Workforce, Operations, Governance, Connections, and Organization only; each section exposes its relevant secondary destinations; no Foundation or F24 label is shown in the product shell.
+
+## Test 17 - Use the R1 shell on mobile
+Viewport: mobile
+Covers: R1 mobile navigation, fixed Home/Workforce/Operations/More actions, More drawer, responsive section tabs and content scrolling
+Description: Verifies the redesigned mobile shell does not dump every workspace into a permanent drawer and remains usable without horizontal page clipping.
+
+Steps:
+1. Sign in on mobile and move between Home, Workforce, and Operations using the bottom navigation
+2. Tap More and open Governance from the simplified navigation drawer
+3. Open a section with secondary tabs and scroll the page
+
+Expected: The bottom navigation contains Home, Workforce, Operations, and More; More opens the six-destination product navigation; section tabs scroll independently when needed; the page content remains readable without horizontal clipping.
+
+
