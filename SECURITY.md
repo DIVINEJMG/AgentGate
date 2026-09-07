@@ -134,6 +134,14 @@ Templates never connect an integration, change an Agent capability declaration, 
 
 Template application reuses the existing tenant, Workforce and Jobs permission boundaries and validates the selected Agent Identity and human supervisor. AppDeploy does not provide a multi-record transaction, so F23 preflights known blockers and does not claim all-or-nothing provisioning across Role, Worker and Job records.
 
+## Workforce productionization boundary
+
+Foundation 24 introduces commercial capacity controls without making billing an authorization authority. Worker creation checks a server-side plan entitlement and fails closed when subscription state or the bounded Worker count cannot be verified. A downgrade never silently disables existing Workers; it prevents additional provisioning until capacity is within the verified entitlement.
+
+Organization invitations use authenticated AppDeploy invite codes with an email allow-list. Invite joining creates only an existing human organization membership and cannot create Agent capabilities, Policies, approvals or provider credentials. Invite URLs are built by the platform client helper rather than trusted host headers.
+
+The billing adapter defaults to Free when no verified external subscription exists. No client route can self-upgrade a plan and no payment provider state is fabricated. Commercial usage and monitoring are bounded projections over canonical records; truncation is disclosed.
+
 ## Risk boundary
 
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.
