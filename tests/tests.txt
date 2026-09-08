@@ -180,3 +180,267 @@ Steps:
 3. Review the Workforce Templates cards and open one template
 
 Expected: All six templates remain available without horizontal page clipping, connected/missing integrations and available/unavailable suggested capabilities are visible, and the template states that setup is draft-only with no automatic grants.
+
+## Test 13 - Enforce the Free worker entitlement
+Viewport: desktop
+Covers: F24 commercial snapshot route family, server-side plan entitlement, Worker creation capacity guard, Commercial workspace
+Description: Verifies an organization cannot provision more managed Workers than the server-authoritative plan allows.
+
+Setup:
+1. On the default Free plan, create two non-archived managed Workers through the normal Workforce flow
+2. Register one additional unbound active Agent Identity
+
+Steps:
+1. Open Commercial and confirm the Free plan shows 2/2 Workers
+2. Open Workforce and attempt to create a third managed Worker
+3. Return to Commercial
+
+Expected: The third Worker is rejected with the plan-capacity error, the Worker count remains 2/2, and no existing Worker is disabled.
+
+## Test 14 - Invite and join a human organization member
+Viewport: desktop
+Covers: F24 organization invitation create/resolve/join routes, email allow-list, membership creation, tenant role boundary
+Description: Verifies authenticated organization collaboration uses a real invite lifecycle rather than a client-generated token.
+
+Setup:
+1. Actor A is an organization owner
+2. Actor B has a separate Audoryn account using a different email address
+
+Steps:
+1. Actor A opens Commercial and creates an Operator invitation for Actor B's email
+2. Actor B opens the generated invitation link and signs in with the allow-listed account
+3. Actor B accepts the invitation
+
+Expected: Actor B joins the organization as Operator, the invitation is recorded as joined, and no Agent capability, Policy, approval or provider credential is created by joining.
+
+## Test 15 - Review production readiness on mobile with API v2
+Viewport: mobile
+Covers: API v2 commercial adapter, job/run usage accounting, onboarding, production monitoring, responsive Commercial workspace
+Description: Verifies an SMB operator can inspect workforce commercial readiness and operational signals from a phone.
+
+Steps:
+1. Open mobile navigation → Commercial
+2. Switch Compatibility view to API v2
+3. Review plan capacity, monthly usage, onboarding checklist, production signals and recent invitations
+
+Expected: Commercial data remains usable without horizontal page clipping; bounded-window truncation is disclosed; billing state does not claim checkout when no verified provider is connected.
+
+## Test 16 - Navigate the R1 information architecture
+Viewport: desktop
+Covers: R1 primary navigation, section-level secondary navigation, preservation of Workforce/Operations/Governance/Connections/Organization destinations
+Description: Verifies the redesign replaces the legacy 17-item global sidebar with six product-level destinations while keeping the existing workspaces reachable.
+
+Steps:
+1. Sign in and inspect the primary navigation
+2. Open Workforce and switch between Workers, Jobs, and Memory using the section navigation
+3. Open Governance, Connections, and Organization from the primary navigation
+
+Expected: The primary navigation shows Home, Workforce, Operations, Governance, Connections, and Organization only; each section exposes its relevant secondary destinations; no Foundation or F24 label is shown in the product shell.
+
+## Test 17 - Use the R1 shell on mobile
+Viewport: mobile
+Covers: R1 mobile navigation, fixed Home/Workforce/Operations/More actions, More drawer, responsive section tabs and content scrolling
+Description: Verifies the redesigned mobile shell does not dump every workspace into a permanent drawer and remains usable without horizontal page clipping.
+
+Steps:
+1. Sign in on mobile and move between Home, Workforce, and Operations using the bottom navigation
+2. Tap More and open Governance from the simplified navigation drawer
+3. Open a section with secondary tabs and scroll the page
+
+Expected: The bottom navigation contains Home, Workforce, Operations, and More; More opens the six-destination product navigation; section tabs scroll independently when needed; the page content remains readable without horizontal clipping.
+
+## Test 18 - Review compact R2 operational hierarchy
+Viewport: desktop
+Covers: R2 operational page-title scale, customer-facing Foundation-label removal, existing section navigation
+Description: Verifies operational workspaces use a compact professional heading scale without exposing internal foundation numbering.
+
+Steps:
+1. Open Operations → Supervision
+2. Open Workforce → Jobs
+3. Open Governance → Risk
+
+Expected: Each workspace keeps its section navigation and readable purpose text, application page titles are materially smaller than the Home hero, and no Foundation/F-number label appears in the reviewed customer-facing headings or supporting copy.
+
+## Test 19 - Keep the R2 palette neutral on mobile
+Viewport: mobile
+Covers: R2 legacy palette cleanup, neutral information surfaces, semantic status colors, responsive layout
+Description: Verifies the final palette sweep removes dark-blue containers while preserving semantic success, warning, and danger signals.
+
+Steps:
+1. Open Operations → Supervision and inspect notice/status surfaces
+2. Open Organization → Usage & billing and inspect metrics/invitations
+3. Open Governance → Audit and inspect filters/trace surfaces
+
+Expected: Surfaces use warm neutrals, white, or Audoryn Deep rather than legacy navy/SaaS blue; semantic green, amber, and red remain reserved for meaningful states; no horizontal page clipping is introduced.
+
+## Test 20 - Browse the W1 public website before authentication
+Viewport: desktop
+Covers: W1 public home, Product/Solutions/Security/Resources/Pricing navigation, anonymous access, public footer
+Description: Verifies an anonymous visitor lands on the public Audoryn website rather than the operational workspace and can move through the core public pages without signing in.
+
+Steps:
+1. Open the Audoryn root URL while signed out
+2. Open Product, Security, Pricing, and Resources from the public navigation
+3. Return to Home using the Audoryn wordmark
+
+Expected: Public pages render without an app sidebar or organization data; the header remains Product, Solutions, Security, Resources, Pricing, Sign in, and Get started; the footer exposes product, solutions, resources, company and legal navigation.
+
+## Test 21 - Transition from public Audoryn into protected workspace access
+Viewport: desktop
+Covers: W1 Get started, Sign in, protected app route, existing AppDeploy authentication, return-to-public action
+Description: Verifies public calls to action lead into the existing authenticated product rather than exposing private workspace data anonymously.
+
+Steps:
+1. From the public Home page choose Sign in
+2. Confirm the Audoryn workspace access screen is shown before any private organization/workforce data
+3. Use Back to Audoryn
+4. Choose Get started and confirm the account-start screen is shown
+
+Expected: Sign in and Get started remain separate public entry points into the same authentication system; anonymous visitors never see the private sidebar or organization data; Back to Audoryn returns to the public website.
+
+## Test 22 - Use the W1 public navigation on mobile
+Viewport: mobile
+Covers: public mobile header/menu, public page responsiveness, compact typography, public-to-login transition
+Description: Verifies the public website stays spacious and usable on a phone without reusing the private app navigation.
+
+Steps:
+1. Open the public Audoryn Home page on mobile
+2. Open Menu and navigate to Solutions, Security, and Pricing
+3. Open Menu again and choose Sign in
+
+Expected: The public mobile menu exposes the same restrained public destinations without horizontal clipping; page headings remain compact relative to the desktop hero; Sign in transitions to workspace access rather than the private mobile app shell.
+
+## Test 23 - Keep public security and pricing claims bounded to implemented product behavior
+Viewport: desktop
+Covers: public Security page, public Pricing page, F24 billing-adapter boundary, security architecture wording
+Description: Verifies the public website explains real Audoryn controls without inventing a payment checkout or authorization shortcut.
+
+Steps:
+1. Open Security and review the execution-path controls
+2. Open Pricing and review Free, Business, and Enterprise
+3. Inspect the pricing note beneath the plan columns
+
+Expected: Security describes identity separation, capability, policy, approval, credential, incident, audit, and tenant controls; Pricing does not show a fake checkout or claim plan state authorizes AI actions; the page states that verified billing integration is required before checkout is advertised.
+
+## Test 24 - Create and start a Worker in one flow
+Viewport: desktop
+Covers: R3 Worker Quick Start, POST workforce quick-start route family, automatic Agent Identity creation, Worker/Job activation, start-now queueing, automatic runtime handoff
+Description: Verifies the normal setup path is Worker → work → timing → start, without requiring Trigger, Scheduler, Runtime, or Execute configuration.
+
+Setup:
+1. Create a reusable Role with at least one responsibility
+
+Steps:
+1. Open Workforce and choose Worker
+2. Enter a Worker name, Role, department, keep automatic security identity, and add one Job with no external capability requirement
+3. Choose Every 5 minutes and Create & start worker
+4. Open Jobs → Work Queue, then inspect Triggers (advanced)
+
+Expected: The Worker and Job become ACTIVE when security readiness passes, the first Work Item is queued immediately instead of waiting five minutes, the recurring 5-minute trigger is already configured, and the UI does not require Scheduler, Managed Runtime, Run now, or Execute setup.
+
+## Test 25 - Keep missing capability authority explicit in Quick Start
+Viewport: desktop
+Covers: R3 needs-setup state, capability non-grant invariant, automatic activation reconciliation, direct Set up access path
+Description: Verifies quick setup remains convenient without silently granting provider authority.
+
+Setup:
+1. Connect a provider that exposes at least one capability scope but do not declare that scope on the Agent that Quick Start will create
+
+Steps:
+1. Create a Worker with a Job that requires the available provider capability
+2. Choose Start now and submit the Quick Start form
+3. Inspect the result and choose Set up access
+
+Expected: The Worker and Job are preserved but automatic execution is blocked with a visible Needs setup reason before a Run is created; the capability is not granted automatically; policy or integration gaps are also identified before runtime; Resolve setup opens the relevant Capabilities, Policies, or Integrations workspace.
+
+## Test 26 - Configure standalone Job automation in the Job form
+Viewport: desktop
+Covers: R3 POST jobs quick-start route family, standalone Job schedule configuration, automatic trigger creation, advanced trigger inspection
+Description: Verifies creating a Job separately no longer requires a second trip to Triggers for ordinary scheduling.
+
+Setup:
+1. Have one ACTIVE managed Worker whose Agent Identity is ready for a Job with no external capability requirement
+
+Steps:
+1. Open Workforce → Jobs and choose Job
+2. Define the Job, select On a schedule, set Every 5 minutes, and create it
+3. Open Triggers (advanced) and inspect the Job configuration
+
+Expected: The Job is created and activated automatically, its 5-minute recurring trigger already exists, and the advanced Triggers workspace is optional inspection/editing rather than a required setup step.
+
+## Test 27 - Use Worker Quick Start on mobile with multiple Jobs and working hours
+Viewport: mobile
+Covers: R3 responsive Worker Quick Start, multiple Jobs, per-Job timing, Worker working hours, automatic infrastructure messaging
+Description: Verifies the intent-first setup remains usable on a phone without exposing infrastructure configuration as mandatory steps.
+
+Setup:
+1. Create at least one reusable Workforce Role
+
+Steps:
+1. Open mobile Workforce and create a Worker
+2. Add two Jobs, give them different timing choices, and edit the Worker working hours
+3. Submit Create & start worker
+
+Expected: The form remains readable without horizontal clipping, both Jobs are attached to the new Worker, working hours are saved on the Worker, recurring Jobs queue their first eligible run immediately, and Audoryn reports either started or a single Needs setup state without sending the user through Scheduler or Runtime configuration.
+
+## Test 28 - Drain a bounded automatic queue without manual Execute
+Viewport: desktop
+Covers: R3 bounded Managed Runtime dispatch, 5-minute scheduler handoff, queue catch-up, readiness-before-Run guardrail
+Description: Verifies one extra queued item cannot leave a recurring Job permanently behind and setup blockers do not create repeated FAILED Runs.
+
+Setup:
+1. Have one ACTIVE Worker with an ACTIVE authorized Job and at least two due Work Items
+
+Steps:
+1. Run the Workforce Scheduler tick
+2. Open Jobs → Work Queue and Runtime
+3. Inspect the processed items and any remaining due queue
+
+Expected: Audoryn may start up to five due AI Runs in the tick, due work drains without pressing Execute, and any capability/integration/policy readiness failure is attached to the Work Item or trigger before a new Run is created.
+
+## Test 29 - Complete automatic Agent Identity provisioning during Worker Quick Start
+Viewport: desktop
+Covers: automatic Agent Identity creation, credential/key issuance, one-time credential handoff, managed Worker binding, credential non-persistence, capability non-grant invariant
+Description: Verifies Worker Quick Start finishes the Agent Identity flow instead of creating an identity whose generated credential is silently discarded.
+
+Setup:
+1. Create one reusable Workforce Role
+
+Steps:
+1. Open Workforce, create a Worker, and keep automatic security identity selected
+2. Add a Job with no external capability requirement and submit Create & start worker
+3. Inspect the one-time Agent credential handoff, copy the key, close it, then open Connections → Agent identities
+
+Expected: The Worker is bound to a new ACTIVE Agent Identity whose credential is ACTIVE with a fingerprint, version and agent.authenticate scope; the plaintext agt_sk_ key was created automatically and shown once, is not recoverable after closing, and no provider capability was silently granted.
+
+## Test 30 - Clear the entire Work Queue
+Viewport: desktop
+Covers: POST work-items clear-queue route family, active Run force-cancellation, runtime cancellation fencing, runtime-dispatch cleanup, hard Work Item removal, destructive confirmation
+Description: Verifies Clear queue means the current queue is completely emptied, regardless of Work Item state.
+
+Setup:
+1. Create more than 200 Work Items spanning multiple database pages, including QUEUED, RUNNING or WAITING_APPROVAL, and at least one terminal COMPLETED or FAILED item
+
+Steps:
+1. Open Jobs → Work Queue and choose Clear queue
+2. Confirm the destructive action
+3. Refresh Work Queue and Runtime
+
+Expected: Work Queue contains zero Work Items after refresh even when the collection originally exceeded 200 records; the UI transparently completes bounded deletion batches, active associated Runs are CANCELLED, no removed Work Item retains a runtime dispatch, terminal Work Item history is also removed from the queue, and a cancelled correlation cannot resume a provider action.
+
+## Test 31 - Permanently delete active Jobs and Workers
+Viewport: desktop
+Covers: DELETE job route family, DELETE worker route family, active Run force-cancellation, Work Item purge, trigger/dependency cleanup, automatic Agent credential revocation
+Description: Verifies Delete means delete even when work is currently running or waiting for approval.
+
+Setup:
+1. Create an automatically provisioned Worker with two Jobs, including one recurring Job, and enough organization Work Item history to exceed 200 records; start work so at least one Work Item is RUNNING or WAITING_APPROVAL
+
+Steps:
+1. Delete the active Job and confirm without waiting for its Work Item to finish
+2. Confirm the Job disappears from Jobs and its Work Items disappear from Work Queue
+3. Delete the Worker while its remaining Job has active work, then inspect Workforce, Jobs, Triggers and Connections → Agent identities
+
+Expected: Neither destructive action is blocked by active work or by Work Item pagination beyond 200 records; the UI automatically continues bounded deletion batches, associated Runs are CANCELLED, Job/Worker definitions and all associated Work Items/triggers are removed, dependency references cannot recreate the deleted Job, historical Run/Audit records remain for traceability, and the automatically provisioned Agent Identity is DISABLED with its credential REVOKED.
+
+

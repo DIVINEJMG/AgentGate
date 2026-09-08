@@ -1,2 +1,13 @@
-{"headline":"Secure your AI workforce","subtitle":"Sign in to access Audoryn — An SOT Product","style":{"mode":"dark","accentColor":"#4C8DFF","backgroundColor":"#0B0E13","panelColor":"#10151C","textColor":"#E8EDF5","fontFamily":"Inter, system-ui, sans-serif","borderRadius":10}}
-
+{
+  "headline": "Continue to Audoryn",
+  "subtitle": "Secure workspace access — An SOT Product",
+  "style": {
+    "mode": "light",
+    "accentColor": "#26382F",
+    "backgroundColor": "#F5F5F1",
+    "panelColor": "#FFFFFF",
+    "textColor": "#151513",
+    "fontFamily": "Inter, Helvetica Neue, Arial, system-ui, sans-serif",
+    "borderRadius": 8
+  }
+}
