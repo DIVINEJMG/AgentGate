@@ -419,14 +419,14 @@ Covers: POST work-items clear-queue route family, active Run force-cancellation,
 Description: Verifies Clear queue means the current queue is completely emptied, regardless of Work Item state.
 
 Setup:
-1. Create Work Items that include QUEUED, RUNNING or WAITING_APPROVAL, and at least one terminal COMPLETED or FAILED item
+1. Create more than 200 Work Items spanning multiple database pages, including QUEUED, RUNNING or WAITING_APPROVAL, and at least one terminal COMPLETED or FAILED item
 
 Steps:
 1. Open Jobs → Work Queue and choose Clear queue
 2. Confirm the destructive action
 3. Refresh Work Queue and Runtime
 
-Expected: Work Queue contains zero Work Items after refresh; active associated Runs are CANCELLED, no removed Work Item retains a runtime dispatch, terminal Work Item history is also removed from the queue, and a cancelled correlation cannot resume a provider action.
+Expected: Work Queue contains zero Work Items after refresh even when the collection originally exceeded 200 records; the UI transparently completes bounded deletion batches, active associated Runs are CANCELLED, no removed Work Item retains a runtime dispatch, terminal Work Item history is also removed from the queue, and a cancelled correlation cannot resume a provider action.
 
 ## Test 31 - Permanently delete active Jobs and Workers
 Viewport: desktop
@@ -434,13 +434,13 @@ Covers: DELETE job route family, DELETE worker route family, active Run force-ca
 Description: Verifies Delete means delete even when work is currently running or waiting for approval.
 
 Setup:
-1. Create an automatically provisioned Worker with two Jobs, including one recurring Job, and start work so at least one Work Item is RUNNING or WAITING_APPROVAL
+1. Create an automatically provisioned Worker with two Jobs, including one recurring Job, and enough organization Work Item history to exceed 200 records; start work so at least one Work Item is RUNNING or WAITING_APPROVAL
 
 Steps:
 1. Delete the active Job and confirm without waiting for its Work Item to finish
 2. Confirm the Job disappears from Jobs and its Work Items disappear from Work Queue
 3. Delete the Worker while its remaining Job has active work, then inspect Workforce, Jobs, Triggers and Connections → Agent identities
 
-Expected: Neither destructive action is blocked by active work; associated Runs are CANCELLED, Job/Worker definitions and all associated Work Items/triggers are removed, dependency references cannot recreate the deleted Job, historical Run/Audit records remain for traceability, and the automatically provisioned Agent Identity is DISABLED with its credential REVOKED.
+Expected: Neither destructive action is blocked by active work or by Work Item pagination beyond 200 records; the UI automatically continues bounded deletion batches, associated Runs are CANCELLED, Job/Worker definitions and all associated Work Items/triggers are removed, dependency references cannot recreate the deleted Job, historical Run/Audit records remain for traceability, and the automatically provisioned Agent Identity is DISABLED with its credential REVOKED.
 
 
