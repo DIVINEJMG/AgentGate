@@ -29,6 +29,14 @@ export async function removeRuntimeDispatch(id: string | null | undefined) {
   await db.delete(TABLE, [id]);
 }
 
+export async function removeRuntimeDispatches(ids: Array<string | null | undefined>) {
+  const unique = Array.from(new Set(ids.filter((id): id is string => Boolean(id))));
+  if (!unique.length) return 0;
+  if (unique.length > 500) throw new Error('Managed Runtime dispatch cleanup exceeds the bounded batch limit.');
+  await db.delete(TABLE, unique);
+  return unique.length;
+}
+
 export async function readRuntimeDispatchPage(limit = 5) {
   const { items: states } = await db.list<RuntimeCursorRecord>(STATE_TABLE, { limit: 1 });
   const state = states[0];
