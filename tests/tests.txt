@@ -338,20 +338,20 @@ Steps:
 
 Expected: The Worker and Job become ACTIVE when security readiness passes, the first Work Item is queued immediately instead of waiting five minutes, the recurring 5-minute trigger is already configured, and the UI does not require Scheduler, Managed Runtime, Run now, or Execute setup.
 
-## Test 25 - Keep missing capability authority explicit in Quick Start
+## Test 25 - Provision Job capability and policy automatically in Quick Start
 Viewport: desktop
-Covers: R3 needs-setup state, capability non-grant invariant, automatic activation reconciliation, direct Set up access path
-Description: Verifies quick setup remains convenient without silently granting provider authority.
+Covers: Worker Quick Start automatic authority provisioning, Agent capability declaration, narrow default Policy creation, Job activation, automatic runtime handoff
+Description: Verifies selecting a connected provider capability during automatic Worker creation completes the internal authority setup instead of sending the user to Capabilities or Policies.
 
 Setup:
-1. Connect a provider that exposes at least one capability scope but do not declare that scope on the Agent that Quick Start will create
+1. Connect one GitHub repository but do not predeclare `github.repository.pull_requests.read` on any Agent and do not create a matching allow policy
 
 Steps:
-1. Create a Worker with a Job that requires the available provider capability
-2. Choose Start now and submit the Quick Start form
-3. Inspect the result and choose Set up access
+1. Create a Worker with automatic security identity and a Job requiring `github.repository.pull_requests.read`
+2. Choose Every 5 minutes and submit Create & start worker
+3. Inspect the Worker, Job, Agent capability profile, Policies and Work Queue
 
-Expected: The Worker and Job are preserved but automatic execution is blocked with a visible Needs setup reason before a Run is created; the capability is not granted automatically; policy or integration gaps are also identified before runtime; Resolve setup opens the relevant Capabilities, Policies, or Integrations workspace.
+Expected: Audoryn automatically creates the Agent Identity and credential, declares `github.repository.pull_requests.read` on that Agent, creates an enabled narrow policy for that Agent + connected GitHub resource + scope, activates the Worker and Job, queues the first Work Item immediately and configures the recurring trigger without requiring manual Capabilities, Policies, Scheduler, Runtime or Run-now setup.
 
 ## Test 26 - Configure standalone Job automation in the Job form
 Viewport: desktop
@@ -411,7 +411,7 @@ Steps:
 2. Add a Job with no external capability requirement and submit Create & start worker
 3. Inspect the one-time Agent credential handoff, copy the key, close it, then open Connections → Agent identities
 
-Expected: The Worker is bound to a new ACTIVE Agent Identity whose credential is ACTIVE with a fingerprint, version and agent.authenticate scope; the plaintext agt_sk_ key was created automatically and shown once, is not recoverable after closing, and no provider capability was silently granted.
+Expected: The Worker is bound to a new ACTIVE Agent Identity whose credential is ACTIVE with a fingerprint, version and agent.authenticate scope; the plaintext agt_sk_ key was created automatically and shown once, is not recoverable after closing, and any Job-selected provider capabilities are attached automatically as separate least-privilege capability declarations.
 
 ## Test 30 - Clear the entire Work Queue
 Viewport: desktop
@@ -443,4 +443,18 @@ Steps:
 
 Expected: Neither destructive action is blocked by active work or by Work Item pagination beyond 200 records; the UI automatically continues bounded deletion batches, associated Runs are CANCELLED, Job/Worker definitions and all associated Work Items/triggers are removed, dependency references cannot recreate the deleted Job, historical Run/Audit records remain for traceability, and the automatically provisioned Agent Identity is DISABLED with its credential REVOKED.
 
+## Test 32 - Preserve explicit security denial during automatic setup
+Viewport: desktop
+Covers: Quick Start automatic policy provisioning guardrail, explicit Policy DENY precedence, no automatic override of human governance
+Description: Verifies automatic setup fills missing internal configuration but does not defeat a security rule a human intentionally created.
 
+Setup:
+1. Connect one GitHub repository
+2. Create an enabled DENY policy covering `github.repository.pull_requests.read` on that resource
+
+Steps:
+1. Create a Worker with automatic security identity and a Job requiring `github.repository.pull_requests.read`
+2. Submit Create & start worker
+3. Inspect the resulting Worker/Job readiness and Policies
+
+Expected: Audoryn creates the Agent Identity and attaches the selected capability, but it does not create an overriding ALLOW policy; the Worker/Job remains in Needs setup with the explicit policy restriction visible and no Run is started until a human changes that governance rule.
