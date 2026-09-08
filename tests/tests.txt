@@ -398,4 +398,49 @@ Steps:
 
 Expected: Audoryn may start up to five due AI Runs in the tick, due work drains without pressing Execute, and any capability/integration/policy readiness failure is attached to the Work Item or trigger before a new Run is created.
 
+## Test 29 - Complete automatic Agent Identity provisioning during Worker Quick Start
+Viewport: desktop
+Covers: automatic Agent Identity creation, credential/key issuance, one-time credential handoff, managed Worker binding, credential non-persistence, capability non-grant invariant
+Description: Verifies Worker Quick Start finishes the Agent Identity flow instead of creating an identity whose generated credential is silently discarded.
+
+Setup:
+1. Create one reusable Workforce Role
+
+Steps:
+1. Open Workforce, create a Worker, and keep automatic security identity selected
+2. Add a Job with no external capability requirement and submit Create & start worker
+3. Inspect the one-time Agent credential handoff, copy the key, close it, then open Connections → Agent identities
+
+Expected: The Worker is bound to a new ACTIVE Agent Identity whose credential is ACTIVE with a fingerprint, version and agent.authenticate scope; the plaintext agt_sk_ key was created automatically and shown once, is not recoverable after closing, and no provider capability was silently granted.
+
+## Test 30 - Clear the entire Work Queue
+Viewport: desktop
+Covers: POST work-items clear-queue route family, active Run force-cancellation, runtime cancellation fencing, runtime-dispatch cleanup, hard Work Item removal, destructive confirmation
+Description: Verifies Clear queue means the current queue is completely emptied, regardless of Work Item state.
+
+Setup:
+1. Create Work Items that include QUEUED, RUNNING or WAITING_APPROVAL, and at least one terminal COMPLETED or FAILED item
+
+Steps:
+1. Open Jobs → Work Queue and choose Clear queue
+2. Confirm the destructive action
+3. Refresh Work Queue and Runtime
+
+Expected: Work Queue contains zero Work Items after refresh; active associated Runs are CANCELLED, no removed Work Item retains a runtime dispatch, terminal Work Item history is also removed from the queue, and a cancelled correlation cannot resume a provider action.
+
+## Test 31 - Permanently delete active Jobs and Workers
+Viewport: desktop
+Covers: DELETE job route family, DELETE worker route family, active Run force-cancellation, Work Item purge, trigger/dependency cleanup, automatic Agent credential revocation
+Description: Verifies Delete means delete even when work is currently running or waiting for approval.
+
+Setup:
+1. Create an automatically provisioned Worker with two Jobs, including one recurring Job, and start work so at least one Work Item is RUNNING or WAITING_APPROVAL
+
+Steps:
+1. Delete the active Job and confirm without waiting for its Work Item to finish
+2. Confirm the Job disappears from Jobs and its Work Items disappear from Work Queue
+3. Delete the Worker while its remaining Job has active work, then inspect Workforce, Jobs, Triggers and Connections → Agent identities
+
+Expected: Neither destructive action is blocked by active work; associated Runs are CANCELLED, Job/Worker definitions and all associated Work Items/triggers are removed, dependency references cannot recreate the deleted Job, historical Run/Audit records remain for traceability, and the automatically provisioned Agent Identity is DISABLED with its credential REVOKED.
+
 
