@@ -321,3 +321,81 @@ Steps:
 3. Inspect the pricing note beneath the plan columns
 
 Expected: Security describes identity separation, capability, policy, approval, credential, incident, audit, and tenant controls; Pricing does not show a fake checkout or claim plan state authorizes AI actions; the page states that verified billing integration is required before checkout is advertised.
+
+## Test 24 - Create and start a Worker in one flow
+Viewport: desktop
+Covers: R3 Worker Quick Start, POST workforce quick-start route family, automatic Agent Identity creation, Worker/Job activation, start-now queueing, automatic runtime handoff
+Description: Verifies the normal setup path is Worker → work → timing → start, without requiring Trigger, Scheduler, Runtime, or Execute configuration.
+
+Setup:
+1. Create a reusable Role with at least one responsibility
+
+Steps:
+1. Open Workforce and choose Worker
+2. Enter a Worker name, Role, department, keep automatic security identity, and add one Job with no external capability requirement
+3. Choose Every 5 minutes and Create & start worker
+4. Open Jobs → Work Queue, then inspect Triggers (advanced)
+
+Expected: The Worker and Job become ACTIVE when security readiness passes, the first Work Item is queued immediately instead of waiting five minutes, the recurring 5-minute trigger is already configured, and the UI does not require Scheduler, Managed Runtime, Run now, or Execute setup.
+
+## Test 25 - Keep missing capability authority explicit in Quick Start
+Viewport: desktop
+Covers: R3 needs-setup state, capability non-grant invariant, automatic activation reconciliation, direct Set up access path
+Description: Verifies quick setup remains convenient without silently granting provider authority.
+
+Setup:
+1. Connect a provider that exposes at least one capability scope but do not declare that scope on the Agent that Quick Start will create
+
+Steps:
+1. Create a Worker with a Job that requires the available provider capability
+2. Choose Start now and submit the Quick Start form
+3. Inspect the result and choose Set up access
+
+Expected: The Worker and Job are preserved but automatic execution is blocked with a visible Needs setup reason before a Run is created; the capability is not granted automatically; policy or integration gaps are also identified before runtime; Resolve setup opens the relevant Capabilities, Policies, or Integrations workspace.
+
+## Test 26 - Configure standalone Job automation in the Job form
+Viewport: desktop
+Covers: R3 POST jobs quick-start route family, standalone Job schedule configuration, automatic trigger creation, advanced trigger inspection
+Description: Verifies creating a Job separately no longer requires a second trip to Triggers for ordinary scheduling.
+
+Setup:
+1. Have one ACTIVE managed Worker whose Agent Identity is ready for a Job with no external capability requirement
+
+Steps:
+1. Open Workforce → Jobs and choose Job
+2. Define the Job, select On a schedule, set Every 5 minutes, and create it
+3. Open Triggers (advanced) and inspect the Job configuration
+
+Expected: The Job is created and activated automatically, its 5-minute recurring trigger already exists, and the advanced Triggers workspace is optional inspection/editing rather than a required setup step.
+
+## Test 27 - Use Worker Quick Start on mobile with multiple Jobs and working hours
+Viewport: mobile
+Covers: R3 responsive Worker Quick Start, multiple Jobs, per-Job timing, Worker working hours, automatic infrastructure messaging
+Description: Verifies the intent-first setup remains usable on a phone without exposing infrastructure configuration as mandatory steps.
+
+Setup:
+1. Create at least one reusable Workforce Role
+
+Steps:
+1. Open mobile Workforce and create a Worker
+2. Add two Jobs, give them different timing choices, and edit the Worker working hours
+3. Submit Create & start worker
+
+Expected: The form remains readable without horizontal clipping, both Jobs are attached to the new Worker, working hours are saved on the Worker, recurring Jobs queue their first eligible run immediately, and Audoryn reports either started or a single Needs setup state without sending the user through Scheduler or Runtime configuration.
+
+## Test 28 - Drain a bounded automatic queue without manual Execute
+Viewport: desktop
+Covers: R3 bounded Managed Runtime dispatch, 5-minute scheduler handoff, queue catch-up, readiness-before-Run guardrail
+Description: Verifies one extra queued item cannot leave a recurring Job permanently behind and setup blockers do not create repeated FAILED Runs.
+
+Setup:
+1. Have one ACTIVE Worker with an ACTIVE authorized Job and at least two due Work Items
+
+Steps:
+1. Run the Workforce Scheduler tick
+2. Open Jobs → Work Queue and Runtime
+3. Inspect the processed items and any remaining due queue
+
+Expected: Audoryn may start up to five due AI Runs in the tick, due work drains without pressing Execute, and any capability/integration/policy readiness failure is attached to the Work Item or trigger before a new Run is created.
+
+

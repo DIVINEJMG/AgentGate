@@ -4,13 +4,6 @@
     "cron": "*/5 * * * *",
     "handler": "workforceSchedulerCron",
     "timezone": "UTC",
-    "payload": {"batchSize": 50}
-  },
-  {
-    "name": "managed-runtime",
-    "cron": "7 * * * *",
-    "handler": "managedRuntimeCron",
-    "timezone": "UTC",
-    "payload": {"maxAiRuns": 1}
+    "payload": {"batchSize": 50, "maxAiRuns": 5}
   }
 ]
