@@ -38,6 +38,7 @@ import './supervision.css';
 import './performance.css';
 import './commercial.css';
 import './r1.css';
+import './r3.css';
 
 type EntryMode = 'signin' | 'signup' | 'app';
 
@@ -171,7 +172,7 @@ export default function ProductApp({ entryMode, onBack, onSignedIn }: { entryMod
 
   function renderView() {
     if (view === 'workforce') return <WorkforcePanel organization={organization} user={user!} apiVersion={apiVersion} onApiVersionChange={setApiVersion} onNavigate={setView} />;
-    if (view === 'jobs') return <JobsPanel organization={organization} apiVersion={apiVersion} onApiVersionChange={setApiVersion} />;
+    if (view === 'jobs') return <JobsPanel organization={organization} apiVersion={apiVersion} onApiVersionChange={setApiVersion} onNavigate={setView} />;
     if (view === 'supervision') return <SupervisionPanel organization={organization} user={user!} apiVersion={apiVersion} onApiVersionChange={setApiVersion} />;
     if (view === 'performance') return <PerformancePanel organization={organization} apiVersion={apiVersion} onApiVersionChange={setApiVersion} />;
     if (view === 'commercial') return <CommercialPanel organization={organization} apiVersion={apiVersion} onApiVersionChange={setApiVersion} />;
