@@ -338,20 +338,20 @@ Steps:
 
 Expected: The Worker and Job become ACTIVE when security readiness passes, the first Work Item is queued immediately instead of waiting five minutes, the recurring 5-minute trigger is already configured, and the UI does not require Scheduler, Managed Runtime, Run now, or Execute setup.
 
-## Test 25 - Keep missing capability authority explicit in Quick Start
+## Test 25 - Provision Job capability and policy automatically in Quick Start
 Viewport: desktop
-Covers: R3 needs-setup state, capability non-grant invariant, automatic activation reconciliation, direct Set up access path
-Description: Verifies quick setup remains convenient without silently granting provider authority.
+Covers: Worker Quick Start automatic authority provisioning, Agent capability declaration, narrow default Policy creation, Job activation, automatic runtime handoff
+Description: Verifies selecting a connected provider capability during automatic Worker creation completes the internal authority setup instead of sending the user to Capabilities or Policies.
 
 Setup:
-1. Connect a provider that exposes at least one capability scope but do not declare that scope on the Agent that Quick Start will create
+1. Connect one GitHub repository but do not predeclare `github.repository.pull_requests.read` on any Agent and do not create a matching allow policy
 
 Steps:
-1. Create a Worker with a Job that requires the available provider capability
-2. Choose Start now and submit the Quick Start form
-3. Inspect the result and choose Set up access
+1. Create a Worker with automatic security identity and a Job requiring `github.repository.pull_requests.read`
+2. Choose Every 5 minutes and submit Create & start worker
+3. Inspect the Worker, Job, Agent capability profile, Policies and Work Queue
 
-Expected: The Worker and Job are preserved but automatic execution is blocked with a visible Needs setup reason before a Run is created; the capability is not granted automatically; policy or integration gaps are also identified before runtime; Resolve setup opens the relevant Capabilities, Policies, or Integrations workspace.
+Expected: Audoryn automatically creates the Agent Identity and credential, declares `github.repository.pull_requests.read` on that Agent, creates an enabled narrow policy for that Agent + connected GitHub resource + scope, activates the Worker and Job, queues the first Work Item immediately and configures the recurring trigger without requiring manual Capabilities, Policies, Scheduler, Runtime or Run-now setup.
 
 ## Test 26 - Configure standalone Job automation in the Job form
 Viewport: desktop
@@ -411,7 +411,7 @@ Steps:
 2. Add a Job with no external capability requirement and submit Create & start worker
 3. Inspect the one-time Agent credential handoff, copy the key, close it, then open Connections → Agent identities
 
-Expected: The Worker is bound to a new ACTIVE Agent Identity whose credential is ACTIVE with a fingerprint, version and agent.authenticate scope; the plaintext agt_sk_ key was created automatically and shown once, is not recoverable after closing, and no provider capability was silently granted.
+Expected: The Worker is bound to a new ACTIVE Agent Identity whose credential is ACTIVE with a fingerprint, version and agent.authenticate scope; the plaintext agt_sk_ key was created automatically and shown once, is not recoverable after closing, and any Job-selected provider capabilities are attached automatically as separate least-privilege capability declarations.
 
 ## Test 30 - Clear the entire Work Queue
 Viewport: desktop
@@ -443,4 +443,72 @@ Steps:
 
 Expected: Neither destructive action is blocked by active work or by Work Item pagination beyond 200 records; the UI automatically continues bounded deletion batches, associated Runs are CANCELLED, Job/Worker definitions and all associated Work Items/triggers are removed, dependency references cannot recreate the deleted Job, historical Run/Audit records remain for traceability, and the automatically provisioned Agent Identity is DISABLED with its credential REVOKED.
 
+## Test 32 - Preserve explicit security denial during automatic setup
+Viewport: desktop
+Covers: Quick Start automatic policy provisioning guardrail, explicit Policy DENY precedence, no automatic override of human governance
+Description: Verifies automatic setup fills missing internal configuration but does not defeat a security rule a human intentionally created.
 
+Setup:
+1. Connect one GitHub repository
+2. Create an enabled DENY policy covering `github.repository.pull_requests.read` on that resource
+
+Steps:
+1. Create a Worker with automatic security identity and a Job requiring `github.repository.pull_requests.read`
+2. Submit Create & start worker
+3. Inspect the resulting Worker/Job readiness and Policies
+
+Expected: Audoryn creates the Agent Identity and attaches the selected capability, but it does not create an overriding ALLOW policy; the Worker/Job remains in Needs setup with the explicit policy restriction visible and no Run is started until a human changes that governance rule.
+
+## Test 33 - Browse Results as business deliverables
+Viewport: desktop
+Covers: F25 Results list/detail route families, terminal Runtime-to-Result projection, immutable versioning, Operations Results navigation, structured Result rendering
+Description: Verifies completed managed work appears automatically as a clean Result rather than requiring the user to inspect Runtime output.
+
+Setup:
+1. Create an active Worker with a Job that can complete successfully and run it twice
+
+Steps:
+1. Open Operations → Results
+2. Open the newest Result for the Job
+3. Return to the Job Results history
+
+Expected: Results is the default Operations page, both executions appear as separate immutable versions, the newest Result opens as a document with Summary/Findings or evidence, Worker/Job/completion metadata and a collapsed Execution details section, and the earlier version remains available.
+
+## Test 34 - Search and drill into Worker and Job results
+Viewport: desktop
+Covers: Result content index search, Worker/Job/Department/Status/Date filters, Results Workers subpage, Results Jobs subpage
+Description: Verifies a business user can find work by actual result content and navigate naturally through Workers and Jobs.
+
+Steps:
+1. Search Results for a distinctive phrase contained in a completed Result body
+2. Apply Worker, status and date filters
+3. Open Workers, choose the producing Worker, then open Jobs and choose the producing Job
+
+Expected: Search returns the Result containing the phrase, filters narrow the visible list, the Worker page shows its result history and weekly count, and the Job page shows Latest, Previous results, Worker and schedule context.
+
+## Test 35 - Export and print an official Result
+Viewport: desktop
+Covers: F25 Result export provenance route, PDF/DOCX/MD/TXT/JSON exports, conditional CSV/XLSX exports, dedicated print presentation, result.exported audit event
+Description: Verifies Results can leave Audoryn as professional branded deliverables without exposing the application shell.
+
+Setup:
+1. Have one completed Result containing at least one structured table
+
+Steps:
+1. Open the Result and download PDF, Word and Markdown
+2. Download Excel from the same table-backed Result
+3. Choose Print and then return to Results Overview
+
+Expected: Each export is branded Audoryn / An SOT Product and carries organization, Worker, Job, generated date, version and Result ID provenance; Excel is offered because the Result contains a table; Print excludes navigation/sidebar/buttons; Recent exports records the actions and Audit contains result.exported provenance.
+
+## Test 36 - Enforce Result access and attention states on mobile
+Viewport: mobile
+Covers: results.read/results.export permission boundary, Failed/Cancelled/Completed-with-attention presentation, mobile Results navigation and document layout
+Description: Verifies Results remain permission-scoped and readable on a phone while presenting customer-facing outcome states instead of internal runtime states.
+
+Steps:
+1. Open Operations → Results on mobile with an authorized organization member
+2. Inspect Results containing failed, cancelled and approval-involved completed work
+3. Use an organization role without results.export and open a Result
+
+Expected: Mobile Results is usable without horizontal application-shell overflow; statuses read Failed, Cancelled and Completed with attention rather than runtime lifecycle states; the Result remains readable when results.read is granted, while Download/Print controls are absent when results.export is not granted.
