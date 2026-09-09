@@ -14,6 +14,8 @@ import WorkforcePanel from './components/WorkforcePanel';
 import JobsPanel from './components/JobsPanel';
 import SupervisionPanel from './components/SupervisionPanel';
 import PerformancePanel from './components/PerformancePanel';
+import ResultsPanel from './components/ResultsPanel';
+import RuntimePanel from './components/RuntimePanel';
 import CommercialPanel from './components/CommercialPanel';
 import InvitationGate from './components/InvitationGate';
 import MemoryPanel from './components/MemoryPanel';
@@ -36,6 +38,7 @@ import './jobs.css';
 import './memory.css';
 import './supervision.css';
 import './performance.css';
+import './results.css';
 import './commercial.css';
 import './r1.css';
 import './r3.css';
@@ -173,8 +176,10 @@ export default function ProductApp({ entryMode, onBack, onSignedIn }: { entryMod
   function renderView() {
     if (view === 'workforce') return <WorkforcePanel organization={organization} user={user!} apiVersion={apiVersion} onApiVersionChange={setApiVersion} onNavigate={setView} />;
     if (view === 'jobs') return <JobsPanel organization={organization} apiVersion={apiVersion} onApiVersionChange={setApiVersion} onNavigate={setView} />;
+    if (view === 'results') return <ResultsPanel organization={organization} apiVersion={apiVersion} />;
     if (view === 'supervision') return <SupervisionPanel organization={organization} user={user!} apiVersion={apiVersion} onApiVersionChange={setApiVersion} />;
     if (view === 'performance') return <PerformancePanel organization={organization} apiVersion={apiVersion} onApiVersionChange={setApiVersion} />;
+    if (view === 'runtime') return <RuntimePanel organization={organization} apiVersion={apiVersion} onWorkChanged={() => void hydrateIdentity(apiVersion, user)} />;
     if (view === 'commercial') return <CommercialPanel organization={organization} apiVersion={apiVersion} onApiVersionChange={setApiVersion} />;
     if (view === 'memory') return <MemoryPanel organization={organization} apiVersion={apiVersion} onApiVersionChange={setApiVersion} />;
     if (view === 'agents') return <AgentsPanel organization={organization} user={user!} apiVersion={apiVersion} onApiVersionChange={setApiVersion} onCountChange={setAgentCount} />;
@@ -207,7 +212,7 @@ export default function ProductApp({ entryMode, onBack, onSignedIn }: { entryMod
     <nav className='mobile-primary-nav' aria-label='Mobile primary navigation'>
       <button className={view === 'overview' ? 'active' : ''} onClick={() => setView('overview')}>Home</button>
       <button className={section === 'workforce' ? 'active' : ''} onClick={() => setView('workforce')}>Workforce</button>
-      <button className={section === 'operations' ? 'active' : ''} onClick={() => setView('supervision')}>Operations</button>
+      <button className={section === 'operations' ? 'active' : ''} onClick={() => setView('results')}>Operations</button>
       <button className={section === 'governance' || section === 'connections' || section === 'organization' ? 'active' : ''} onClick={() => setMobileNavOpen(true)}>More</button>
     </nav>
   </div>;
