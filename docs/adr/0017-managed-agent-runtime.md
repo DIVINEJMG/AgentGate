@@ -20,4 +20,3 @@ Foundation 15 can create durable Work Items automatically, but no component owns
 
 ## Consequences
 Audoryn now has a real managed execution loop while preserving the control plane as the authority boundary. Strong transactional claiming, distributed leases and write-side exactly-once guarantees remain deferred to the later durable-execution foundation.
-

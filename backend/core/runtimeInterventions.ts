@@ -30,4 +30,3 @@ export async function assertRuntimeCorrelationAllowed(organizationId: string, co
   if (nextToken || items.length > 1) throw new Error('Runtime cancellation state is ambiguous. Execution is denied.');
   if (items[0]) throw new Error(`Managed Run was cancelled: ${items[0].reason}`);
 }
-

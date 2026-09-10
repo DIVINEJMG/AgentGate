@@ -12,3 +12,4 @@ export type ApprovalNotificationState=Awaited<ReturnType<typeof notifications.ge
 export async function getApprovalNotificationState(){return notifications.getEnvironment()}
 export async function enableApprovalNotifications(){await notifications.subscribe();return notifications.getEnvironment()}
 export function onApprovalNotification(callback:()=>void){return notifications.onMessage((payload)=>{if('data' in payload&&payload.data.kind==='approval')callback()})}
+

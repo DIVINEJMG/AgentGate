@@ -60,7 +60,7 @@ AppDeploy's current key-value store does not provide a transactional compare-and
 
 Audit & Observability adds an application-level append-only event ledger. Critical action execution establishes an audit path before provider invocation; action, approval, agent, integration and policy events are correlated and tenant-scoped. The Audit UI provides bounded search, severity/category filters, correlation tracing and operational summaries across the most recent 200 scanned events.
 
-No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative domain mutations and audit events cannot be atomically committed together with the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
+No synthetic backfill is created for older foundations: audit coverage begins with the Foundation 9 deployment. Administrative mutation and audit writes cannot be transactionally committed together with the current KV store, so management events are best-effort while provider execution is security-gated on required audit persistence.
 
 ## Foundation 10
 
@@ -163,3 +163,4 @@ The initial billing adapter defaults organizations to Free unless verified exter
 3. Security is architecture, not a pre-launch phase.
 4. Dangerous actions must be attributable and explainable.
 5. AppDeploy is the deployment environment, not the domain boundary.
+

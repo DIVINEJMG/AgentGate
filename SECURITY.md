@@ -147,3 +147,4 @@ The billing adapter defaults to Free when no verified external subscription exis
 Foundation 10 keeps risk deterministic. Provider capability risk is the floor and behavior can only maintain or raise it. The current signals are burst requests, repeated blocked actions, repeated provider failures, approval pressure and bounded-history truncation. Each active signal raises risk one level, capped at `critical`; no AI model can authorize or lower risk.
 
 Policy evaluation and runtime execution consume effective risk. Approval-time reauthorization recomputes risk instead of reusing the held snapshot. If risk assessment cannot be completed, the execution path fails closed. The behavior read is bounded to 100 action records; when that window is truncated, uncertainty conservatively raises risk rather than silently underestimating it.
+

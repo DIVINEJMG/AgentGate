@@ -20,4 +20,3 @@ Foundation 14 can create durable Work Items only when a human presses Run now. A
 
 ## Consequences
 Audoryn can now create work automatically without pretending the Managed Runtime exists. The current KV store cannot provide atomic compare-and-set, so concurrent exactly-once guarantees remain out of scope until Foundation 21 durable execution.
-

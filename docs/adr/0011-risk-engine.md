@@ -15,4 +15,3 @@ Decision Lab and Action Gateway policy matching use effective risk. Approved hel
 
 ## Consequences
 Risk is explainable and reproducible from visible thresholds. The 100-record history window can be truncated, so truncation itself conservatively adds one risk level. Threshold configuration remains code-defined in Foundation 10; organization-specific tuning can be introduced later behind a versioned risk-policy boundary.
-

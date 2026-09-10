@@ -20,3 +20,4 @@ No PostgreSQL or new persistence service is introduced. Action, idempotency, and
 ## Scope boundary
 
 Email, documents, CRM updates, CMS publishing, and GitHub pull-request writes remain future capabilities. This checkpoint establishes the canonical payload and approval boundary needed before expanding to those providers.
+

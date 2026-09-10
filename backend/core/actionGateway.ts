@@ -40,3 +40,4 @@ export async function testActionForUser(userId: string, organizationId: string, 
 export async function listActionsForUser(userId: string, organizationId: string) { await requireHumanAccess(userId, organizationId, 'actions.read'); const { items } = await db.list<ActionRecord>(actionsTable(organizationId), { limit: 100 }); return items.map((item) => publicAction(item.id, item)).sort((a, b) => b.requestedAt.localeCompare(a.requestedAt)); }
 export function serializeActionV2(action: ReturnType<typeof publicAction>) { return { identity: { id: action.id, status: action.status, correlationId: action.correlationId, requestedAt: action.requestedAt, completedAt: action.completedAt }, actor: action.agent, request: action.request, risk: action.riskAssessment, authorization: action.policy, execution: { result: action.result, error: action.error, idempotencyHash: action.idempotencyHash, approvalId: action.approvalId }, organizationId: action.organizationId }; }
 
+

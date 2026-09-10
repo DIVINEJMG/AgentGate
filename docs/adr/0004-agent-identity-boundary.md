@@ -13,4 +13,3 @@ Reuse human OAuth tokens; store recoverable plaintext agent keys; model agents a
 
 ## Consequences
 Agent authentication can later be placed in front of the Action Gateway without sharing human trust. Rotation and revocation are possible without credential recovery. Credential verification must fail closed and, when introduced, must validate both the authoritative credential record and agent lifecycle state.
-

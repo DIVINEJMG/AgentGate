@@ -22,4 +22,3 @@ Policy evaluation is side-effect free. Foundation 6 provides dry-run evaluation 
 - A policy record can be disabled without deleting its history; every modification increments its revision.
 - The policy engine remains independent of GitHub or any future provider.
 - Approval decisions can be represented before the approval queue itself exists.
-

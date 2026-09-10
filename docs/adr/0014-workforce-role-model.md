@@ -19,4 +19,3 @@ Audoryn F0–F12 established the security control plane. The Workforce Runtime a
 
 ## Consequences
 The product can present an understandable AI workforce directory without weakening the existing control plane. Future Jobs and Runtime foundations can reference Worker IDs while all external execution continues through Agent Identity and the Action Gateway.
-

@@ -20,4 +20,3 @@ A provider connection advertises supported operations but does not authorize any
 
 ## Consequences
 New providers implement the adapter contract without rewriting Audoryn core. Private provider connections require the credential vault to be configured. Secret rotation will require a deliberate future key-rotation migration strategy.
-
