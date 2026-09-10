@@ -18,4 +18,3 @@ Audoryn now manages Workers, Jobs, Runs, provider Actions, approvals, escalation
 
 ## Consequences
 Organizations gain practical workforce operations visibility without weakening deterministic authorization or turning Audoryn into an employee-rating system. Stronger queue/lease durability remains Foundation 21 work.
-

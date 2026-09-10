@@ -12,4 +12,3 @@ No synthetic backfill is generated for pre-Foundation-9 history.
 
 ## Consequences
 Critical runtime execution fails closed when the pre-execution audit path is unavailable. Correlation traces can connect request, policy, approval and outcome. Administrative audit completeness is not transactionally guaranteed. The ledger is application-level append-only, not a database-level WORM system; stronger atomic/outbox and retention storage may replace this adapter later without changing the canonical event contract.
-

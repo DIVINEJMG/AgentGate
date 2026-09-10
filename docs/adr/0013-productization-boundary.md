@@ -16,4 +16,3 @@ A future Stripe/Paddle/other adapter must implement a replaceable billing-provid
 - Usage reads are bounded and expose truncation rather than claiming exact totals when the window is incomplete.
 - No billing secrets or payment credentials exist in frontend code or repository state.
 - Plan state cannot authorize agent actions.
-

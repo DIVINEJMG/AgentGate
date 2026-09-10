@@ -20,4 +20,3 @@ Disconnected integrations are excluded from the live capability catalog. Previou
 
 ## Consequences
 Foundation 6 can evaluate one stable resource/action/scope model regardless of provider. Future adapters add capability descriptors without rewriting the policy domain. Capability declarations remain useful intent metadata while fail-closed authorization is preserved.
-

@@ -26,4 +26,3 @@ function selectorSummary(policy:PolicyRecord){const values=[policy.selectors.age
 function namesForAgents(ids:string[],agents:AgentIdentity[]){if(ids.length===0)return'Any agent';return ids.map((id)=>agents.find((agent)=>agent.id===id)?.name??id).join(', ')}
 function namesForResources(ids:string[],catalog:CapabilityCatalog|null){if(ids.length===0)return'Any resource';return ids.map((id)=>catalog?.resources.find((resource)=>resource.id===id)?.displayName??id).join(', ')}
 function message(value:unknown){const data=value as{response?:{data?:{error?:string}};message?:string};return data.response?.data?.error||data.message||'Policy request failed.'}
-

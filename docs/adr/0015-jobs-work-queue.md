@@ -19,4 +19,3 @@ Foundation 13 introduced business-facing Workers, but Workers still need durable
 
 ## Consequences
 Audoryn can now express and queue repeatable business work without pretending autonomous execution already exists. Foundation 15 can create Work Items from schedules/triggers, and Foundation 16 can claim queued Work Items and turn them into Runs while preserving the original Job snapshot and control-plane boundaries.
-

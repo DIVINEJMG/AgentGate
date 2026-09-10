@@ -23,3 +23,4 @@ export function actionPayload(raw: unknown): Record<string, unknown> {
 export function canonicalActionPayload(payload: Record<string, unknown>) {
   return JSON.stringify(sorted(payload));
 }
+

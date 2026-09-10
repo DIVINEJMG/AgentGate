@@ -12,4 +12,3 @@ Foundation 7 enables only read-only GitHub operations. Write/destructive operati
 
 ## Consequences
 The dashboard, future SDKs, MCP gateways and direct agent clients share one enforcement path. Policy changes do not require gateway rewrites, provider changes remain inside adapters, and later audit/risk modules can observe the action record without owning execution.
-

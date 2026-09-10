@@ -19,4 +19,3 @@ Managed Audoryn Workers can now plan and execute bounded work through the existi
 
 ## Consequences
 Human supervision becomes part of normal autonomous work without creating a second authorization plane. Performance analytics remain deferred to F20 and strong queue/lease atomicity remains deferred to F21.
-

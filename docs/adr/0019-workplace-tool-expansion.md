@@ -18,4 +18,3 @@ Audoryn's Action Gateway and provider adapter boundary are provider-neutral, but
 
 ## Consequences
 Audoryn moves beyond GitHub with real workplace read surfaces while preserving one authorization path. Write-side workplace actions, token refresh/OAuth app management and generic outbound egress remain explicit future work rather than hidden security debt.
-

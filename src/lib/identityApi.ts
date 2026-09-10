@@ -7,13 +7,15 @@ export interface OrganizationAccess { id: string; name: string; createdAt: strin
 export async function currentUser(): Promise<AuthUser | null> { return auth.getUser(); }
 export async function signIn() { return auth.signIn({ scope: 'openid email profile offline_access' }); }
 export async function signOut() { return auth.signOut(); }
+
 export async function listOrganizations(version: ApiVersion): Promise<OrganizationAccess[]> {
-  const response = await api.get(`/api/${version}/organizations`);
-  if (version === 'v1') return response.data.organizations as OrganizationAccess[];
-  return response.data.items.map((item: any) => ({ ...item.organization, ...item.membership }));
+    const response = await api.get(`/api/${version}/organizations`);
+    if (version === 'v1') return response.data.organizations as OrganizationAccess[];
+    return (response.data.items as Array<{ organization: { id: string; name: string; createdAt: string }; membership: { role: Role; permissions: string[] } }>).map((item) => ({ ...item.organization, ...item.membership }));
 }
+
 export async function createOrganization(version: ApiVersion, name: string): Promise<OrganizationAccess> {
-  const response = await api.post(`/api/${version}/organizations`, { name });
-  if (version === 'v1') return response.data.organization as OrganizationAccess;
-  return { ...response.data.data.organization, ...response.data.data.membership } as OrganizationAccess;
+    const response = await api.post(`/api/${version}/organizations`, { name });
+    if (version === 'v1') return response.data.organization as OrganizationAccess;
+    return { ...response.data.data.organization, ...response.data.data.membership } as OrganizationAccess;
 }

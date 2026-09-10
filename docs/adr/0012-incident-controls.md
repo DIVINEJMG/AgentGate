@@ -19,4 +19,3 @@ The organization emergency stop is intentionally independent of individual targe
 
 ## Storage limitation
 AppDeploy KV does not provide transactional compare-and-set. Per-target control storage is bounded and a control-history overflow fails closed rather than guessing an active state.
-
