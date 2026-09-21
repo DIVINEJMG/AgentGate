@@ -1,4 +1,4 @@
-import { api } from '@appdeploy/client';
+import { api } from '../platform/client';
 import type { CapabilityRisk } from './capabilityApi';
 import type { PolicyOutcome } from './policyApi';
 import type { ApiVersion } from './systemApi';
