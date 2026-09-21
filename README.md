@@ -1,6 +1,6 @@
 # Audoryn
 
-Foundation 24 productionizes the Audoryn workforce with server-side plan entitlements, worker-capacity enforcement, bounded job/run usage accounting, organization invitations, onboarding, billing-adapter separation and production monitoring. Commercial state limits product capacity but never authorizes AI execution.
+Foundation 26 is migrating Aduoryn to a platform-independent architecture: React/TypeScript frontend on Vercel and a Python/FastAPI backend targeting Render. The current F1–F25 TypeScript backend is preserved as migration reference code while canonical behavior is ported with parity checks.
 
 **An SOT Product**
 
@@ -162,5 +162,5 @@ The initial billing adapter defaults organizations to Free unless verified exter
 2. Public API versions coexist instead of overwriting each other.
 3. Security is architecture, not a pre-launch phase.
 4. Dangerous actions must be attributable and explainable.
-5. AppDeploy is the deployment environment, not the domain boundary.
+5. Hosting platforms are replaceable infrastructure edges; GitHub is the source of truth, Vercel hosts the frontend, and Render is the backend/runtime target.
 

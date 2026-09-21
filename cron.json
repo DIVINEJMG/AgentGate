@@ -1,9 +1,0 @@
-[
-  {
-    "name": "workforce-scheduler",
-    "cron": "*/5 * * * *",
-    "handler": "workforceSchedulerCron",
-    "timezone": "UTC",
-    "payload": {"batchSize": 50, "maxAiRuns": 5}
-  }
-]
