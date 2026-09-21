@@ -1,4 +1,4 @@
-import { api } from '@appdeploy/client';
+import { api } from '../platform/client';
 import type { CapabilityRisk } from './capabilityApi';
 import type { ApiVersion } from './systemApi';
 export type RiskSignalCode='burst_activity'|'repeated_blocks'|'repeated_failures'|'approval_pressure'|'history_truncated';
