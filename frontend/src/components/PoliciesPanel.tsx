@@ -1,5 +1,5 @@
 import { useEffect,useMemo,useState } from 'react';
-import { Bot,CheckCircle2,FileKey2,Loader2,Play,Save,ShieldAlert,ShieldCheck,ShieldQuestion,X } from 'lucide-react';
+import { CheckCircle2,FileKey2,Loader2,Play,Save,ShieldAlert,ShieldCheck,ShieldQuestion,X } from 'lucide-react';
 import { listAgents,type AgentIdentity } from '../lib/agentApi';
 import { listCapabilityCatalog,type CapabilityCatalog } from '../lib/capabilityApi';
 import type { OrganizationAccess } from '../lib/identityApi';
