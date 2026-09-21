@@ -1,4 +1,4 @@
-import { api } from '@appdeploy/client';
+import { api } from '../platform/client';
 import type { ApiVersion } from './systemApi';
 
 export type AgentStatus = 'active' | 'suspended' | 'disabled';
