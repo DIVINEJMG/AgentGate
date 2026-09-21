@@ -12,13 +12,13 @@ export class ApiClientError extends Error {
   }
 }
 
-type ApiResponse<T = unknown> = { data: T; status: number; headers: Headers };
+type ApiResponse<T = any> = { data: T; status: number; headers: Headers };
 
 function readAccessToken() {
   return window.localStorage.getItem('audoryn.access_token');
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<ApiResponse<T>> {
+async function request<T = any>(method: string, path: string, body?: unknown): Promise<ApiResponse<T>> {
   const headers = new Headers({ Accept: 'application/json' });
   const token = readAccessToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -50,8 +50,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = Object.freeze({
-  get: <T = unknown>(path: string) => request<T>('GET', path),
-  post: <T = unknown>(path: string, body?: unknown) => request<T>('POST', path, body),
-  put: <T = unknown>(path: string, body?: unknown) => request<T>('PUT', path, body),
-  delete: <T = unknown>(path: string, body?: unknown) => request<T>('DELETE', path, body),
+  get: <T = any>(path: string) => request<T>('GET', path),
+  post: <T = any>(path: string, body?: unknown) => request<T>('POST', path, body),
+  put: <T = any>(path: string, body?: unknown) => request<T>('PUT', path, body),
+  delete: <T = any>(path: string, body?: unknown) => request<T>('DELETE', path, body),
 });
