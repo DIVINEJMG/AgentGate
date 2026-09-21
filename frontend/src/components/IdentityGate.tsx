@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AuthUser } from '@appdeploy/client';
+import type { AuthUser } from '../platform/client';
 import type { ApiVersion } from '../lib/systemApi';
 import type { OrganizationAccess } from '../lib/identityApi';
 
