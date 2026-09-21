@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bot, Check, Clipboard, KeyRound, PauseCircle, Plus, RefreshCw, ShieldOff, X } from 'lucide-react';
-import type { AuthUser } from '@appdeploy/client';
+import type { AuthUser } from '../platform/client';
 import type { OrganizationAccess } from '../lib/identityApi';
 import { listAgents, registerAgent, revokeCredential, rotateCredential, setAgentLifecycle, type AgentIdentity, type AgentStatus, type CredentialReveal } from '../lib/agentApi';
 import type { ApiVersion } from '../lib/systemApi';
