@@ -1,4 +1,4 @@
-import { api } from '@appdeploy/client';
+import { api } from '../platform/client';
 import type { ApiVersion } from './systemApi';
 export type AuditCategory='identity'|'workforce'|'integration'|'policy'|'action'|'approval'|'risk'|'incident'|'security'|'system';export type AuditSeverity='info'|'warning'|'critical';export type AuditActorType='human'|'agent'|'system';
 export interface AuditEvent{id:string;organizationId:string;eventType:string;category:AuditCategory;severity:AuditSeverity;actor:{type:AuditActorType;id:string;label:string|null};resource:{type:string;id:string;name:string|null};correlationId:string|null;outcome:string|null;summary:string;metadata:Record<string,string|number|boolean|null>;occurredAt:string}
