@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AuthUser } from '@appdeploy/client';
+import type { AuthUser } from './platform/client';
 import AgentsPanel from './components/AgentsPanel';
 import ActionsPanel from './components/ActionsPanel';
 import ApprovalsPanel from './components/ApprovalsPanel';
@@ -118,10 +118,7 @@ export default function ProductApp({ entryMode, onBack, onSignedIn }: { entryMod
   async function handleSignIn() {
     setAuthError(null);
     try {
-      const result = await signIn();
-      setIdentityLoading(true);
-      await hydrateIdentity(apiVersion, result.user);
-      onSignedIn();
+      await signIn();
     } catch (caught) {
       const code = (caught as { code?: string }).code;
       setAuthError(code === 'popup_blocked' ? 'Allow popups for Audoryn, then try again.' : code === 'popup_closed' ? 'Sign in was cancelled.' : 'Secure sign in failed.');
