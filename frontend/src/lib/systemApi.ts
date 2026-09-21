@@ -1,4 +1,4 @@
-import { api } from '@appdeploy/client';
+import { api } from '../platform/client';
 
 export type ApiVersion = 'v1' | 'v2';
 export interface SystemStatus { service: string; apiVersion: ApiVersion; state: 'operational'; securityMode: 'fail-closed'; architecture: 'modular-monolith'; currentApiVersion: 'v2'; supportedApiVersions: ApiVersion[]; checkedAt: string; }
