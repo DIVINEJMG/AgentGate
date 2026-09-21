@@ -1,5 +1,5 @@
 import { useEffect,useMemo,useState } from 'react';
-import type { AuthUser } from '@appdeploy/client';
+import type { AuthUser } from '../platform/client';
 import { Clock3,Plus,Trash2,X } from 'lucide-react';
 import type { OrganizationAccess } from '../lib/identityApi';
 import type { ApiVersion } from '../lib/systemApi';
