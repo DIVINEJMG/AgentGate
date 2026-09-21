@@ -1,5 +1,5 @@
 import { useEffect,useMemo,useState } from 'react';
-import type { AuthUser } from '@appdeploy/client';
+import type { AuthUser } from '../platform/client';
 import { Bot,Briefcase,Check,Clipboard,Clock3,KeyRound,PauseCircle,PlayCircle,Plus,ShieldCheck,Trash2,Users,UserRoundCog,X } from 'lucide-react';
 import type { OrganizationAccess } from '../lib/identityApi';
 import type { ApiVersion } from '../lib/systemApi';
