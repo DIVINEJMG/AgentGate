@@ -1,4 +1,4 @@
-import { api } from '@appdeploy/client';
+import { api } from '../platform/client';
 import type { ApiVersion } from './systemApi';
 export interface PerformanceSummary{workers:number;activeWorkers:number;runs:number;terminalRuns:number;completed:number;failed:number;cancelled:number;successRate:number;failureRate:number;approvalRate:number;blockedActions:number;escalations:number;escalationsPer100Runs:number;incidents:number;incidentsPer100Runs:number;averageRunDurationMs:number;medianRunDurationMs:number}
 export interface WorkerPerformance{id:string;name:string;department:string;status:string;supervisorUserId:string;runs:number;completed:number;failed:number;cancelled:number;waitingApproval:number;successRate:number;failureRate:number;approvalRate:number;blockedActions:number;escalations:number;incidents:number;averageRunDurationMs:number;medianRunDurationMs:number}
