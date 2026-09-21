@@ -1,4 +1,4 @@
-import { api } from '@appdeploy/client';
+import { api } from '../platform/client';
 import type { ApiVersion } from './systemApi';
 export type CapabilityRisk = 'low' | 'medium' | 'high' | 'critical';
 export interface CapabilityAction { id: string; action: string; target: string; providerOperation: string; scope: string; description: string; risk: CapabilityRisk; }
