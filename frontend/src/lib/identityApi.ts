@@ -1,4 +1,4 @@
-import { api, auth, type AuthUser } from '@appdeploy/client';
+import { api, auth, type AuthUser } from '../platform/client';
 import type { ApiVersion } from './systemApi';
 
 export type Role = 'owner' | 'admin' | 'security_manager' | 'operator' | 'approver' | 'viewer';
