@@ -1,4 +1,4 @@
-import { api, notifications } from '@appdeploy/client';
+import { api, notifications } from '../platform/client';
 import type { CapabilityRisk } from './capabilityApi';
 import type { PolicyOutcome } from './policyApi';
 import type { ApiVersion } from './systemApi';
