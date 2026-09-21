@@ -1,4 +1,4 @@
-import { api, notifications } from '@appdeploy/client';
+import { api, notifications } from '../platform/client';
 import type { ApiVersion } from './systemApi';
 
 export type EscalationTrigger = 'job_failure' | 'policy_decision' | 'risk_high' | 'risk_critical';
