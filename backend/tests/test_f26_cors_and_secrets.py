@@ -1,4 +1,5 @@
 import pytest
+from pydantic import SecretStr
 
 from app.bootstrap.settings import Settings
 
@@ -19,8 +20,8 @@ def test_production_cors_accepts_explicit_origins() -> None:
 
 def test_secret_values_are_not_revealed_by_repr() -> None:
     settings = Settings(
-        database_url="postgresql://user:password@host/db",
-        redis_url="redis://:password@host:6379/0",
+        database_url=SecretStr("postgresql://user:password@host/db"),
+        redis_url=SecretStr("redis://:password@host:6379/0"),
     )
     rendered = repr(settings)
     assert "password@host" not in rendered
