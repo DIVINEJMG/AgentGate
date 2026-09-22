@@ -1,52 +1,70 @@
 # F27 staging provider status
 
-## Completed
+## Active staging infrastructure
 
-- F27.4: Neon staging schema is fully present in audoryn-staging.
-  - Project: audoryn-staging
-  - Region: aws-eu-central-1
-  - Database: audoryn
-  - Alembic version: 0003_f27_provider_metadata
-  - Canonical, migration, artifact, audit, queue, and result tables verified.
-  - WorkItem idempotency and artifact size/checksum metadata verified.
-- F27.5: dedicated Upstash Redis staging database created in the current Aduoryn Upstash account.
-  - Name: audoryn-redis-staging
-  - Region: eu-central-1
-  - TLS: enabled
-  - Eviction: disabled
-  - Live SET/GET verification passed.
-- F27.6: Render audoryn-api REDIS_URL points to audoryn-redis-staging.
-  - The legacy Render Redis instance remains intact for rollback.
-  - The resulting Render deploy completed successfully.
-- F27.7: private Upstash Blob bucket created in the same current Aduoryn Upstash account.
-  - Name: audoryn-artifacts-staging
-  - Visibility: private
-  - A signed PUT upload of a staging health marker succeeded.
-  - The application blueprint exposes server-only Blob configuration boundaries.
-- F27.9/F27.10: QStash and Workflow are anchored in the current Aduoryn Upstash account.
-  - EU QStash credentials are configured server-side in Render.
-  - QStash and Workflow DLQs are reachable and currently empty.
-  - The Render cron scheduler declaration is removed.
-  - QStash HTTP dispatch is the target scheduling topology.
-  - The Python scheduler module remains as a provider-independent fallback.
-  - A signed POST heartbeat endpoint exists for safe QStash delivery verification.
+### Neon
+- Project: audoryn-staging
+- Region: aws-eu-central-1
+- Database: audoryn
+- Application role: audoryn_app
+- Migration role: audoryn_migrator
+- Alembic version: 0003_f27_provider_metadata
 
-## Current Upstash account rule
-
-The currently connected Upstash account is the only active Upstash account for Aduoryn going forward:
-
+### Upstash — current Aduoryn account
 - Redis: audoryn-redis-staging
+  - eu-central-1
+  - TLS enabled
+  - eviction disabled
+  - direct SET/GET verification passed
 - Blob: audoryn-artifacts-staging
-- QStash: EU account
-- Workflow and DLQ: same EU QStash account
+  - private
+  - signed PUT upload verification passed
+- QStash: EU
+  - server credentials configured in Render staging
+  - signed one-off heartbeat delivery returned 200 OK
+  - active hourly heartbeat schedule targets:
+    https://audoryn-api-staging.onrender.com/internal/v1/runtime/heartbeat
+- Workflow/DLQ:
+  - QStash DLQ reachable and empty
+  - Workflow DLQ reachable and empty
 
-Resources that were previously created under another Upstash account are historical only and must not
-be modified, reused, deleted, or treated as active Aduoryn infrastructure.
+### Render
+- Service: audoryn-api-staging
+- Branch: main
+- Region: Frankfurt
+- Plan: free
+- Current deploy: live
+- DATABASE_URL: Neon staging
+- REDIS_URL: current-account Upstash Redis
+- QStash credentials: current-account EU QStash
+- UPSTASH_BLOB_BUCKET: current-account private Blob bucket
+- CUTOVER_STAGE: system
+- SHADOW_MODE_ENABLED: true
+- RUNTIME_EXECUTION_ENABLED: false
 
-## Blob runtime credential note
+The older audoryn-api Render service remains untouched as fallback.
 
-The connected Upstash tool deliberately does not return private bucket tokens. The bucket itself is
-created and storage writes are verified through provider-signed URLs. Activating the FastAPI
-ObjectStorage transport still requires the server-only UPSTASH_BLOB_TOKEN to be supplied through the
-provider console or another secure credential path; it must never be committed to GitHub or exposed
-to the frontend.
+## QStash schedules
+
+One earlier test schedule points at the old API health endpoint and is paused. It remains preserved
+rather than deleted.
+
+The active staging schedule targets the signed POST heartbeat endpoint on audoryn-api-staging.
+
+Real job schedules will later be created dynamically from canonical job definitions and will target
+the verified runtime dispatch endpoint rather than bypassing PostgreSQL or the Action Gateway.
+
+## Blob credential boundary
+
+The current Upstash connector intentionally does not expose private bucket tokens. The bucket is
+created and actual storage writes are verified through provider-signed upload URLs.
+
+The FastAPI ObjectStorage transport must remain fail-closed until the server-only
+UPSTASH_BLOB_TOKEN is supplied securely to Render. This token must never be committed to GitHub,
+stored in Vercel frontend variables, or exposed to the browser.
+
+## Account rule
+
+The currently connected Upstash account is the only active Upstash account for Aduoryn going
+forward. Resources in any earlier Upstash account are historical only and must not be modified,
+reused, deleted, or treated as active infrastructure.
