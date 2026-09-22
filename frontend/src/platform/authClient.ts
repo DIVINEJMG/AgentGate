@@ -1,5 +1,4 @@
 import { api } from './apiClient';
-import { authUrl } from './config';
 
 export interface AuthUser {
   userId: string;
@@ -7,36 +6,60 @@ export interface AuthUser {
   name?: string | null;
 }
 
-type SessionPayload =
-  | { user: { id?: string; userId?: string; email?: string | null; name?: string | null } | null }
-  | { identity: { subject: string; email?: string | null; displayName?: string | null } | null };
+export interface AuthCredentials {
+  email: string;
+  password: string;
+  name?: string;
+}
+
+type SessionPayload = {
+  user: { id?: string; userId?: string; email?: string | null; name?: string | null } | null;
+  accessToken?: string;
+  tokenType?: string;
+};
 
 function normalizeUser(payload: SessionPayload): AuthUser | null {
-  if ('user' in payload) {
-    const user = payload.user;
-    if (!user) return null;
-    const userId = user.userId ?? user.id;
-    return userId ? { userId, email: user.email ?? null, name: user.name ?? null } : null;
-  }
-  const identity = payload.identity;
-  return identity ? { userId: identity.subject, email: identity.email ?? null, name: identity.displayName ?? null } : null;
+  const user = payload.user;
+  if (!user) return null;
+  const userId = user.userId ?? user.id;
+  return userId ? { userId, email: user.email ?? null, name: user.name ?? null } : null;
+}
+
+function persistSession(payload: SessionPayload): AuthUser {
+  const user = normalizeUser(payload);
+  if (!user || !payload.accessToken) throw new Error('Authentication response was incomplete.');
+  window.localStorage.setItem('audoryn.access_token', payload.accessToken);
+  return user;
 }
 
 export const auth = Object.freeze({
   async getUser(): Promise<AuthUser | null> {
+    const token = window.localStorage.getItem('audoryn.access_token');
+    if (!token) return null;
     try {
       const response = await api.get<SessionPayload>('/api/v2/auth/session');
       return normalizeUser(response.data);
     } catch (error) {
       if (typeof error === 'object' && error !== null && 'status' in error &&
-          (error as { status?: number }).status === 401) return null;
+          (error as { status?: number }).status === 401) {
+        window.localStorage.removeItem('audoryn.access_token');
+        return null;
+      }
       throw error;
     }
   },
 
-  async signIn(_options?: { scope?: string }) {
-    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    window.location.assign(`${authUrl('/api/v2/auth/login')}?returnTo=${encodeURIComponent(returnTo)}`);
+  async signIn(credentials: AuthCredentials): Promise<AuthUser> {
+    const response = await api.post<SessionPayload>('/api/v2/auth/login', {
+      email: credentials.email,
+      password: credentials.password,
+    });
+    return persistSession(response.data);
+  },
+
+  async signUp(credentials: AuthCredentials): Promise<AuthUser> {
+    const response = await api.post<SessionPayload>('/api/v2/auth/signup', credentials);
+    return persistSession(response.data);
   },
 
   async signOut() {

@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     runtime_execution_enabled: bool = False
     worker_poll_seconds: float = 2.0
     worker_heartbeat_ttl_seconds: int = 60
+    auth_session_ttl_seconds: int = 60 * 60 * 24 * 7
+    auth_login_failure_window_seconds: int = 60 * 15
     object_storage_provider: str = "unconfigured"
     upstash_blob_bucket: str | None = None
     upstash_blob_token: SecretStr | None = None

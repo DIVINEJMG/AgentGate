@@ -1,11 +1,12 @@
-import { api, auth, type AuthUser } from '../platform/client';
+import { api, auth, type AuthCredentials, type AuthUser } from '../platform/client';
 import type { ApiVersion } from './systemApi';
 
 export type Role = 'owner' | 'admin' | 'security_manager' | 'operator' | 'approver' | 'viewer';
 export interface OrganizationAccess { id: string; name: string; createdAt: string; role: Role; permissions: string[]; }
 
 export async function currentUser(): Promise<AuthUser | null> { return auth.getUser(); }
-export async function signIn() { return auth.signIn({ scope: 'openid email profile offline_access' }); }
+export async function signIn(credentials: AuthCredentials) { return auth.signIn(credentials); }
+export async function signUp(credentials: AuthCredentials) { return auth.signUp(credentials); }
 export async function signOut() { return auth.signOut(); }
 
 export async function listOrganizations(version: ApiVersion): Promise<OrganizationAccess[]> {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AuthUser } from './platform/client';
+import type { AuthCredentials, AuthUser } from './platform/client';
 import AgentsPanel from './components/AgentsPanel';
 import ActionsPanel from './components/ActionsPanel';
 import ApprovalsPanel from './components/ApprovalsPanel';
@@ -22,7 +22,7 @@ import MemoryPanel from './components/MemoryPanel';
 import { IdentityLoading, OrganizationOnboarding, SignInGate } from './components/IdentityGate';
 import Sidebar from './components/Sidebar';
 import { listAgents } from './lib/agentApi';
-import { createOrganization, currentUser, listOrganizations, signIn, signOut, type OrganizationAccess } from './lib/identityApi';
+import { createOrganization, currentUser, listOrganizations, signIn, signOut, signUp, type OrganizationAccess } from './lib/identityApi';
 import { listIntegrations } from './lib/integrationApi';
 import { loadSystemStatus, type ApiVersion, type SystemStatus } from './lib/systemApi';
 import { clearPendingInvitationCode, getPendingInvitationCode } from './lib/commercialApi';
@@ -115,13 +115,15 @@ export default function ProductApp({ entryMode, onBack, onSignedIn }: { entryMod
     };
   }, [apiVersion]);
 
-  async function handleSignIn() {
+  async function handleAuthenticate(credentials: AuthCredentials, mode: 'signin' | 'signup') {
     setAuthError(null);
+    setIdentityLoading(true);
     try {
-      await signIn();
+      const authenticated = mode === 'signup' ? await signUp(credentials) : await signIn(credentials);
+      await hydrateIdentity(apiVersion, authenticated);
     } catch (caught) {
-      const code = (caught as { code?: string }).code;
-      setAuthError(code === 'popup_blocked' ? 'Allow popups for Audoryn, then try again.' : code === 'popup_closed' ? 'Sign in was cancelled.' : 'Secure sign in failed.');
+      const message = caught instanceof Error ? caught.message : 'Secure authentication failed.';
+      setAuthError(message);
     } finally {
       setIdentityLoading(false);
     }
@@ -161,7 +163,7 @@ export default function ProductApp({ entryMode, onBack, onSignedIn }: { entryMod
   }
 
   if (identityLoading) return <IdentityLoading />;
-  if (!user) return <SignInGate onSignIn={handleSignIn} error={authError} mode={entryMode === 'signup' ? 'signup' : 'signin'} onBack={onBack} />;
+  if (!user) return <SignInGate onAuthenticate={handleAuthenticate} error={authError} mode={entryMode === 'signup' ? 'signup' : 'signin'} onBack={onBack} />;
   if (pendingInvite) return <InvitationGate code={pendingInvite} apiVersion={apiVersion} onJoined={handleInviteJoined} onAbandon={handleInviteAbandon} />;
   if (organizations.length === 0) return <OrganizationOnboarding user={user} apiVersion={apiVersion} onCreate={handleCreateOrganization} />;
 

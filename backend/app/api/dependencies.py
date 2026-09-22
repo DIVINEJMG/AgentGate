@@ -4,9 +4,9 @@ from fastapi import Header, HTTPException, status
 
 from app.domain.identity.errors import AuthenticationError
 from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.auth.provider import UnconfiguredIdentityProvider
+from app.infrastructure.auth.provider import SessionIdentityProvider
 
-_identity_provider = UnconfiguredIdentityProvider()
+_identity_provider = SessionIdentityProvider()
 
 
 async def human_principal(
