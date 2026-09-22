@@ -2,7 +2,7 @@
 
 ## Durable execution controls
 
-Managed workers use lease fencing and stable Action Gateway idempotency keys. A stale worker cannot renew a superseded lease, expired work is recovered with a bounded retry policy, and repeated expiry is dead-lettered. AppDeploy database does not expose transactional compare-and-swap, so Audoryn documents this as verified at-least-once execution with idempotent external action boundaries rather than claiming strict exactly-once execution.
+Managed workers use lease fencing and stable Action Gateway idempotency keys. A stale worker cannot renew a superseded lease, expired work is recovered with a bounded retry policy, and repeated expiry is dead-lettered. legacy platform database does not expose transactional compare-and-swap, so Audoryn documents this as verified at-least-once execution with idempotent external action boundaries rather than claiming strict exactly-once execution.
 
 Audoryn is security-sensitive infrastructure. Security controls are architectural requirements.
 
@@ -22,7 +22,7 @@ Plaintext agent credentials are never persisted. A secret is generated at issuan
 
 ## Integration credentials
 
-Provider credentials use a different boundary from agent authentication. Tenant-supplied provider tokens are encrypted with AES-256-GCM before database persistence. The encryption key is derived from `INTEGRATION_MASTER_KEY`, which exists only in AppDeploy backend secret storage and is never returned to the client. Public GitHub repository connections require no provider token. If the vault is not configured, private credential-backed connections fail closed.
+Provider credentials use a different boundary from agent authentication. Tenant-supplied provider tokens are encrypted with AES-256-GCM before database persistence. The encryption key is derived from `INTEGRATION_MASTER_KEY`, which exists only in legacy platform backend secret storage and is never returned to the client. Public GitHub repository connections require no provider token. If the vault is not configured, private credential-backed connections fail closed.
 
 ## Capability boundary
 
@@ -36,7 +36,7 @@ Policies are revisioned and can be disabled without deleting their history.
 
 ## Action Gateway boundary
 
-Foundation 7 places deterministic decisions in the runtime execution path. External agent routes require the agent's separate bearer credential; human AppDeploy sessions do not satisfy agent authentication. Every accepted request establishes an idempotency key hash and correlation ID before provider execution. `DENY` never calls an adapter, `REQUIRE_APPROVAL` is held without execution, and only `ALLOW` can invoke a provider operation.
+Foundation 7 places deterministic decisions in the runtime execution path. External agent routes require the agent's separate bearer credential; human legacy platform sessions do not satisfy agent authentication. Every accepted request establishes an idempotency key hash and correlation ID before provider execution. `DENY` never calls an adapter, `REQUIRE_APPROVAL` is held without execution, and only `ALLOW` can invoke a provider operation.
 
 The first executable provider surface is intentionally read-only GitHub metadata, issue and pull-request retrieval. Provider writes remain unavailable. Agent secrets are never persisted by the gateway or test harness, integration tokens remain decrypted only inside the backend credential boundary, and provider failures are recorded as failures rather than converted into successful authorization.
 
@@ -46,13 +46,13 @@ Foundation 8 persists a pending approval before a `REQUIRE_APPROVAL` action beco
 
 Approval does not reuse stale authority. Before provider execution, Audoryn verifies that the initiating agent is still active, the same credential fingerprint is still current and valid, the integration remains connected, the exact provider operation still exists, the agent still declares the scope, and current policy does not resolve to `DENY`. Any failed revalidation blocks execution. Push notification delivery is best-effort and never changes authorization state.
 
-Because the current AppDeploy key-value store exposes no transactional compare-and-set primitive, Audoryn does not claim strong serialization for simultaneous competing approval clicks. Provider execution remains read-only until a storage boundary suitable for atomic decision/idempotency locking is available.
+Because the current legacy platform key-value store exposes no transactional compare-and-set primitive, Audoryn does not claim strong serialization for simultaneous competing approval clicks. Provider execution remains read-only until a storage boundary suitable for atomic decision/idempotency locking is available.
 
 ## Audit boundary
 
 Foundation 9 exposes no audit update or delete API. Events are appended to a tenant-scoped ledger and can be read only by humans with `audit.read`. Correlation IDs connect agent requests, authorization outcomes, approvals and provider results. New provider execution is denied when its required pre-execution audit event cannot be persisted.
 
-Administrative domain mutations and audit events cannot be atomically committed together with the current AppDeploy KV store. Those management events are therefore best-effort and failures are surfaced to backend observability logs. Audoryn does not claim database-level WORM guarantees or transactional audit completeness until a storage boundary supporting atomic mutation/outbox semantics is available.
+Administrative domain mutations and audit events cannot be atomically committed together with the current legacy platform KV store. Those management events are therefore best-effort and failures are surfaced to backend observability logs. Audoryn does not claim database-level WORM guarantees or transactional audit completeness until a storage boundary supporting atomic mutation/outbox semantics is available.
 
 ## Incident-control boundary
 
@@ -60,7 +60,7 @@ Foundation 11 separates emergency execution state from identity and integration 
 
 Incident resolution never restores execution automatically. Recovery is a separate explicit human operation with `incidents.manage`, a reason and audit attribution. Organization restoration does not override a still-suspended agent or integration. Existing agent lifecycle suspension/disable remains an independent guardrail.
 
-Because AppDeploy KV has no transactional compare-and-set, concurrent management transitions cannot be claimed as strongly serialized. Per-target control reads are bounded; ambiguous overflow fails closed rather than assuming execution is active.
+Because legacy platform KV has no transactional compare-and-set, concurrent management transitions cannot be claimed as strongly serialized. Per-target control reads are bounded; ambiguous overflow fails closed rather than assuming execution is active.
 
 ## Productization boundary
 
@@ -102,7 +102,7 @@ Foundation 17 treats memory as untrusted context, never as authorization. Manage
 
 Context assembly is bounded, excludes archived/expired records and stores the selected memory IDs on the Run for traceability. Memory content is never evaluated as capability state and cannot alter risk, deterministic policy, approvals or incident controls. Expiry means a record is no longer context-eligible; F17 does not claim physical retention deletion.
 
-Successful Run artifacts are stored separately in AppDeploy Storage with tenant-scoped metadata. Access requires `artifacts.read` and is issued through short-lived signed URLs. Provider credentials and Agent credentials are never written into memory or artifacts by this foundation.
+Successful Run artifacts are stored separately in legacy platform Storage with tenant-scoped metadata. Access requires `artifacts.read` and is issued through short-lived signed URLs. Provider credentials and Agent credentials are never written into memory or artifacts by this foundation.
 
 ## Workplace tool expansion boundary
 
@@ -132,13 +132,13 @@ Foundation 23 treats templates as setup guidance, never as authority bundles. A 
 
 Templates never connect an integration, change an Agent capability declaration, create or enable a Policy, approve an Action, activate a Worker or Job, queue work, or execute a provider operation. Example Jobs are created only when every required scope already exists in the tenant's live capability catalog; otherwise the Job remains explicitly blocked in the template result with its missing requirements intact.
 
-Template application reuses the existing tenant, Workforce and Jobs permission boundaries and validates the selected Agent Identity and human supervisor. AppDeploy does not provide a multi-record transaction, so F23 preflights known blockers and does not claim all-or-nothing provisioning across Role, Worker and Job records.
+Template application reuses the existing tenant, Workforce and Jobs permission boundaries and validates the selected Agent Identity and human supervisor. legacy platform does not provide a multi-record transaction, so F23 preflights known blockers and does not claim all-or-nothing provisioning across Role, Worker and Job records.
 
 ## Workforce productionization boundary
 
 Foundation 24 introduces commercial capacity controls without making billing an authorization authority. Worker creation checks a server-side plan entitlement and fails closed when subscription state or the bounded Worker count cannot be verified. A downgrade never silently disables existing Workers; it prevents additional provisioning until capacity is within the verified entitlement.
 
-Organization invitations use authenticated AppDeploy invite codes with an email allow-list. Invite joining creates only an existing human organization membership and cannot create Agent capabilities, Policies, approvals or provider credentials. Invite URLs are built by the platform client helper rather than trusted host headers.
+Organization invitations use authenticated legacy platform invite codes with an email allow-list. Invite joining creates only an existing human organization membership and cannot create Agent capabilities, Policies, approvals or provider credentials. Invite URLs are built by the platform client helper rather than trusted host headers.
 
 The billing adapter defaults to Free when no verified external subscription exists. No client route can self-upgrade a plan and no payment provider state is fabricated. Commercial usage and monitoring are bounded projections over canonical records; truncation is disclosed.
 
