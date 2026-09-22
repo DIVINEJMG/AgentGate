@@ -1,8 +1,11 @@
 from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.domain.organizations.repositories import OrganizationRecord, OrganizationRepository
 from app.infrastructure.database.models import Organization, OrganizationMembership
+
 
 class SQLAlchemyOrganizationRepository(OrganizationRepository):
     def __init__(self, session: AsyncSession) -> None:
@@ -23,6 +26,11 @@ class SQLAlchemyOrganizationRepository(OrganizationRepository):
         return self._record(model) if model else None
 
     async def list_for_user(self, user_id: UUID) -> list[OrganizationRecord]:
-        statement = select(Organization).join(OrganizationMembership).where(OrganizationMembership.user_id == user_id).order_by(Organization.name, Organization.id)
+        statement = (
+            select(Organization)
+            .join(OrganizationMembership)
+            .where(OrganizationMembership.user_id == user_id)
+            .order_by(Organization.name, Organization.id)
+        )
         models = (await self._session.scalars(statement)).all()
         return [self._record(model) for model in models]

@@ -1,15 +1,20 @@
 import secrets
 from dataclasses import dataclass
+
 from redis.asyncio import Redis
+
 from app.bootstrap.settings import settings
+
 
 @dataclass(frozen=True, slots=True)
 class Lease:
     key: str
     token: str
 
+
 class RedisCoordinator:
     """Ephemeral coordination only. Canonical business state must remain in PostgreSQL."""
+
     def __init__(self, client: Redis) -> None:
         self._client = client
 
@@ -26,7 +31,10 @@ class RedisCoordinator:
         return Lease(key=key, token=token) if acquired else None
 
     async def release_lock(self, lease: Lease) -> bool:
-        script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end return 0"
+        script = (
+            "if redis.call('get', KEYS[1]) == ARGV[1] then "
+            "return redis.call('del', KEYS[1]) end return 0"
+        )
         return bool(await self._client.eval(script, 1, f"lock:{lease.key}", lease.token))
 
     async def heartbeat(self, key: str, value: str, *, ttl_seconds: int = 60) -> None:
