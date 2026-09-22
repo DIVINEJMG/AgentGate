@@ -1,7 +1,7 @@
 import asyncio
 import time
-from io import BytesIO
 from dataclasses import dataclass
+from io import BytesIO
 from urllib.parse import urlparse
 
 import boto3
