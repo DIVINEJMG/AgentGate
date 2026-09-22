@@ -1,17 +1,20 @@
 import { useState } from 'react';
-import type { AuthUser } from '../platform/client';
+import type { AuthCredentials, AuthUser } from '../platform/client';
 import type { ApiVersion } from '../lib/systemApi';
 import type { OrganizationAccess } from '../lib/identityApi';
 
 function Brand(){return <div className='identity-wordmark'><strong>Audoryn</strong><span>An SOT Product</span></div>}
 
-export function SignInGate({onSignIn,error,mode='signin',onBack}:{onSignIn:()=>Promise<void>;error:string|null;mode?:'signin'|'signup';onBack?:()=>void}){
+export function SignInGate({onAuthenticate,error,mode='signin',onBack}:{onAuthenticate:(credentials:AuthCredentials,mode:'signin'|'signup')=>Promise<void>;error:string|null;mode?:'signin'|'signup';onBack?:()=>void}){
   const[busy,setBusy]=useState(false);
-  async function submit(){setBusy(true);try{await onSignIn()}finally{setBusy(false)}}
+  const[email,setEmail]=useState('');
+  const[password,setPassword]=useState('');
+  const[name,setName]=useState('');
   const signup=mode==='signup';
+  async function submit(event:React.FormEvent){event.preventDefault();setBusy(true);try{await onAuthenticate({email,password,name:signup?name:undefined},mode)}finally{setBusy(false)}}
   return <main className='identity-screen'><div className='identity-shell'>
     <section className='identity-intro'><Brand/><div className='identity-statement'><p>{signup?'Start an Audoryn workspace':'Controlled autonomous workforce infrastructure'}</p><h1>{signup?'Start with a small AI workforce. Keep control from day one.':'Put your AI workforce to work—with control.'}</h1><span>{signup?'Create your account, set up an organization, then add workers only when you are ready to define their authority.':'Coordinate workers, jobs, approvals and connected tools from one calm operating layer. Audoryn keeps human authority explicit when actions become sensitive.'}</span></div><div className='identity-principles'><span>Human oversight</span><span>Tenant isolation</span><span>Deterministic authorization</span></div></section>
-    <section className='identity-action'><p className='identity-action-label'>{signup?'Get started':'Workspace access'}</p><h2>{signup?'Create account':'Sign in'}</h2><p>{signup?'Continue with your organization identity. New users can create an Audoryn workspace after authentication.':'Continue with your organization identity.'}</p>{error&&<p className='form-error' role='alert'>{error}</p>}<button className='primary-button' onClick={submit} disabled={busy}>{busy?'Opening secure sign in…':signup?'Continue to create account':'Continue securely'}</button><p className='legal-note'>By continuing, you agree to Audoryn&apos;s <a href='#/terms'>terms</a> and acknowledge the <a href='#/privacy'>privacy notice</a>.</p>{onBack&&<button className='identity-back' type='button' onClick={onBack}>← Back to Audoryn</button>}</section>
+    <section className='identity-action'><p className='identity-action-label'>{signup?'Get started':'Workspace access'}</p><h2>{signup?'Create account':'Sign in'}</h2><p>{signup?'Create your Audoryn account. Credentials are stored in Neon and sessions are revocable through Upstash Redis.':'Sign in to your Audoryn workspace.'}</p>{error&&<p className='form-error' role='alert'>{error}</p>}<form className='org-form' onSubmit={submit}>{signup&&<><label htmlFor='auth-name'>Name</label><input id='auth-name' value={name} onChange={event=>setName(event.target.value)} autoComplete='name' maxLength={160} placeholder='Your name'/></>}<label htmlFor='auth-email'>Email</label><input id='auth-email' type='email' required value={email} onChange={event=>setEmail(event.target.value)} autoComplete='email' maxLength={320} placeholder='you@company.com'/><label htmlFor='auth-password'>Password</label><input id='auth-password' type='password' required minLength={signup?10:1} value={password} onChange={event=>setPassword(event.target.value)} autoComplete={signup?'new-password':'current-password'} placeholder={signup?'At least 10 characters':'Your password'}/>{signup&&<p className='field-help'>Use at least 10 characters. Your password is salted and hashed before it is stored.</p>}<button className='primary-button' type='submit' disabled={busy}>{busy?(signup?'Creating account…':'Signing in…'):(signup?'Create account':'Sign in securely')}</button></form><p className='legal-note'>By continuing, you agree to Audoryn&apos;s <a href='#/terms'>terms</a> and acknowledge the <a href='#/privacy'>privacy notice</a>.</p>{onBack&&<button className='identity-back' type='button' onClick={onBack}>← Back to Audoryn</button>}</section>
   </div></main>
 }
 
