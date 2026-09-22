@@ -25,6 +25,15 @@ class HumanIdentity(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     email: Mapped[str | None] = mapped_column(String(320), unique=True)
     display_name: Mapped[str | None] = mapped_column(String(160))
 
+class LocalAuthCredential(TimestampMixin, Base):
+    __tablename__ = "local_auth_credentials"
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("human_identities.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
+
+
 class Organization(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "organizations"
     name: Mapped[str] = mapped_column(String(80), nullable=False)
