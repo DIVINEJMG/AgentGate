@@ -14,5 +14,20 @@ services:
       - key: REDIS_URL
         sync: false
 
+  - type: cron
+    name: audoryn-scheduler
+    runtime: python
+    rootDir: backend
+    schedule: "*/5 * * * *"
+    buildCommand: pip install -e .
+    startCommand: python -m app.runtime.scheduler
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+
 databases:
   - name: audoryn-postgres
