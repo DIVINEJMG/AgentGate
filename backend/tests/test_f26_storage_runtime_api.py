@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from app.api.adapters.system_status import serialize_v1, serialize_v2
 from app.application.queries.system_status import get_system_status
 from app.domain.artifacts.storage import ObjectStorage
+from app.domain.jobs.queue import ClaimedWorkItem
 from app.infrastructure.storage.provider import UnconfiguredObjectStorage
 from app.runtime.executor import UnconfiguredRuntimeExecutor
 
@@ -29,9 +31,6 @@ async def test_unconfigured_object_storage_fails_closed() -> None:
 @pytest.mark.asyncio
 async def test_runtime_executor_fails_closed_until_migration_is_enabled() -> None:
     executor = UnconfiguredRuntimeExecutor()
-    from app.domain.jobs.queue import ClaimedWorkItem
-    from datetime import UTC, datetime
-
     item = ClaimedWorkItem(
         id=uuid4(),
         organization_id=uuid4(),

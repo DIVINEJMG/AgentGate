@@ -28,7 +28,7 @@ async def work_once() -> bool:
             executor = UnconfiguredRuntimeExecutor()
             try:
                 await executor.execute(work_item)
-            except Exception as exc:
+            except RuntimeError as exc:
                 await queue.checkpoint_failed(work_item.id, reason=str(exc))
                 await session.commit()
                 return True
