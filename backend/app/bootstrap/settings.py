@@ -69,6 +69,14 @@ class Settings(BaseSettings):
             raw = "postgresql+asyncpg://" + raw.removeprefix("postgres://")
         elif raw.startswith("postgresql://") and "+asyncpg" not in raw:
             raw = "postgresql+asyncpg://" + raw.removeprefix("postgresql://")
+
+        # Neon emits libpq-oriented query parameters. SQLAlchemy's asyncpg
+        # dialect needs `ssl` instead of `sslmode` and does not accept
+        # `channel_binding` as a connect() keyword.
+        raw = raw.replace("channel_binding=require&", "")
+        raw = raw.replace("&channel_binding=require", "")
+        raw = raw.replace("?channel_binding=require", "?")
+        raw = raw.replace("sslmode=require", "ssl=require")
         return SecretStr(raw)
 
     @field_validator("cors_allowed_origins", mode="before")
