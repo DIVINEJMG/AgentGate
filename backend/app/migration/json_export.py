@@ -15,11 +15,11 @@ class JsonDirectoryExtractor:
         for path in sorted(self._directory.glob("*.json")):
             raw = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(raw, list):
-                raise ValueError(f"{path.name} must contain a JSON array.")
+                raise TypeError(f"{path.name} must contain a JSON array.")
             entity_type = path.stem
             for item in raw:
                 if not isinstance(item, dict):
-                    raise ValueError(f"{path.name} contains a non-object record.")
+                    raise TypeError(f"{path.name} contains a non-object record.")
                 legacy_id = str(item.get("id") or "").strip()
                 if not legacy_id:
                     raise ValueError(f"{path.name} contains a record without id.")
