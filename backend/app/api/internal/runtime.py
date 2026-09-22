@@ -1,4 +1,5 @@
 import base64
+import binascii
 import json
 import logging
 from datetime import datetime
@@ -107,7 +108,13 @@ async def failure_callback(
             decoded = base64.b64decode(failure.sourceBody).decode("utf-8")
             source_payload = json.loads(decoded)
             organization_id = UUID(str(source_payload["organization_id"]))
-        except Exception:
+        except (
+            binascii.Error,
+            json.JSONDecodeError,
+            KeyError,
+            UnicodeDecodeError,
+            ValueError,
+        ):
             logger.warning(
                 "QStash failure callback has no tenant lineage: %s",
                 failure.sourceMessageId,
