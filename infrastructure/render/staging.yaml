@@ -33,5 +33,9 @@ services:
         value: system
       - key: SHADOW_MODE_ENABLED
         value: "true"
+      - key: LEGACY_DATABASE_URL
+        sync: false
+      - key: MIGRATION_EXECUTION_ENABLED
+        value: "false"
       - key: RUNTIME_EXECUTION_ENABLED
         value: "false"

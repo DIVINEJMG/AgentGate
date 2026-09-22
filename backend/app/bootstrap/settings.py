@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     )
     qstash_failure_callback_url: str | None = None
     legacy_database_url: SecretStr | None = None
+    migration_execution_enabled: bool = False
     integration_encryption_key: SecretStr | None = None
     oidc_client_secret: SecretStr | None = None
     model_provider_api_key: SecretStr | None = None

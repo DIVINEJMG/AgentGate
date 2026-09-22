@@ -55,3 +55,15 @@ def test_storage_smoke_requires_qstash_signature() -> None:
     response = client.post("/internal/v1/runtime/storage-smoke", json={})
     assert response.status_code == 401
     assert response.json()["detail"] == "QStash signature required."
+
+
+def test_migration_shadow_requires_qstash_signature() -> None:
+    response = client.post("/internal/v1/migration/shadow", json={})
+    assert response.status_code == 401
+    assert response.json()["detail"] == "QStash signature required."
+
+
+def test_migration_run_requires_qstash_signature() -> None:
+    response = client.post("/internal/v1/migration/run", json={})
+    assert response.status_code == 401
+    assert response.json()["detail"] == "QStash signature required."
