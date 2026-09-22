@@ -37,8 +37,9 @@ class UpstashQStashProvider(QueueProvider):
         }
         if idempotency_key:
             headers["Upstash-Deduplication-Id"] = idempotency_key
-        if failure_callback:
-            headers["Upstash-Failure-Callback"] = failure_callback
+        callback = failure_callback or settings.qstash_failure_callback_url
+        if callback:
+            headers["Upstash-Failure-Callback"] = callback
         return headers
 
     async def publish(
