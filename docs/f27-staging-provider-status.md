@@ -9,21 +9,28 @@
   - Alembic version: 0003_f27_provider_metadata
   - Canonical, migration, artifact, audit, queue, and result tables verified.
   - WorkItem idempotency and artifact size/checksum metadata verified.
-- F27.7: private Upstash Blob bucket created:
+- F27.5: dedicated Upstash Redis staging database created.
+  - Name: audoryn-redis-staging
+  - Region: eu-central-1
+  - TLS: enabled
+  - Eviction: disabled
+  - Existing AWB Redis resources were not reused or modified.
+- F27.6: Render audoryn-api REDIS_URL now points to audoryn-redis-staging.
+  - The Render Redis instance remains intact as rollback infrastructure.
+  - The resulting Render deploy completed successfully.
+  - Direct Redis SET/GET health verification passed.
+- F27.7: private Upstash Blob bucket exists from the earlier provider account:
   - audoryn-artifacts-staging
+  - The newly connected Upstash account is separate and does not expose that bucket.
+  - No existing bucket was deleted, replaced, or recreated.
 - F27.10: Render cron scheduler declaration removed.
   - QStash HTTP dispatch is now the target scheduling topology.
   - The Python scheduler module remains as a provider-independent fallback.
+  - The newly connected Upstash account currently has no QStash schedules; future schedules must be
+    created in the account selected for Aduoryn scheduling.
 
-## Redis capacity blocker
+## Account isolation note
 
-Upstash write access is working, but the account's free plan currently permits only one Redis
-database. The existing slot is occupied by awb-gateway-staging-tls.
-
-Per the infrastructure isolation rule, that AWB database is not reused, deleted, reset, or renamed.
-
-Therefore:
-- F27.5 remains blocked until an additional Upstash Redis database can be provisioned.
-- F27.6 remains intentionally on the existing Render Redis until F27.5 is resolved.
-
-No billing change is performed automatically.
+The current Upstash connection is a different account from the one used to create the original
+audoryn-artifacts-staging Blob bucket. Redis cutover uses the current account. Existing resources in
+the previous account remain untouched.
