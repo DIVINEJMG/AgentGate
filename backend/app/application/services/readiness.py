@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 
+import httpx
+from redis.exceptions import RedisError
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.bootstrap.settings import settings
 from app.infrastructure.database.session import engine
@@ -47,13 +50,13 @@ async def check_readiness() -> DependencyStatus:
         async with engine.connect() as connection:
             await connection.execute(text("SELECT 1"))
         postgres = "ready"
-    except Exception:
+    except (OSError, RuntimeError, ValueError, httpx.HTTPError, SQLAlchemyError, RedisError):
         postgres = "unavailable"
 
     coordinator = RedisCoordinator.from_settings()
     try:
         redis = "ready" if await coordinator.ping() else "unavailable"
-    except Exception:
+    except (OSError, RuntimeError, ValueError, httpx.HTTPError, SQLAlchemyError, RedisError):
         redis = "unavailable"
     finally:
         await coordinator.close()
@@ -62,7 +65,7 @@ async def check_readiness() -> DependencyStatus:
         try:
             transport = UpstashBlobS3Transport.from_settings()
             object_storage = "ready" if await transport.healthcheck() else "unavailable"
-        except Exception:
+        except (OSError, RuntimeError, ValueError, httpx.HTTPError, SQLAlchemyError, RedisError):
             object_storage = "unavailable"
     else:
         object_storage = "unconfigured"
@@ -70,7 +73,7 @@ async def check_readiness() -> DependencyStatus:
     try:
         queue_provider = UpstashQStashProvider.from_settings()
         queue = "ready" if await queue_provider.healthcheck() else "unavailable"
-    except Exception:
+    except (OSError, RuntimeError, ValueError, httpx.HTTPError, SQLAlchemyError, RedisError):
         queue = "unconfigured"
 
     return DependencyStatus(
