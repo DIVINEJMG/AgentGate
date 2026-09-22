@@ -93,7 +93,7 @@ async def migrate_table(
     if rows:
         columns = list(rows[0].keys())
         quoted_columns = ", ".join(_quote_identifier(column) for column in columns)
-        placeholders = ", ".join(f"$" + str(index) for index in range(1, len(columns) + 1))
+        placeholders = ", ".join("$" + str(index) for index in range(1, len(columns) + 1))
         sql = (
             f"INSERT INTO {_quote_identifier(table)} ({quoted_columns}) "
             f"VALUES ({placeholders}) ON CONFLICT DO NOTHING"
