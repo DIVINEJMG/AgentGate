@@ -78,7 +78,8 @@ async def _table_exists(connection: asyncpg.Connection, table: str) -> bool:
 async def table_count(connection: asyncpg.Connection, table: str) -> int:
     if not await _table_exists(connection, table):
         return 0
-    return int(await connection.fetchval(f"SELECT count(*) FROM {_quote_identifier(table)}"))
+    value = await connection.fetchval(f"SELECT count(*) FROM {_quote_identifier(table)}")
+    return int(value or 0)
 
 
 async def migrate_table(
