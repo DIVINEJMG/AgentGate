@@ -1,5 +1,12 @@
-# Render
+# Render backend target
 
-Render is the target backend/runtime platform for Aduoryn.
+F26.7 establishes Render as Aduoryn's backend/runtime platform.
 
-Service creation, PostgreSQL, Redis, workers and scheduler provisioning begin in F26.7. F26.0–F26.5 only establishes the repository and Python application boundary.
+Resources:
+- audoryn-api: FastAPI web service
+- audoryn-postgres: canonical PostgreSQL state
+- audoryn-redis: ephemeral Redis-compatible coordination
+- audoryn-scheduler: scheduled process
+- audoryn-worker: background-worker target for F26.17/F26.18
+
+The application uses DATABASE_URL and REDIS_URL; no Render SDK is permitted in domain code.
