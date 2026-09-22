@@ -3,7 +3,7 @@ import binascii
 import json
 import logging
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -14,6 +14,7 @@ from app.infrastructure.database.dispatch import WorkItemDispatchRepository
 from app.infrastructure.database.models import QueueDeliveryFailure
 from app.infrastructure.database.session import session_factory
 from app.infrastructure.qstash.verifier import QStashSignatureVerifier
+from app.infrastructure.storage.provider import object_storage_from_settings
 
 router = APIRouter(prefix="/internal/v1/runtime", tags=["internal-runtime"])
 logger = logging.getLogger(__name__)
@@ -145,6 +146,57 @@ async def failure_callback(
             await session.commit()
 
     return {"status": "recorded", "sourceMessageId": failure.sourceMessageId}
+
+
+@router.post("/storage-smoke")
+async def storage_smoke(
+    request: Request,
+    upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
+) -> dict[str, object]:
+    if not upstash_signature:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="QStash signature required.",
+        )
+
+    raw = await request.body()
+    try:
+        QStashSignatureVerifier().verify(
+            body=raw.decode("utf-8"),
+            signature=upstash_signature,
+            url=str(request.url),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid QStash signature.",
+        ) from exc
+
+    storage = object_storage_from_settings()
+    key = f"system/smoke/{uuid4()}.txt"
+    content = b"audoryn-upstash-blob-smoke"
+    reference = await storage.put(
+        key=key,
+        content=content,
+        media_type="text/plain",
+    )
+    try:
+        downloaded = await storage.get(key=key)
+        signed_url = await storage.signed_url(key=key, expires_seconds=60)
+        if downloaded != content:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Blob round-trip content mismatch.",
+            )
+        return {
+            "status": "ok",
+            "uploaded": reference.size_bytes == len(content),
+            "downloaded": True,
+            "signedUrl": signed_url.startswith("https://"),
+            "deleted": True,
+        }
+    finally:
+        await storage.delete(key=key)
 
 
 @router.post("/dispatch")
