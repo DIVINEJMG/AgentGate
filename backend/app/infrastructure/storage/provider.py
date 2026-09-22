@@ -2,7 +2,7 @@ from app.domain.artifacts.storage import ObjectReference, ObjectStorage
 
 
 class UnconfiguredObjectStorage(ObjectStorage):
-    """Fail closed until S3/R2/Tigris/MinIO credentials are configured."""
+    """Fail closed until Upstash Blob or another ObjectStorage provider is configured."""
 
     async def put(self, *, key: str, content: bytes, media_type: str) -> ObjectReference:
         raise RuntimeError("Object storage provider is not configured.")

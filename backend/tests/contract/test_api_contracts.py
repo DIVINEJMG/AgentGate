@@ -31,3 +31,12 @@ def test_v2_system_status_contract() -> None:
     assert body["controlPlane"]["securityMode"] == "fail-closed"
     assert body["lifecycle"]["current"] == "v2"
     assert body["lifecycle"]["supported"] == ["v1", "v2"]
+
+
+def test_qstash_heartbeat_requires_signature() -> None:
+    response = client.post(
+        "/internal/v1/runtime/heartbeat",
+        json={"source": "contract-test"},
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "QStash signature required."

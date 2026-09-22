@@ -13,6 +13,18 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
+      - key: QSTASH_URL
+        sync: false
+      - key: QSTASH_TOKEN
+        sync: false
+      - key: QSTASH_CURRENT_SIGNING_KEY
+        sync: false
+      - key: QSTASH_NEXT_SIGNING_KEY
+        sync: false
+      - key: UPSTASH_BLOB_BUCKET
+        sync: false
+      - key: UPSTASH_BLOB_TOKEN
+        sync: false
       - key: RUNTIME_EXECUTION_ENABLED
         value: "false"
 
