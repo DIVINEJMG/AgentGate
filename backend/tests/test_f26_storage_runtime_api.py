@@ -16,9 +16,11 @@ def test_v1_and_v2_are_adapters_over_one_canonical_status() -> None:
     v1 = serialize_v1(status)
     v2 = serialize_v2(status)
     assert v1["currentVersion"] == status.current_version
-    assert v2["lifecycle"]["current"] == status.current_version
     assert v1["supportedVersions"] == list(status.supported_versions)
-    assert v2["lifecycle"]["supported"] == list(status.supported_versions)
+    assert v2["lifecycle"] == {
+        "current": status.current_version,
+        "supported": list(status.supported_versions),
+    }
 
 
 @pytest.mark.asyncio
