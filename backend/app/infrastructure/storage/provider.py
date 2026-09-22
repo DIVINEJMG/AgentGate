@@ -1,4 +1,7 @@
+from app.bootstrap.settings import settings
 from app.domain.artifacts.storage import ObjectReference, ObjectStorage
+from app.infrastructure.storage.upstash_blob import UpstashBlobObjectStorage
+from app.infrastructure.storage.upstash_blob_s3 import UpstashBlobS3Transport
 
 
 class UnconfiguredObjectStorage(ObjectStorage):
@@ -15,3 +18,9 @@ class UnconfiguredObjectStorage(ObjectStorage):
 
     async def signed_url(self, *, key: str, expires_seconds: int = 900) -> str:
         raise RuntimeError("Object storage provider is not configured.")
+
+
+def object_storage_from_settings() -> ObjectStorage:
+    if settings.object_storage_provider == "upstash_blob":
+        return UpstashBlobObjectStorage(UpstashBlobS3Transport.from_settings())
+    return UnconfiguredObjectStorage()

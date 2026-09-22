@@ -40,3 +40,12 @@ def test_qstash_heartbeat_requires_signature() -> None:
     )
     assert response.status_code == 401
     assert response.json()["detail"] == "QStash signature required."
+
+
+def test_qstash_failure_callback_requires_signature() -> None:
+    response = client.post(
+        "/internal/v1/runtime/failures",
+        json={"sourceMessageId": "msg-test", "url": "https://example.invalid"},
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "QStash signature required."

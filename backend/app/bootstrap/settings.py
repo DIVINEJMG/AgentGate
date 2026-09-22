@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.application.services.cutover import CutoverStage
@@ -29,10 +29,30 @@ class Settings(BaseSettings):
     object_storage_provider: str = "unconfigured"
     upstash_blob_bucket: str | None = None
     upstash_blob_token: SecretStr | None = None
-    qstash_url: str | None = None
-    qstash_token: SecretStr | None = None
-    qstash_current_signing_key: SecretStr | None = None
-    qstash_next_signing_key: SecretStr | None = None
+    qstash_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("UPSTASH_QSTASH_URL", "QSTASH_URL"),
+    )
+    qstash_token: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("UPSTASH_QSTASH_TOKEN", "QSTASH_TOKEN"),
+    )
+    qstash_current_signing_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "UPSTASH_QSTASH_CURRENT_SIGNING_KEY",
+            "QSTASH_CURRENT_SIGNING_KEY",
+        ),
+    )
+    qstash_next_signing_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "UPSTASH_QSTASH_NEXT_SIGNING_KEY",
+            "QSTASH_NEXT_SIGNING_KEY",
+        ),
+    )
+    qstash_failure_callback_url: str | None = None
+    legacy_database_url: SecretStr | None = None
     integration_encryption_key: SecretStr | None = None
     oidc_client_secret: SecretStr | None = None
     model_provider_api_key: SecretStr | None = None
