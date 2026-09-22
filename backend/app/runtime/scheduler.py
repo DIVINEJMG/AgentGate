@@ -1,12 +1,26 @@
-"""F26 scheduler process boundary.
+import asyncio
 
-Scheduling behavior is migrated in F26.17. This module exists now so deployment topology does not
-couple scheduled execution to the FastAPI process.
-"""
+from app.infrastructure.database.session import session_factory
+from app.infrastructure.database.work_queue import SQLAlchemyWorkItemQueue
+from app.infrastructure.redis.coordination import RedisCoordinator
+
+
+async def schedule_once() -> int:
+    coordinator = RedisCoordinator.from_settings()
+    try:
+        async with session_factory() as session:
+            queue = SQLAlchemyWorkItemQueue(session)
+            due_ids = await queue.list_due_ids(limit=100)
+        for work_item_id in due_ids:
+            await coordinator.publish("work.available", str(work_item_id))
+        return len(due_ids)
+    finally:
+        await coordinator.close()
 
 
 def main() -> None:
-    print("Aduoryn scheduler boundary ready; scheduler behavior is migrated in F26.17.")
+    count = asyncio.run(schedule_once())
+    print(f"Aduoryn scheduler announced {count} due work item(s).")
 
 
 if __name__ == "__main__":

@@ -1,19 +1,11 @@
-from datetime import UTC, datetime
-
 from fastapi import APIRouter
+
+from app.api.adapters.system_status import serialize_v1
+from app.application.queries.system_status import get_system_status
 
 router = APIRouter()
 
 
 @router.get("/system/status", tags=["system"])
 async def system_status() -> dict[str, object]:
-    return {
-        "service": "audoryn",
-        "apiVersion": "v1",
-        "status": "operational",
-        "securityMode": "fail-closed",
-        "architecture": "modular-monolith",
-        "currentVersion": "v2",
-        "supportedVersions": ["v1", "v2"],
-        "checkedAt": datetime.now(UTC).isoformat(),
-    }
+    return serialize_v1(get_system_status())

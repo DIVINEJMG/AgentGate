@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     service_name: str = "audoryn-api"
     database_url: str = "postgresql+asyncpg://audoryn:audoryn@localhost:5432/audoryn"
     redis_url: str = "redis://localhost:6379/0"
+    runtime_execution_enabled: bool = False
+    worker_poll_seconds: float = 2.0
+    worker_heartbeat_ttl_seconds: int = 60
+    object_storage_provider: str = "unconfigured"
 
     @field_validator("database_url", mode="before")
     @classmethod
