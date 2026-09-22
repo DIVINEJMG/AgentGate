@@ -13,18 +13,22 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
-      - key: QSTASH_URL
+      - key: UPSTASH_QSTASH_URL
         sync: false
-      - key: QSTASH_TOKEN
+      - key: UPSTASH_QSTASH_TOKEN
         sync: false
-      - key: QSTASH_CURRENT_SIGNING_KEY
+      - key: UPSTASH_QSTASH_CURRENT_SIGNING_KEY
         sync: false
-      - key: QSTASH_NEXT_SIGNING_KEY
+      - key: UPSTASH_QSTASH_NEXT_SIGNING_KEY
         sync: false
+      - key: QSTASH_FAILURE_CALLBACK_URL
+        value: https://audoryn-api-staging.onrender.com/internal/v1/runtime/failures
       - key: UPSTASH_BLOB_BUCKET
         sync: false
       - key: UPSTASH_BLOB_TOKEN
         sync: false
+      - key: OBJECT_STORAGE_PROVIDER
+        value: upstash_blob
       - key: CUTOVER_STAGE
         value: system
       - key: SHADOW_MODE_ENABLED
