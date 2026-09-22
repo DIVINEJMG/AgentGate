@@ -1,37 +1,35 @@
 # F26 Platform Independence & Python Backend Migration
 
-## F26.0–F26.20
+## F26.0–F26.25
 Platform extraction, Vercel frontend hosting, Python/FastAPI foundation, Render data resources,
-PostgreSQL canonical state, Redis coordination, identity/model/integration boundaries, Action Gateway,
-object storage abstraction, separate API/worker/scheduler processes, v1/v2 adapters, and frontend/API
-separation are established.
+PostgreSQL canonical state, Redis coordination, provider boundaries, Action Gateway, object storage,
+separate runtime processes, API adapters, CORS/secrets, local development, migration tracking, and
+the permanent security invariant suite are established.
 
-## F26.21–F26.25
+## F26.26–F26.30
 
-### F26.21 — CORS
-FastAPI now uses an explicit origin allowlist. Production configuration rejects wildcard origins.
-Local development defaults to `http://localhost:5173`.
+### F26.26 — Behavioral parity
+Parity fixtures record security-sensitive TypeScript reference behavior and Python outcomes for
+default-deny capability handling, no-policy default deny, and policy safety precedence. These run in
+`tests/parity` and expand as domains are migrated.
 
-### F26.22 — Secrets
-Backend credentials use Pydantic `SecretStr` and are loaded only from environment/secret stores.
-Database, Redis, OIDC, model-provider, integration-encryption and object-storage secrets are backend
-only. Browser-safe configuration remains limited to `VITE_API_BASE_URL` and future explicitly
-public auth metadata.
+### F26.27 — CI
+CI explicitly runs Ruff, Pyright, full pytest, the security-invariant suite, parity suite, API
+contract suite, and Alembic offline migration generation, in addition to frontend typecheck/build.
+Deployment-contract validation is a separate workflow.
 
-### F26.23 — Local development
-`infrastructure/local/docker-compose.yml` provides PostgreSQL, Redis and MinIO. The backend and
-frontend can run locally without Render or Vercel.
+### F26.28 — GitHub → Vercel
+The connected Vercel GitHub integration remains authoritative: PRs create previews and merges to
+`main` create production deployments. GitHub validates that Vercel remains frontend-only.
 
-### F26.24 — Domain-by-domain migration
-`docs/f26-domain-migration-matrix.md` records the ordered migration status. A domain is not complete
-until contracts, persistence, security invariants and parity checks pass; the TypeScript reference is
-retained until then.
+### F26.29 — GitHub → Render
+A backend deployment workflow waits for successful CI on `main` and triggers Render only when a
+deploy hook is configured. With no paid Render compute currently provisioned, it skips cleanly rather
+than claiming a deployment. PostgreSQL/Redis remain available.
 
-### F26.25 — Permanent security invariant suite
-CI now runs a dedicated invariant suite covering identity separation, non-authoritative
-instructions/memory, policy precedence, tenant separation and side-effect idempotency. Existing
-schema constraints preserve hashed agent credentials rather than plaintext secrets. Additional
-invariants are added as approval/incident/runtime domains complete.
+### F26.30 — Data migration
+A user-approved export extractor, normalizer, validator, staging repository, migration batch, and
+legacy-ID mapping schema are established. Direct AppDeploy access is explicitly excluded.
 
 Platform rule: GitHub is source of truth; Vercel hosts frontend; Render hosts backend/runtime; domain
 code depends on no hosting-platform SDK.

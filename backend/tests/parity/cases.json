@@ -1,0 +1,22 @@
+[
+  {
+    "id": "missing-capability-default-deny",
+    "typescript_reference": "reference/typescript-backend/core/capabilities.ts",
+    "expected": "DENY"
+  },
+  {
+    "id": "same-priority-allow-vs-deny",
+    "typescript_reference": "reference/typescript-backend/core/policies.ts",
+    "expected": "DENY"
+  },
+  {
+    "id": "same-priority-approval-vs-allow",
+    "typescript_reference": "reference/typescript-backend/core/policies.ts",
+    "expected": "REQUIRE_APPROVAL"
+  },
+  {
+    "id": "no-matching-policy-default-deny",
+    "typescript_reference": "reference/typescript-backend/core/policies.ts",
+    "expected": "DENY"
+  }
+]
