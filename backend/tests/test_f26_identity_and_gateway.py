@@ -41,7 +41,7 @@ def agent(org_id, agent_id):
         credential_fingerprint="sha256:test",
         capabilities=frozenset({"github.repository.write"}),
         risk_level="low",
-        policy_context=frozendict(),
+        policy_context=(),
     )
 
 

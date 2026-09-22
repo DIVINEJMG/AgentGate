@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from frozendict import frozendict
 from uuid import UUID
 
 
@@ -19,4 +18,4 @@ class AgentPrincipal:
     credential_fingerprint: str
     capabilities: frozenset[str]
     risk_level: str
-    policy_context: frozendict[str, str]
+    policy_context: tuple[tuple[str, str], ...]

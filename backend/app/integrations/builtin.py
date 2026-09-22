@@ -1,7 +1,10 @@
+from typing import cast
+
 from app.domain.integrations.contracts import (
     IntegrationAdapter,
     IntegrationExecutionResult,
     IntegrationManifest,
+    RiskLevel,
 )
 
 
@@ -30,7 +33,7 @@ def _manifest(provider: str, resource: str, action: str, scope: str, risk: str, 
         capability=f"{provider}.{action}",
         action=action,
         scope=scope,
-        risk=risk,  # type: ignore[arg-type]
+        risk=cast(RiskLevel, risk)
         input_schema={"type": "object"},
         output_schema={"type": "object"},
         side_effect=side_effect,
