@@ -39,3 +39,4 @@ jobs:
       - run: pytest tests/parity
       - run: pytest tests/contract
       - run: alembic upgrade head --sql > /tmp/audoryn-schema.sql
+      - run: python ../scripts/verify_no_legacy_platform.py

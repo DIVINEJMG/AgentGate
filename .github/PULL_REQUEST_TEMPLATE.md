@@ -17,4 +17,4 @@ Describe the change and the Audoryn foundation or module it affects.
 
 - [ ] Typecheck passes.
 - [ ] Build passes.
-- [ ] Relevant AppDeploy QA workflows pass.
+- [ ] Relevant GitHub CI and deployment-contract workflows pass.

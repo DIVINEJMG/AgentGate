@@ -1,5 +1,6 @@
 import asyncio
 
+from app.application.services.cutover import CutoverController
 from app.bootstrap.settings import settings
 from app.infrastructure.database.session import session_factory
 from app.infrastructure.database.work_queue import SQLAlchemyWorkItemQueue
@@ -11,6 +12,7 @@ async def work_once() -> bool:
     if not settings.runtime_execution_enabled:
         return False
 
+    CutoverController(settings.cutover_stage).require_authoritative("runtime")
     coordinator = RedisCoordinator.from_settings()
     try:
         async with session_factory() as session:

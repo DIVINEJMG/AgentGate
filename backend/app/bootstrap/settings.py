@@ -3,6 +3,8 @@ from functools import lru_cache
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.application.services.cutover import CutoverStage
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -19,6 +21,8 @@ class Settings(BaseSettings):
     )
     redis_url: SecretStr = SecretStr("redis://localhost:6379/0")
     cors_allowed_origins: tuple[str, ...] = ("http://localhost:5173",)
+    cutover_stage: CutoverStage = "system"
+    shadow_mode_enabled: bool = True
     runtime_execution_enabled: bool = False
     worker_poll_seconds: float = 2.0
     worker_heartbeat_ttl_seconds: int = 60

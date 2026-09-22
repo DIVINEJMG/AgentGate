@@ -54,7 +54,7 @@ Human Approvals turns held actions into an explicit reviewer workflow. Roles wit
 
 Approve does not blindly execute stale authority: Audoryn revalidates the original agent credential fingerprint, agent lifecycle, integration, declared scope, provider operation and current policy before resuming the exact held action. Reject permanently blocks it. Approval requests may send a best-effort push alert to an eligible agent owner who has enabled notifications.
 
-AppDeploy's current key-value store does not provide a transactional compare-and-set primitive, so provider writes remain disabled and concurrent approval serialization is not claimed as exactly-once.
+legacy platform's current key-value store does not provide a transactional compare-and-set primitive, so provider writes remain disabled and concurrent approval serialization is not claimed as exactly-once.
 
 ## Foundation 9
 
@@ -116,7 +116,7 @@ Memory & Artifacts adds three explicit context scopes: automatic short-lived Run
 
 Memory is never authority. Context is labeled untrusted in AI planning and is not passed into capability, risk, policy, approval or incident-control decisions. Long-term memory cannot be self-written by the model; a human must create it or explicitly promote Run Memory into Worker Memory.
 
-Successful Runs also persist a JSON result artifact in AppDeploy Storage. Artifact metadata remains tenant-scoped in the database and humans with `artifacts.read` receive short-lived signed URLs. F17 retention dates control future context eligibility; physical deletion is not claimed.
+Successful Runs also persist a JSON result artifact in legacy platform Storage. Artifact metadata remains tenant-scoped in the database and humans with `artifacts.read` receive short-lived signed URLs. F17 retention dates control future context eligibility; physical deletion is not claimed.
 
 ## Foundation 18
 
@@ -138,7 +138,7 @@ Audoryn deliberately does not compute an employee quality or productivity score.
 
 ## Foundation 21
 
-Reliability & Durable Execution hardens managed work on the existing AppDeploy database with verified lease fencing, heartbeats, execution checkpoints, bounded recovery/backoff, dead-letter Work Items, stable per-Work-Item Action Gateway idempotency and cursor-checkpointed scheduling. Audoryn documents at-least-once processing with idempotent external action boundaries rather than claiming transactional exactly-once execution.
+Reliability & Durable Execution hardens managed work on the existing legacy platform database with verified lease fencing, heartbeats, execution checkpoints, bounded recovery/backoff, dead-letter Work Items, stable per-Work-Item Action Gateway idempotency and cursor-checkpointed scheduling. Audoryn documents at-least-once processing with idempotent external action boundaries rather than claiming transactional exactly-once execution.
 
 ## Foundation 22
 

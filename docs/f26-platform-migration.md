@@ -33,3 +33,11 @@ legacy-ID mapping schema are established. Direct AppDeploy access is explicitly 
 
 Platform rule: GitHub is source of truth; Vercel hosts frontend; Render hosts backend/runtime; domain
 code depends on no hosting-platform SDK.
+
+
+## F26.31–F26.34
+
+Shadow mode is read-only, cutover authority is explicit and progressive, active production paths are
+CI-enforced to contain zero retired-platform dependencies, and the final production/rollback
+architecture is documented. Render backend compute remains the final infrastructure prerequisite
+before declaring the complete F26 production cutover done.

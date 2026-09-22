@@ -5,7 +5,7 @@ from app.migration.contracts import LegacyRecord
 
 
 class JsonDirectoryExtractor:
-    """Reads user-approved legacy JSON exports only; never reaches AppDeploy directly."""
+    """Reads user-approved legacy JSON exports only; never reaches the retired platform directly."""
 
     def __init__(self, directory: Path) -> None:
         self._directory = directory
