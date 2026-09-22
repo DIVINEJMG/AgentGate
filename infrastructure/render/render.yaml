@@ -13,6 +13,24 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
+      - key: RUNTIME_EXECUTION_ENABLED
+        value: "false"
+
+  - type: worker
+    name: audoryn-worker
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -e .
+    startCommand: python -m app.runtime.worker
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: RUNTIME_EXECUTION_ENABLED
+        value: "false"
 
   - type: cron
     name: audoryn-scheduler
