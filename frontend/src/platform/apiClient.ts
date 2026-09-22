@@ -42,7 +42,10 @@ async function request<T = any>(method: string, path: string, body?: unknown): P
       typeof payload === 'object' && payload !== null && 'message' in payload &&
       typeof (payload as { message?: unknown }).message === 'string'
         ? (payload as { message: string }).message
-        : `Request failed with status ${response.status}.`;
+        : typeof payload === 'object' && payload !== null && 'detail' in payload &&
+          typeof (payload as { detail?: unknown }).detail === 'string'
+          ? (payload as { detail: string }).detail
+          : `Request failed with status ${response.status}.`;
     throw new ApiClientError(message, response.status, payload);
   }
 
