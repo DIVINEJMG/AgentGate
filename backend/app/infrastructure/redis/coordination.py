@@ -1,5 +1,6 @@
 import secrets
 from dataclasses import dataclass
+from typing import Any
 
 from redis.asyncio import Redis
 
@@ -16,7 +17,7 @@ class RedisCoordinator:
     """Ephemeral coordination only. Canonical business state must remain in PostgreSQL."""
 
     def __init__(self, client: Redis) -> None:
-        self._client = client
+        self._client: Any = client
 
     @classmethod
     def from_settings(cls) -> "RedisCoordinator":
@@ -44,7 +45,8 @@ class RedisCoordinator:
         await self._client.set(f"cache:{key}", value, ex=ttl_seconds)
 
     async def cache_get(self, key: str) -> str | None:
-        return await self._client.get(f"cache:{key}")
+        value = await self._client.get(f"cache:{key}")
+        return value if isinstance(value, str) else None
 
     async def publish(self, channel: str, payload: str) -> int:
         return int(await self._client.publish(f"audoryn:{channel}", payload))
