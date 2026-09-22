@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -100,9 +101,13 @@ class WorkItem(TenantModel, Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
     priority: Mapped[str] = mapped_column(String(16), nullable=False, default="normal")
     correlation_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    idempotency_key: Mapped[str] = mapped_column(String(180), nullable=False)
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    __table_args__ = (Index("ix_work_items_queue", "organization_id", "status", "scheduled_at"),)
+    __table_args__ = (
+        UniqueConstraint("organization_id", "idempotency_key", name="uq_work_item_idempotency"),
+        Index("ix_work_items_queue", "organization_id", "status", "scheduled_at"),
+    )
 
 class Run(TenantModel, Base):
     __tablename__ = "runs"
@@ -213,6 +218,8 @@ class Artifact(TenantModel, Base):
     run_id: Mapped[UUID | None] = mapped_column(ForeignKey("runs.id"))
     storage_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
     media_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    size_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    checksum_sha256: Mapped[str | None] = mapped_column(String(64))
     metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
 
 class Result(TenantModel, Base):
