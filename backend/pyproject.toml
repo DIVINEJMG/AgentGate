@@ -1,6 +1,6 @@
 [project]
 name = "audoryn-backend"
-version = "26.1.0"
+version = "26.2.0"
 description = "Aduoryn control plane and autonomous execution backend"
 requires-python = ">=3.13"
 dependencies = [
@@ -14,21 +14,32 @@ dependencies = [
   "sqlalchemy[asyncio]>=2.0.43,<3",
   "uvicorn[standard]>=0.35,<1"
 ]
+
 [project.optional-dependencies]
-dev = ["pyright>=1.1.405,<2","pytest>=8.4,<9","pytest-asyncio>=1.1,<2","ruff>=0.13,<1"]
+dev = [
+  "pyright>=1.1.405,<2",
+  "pytest>=8.4,<9",
+  "pytest-asyncio>=1.1,<2",
+  "ruff>=0.13,<1"
+]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
 [tool.ruff]
 target-version = "py313"
 line-length = 100
+
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 include = ["app", "tests"]
+
 [build-system]
 requires = ["setuptools>=80"]
 build-backend = "setuptools.build_meta"
+
 [tool.setuptools.packages.find]
 include = ["app*"]
