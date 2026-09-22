@@ -1,18 +1,22 @@
+from typing import ClassVar
+
 from app.migration.contracts import LegacyRecord, NormalizedRecord
 
 
 class CanonicalNormalizer:
-    _SUPPORTED = {
-        "organizations",
-        "human_identities",
-        "agent_identities",
-        "workers",
-        "jobs",
-        "integrations",
-        "capabilities",
-        "policies",
-        "results",
-    }
+    _SUPPORTED: ClassVar[frozenset[str]] = frozenset(
+        {
+            "organizations",
+            "human_identities",
+            "agent_identities",
+            "workers",
+            "jobs",
+            "integrations",
+            "capabilities",
+            "policies",
+            "results",
+        }
+    )
 
     def normalize(self, record: LegacyRecord) -> NormalizedRecord:
         if record.entity_type not in self._SUPPORTED:
