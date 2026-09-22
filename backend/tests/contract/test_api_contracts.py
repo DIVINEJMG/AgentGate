@@ -49,3 +49,9 @@ def test_qstash_failure_callback_requires_signature() -> None:
     )
     assert response.status_code == 401
     assert response.json()["detail"] == "QStash signature required."
+
+
+def test_storage_smoke_requires_qstash_signature() -> None:
+    response = client.post("/internal/v1/runtime/storage-smoke", json={})
+    assert response.status_code == 401
+    assert response.json()["detail"] == "QStash signature required."
