@@ -58,3 +58,55 @@ async def test_tenant_storage_scopes_large_payload_without_changing_bytes() -> N
     assert reference.size_bytes == len(content)
     assert reference.key == f"org/{organization_id}/exports/large.bin"
     assert underlying.keys == [reference.key]
+
+from unittest.mock import AsyncMock, MagicMock
+
+from app.domain.jobs.dispatch import ScheduledDispatch
+from app.infrastructure.database.dispatch import WorkItemDispatchRepository
+from app.infrastructure.qstash.provider import UpstashQStashProvider
+from app.infrastructure.storage.upstash_blob import UpstashBlobObjectStorage
+
+
+@pytest.mark.asyncio
+async def test_upstash_blob_adapter_delegates_without_mutating_bytes() -> None:
+    transport = AsyncMock()
+    transport.get.return_value = b"payload"
+    transport.signed_url.return_value = "https://blob.invalid/signed"
+    storage = UpstashBlobObjectStorage(transport)
+
+    ref = await storage.put(key="org/x/report.bin", content=b"payload", media_type="application/octet-stream")
+    assert ref.key == "org/x/report.bin"
+    assert ref.size_bytes == 7
+    assert await storage.get(key=ref.key) == b"payload"
+    assert await storage.signed_url(key=ref.key, expires_seconds=60) == "https://blob.invalid/signed"
+    await storage.delete(key=ref.key)
+    transport.put.assert_awaited_once_with(key=ref.key, content=b"payload", media_type="application/octet-stream")
+
+
+def test_qstash_headers_include_retry_timeout_and_deduplication() -> None:
+    provider = UpstashQStashProvider(base_url="https://qstash.example", token="secret")
+    headers = provider._headers(retries=4, timeout_seconds=20, idempotency_key="idem-123")
+    assert headers["Upstash-Retries"] == "4"
+    assert headers["Upstash-Timeout"] == "20s"
+    assert headers["Upstash-Deduplication-Id"] == "idem-123"
+    assert headers["Authorization"].startswith("Bearer ")
+
+
+@pytest.mark.asyncio
+async def test_dispatch_repository_returns_existing_work_item_for_duplicate_key() -> None:
+    existing = MagicMock()
+    session = AsyncMock()
+    session.scalar.return_value = existing
+    repo = WorkItemDispatchRepository(session)
+    dispatch = ScheduledDispatch(
+        organization_id=uuid4(),
+        job_id=uuid4(),
+        job_revision_id=uuid4(),
+        idempotency_key="same-key",
+        correlation_id="corr-1",
+        scheduled_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+        payload={},
+    )
+    result = await repo.create(dispatch)
+    assert result is existing
+    session.add.assert_not_called()
