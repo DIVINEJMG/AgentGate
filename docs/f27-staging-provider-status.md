@@ -68,3 +68,23 @@ stored in Vercel frontend variables, or exposed to the browser.
 The currently connected Upstash account is the only active Upstash account for Aduoryn going
 forward. Resources in any earlier Upstash account are historical only and must not be modified,
 reused, deleted, or treated as active infrastructure.
+
+## F27.21-F27.30 progress
+
+### Scheduler cutover
+- CUTOVER_STAGE moved to scheduler, then runtime after live validation.
+- RUNTIME_EXECUTION_ENABLED remains false.
+- QStash schedule scd_672GdnaxKhWnGzqor3za5AB6eDd2 delivered to /internal/v1/runtime/dispatch and was paused after verification.
+- Duplicate delivery with the same organization/idempotency key produced exactly one WorkItem.
+
+### Production provisioning
+- Neon production project: audoryn-production (AWS eu-central-1).
+- Production Neon schema is at Alembic 0004_f27_queue_failures.
+- Upstash Redis production creation is currently blocked by the connected account free-plan one-database limit.
+- Upstash Blob production creation is currently blocked by the connected account free-plan one-bucket limit.
+- Production Render/QStash cutover remains gated until separate production Redis and Blob resources exist; staging resources will not be reused.
+
+### Runtime safety
+- Staging CUTOVER_STAGE=runtime.
+- RUNTIME_EXECUTION_ENABLED=false.
+- Legacy Render PostgreSQL/Redis remain preserved for rollback.
