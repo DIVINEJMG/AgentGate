@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     worker_poll_seconds: float = 2.0
     worker_heartbeat_ttl_seconds: int = 60
     object_storage_provider: str = "unconfigured"
+    upstash_blob_bucket: str | None = None
+    upstash_blob_token: SecretStr | None = None
+    qstash_url: str | None = None
+    qstash_token: SecretStr | None = None
+    qstash_current_signing_key: SecretStr | None = None
+    qstash_next_signing_key: SecretStr | None = None
     integration_encryption_key: SecretStr | None = None
     oidc_client_secret: SecretStr | None = None
     model_provider_api_key: SecretStr | None = None
