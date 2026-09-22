@@ -5,7 +5,6 @@ from alembic import op
 from app.infrastructure.database import models  # noqa: F401
 from app.infrastructure.database.base import Base
 
-
 revision = "0001_canonical_postgres"
 down_revision = None
 branch_labels = None
