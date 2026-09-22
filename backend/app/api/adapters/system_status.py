@@ -10,6 +10,10 @@ def serialize_v1(status: SystemStatus) -> dict[str, object]:
         "architecture": status.architecture_style,
         "currentVersion": status.current_version,
         "supportedVersions": list(status.supported_versions),
+        "migration": {
+            "cutoverStage": status.cutover_stage,
+            "shadowMode": status.shadow_mode,
+        },
         "checkedAt": status.checked_at,
     }
 
@@ -26,6 +30,10 @@ def serialize_v2(status: SystemStatus) -> dict[str, object]:
         "lifecycle": {
             "current": status.current_version,
             "supported": list(status.supported_versions),
+        },
+        "migration": {
+            "cutoverStage": status.cutover_stage,
+            "shadowMode": status.shadow_mode,
         },
         "checkedAt": status.checked_at,
     }
