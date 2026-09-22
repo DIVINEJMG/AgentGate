@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,32 +14,62 @@ class Settings(BaseSettings):
 
     environment: str = "development"
     service_name: str = "audoryn-api"
-    database_url: str = "postgresql+asyncpg://audoryn:audoryn@localhost:5432/audoryn"
-    redis_url: str = "redis://localhost:6379/0"
+    database_url: SecretStr = SecretStr(
+        "postgresql+asyncpg://audoryn:audoryn@localhost:5432/audoryn"
+    )
+    redis_url: SecretStr = SecretStr("redis://localhost:6379/0")
+    cors_allowed_origins: tuple[str, ...] = ("http://localhost:5173",)
     runtime_execution_enabled: bool = False
     worker_poll_seconds: float = 2.0
     worker_heartbeat_ttl_seconds: int = 60
     object_storage_provider: str = "unconfigured"
+    integration_encryption_key: SecretStr | None = None
+    oidc_client_secret: SecretStr | None = None
+    model_provider_api_key: SecretStr | None = None
+    object_storage_access_key: SecretStr | None = None
+    object_storage_secret_key: SecretStr | None = None
 
     @field_validator("database_url", mode="before")
     @classmethod
     def normalize_database_url(cls, value: object) -> object:
-        if not isinstance(value, str):
+        raw = value.get_secret_value() if isinstance(value, SecretStr) else value
+        if not isinstance(raw, str):
             return value
-        if value.startswith("postgres://"):
-            return "postgresql+asyncpg://" + value.removeprefix("postgres://")
-        if value.startswith("postgresql://") and "+asyncpg" not in value:
-            return "postgresql+asyncpg://" + value.removeprefix("postgresql://")
+        if raw.startswith("postgres://"):
+            raw = "postgresql+asyncpg://" + raw.removeprefix("postgres://")
+        elif raw.startswith("postgresql://") and "+asyncpg" not in raw:
+            raw = "postgresql+asyncpg://" + raw.removeprefix("postgresql://")
+        return SecretStr(raw)
+
+    @field_validator("cors_allowed_origins", mode="before")
+    @classmethod
+    def parse_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            return tuple(part.strip() for part in value.split(",") if part.strip())
         return value
+
+    @property
+    def database_dsn(self) -> str:
+        return self.database_url.get_secret_value()
+
+    @property
+    def redis_dsn(self) -> str:
+        return self.redis_url.get_secret_value()
 
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
 
+    def validate_security(self) -> None:
+        if self.is_production and "*" in self.cors_allowed_origins:
+            raise ValueError("Wildcard CORS is forbidden in production.")
+
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    config = Settings()
+    config.validate_security()
+    return config
 
 
 settings = get_settings()

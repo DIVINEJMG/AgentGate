@@ -21,7 +21,7 @@ class RedisCoordinator:
 
     @classmethod
     def from_settings(cls) -> "RedisCoordinator":
-        return cls(Redis.from_url(settings.redis_url, decode_responses=True))
+        return cls(Redis.from_url(settings.redis_dsn, decode_responses=True))
 
     async def ping(self) -> bool:
         return bool(await self._client.ping())
