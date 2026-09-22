@@ -1,10 +1,12 @@
 import asyncio
 import time
+from io import BytesIO
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
 import boto3
 import httpx
+from boto3.s3.transfer import TransferConfig
 from botocore.client import Config
 
 from app.bootstrap.settings import settings
@@ -89,12 +91,18 @@ class UpstashBlobS3Transport:
     async def put(self, *, key: str, content: bytes, media_type: str) -> None:
         creds, client = await self._client()
         await asyncio.to_thread(
-            client.put_object,
-            Bucket=creds.bucket,
-            Key=key,
-            Body=content,
-            ContentType=media_type,
-            CacheControl="private, max-age=3600",
+            client.upload_fileobj,
+            BytesIO(content),
+            creds.bucket,
+            key,
+            ExtraArgs={
+                "ContentType": media_type,
+                "CacheControl": "private, max-age=3600",
+            },
+            Config=TransferConfig(
+                multipart_threshold=8 * 1024 * 1024,
+                multipart_chunksize=8 * 1024 * 1024,
+            ),
         )
 
     async def get(self, *, key: str) -> bytes:
