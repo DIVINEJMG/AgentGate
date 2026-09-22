@@ -1,9 +1,11 @@
 from fastapi import APIRouter
 
 from app.api.adapters.system_status import serialize_v1
+from app.api.organization_routes import v1_router as organization_router
 from app.application.queries.system_status import get_system_status
 
 router = APIRouter()
+router.include_router(organization_router)
 
 
 @router.get("/system/status", tags=["system"])
