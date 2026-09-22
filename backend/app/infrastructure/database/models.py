@@ -263,3 +263,22 @@ class OutboxEvent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (Index("ix_outbox_unpublished", "published_at", "created_at"),)
+
+
+class QueueDeliveryFailure(TenantModel, Base):
+    __tablename__ = "queue_delivery_failures"
+    source_message_id: Mapped[str] = mapped_column(String(180), nullable=False, unique=True)
+    dlq_id: Mapped[str | None] = mapped_column(String(180))
+    status_code: Mapped[int | None] = mapped_column(Integer)
+    retried: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_retries: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    destination_url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    failure_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        Index(
+            "ix_queue_delivery_failures_org_created",
+            "organization_id",
+            "created_at",
+        ),
+    )
