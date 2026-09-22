@@ -34,6 +34,33 @@ class DispatchPayload(BaseModel):
         )
 
 
+@router.post("/heartbeat")
+async def heartbeat(
+    request: Request,
+    upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
+) -> dict[str, str]:
+    if not upstash_signature:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="QStash signature required.",
+        )
+
+    raw = await request.body()
+    try:
+        QStashSignatureVerifier().verify(
+            body=raw.decode("utf-8"),
+            signature=upstash_signature,
+            url=str(request.url),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid QStash signature.",
+        ) from exc
+
+    return {"status": "ok", "source": "qstash"}
+
+
 @router.post("/dispatch")
 async def dispatch(
     request: Request,
