@@ -9,13 +9,13 @@ from app.infrastructure.database import models  # noqa: F401
 from app.infrastructure.database.base import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", settings.database_dsn)
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=settings.database_url,
+        url=settings.database_dsn,
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=True,

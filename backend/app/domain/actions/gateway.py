@@ -51,6 +51,10 @@ class ActionGateway:
         principal: AgentPrincipal,
         proposal: ActionProposal,
     ) -> IntegrationExecutionResult:
+        if not isinstance(principal, AgentPrincipal):
+            raise PermissionError("Human identity cannot authenticate as Agent.")
+        if not proposal.idempotency_key.strip():
+            raise PermissionError("Side effects require a stable idempotency key.")
         if principal.organization_id != proposal.organization_id:
             raise PermissionError("Cross-tenant action denied.")
         if principal.agent_id != proposal.agent_id:
@@ -58,11 +62,15 @@ class ActionGateway:
         if proposal.scope not in principal.capabilities:
             raise PermissionError("Agent lacks declared capability.")
 
-        for guard in self._guards:
-            decision = await guard.evaluate(principal=principal, proposal=proposal)
-            if decision.outcome == "DENY":
-                raise PermissionError(decision.reason)
-            if decision.outcome == "REQUIRE_APPROVAL":
-                raise PermissionError("Human approval required before execution.")
+        decisions = [
+            await guard.evaluate(principal=principal, proposal=proposal)
+            for guard in self._guards
+        ]
+        outcomes = {decision.outcome for decision in decisions}
+        if "DENY" in outcomes:
+            reason = next(d.reason for d in decisions if d.outcome == "DENY")
+            raise PermissionError(reason)
+        if "REQUIRE_APPROVAL" in outcomes:
+            raise PermissionError("Human approval required before execution.")
 
         return await self._executor.execute(proposal)

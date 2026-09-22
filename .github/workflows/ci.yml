@@ -35,4 +35,5 @@ jobs:
       - run: ruff check app tests migrations
       - run: pyright
       - run: pytest
+      - run: pytest tests/test_security_invariants.py
       - run: alembic upgrade head --sql > /tmp/audoryn-schema.sql
