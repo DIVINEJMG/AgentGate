@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Header, HTTPException, status
 
 from app.domain.identity.errors import AuthenticationError
 from app.domain.identity.principals import HumanPrincipal
