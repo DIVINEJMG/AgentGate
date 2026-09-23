@@ -40,14 +40,16 @@ class RepeatableMigrationPipeline:
     explicitly enabled production operation.
     """
 
-    SUPPORTED_ENTITY_TYPES = frozenset({
-        "organization",
-        "membership",
-        "agent_identity",
-        "worker",
-        "job",
-        "result",
-    })
+    SUPPORTED_ENTITY_TYPES = frozenset(
+        {
+            "organization",
+            "membership",
+            "agent_identity",
+            "worker",
+            "job",
+            "result",
+        }
+    )
 
     def stage(
         self,
@@ -62,9 +64,7 @@ class RepeatableMigrationPipeline:
 
         for record in records:
             if record.entity_type not in self.SUPPORTED_ENTITY_TYPES:
-                raise MigrationValidationError(
-                    f"Unsupported entity type: {record.entity_type}"
-                )
+                raise MigrationValidationError(f"Unsupported entity type: {record.entity_type}")
             if not record.legacy_id.strip():
                 raise MigrationValidationError("legacy_id is required.")
 
@@ -75,11 +75,7 @@ class RepeatableMigrationPipeline:
                 )
             seen.add(key)
 
-            normalized = {
-                str(k): v
-                for k, v in record.payload.items()
-                if v is not None
-            }
+            normalized = {str(k): v for k, v in record.payload.items() if v is not None}
             staged.append(
                 StagedRecord(
                     batch_id=batch,
