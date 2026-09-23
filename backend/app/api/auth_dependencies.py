@@ -4,6 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Header, HTTPException, status
+
 from app.domain.identity.agents import AgentDomainError
 from app.domain.identity.errors import AuthenticationError, AuthorizationError
 from app.domain.identity.principals import AgentPrincipal, HumanPrincipal
