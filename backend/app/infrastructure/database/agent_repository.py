@@ -47,16 +47,16 @@ class SQLAlchemyAgentRepository:
             id=agent.id,
             organization_id=agent.organization_id,
             name=agent.name,
-            description=agent.description,
+            description="",
             owner_user_id=agent.created_by,
             status=agent.status,
             credential=AgentCredentialView(
                 status=credential.status,
                 fingerprint=credential.fingerprint,
                 version=credential.version,
-                scopes=tuple(credential.scopes),
-                expires_at=credential.expires_at,
-                last_used_at=credential.last_used_at,
+                scopes=("agent.authenticate",),
+                expires_at=None,
+                last_used_at=None,
             ),
             created_at=agent.created_at,
             updated_at=agent.updated_at,
@@ -129,7 +129,6 @@ class SQLAlchemyAgentRepository:
         agent = AgentIdentity(
             organization_id=organization_id,
             name=name,
-            description=description,
             status="active",
             created_by=user_id,
             created_at=created_at,
@@ -143,10 +142,6 @@ class SQLAlchemyAgentRepository:
             secret_hash=credential_hash,
             status="active",
             version=1,
-            scopes=list(scopes),
-            expires_at=None,
-            last_used_at=None,
-            revoked_at=None,
             created_at=created_at,
             updated_at=created_at,
         )
@@ -199,7 +194,6 @@ class SQLAlchemyAgentRepository:
         agent.updated_at = changed_at
         if status == "disabled":
             credential.status = "revoked"
-            credential.revoked_at = changed_at
             credential.updated_at = changed_at
         self._audit(
             organization_id=organization_id,
@@ -233,7 +227,6 @@ class SQLAlchemyAgentRepository:
         if current is None:
             raise AgentDomainError("Agent credential is unavailable.", 500)
         current.status = "revoked"
-        current.revoked_at = created_at
         current.updated_at = created_at
         self._session.add(
             AgentCredential(
@@ -242,10 +235,6 @@ class SQLAlchemyAgentRepository:
                 secret_hash=credential_hash,
                 status="active",
                 version=version,
-                scopes=list(scopes),
-                expires_at=None,
-                last_used_at=None,
-                revoked_at=None,
                 created_at=created_at,
                 updated_at=created_at,
             )
@@ -279,7 +268,6 @@ class SQLAlchemyAgentRepository:
         if credential is None:
             raise AgentDomainError("Agent credential is unavailable.", 500)
         credential.status = "revoked"
-        credential.revoked_at = changed_at
         credential.updated_at = changed_at
         if agent.status != "disabled":
             agent.status = "suspended"
