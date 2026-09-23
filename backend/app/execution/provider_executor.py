@@ -225,7 +225,7 @@ class UniversalProviderExecutor:
         The Action Gateway should call prepare + execute_request so authorization
         snapshots are always present on real provider execution.
         """
-        prepared = await self.prepare(proposal)
+        await self.prepare(proposal)
         raise PermissionError(
             "Direct provider execution is disabled; execute through ActionGateway."
         )
