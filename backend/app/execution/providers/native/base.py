@@ -49,11 +49,7 @@ class NativeProvider(ABC):
 
         declared = set(resource.available_capabilities)
         configured_raw = configuration.get("permissionScopes", "").strip()
-        configured = {
-            item.strip()
-            for item in configured_raw.split(",")
-            if item.strip()
-        }
+        configured = {item.strip() for item in configured_raw.split(",") if item.strip()}
         if configured:
             declared &= configured
 
