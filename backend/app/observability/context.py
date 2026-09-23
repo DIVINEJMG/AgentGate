@@ -2,12 +2,12 @@ import contextvars
 import json
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
-_CONTEXT: contextvars.ContextVar[dict[str, str]] = contextvars.ContextVar(
+_CONTEXT: contextvars.ContextVar[dict[str, str] | None] = contextvars.ContextVar(
     "audoryn_observability_context",
-    default={},
+    default=None,
 )
 
 
@@ -39,11 +39,11 @@ class ExecutionContext:
         }
 
 
-def bind_context(context: ExecutionContext) -> contextvars.Token[dict[str, str]]:
+def bind_context(context: ExecutionContext) -> contextvars.Token[dict[str, str] | None]:
     return _CONTEXT.set(context.fields())
 
 
-def reset_context(token: contextvars.Token[dict[str, str]]) -> None:
+def reset_context(token: contextvars.Token[dict[str, str] | None]) -> None:
     _CONTEXT.reset(token)
 
 
@@ -54,7 +54,7 @@ def structured_event(
     level: int = logging.INFO,
     fields: Mapping[str, object] | None = None,
 ) -> None:
-    payload: dict[str, object] = {"event": event, **_CONTEXT.get()}
+    payload: dict[str, object] = {"event": event, **(_CONTEXT.get() or {})}
     if fields:
         payload.update(fields)
     logger.log(level, json.dumps(payload, separators=(",", ":"), sort_keys=True))
