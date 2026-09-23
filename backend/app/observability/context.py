@@ -1,9 +1,9 @@
-import contextvars
-import json
-import logging
+from contextvars import ContextVar, Token
+from json import dumps
+from logging import INFO, Logger
 
 
-_CONTEXT: contextvars.ContextVar[dict[str, str] | None] = contextvars.ContextVar(
+_CONTEXT: ContextVar[dict[str, str] | None] = ContextVar(
     "audoryn_observability_context",
     default=None,
 )
@@ -11,14 +11,14 @@ _CONTEXT: contextvars.ContextVar[dict[str, str] | None] = contextvars.ContextVar
 
 class ExecutionContext:
     __slots__ = (
-        "organization_id",
-        "worker_id",
-        "job_id",
-        "work_item_id",
-        "run_id",
-        "agent_id",
         "action_id",
+        "agent_id",
         "correlation_id",
+        "job_id",
+        "organization_id",
+        "run_id",
+        "work_item_id",
+        "worker_id",
     )
 
     def __init__(
@@ -59,22 +59,22 @@ class ExecutionContext:
         }
 
 
-def bind_context(context: ExecutionContext) -> contextvars.Token[dict[str, str] | None]:
+def bind_context(context: ExecutionContext) -> Token[dict[str, str] | None]:
     return _CONTEXT.set(context.fields())
 
 
-def reset_context(token: contextvars.Token[dict[str, str] | None]) -> None:
+def reset_context(token: Token[dict[str, str] | None]) -> None:
     _CONTEXT.reset(token)
 
 
 def structured_event(
-    logger: logging.Logger,
+    logger: Logger,
     event: str,
     *,
-    level: int = logging.INFO,
+    level: int = INFO,
     fields: dict[str, object] | None = None,
 ) -> None:
     payload: dict[str, object] = {"event": event, **(_CONTEXT.get() or {})}
     if fields:
         payload.update(fields)
-    logger.log(level, json.dumps(payload, separators=(",", ":"), sort_keys=True))
+    logger.log(level, dumps(payload, separators=(",", ":"), sort_keys=True))
