@@ -6,7 +6,11 @@ import pytest
 
 from app.application.migration_order import assert_migration_order
 from app.domain.identity.principals import AgentPrincipal, HumanPrincipal
-from app.domain.integrations.contracts import IntegrationManifest, IntegrationOperation
+from app.domain.integrations.contracts import (
+    IntegrationManifest,
+    IntegrationOperation,
+    provider_manifest,
+)
 from app.domain.secrets.vault import require_secret_reference
 from app.domain.security.invariants import (
     require_execution_allowed,
@@ -22,26 +26,34 @@ from app.observability.context import (
 
 
 def test_integration_manifest_describes_provider_operations() -> None:
-    operation = IntegrationOperation(
+    operation_manifest = IntegrationManifest(
+        provider="github",
         resource="repository",
+        capability="github.repository.issues.create",
         action="issue.create",
         scope="github.repository.issues.create",
         risk="medium",
         input_schema={"title": {"type": "string"}},
         output_schema={"id": {"type": "string"}},
-        side_effect="write",
-        approval_recommended=True,
-    )
-    manifest = IntegrationManifest(
-        provider="github",
-        resources=("repository",),
-        capabilities=("github.repository.issues.create",),
+        side_effect=True,
+        approval_default=True,
         credential_strategy="oauth2",
-        operations=(operation,),
     )
-    assert manifest.operation("issue.create") == operation
-    with pytest.raises(KeyError):
-        manifest.operation("unknown")
+
+    class Adapter:
+        provider = "github"
+        manifests = (operation_manifest,)
+
+        async def execute(self, **kwargs):
+            raise NotImplementedError
+
+    manifest = provider_manifest(Adapter())
+    operation: IntegrationOperation = manifest.operations[0]
+    assert manifest.provider == "github"
+    assert manifest.resources == ("repository",)
+    assert manifest.capabilities == ("github.repository.issues.create",)
+    assert operation.action == "issue.create"
+    assert operation.side_effect == "write"
 
 
 def test_domain_migration_order_rejects_big_bang_skips() -> None:
