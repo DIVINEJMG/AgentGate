@@ -47,6 +47,7 @@ def normalize_path(path: str) -> str:
     path = path.split("?", 1)[0]
     path = TEMPLATE_EXPR.sub("{param}", path)
     path = PATH_PARAM.sub("{param}", path)
+    path = COLON_PARAM.sub("{param}", path)
     path = re.sub(r"/api/(?:v1|v2)/", "/api/{param}/", path)
     path = re.sub(r"//+", "/", path)
     if len(path) > 1:
@@ -75,6 +76,10 @@ def reference_endpoints() -> list[Endpoint]:
                 endpoints.append(
                     Endpoint(method.upper(), normalize_path(raw_path), str(file.relative_to(ROOT)))
                 )
+        for _, method, raw_path in REFERENCE_OBJECT_ROUTE.findall(text):
+            endpoints.append(
+                Endpoint(method.upper(), normalize_path(raw_path), str(file.relative_to(ROOT)))
+            )
     return sorted(set(endpoints))
 
 
