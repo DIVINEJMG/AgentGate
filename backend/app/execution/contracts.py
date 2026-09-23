@@ -264,3 +264,4 @@ class ProviderRuntimeContext:
     configuration: dict[str, str]
     credential: str | None
     resource: ResourceDescriptor
+    credential_reference: str | None = None
