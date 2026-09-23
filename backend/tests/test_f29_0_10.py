@@ -9,7 +9,6 @@ import pytest
 from app.execution.bootstrap import execution_provider_registry
 from app.execution.contracts import (
     CapabilityDescriptor,
-    ExecutionPreferences,
     ExecutionRequest,
     ExecutionResult,
     ProviderHealth,
@@ -292,7 +291,7 @@ def test_legacy_builtin_adapters_are_universal_compatibility_facades() -> None:
         calendar_adapter,
     ):
         universal = execution_provider_registry().get(adapter.provider)
-        assert adapter._provider is universal  # noqa: SLF001
+        assert adapter._provider is universal
         assert adapter.manifests
 
 

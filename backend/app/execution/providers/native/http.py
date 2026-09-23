@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
-
 import httpx
 
 from app.execution.contracts import ExecutionErrorCode

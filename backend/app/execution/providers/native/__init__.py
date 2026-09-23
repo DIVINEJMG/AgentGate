@@ -7,7 +7,7 @@ from app.execution.providers.native.slack import SlackProvider
 __all__ = [
     "GitHubProvider",
     "GmailProvider",
-    "SlackProvider",
-    "GoogleDriveProvider",
     "GoogleCalendarProvider",
+    "GoogleDriveProvider",
+    "SlackProvider",
 ]

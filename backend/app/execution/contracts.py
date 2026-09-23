@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
 RiskLevel = Literal["low", "medium", "high", "critical"]
@@ -215,7 +215,7 @@ class ExecutionResult:
         started_at: datetime,
         verification: VerificationResult | None = None,
         artifacts: tuple[str, ...] = (),
-    ) -> "ExecutionResult":
+    ) -> ExecutionResult:
         completed_at = datetime.now(UTC)
         latency_ms = max(
             0,
