@@ -253,7 +253,7 @@ def test_f29_realtime_event_catalog_matches_contract() -> None:
 def test_f29_websocket_and_sse_routes_are_mounted() -> None:
     application = create_application()
     websocket_paths = {
-        str(getattr(route, "path"))
+        str(route.path)  # type: ignore[attr-defined]
         for route in application.routes
         if route.__class__.__name__ == "APIWebSocketRoute" and hasattr(route, "path")
     }
