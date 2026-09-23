@@ -90,18 +90,21 @@ def reference_endpoints() -> list[Endpoint]:
 
 def python_endpoints() -> list[Endpoint]:
     sys.path.insert(0, str(BACKEND_ROOT))
-    from fastapi.routing import APIRoute
     from app.bootstrap.application import create_application
 
     application = create_application()
     endpoints: list[Endpoint] = []
     for route in application.routes:
-        if not isinstance(route, APIRoute):
+        path = getattr(route, "path", None)
+        methods = getattr(route, "methods", None)
+        if not isinstance(path, str) or not methods:
             continue
-        for method in sorted(route.methods or set()):
+        if not (path.startswith("/api/") or path.startswith("/health/")):
+            continue
+        for method in sorted(methods):
             if method in {"HEAD", "OPTIONS"}:
                 continue
-            endpoints.append(Endpoint(method, normalize_path(route.path), "FastAPI"))
+            endpoints.append(Endpoint(method, normalize_path(path), "FastAPI"))
     return sorted(set(endpoints))
 
 
