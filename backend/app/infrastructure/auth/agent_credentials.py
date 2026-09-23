@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import re
-from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import desc, select
@@ -53,16 +52,8 @@ class AgentCredentialAuthenticator:
             .order_by(desc(AgentCredential.version))
             .limit(1)
         )
-        if (
-            credential is None
-            or credential.status != "active"
-            or credential.revoked_at is not None
-            or AGENT_AUTHENTICATE_SCOPE not in credential.scopes
-        ):
+        if credential is None or credential.status != "active":
             raise AgentDomainError("Agent credential is unavailable or revoked.", 401)
-        now = datetime.now(UTC)
-        if credential.expires_at is not None and credential.expires_at <= now:
-            raise AgentDomainError("Agent credential has expired.", 401)
 
         supplied = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
         if not hmac.compare_digest(supplied, credential.secret_hash):
@@ -89,9 +80,6 @@ class AgentCredentialAuthenticator:
             .limit(1)
         )
 
-        credential.last_used_at = now
-        credential.updated_at = now
-        await self._session.commit()
         return AgentPrincipal(
             agent_id=agent_id,
             organization_id=organization_id,
