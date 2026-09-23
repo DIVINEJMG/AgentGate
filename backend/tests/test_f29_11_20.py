@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.bootstrap.application import create_application
+from app.main import app
 from app.domain.actions.gateway import ActionGateway, AuthorizationDecision
 from app.domain.identity.principals import AgentPrincipal
 from app.domain.integrations.contracts import IntegrationExecutionResult
@@ -251,13 +251,12 @@ def test_f29_realtime_event_catalog_matches_contract() -> None:
 
 
 def test_f29_websocket_and_sse_routes_are_mounted() -> None:
-    application = create_application()
     route_paths = {
         str(route.path)  # type: ignore[attr-defined]
-        for route in application.routes
+        for route in app.routes
         if hasattr(route, "path")
     }
     assert "/ws/v1/organizations/{organization_id}" in route_paths
 
-    paths = set(application.openapi()["paths"])
+    paths = set(app.openapi()["paths"])
     assert "/api/v2/organizations/{organization_id}/events/stream" in paths
