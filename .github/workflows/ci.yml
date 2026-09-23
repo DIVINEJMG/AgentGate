@@ -34,6 +34,7 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check app tests migrations
       - run: ruff format --check app/application/services/data_migration.py app/application/services/cutover_gate.py tests/test_f28_21_26.py
+      - run: ruff format --check app/execution app/integrations/builtin.py app/api/integration_capability_routes.py tests/test_f29_0_10.py
       - run: pyright
       - run: pytest
       - run: pytest tests/test_security_invariants.py
@@ -53,3 +54,4 @@ jobs:
       - run: python ../scripts/verify_f28_11_20.py
       - run: python ../scripts/verify_f28_security_invariants.py
       - run: python ../scripts/verify_f28_21_26.py
+      - run: python ../scripts/verify_f29_0_10.py

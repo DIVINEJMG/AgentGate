@@ -4,7 +4,6 @@ import hashlib
 from typing import Annotated, Any
 from uuid import UUID
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth_dependencies import organization_principal
 from app.api.product_common import append_audit, not_found, require_permission, utcnow
 from app.domain.identity.principals import HumanPrincipal
+from app.execution.bootstrap import execution_provider_registry
+from app.execution.contracts import ExecutionProviderError, ResourceDescriptor
 from app.infrastructure.database.models import (
     AgentIdentity,
     CapabilityProfile,
@@ -28,148 +29,6 @@ from app.infrastructure.secrets.integration_crypto import (
 v1_router = APIRouter(tags=["integrations", "capabilities"])
 v2_router = APIRouter(tags=["integrations", "capabilities"])
 
-PROVIDERS: dict[str, dict[str, Any]] = {
-    "github": {
-        "label": "GitHub",
-        "credential": "optional",
-        "operations": [
-            {
-                "providerOperation": "repository.metadata.read",
-                "scope": "github.repository.metadata.read",
-                "action": "read",
-                "target": "repository metadata",
-                "description": "Read repository metadata.",
-                "risk": "low",
-            },
-            {
-                "providerOperation": "repository.issues.read",
-                "scope": "github.repository.issues.read",
-                "action": "read",
-                "target": "repository issues",
-                "description": "Read open repository issues.",
-                "risk": "low",
-            },
-            {
-                "providerOperation": "repository.pull_requests.read",
-                "scope": "github.repository.pull_requests.read",
-                "action": "read",
-                "target": "pull requests",
-                "description": "Read open pull requests.",
-                "risk": "low",
-            },
-            {
-                "providerOperation": "repository.issue.create",
-                "scope": "github.repository.issues.create",
-                "action": "create",
-                "target": "repository issue",
-                "description": "Create a GitHub issue.",
-                "risk": "high",
-            },
-        ],
-    },
-    "gmail": {
-        "label": "Gmail",
-        "credential": "required",
-        "operations": [
-            {
-                "providerOperation": "mailbox.profile.read",
-                "scope": "gmail.mailbox.profile.read",
-                "action": "read",
-                "target": "mailbox profile",
-                "description": "Read Gmail mailbox profile metadata.",
-                "risk": "low",
-            },
-            {
-                "providerOperation": "messages.recent.read",
-                "scope": "gmail.messages.recent.read",
-                "action": "read",
-                "target": "recent messages",
-                "description": "Read bounded recent-message metadata.",
-                "risk": "medium",
-            },
-        ],
-    },
-    "google_drive": {
-        "label": "Google Drive",
-        "credential": "required",
-        "operations": [
-            {
-                "providerOperation": "drive.profile.read",
-                "scope": "google_drive.profile.read",
-                "action": "read",
-                "target": "Drive profile",
-                "description": "Read Drive account metadata.",
-                "risk": "low",
-            },
-            {
-                "providerOperation": "files.recent.read",
-                "scope": "google_drive.files.recent.read",
-                "action": "read",
-                "target": "recent files",
-                "description": "Read recent Drive file metadata.",
-                "risk": "medium",
-            },
-        ],
-    },
-    "slack": {
-        "label": "Slack",
-        "credential": "required",
-        "operations": [
-            {
-                "providerOperation": "workspace.identity.read",
-                "scope": "slack.workspace.identity.read",
-                "action": "read",
-                "target": "workspace identity",
-                "description": "Read Slack workspace identity.",
-                "risk": "low",
-            },
-            {
-                "providerOperation": "channels.read",
-                "scope": "slack.channels.read",
-                "action": "read",
-                "target": "channels",
-                "description": "Read visible Slack channels.",
-                "risk": "low",
-            },
-            {
-                "providerOperation": "chat.message.create",
-                "scope": "slack.messages.create",
-                "action": "create",
-                "target": "Slack message",
-                "description": "Post a Slack message.",
-                "risk": "high",
-            },
-        ],
-    },
-    "google_calendar": {
-        "label": "Google Calendar",
-        "credential": "required",
-        "operations": [
-            {
-                "providerOperation": "calendar.primary.read",
-                "scope": "google_calendar.primary.read",
-                "action": "read",
-                "target": "primary calendar",
-                "description": "Read primary calendar metadata.",
-                "risk": "low",
-            },
-            {
-                "providerOperation": "events.upcoming.read",
-                "scope": "google_calendar.events.upcoming.read",
-                "action": "read",
-                "target": "upcoming events",
-                "description": "Read upcoming calendar events.",
-                "risk": "low",
-            },
-        ],
-    },
-    "generic_mcp": {
-        "label": "Generic REST / MCP",
-        "credential": "disabled",
-        "operations": [],
-    },
-}
-
 ROUTE_PROVIDER = {
     "github": "github",
     "gmail": "gmail",
@@ -180,146 +39,48 @@ ROUTE_PROVIDER = {
 }
 
 
-async def _validate_provider(
-    provider: str,
-    config: dict[str, Any],
-    credential: str | None,
-) -> dict[str, Any]:
-    descriptor = PROVIDERS[provider]
-    if descriptor["credential"] == "disabled":
+def _provider_id(route_provider: str) -> str:
+    return ROUTE_PROVIDER.get(route_provider, route_provider.replace("-", "_"))
+
+
+def _provider_or_404(provider_id: str):
+    if provider_id == "generic_mcp":
         raise HTTPException(
             409,
-            "Generic REST / MCP is guarded until an explicit outbound-origin allowlist exists.",
+            "Generic REST / MCP remains guarded until the F29 custom-provider boundary is enabled.",
         )
-    if descriptor["credential"] == "required" and not credential:
-        raise HTTPException(400, f"{descriptor['label']} requires an access token.")
+    try:
+        return execution_provider_registry().get(provider_id)
+    except KeyError as error:
+        raise HTTPException(404, "Integration provider is not supported.") from error
 
-    timeout = httpx.Timeout(10.0)
-    headers = {"User-Agent": "Aduoryn/1.0"}
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        if provider == "github":
-            repository = str(config.get("repository", "")).strip()
-            parts = repository.split("/", 1)
-            if len(parts) != 2 or not all(parts):
-                raise HTTPException(400, "GitHub repository must be owner/name.")
-            if credential:
-                headers["Authorization"] = f"Bearer {credential}"
-            response = await client.get(
-                f"https://api.github.com/repos/{parts[0]}/{parts[1]}",
-                headers=headers,
-            )
-            if response.status_code >= 400:
-                raise HTTPException(
-                    400,
-                    f"GitHub repository validation failed ({response.status_code}).",
-                )
-            data = response.json()
-            full_name = str(data.get("full_name") or repository)
-            return {
-                "resourceKey": full_name.lower(),
-                "displayName": full_name,
-                "webUrl": str(data.get("html_url") or f"https://github.com/{repository}"),
-                "config": {"repository": full_name},
-                "metadata": {
-                    "private": bool(data.get("private", False)),
-                    "archived": bool(data.get("archived", False)),
-                    "defaultBranch": data.get("default_branch"),
-                },
-            }
 
-        headers["Authorization"] = f"Bearer {credential}"
-        if provider == "gmail":
-            response = await client.get(
-                "https://gmail.googleapis.com/gmail/v1/users/me/profile",
-                headers=headers,
-            )
-            if response.status_code >= 400:
-                raise HTTPException(400, "Gmail credential validation failed.")
-            data = response.json()
-            email = str(data.get("emailAddress") or "connected-mailbox")
-            return {
-                "resourceKey": email.lower(),
-                "displayName": f"Gmail · {email}",
-                "webUrl": "https://mail.google.com/",
-                "config": {"account": email},
-                "metadata": {
-                    "emailAddress": email,
-                    "messagesTotal": data.get("messagesTotal"),
-                    "threadsTotal": data.get("threadsTotal"),
-                },
-            }
-        if provider == "google_drive":
-            response = await client.get(
-                "https://www.googleapis.com/drive/v3/about?fields=user",
-                headers=headers,
-            )
-            if response.status_code >= 400:
-                raise HTTPException(400, "Google Drive credential validation failed.")
-            data = response.json().get("user", {})
-            email = str(data.get("emailAddress") or data.get("displayName") or "drive")
-            key = str(data.get("permissionId") or email).lower()
-            return {
-                "resourceKey": key,
-                "displayName": f"Google Drive · {email}",
-                "webUrl": "https://drive.google.com/drive/my-drive",
-                "config": {"account": email},
-                "metadata": {
-                    "emailAddress": data.get("emailAddress"),
-                    "displayName": data.get("displayName"),
-                    "permissionId": data.get("permissionId"),
-                },
-            }
-        if provider == "google_calendar":
-            response = await client.get(
-                "https://www.googleapis.com/calendar/v3/calendars/primary",
-                headers=headers,
-            )
-            if response.status_code >= 400:
-                raise HTTPException(400, "Google Calendar credential validation failed.")
-            data = response.json()
-            calendar_id = str(data.get("id") or "primary")
-            summary = str(data.get("summary") or calendar_id)
-            return {
-                "resourceKey": calendar_id.lower(),
-                "displayName": f"Google Calendar · {summary}",
-                "webUrl": "https://calendar.google.com/calendar/u/0/r",
-                "config": {"calendarId": "primary"},
-                "metadata": {
-                    "calendarId": calendar_id,
-                    "summary": summary,
-                    "timeZone": data.get("timeZone"),
-                    "accessRole": data.get("accessRole"),
-                },
-            }
-        if provider == "slack":
-            response = await client.get(
-                "https://slack.com/api/auth.test",
-                headers=headers,
-            )
-            if response.status_code >= 400:
-                raise HTTPException(400, "Slack credential validation failed.")
-            data = response.json()
-            if data.get("ok") is not True:
-                raise HTTPException(
-                    400, f"Slack credential validation failed: {data.get('error', 'unknown')}"
-                )
-            team_id = str(data.get("team_id") or "slack")
-            team = str(data.get("team") or team_id)
-            return {
-                "resourceKey": team_id.lower(),
-                "displayName": f"Slack · {team}",
-                "webUrl": str(data.get("url") or f"https://app.slack.com/client/{team_id}"),
-                "config": {"teamId": team_id},
-                "metadata": {
-                    "teamId": team_id,
-                    "team": team,
-                    "userId": data.get("user_id"),
-                    "user": data.get("user"),
-                    "enterpriseId": data.get("enterprise_id"),
-                },
-            }
-    raise HTTPException(400, "Unsupported integration provider.")
+def _provider_http_error(error: ExecutionProviderError) -> HTTPException:
+    status_code = 503 if error.error.retryable else 400
+    if error.error.code == "resource_not_found":
+        status_code = 404
+    return HTTPException(status_code, error.error.safe_message)
 
+
+async def _discover_connection(
+    provider_id: str,
+    config: dict[str, str],
+    credential: str | None,
+) -> ResourceDescriptor:
+    provider = _provider_or_404(provider_id)
+    try:
+        resources = await provider.discover_resources(
+            configuration=config,
+            credential=credential,
+        )
+    except ExecutionProviderError as error:
+        raise _provider_http_error(error) from error
+    if len(resources) != 1:
+        raise HTTPException(
+            503,
+            "Provider connection discovery did not resolve exactly one canonical resource.",
+        )
+    return resources[0]
 
 def _config(integration: Integration) -> dict[str, Any]:
     return integration.config if isinstance(integration.config, dict) else {}
@@ -396,31 +157,32 @@ async def _connect(
     payload: dict[str, Any],
 ) -> Integration:
     require_permission(principal, "integrations.manage")
-    provider = ROUTE_PROVIDER.get(route_provider, route_provider.replace("-", "_"))
-    if provider not in PROVIDERS:
-        raise HTTPException(404, "Integration provider is not supported.")
+    provider_id = _provider_id(route_provider)
+    provider = _provider_or_404(provider_id)
 
     raw_config = payload.get("config")
-    config: dict[str, Any] = (
-        dict(raw_config) if isinstance(raw_config, dict) else {}
+    config: dict[str, str] = (
+        {str(key): str(value) for key, value in raw_config.items()}
+        if isinstance(raw_config, dict)
+        else {}
     )
     credential = (
         str(payload.get("credential", "")).strip()
         if payload.get("credential") is not None
         else ""
     )
-    connection = await _validate_provider(
-        provider, config, credential or None
+    resource = await _discover_connection(
+        provider_id, config, credential or None
     )
     existing = await session.scalar(
         select(Integration).where(
             Integration.organization_id == organization_id,
-            Integration.provider == provider,
+            Integration.provider == provider_id,
         )
     )
     if existing is not None and existing.status != "disconnected":
         existing_key = str(_config(existing).get("resourceKey", ""))
-        if existing_key == connection["resourceKey"]:
+        if existing_key == resource.external_id:
             raise HTTPException(409, "This provider resource is already connected.")
 
     fingerprint = (
@@ -429,22 +191,25 @@ async def _connect(
         else None
     )
     now = utcnow()
-    descriptor = PROVIDERS[provider]
+    manifest = provider.manifest
     integration = Integration(
         organization_id=organization_id,
-        provider=provider,
-        display_name=connection["displayName"],
+        provider=provider_id,
+        display_name=resource.display_name,
         status="connected",
         config={
-            **connection["config"],
-            "resourceKey": connection["resourceKey"],
-            "webUrl": connection["webUrl"],
-            "metadata": connection["metadata"],
+            **resource.configuration,
+            "resourceKey": resource.external_id,
+            "resourceType": resource.resource_type,
+            "webUrl": resource.web_url or "",
+            "metadata": resource.metadata,
             "supportedOperations": [
-                item["providerOperation"] for item in descriptor["operations"]
+                item.operation for item in manifest.capabilities
             ],
+            "providerKind": manifest.kind,
+            "adapterVersion": manifest.version,
             "credentialFingerprint": fingerprint,
-            "healthMessage": f"{descriptor['label']} connection validated.",
+            "healthMessage": f"{manifest.display_name} connection validated.",
             "lastCheckedAt": now.isoformat(),
             "createdBy": str(principal.user_id),
         },
@@ -477,8 +242,13 @@ async def _connect(
         resource_id=str(integration.id),
         resource_name=integration.display_name,
         outcome="connected",
-        summary=f"{descriptor['label']} integration connected.",
-        metadata={"provider": provider, "credentialConfigured": bool(credential)},
+        summary=f"{manifest.display_name} integration connected.",
+        metadata={
+            "provider": provider_id,
+            "providerKind": manifest.kind,
+            "adapterVersion": manifest.version,
+            "credentialConfigured": bool(credential),
+        },
     )
     await session.commit()
     await session.refresh(integration)
@@ -503,6 +273,7 @@ async def _health(
     if integration.status == "disconnected":
         raise HTTPException(409, "Disconnected integrations cannot be checked.")
 
+    provider = _provider_or_404(integration.provider)
     credential_row = await session.scalar(
         select(IntegrationCredential).where(
             IntegrationCredential.integration_id == integration.id
@@ -514,21 +285,28 @@ async def _health(
             credential = decrypt_integration_secret(credential_row.ciphertext)
         except IntegrationCipherError as error:
             raise HTTPException(503, str(error)) from error
-    config = _config(integration)
+    raw_config = _config(integration)
+    config = {
+        str(key): str(value)
+        for key, value in raw_config.items()
+        if isinstance(value, (str, int, float, bool))
+    }
     try:
-        connection = await _validate_provider(
-            integration.provider, config, credential
+        health = await provider.check_health(
+            configuration=config,
+            credential=credential,
         )
-        integration.status = "connected"
-        config["metadata"] = connection["metadata"]
-        config["healthMessage"] = (
-            f"{PROVIDERS[integration.provider]['label']} connection validated."
+        integration.status = (
+            "connected" if health.state == "healthy" else "degraded"
         )
-    except HTTPException as error:
+        raw_config["metadata"] = health.metadata
+        raw_config["healthMessage"] = health.message
+        raw_config["lastCheckedAt"] = health.checked_at.isoformat()
+    except ExecutionProviderError as error:
         integration.status = "degraded"
-        config["healthMessage"] = str(error.detail)
-    config["lastCheckedAt"] = utcnow().isoformat()
-    integration.config = config
+        raw_config["healthMessage"] = error.error.safe_message
+        raw_config["lastCheckedAt"] = utcnow().isoformat()
+    integration.config = raw_config
     await session.commit()
     await session.refresh(integration)
     return integration
@@ -763,39 +541,55 @@ async def _catalog(
     )
     resources: list[dict[str, Any]] = []
     all_scopes: set[str] = set()
+    registry = execution_provider_registry()
     for integration in integrations:
-        descriptor = PROVIDERS.get(integration.provider)
-        if descriptor is None:
+        try:
+            provider = registry.get(integration.provider)
+        except KeyError:
             continue
+        manifest = provider.manifest
         config = _config(integration)
-        actions = []
-        scopes = []
-        for item in descriptor["operations"]:
+        actions: list[dict[str, Any]] = []
+        scopes: list[str] = []
+        for capability in manifest.capabilities:
+            action_name = capability.operation.rsplit(".", 1)[-1]
             action = {
-                "id": f"{integration.id}:{item['providerOperation']}",
-                "action": item["action"],
-                "target": item["target"],
-                "providerOperation": item["providerOperation"],
-                "scope": item["scope"],
-                "description": item["description"],
-                "risk": item["risk"],
+                "id": f"{integration.id}:{capability.operation}",
+                "action": action_name,
+                "target": capability.target,
+                "providerOperation": capability.operation,
+                "scope": capability.scope,
+                "description": capability.description,
+                "risk": capability.risk,
+                "mode": capability.mode,
+                "sideEffect": capability.side_effect,
+                "requiresCredential": capability.requires_credential,
+                "approvalRecommendation": capability.approval_recommendation,
+                "adapterVersion": manifest.version,
             }
             actions.append(action)
-            scopes.append(item["scope"])
-            all_scopes.add(item["scope"])
+            scopes.append(capability.scope)
+            all_scopes.add(capability.scope)
+        resource_type = (
+            manifest.capabilities[0].resource_type
+            if manifest.capabilities
+            else str(config.get("resourceType", "resource"))
+        )
         resources.append(
             {
                 "id": str(integration.id),
                 "organizationId": str(organization_id),
                 "integrationId": str(integration.id),
                 "provider": integration.provider,
-                "type": "integration_resource",
+                "type": resource_type,
                 "key": str(config.get("resourceKey", integration.id)),
                 "displayName": integration.display_name,
                 "status": integration.status,
                 "metadata": config.get("metadata", {}),
                 "actions": actions,
                 "scopes": scopes,
+                "providerKind": manifest.kind,
+                "adapterVersion": manifest.version,
             }
         )
     return {
