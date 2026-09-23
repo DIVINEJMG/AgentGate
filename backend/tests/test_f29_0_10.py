@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.execution.authorization import CredentialReference, ProviderPermissionSnapshot
 from app.execution.bootstrap import execution_provider_registry
 from app.execution.contracts import (
     CapabilityDescriptor,
@@ -103,6 +104,28 @@ class FakeProvider:
             state=self.health,  # type: ignore[arg-type]
             message="test",
             checked_at=datetime.now(UTC),
+        )
+
+    async def discover_permissions(
+        self,
+        *,
+        resource,
+        configuration,
+        credential,
+        credential_reference,
+    ):
+        del configuration, credential
+        return ProviderPermissionSnapshot(
+            provider=self.manifest.provider,
+            resource_id=resource.id,
+            capability_scopes=resource.available_capabilities,
+            credential=CredentialReference(
+                strategy=self.manifest.credential_strategy,
+                reference=credential_reference,
+            ),
+            checked_at=datetime.now(UTC),
+            adapter=self.manifest.kind,
+            adapter_version=self.manifest.version,
         )
 
     async def normalize_input(self, *, operation, input):
