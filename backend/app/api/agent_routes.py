@@ -7,14 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_dependencies import authenticated_user
+from app.api.auth_dependencies import organization_principal
 from app.application.services.agent_identity import AgentIdentityService
 from app.domain.identity.agents import (
     AgentCredentialReveal,
     AgentDomainError,
     AgentIdentityView,
 )
-from app.infrastructure.auth.service import AuthenticatedUser
+from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.database.agent_repository import SQLAlchemyAgentRepository
 from app.infrastructure.database.session import database_session
 
@@ -101,11 +101,11 @@ v2_router = APIRouter(tags=["agents"])
 @v1_router.get("/organizations/{organization_id}/agents")
 async def list_agents_v1(
     organization_id: UUID,
-    user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
+    user: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, object]:
     try:
-        agents = await _service(session).list_agents(user.id, organization_id)
+        agents = await _service(session).list_agents(user.user_id, organization_id)
     except AgentDomainError as error:
         _raise(error)
     return {"agents": [_v1(agent) for agent in agents], "count": len(agents)}
@@ -114,11 +114,11 @@ async def list_agents_v1(
 @v2_router.get("/organizations/{organization_id}/agents")
 async def list_agents_v2(
     organization_id: UUID,
-    user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
+    user: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, object]:
     try:
-        agents = await _service(session).list_agents(user.id, organization_id)
+        agents = await _service(session).list_agents(user.user_id, organization_id)
     except AgentDomainError as error:
         _raise(error)
     return {"items": [_v2(agent) for agent in agents], "total": len(agents)}
@@ -128,12 +128,12 @@ async def list_agents_v2(
 async def create_agent_v1(
     organization_id: UUID,
     payload: AgentCreateRequest,
-    user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
+    user: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, object]:
     try:
         agent, credential = await _service(session).register_agent(
-            user.id, organization_id, payload.name, payload.description
+            user.user_id, organization_id, payload.name, payload.description
         )
     except AgentDomainError as error:
         _raise(error)
@@ -144,12 +144,12 @@ async def create_agent_v1(
 async def create_agent_v2(
     organization_id: UUID,
     payload: AgentCreateRequest,
-    user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
+    user: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, object]:
     try:
         agent, credential = await _service(session).register_agent(
-            user.id, organization_id, payload.name, payload.description
+            user.user_id, organization_id, payload.name, payload.description
         )
     except AgentDomainError as error:
         _raise(error)
@@ -160,12 +160,12 @@ async def _lifecycle(
     organization_id: UUID,
     agent_id: UUID,
     payload: AgentLifecycleRequest,
-    user: AuthenticatedUser,
+    user: HumanPrincipal,
     session: AsyncSession,
 ) -> AgentIdentityView:
     try:
         return await _service(session).set_lifecycle(
-            user.id, organization_id, agent_id, payload.status
+            user.user_id, organization_id, agent_id, payload.status
         )
     except AgentDomainError as error:
         _raise(error)
@@ -176,7 +176,7 @@ async def lifecycle_v1(
     organization_id: UUID,
     agent_id: UUID,
     payload: AgentLifecycleRequest,
-    user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
+    user: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, object]:
     return {"agent": _v1(await _lifecycle(organization_id, agent_id, payload, user, session))}
@@ -187,7 +187,7 @@ async def lifecycle_v2(
     organization_id: UUID,
     agent_id: UUID,
     payload: AgentLifecycleRequest,
-    user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
+    user: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, object]:
     return {"data": {"agent": _v2(await _lifecycle(organization_id, agent_id, payload, user, session))}}
@@ -196,11 +196,11 @@ async def lifecycle_v2(
 async def _rotate(
     organization_id: UUID,
     agent_id: UUID,
-    user: AuthenticatedUser,
+    user: HumanPrincipal,
     session: AsyncSession,
 ) -> tuple[AgentIdentityView, AgentCredentialReveal]:
     try:
-        return await _service(session).rotate_credential(user.id, organization_id, agent_id)
+        return await _service(session).rotate_credential(user.user_id, organization_id, agent_id)
     except AgentDomainError as error:
         _raise(error)
 
@@ -209,7 +209,7 @@ async def _rotate(
 async def rotate_v1(
     organization_id: UUID,
     agent_id: UUID,
-    user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
+    user: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, object]:
     agent, credential = await _rotate(organization_id, agent_id, user, session)
@@ -220,7 +220,7 @@ async def rotate_v1(
 async def rotate_v2(
     organization_id: UUID,
     agent_id: UUID,
-    user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
+    user: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, object]:
     agent, credential = await _rotate(organization_id, agent_id, user, session)
@@ -230,11 +230,11 @@ async def rotate_v2(
 async def _revoke(
     organization_id: UUID,
     agent_id: UUID,
-    user: AuthenticatedUser,
+    user: HumanPrincipal,
     session: AsyncSession,
 ) -> AgentIdentityView:
     try:
-        return await _service(session).revoke_credential(user.id, organization_id, agent_id)
+        return await _service(session).revoke_credential(user.user_id, organization_id, agent_id)
     except AgentDomainError as error:
         _raise(error)
 
@@ -243,7 +243,7 @@ async def _revoke(
 async def revoke_v1(
     organization_id: UUID,
     agent_id: UUID,
-    user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
+    user: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, object]:
     return {"agent": _v1(await _revoke(organization_id, agent_id, user, session))}
@@ -253,7 +253,7 @@ async def revoke_v1(
 async def revoke_v2(
     organization_id: UUID,
     agent_id: UUID,
-    user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
+    user: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, object]:
     return {"data": {"agent": _v2(await _revoke(organization_id, agent_id, user, session))}}
