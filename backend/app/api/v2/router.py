@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
-from app.api.agent_routes import v2_router as agent_router
 from app.api.adapters.system_status import serialize_v2
+from app.api.agent_routes import v2_router as agent_router
 from app.api.auth_routes import router as auth_router
 from app.api.organization_routes import v2_router as organization_router
 from app.application.queries.system_status import get_system_status
