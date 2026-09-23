@@ -1,11 +1,20 @@
 import asyncio
+import logging
 
 from app.application.services.cutover import CutoverController
 from app.bootstrap.settings import settings
 from app.infrastructure.database.session import session_factory
 from app.infrastructure.database.work_queue import SQLAlchemyWorkItemQueue
 from app.infrastructure.redis.coordination import RedisCoordinator
+from app.observability.context import (
+    ExecutionContext,
+    bind_context,
+    reset_context,
+    structured_event,
+)
 from app.runtime.executor import UnconfiguredRuntimeExecutor
+
+logger = logging.getLogger("audoryn.runtime.worker")
 
 
 async def work_once() -> bool:
@@ -21,23 +30,42 @@ async def work_once() -> bool:
             if work_item is None:
                 return False
 
-            await coordinator.heartbeat(
-                f"work-item:{work_item.id}",
-                "running",
-                ttl_seconds=settings.worker_heartbeat_ttl_seconds,
+            token = bind_context(
+                ExecutionContext(
+                    organization_id=str(work_item.organization_id),
+                    job_id=str(work_item.job_id),
+                    work_item_id=str(work_item.id),
+                    correlation_id=work_item.correlation_id,
+                )
             )
-
-            executor = UnconfiguredRuntimeExecutor()
             try:
-                await executor.execute(work_item)
-            except RuntimeError as exc:
-                await queue.checkpoint_failed(work_item.id, reason=str(exc))
-                await session.commit()
-                return True
+                structured_event(logger, "work_item.claimed")
+                await coordinator.heartbeat(
+                    f"work-item:{work_item.id}",
+                    "running",
+                    ttl_seconds=settings.worker_heartbeat_ttl_seconds,
+                )
 
-            await queue.checkpoint_succeeded(work_item.id)
-            await session.commit()
-            return True
+                executor = UnconfiguredRuntimeExecutor()
+                try:
+                    await executor.execute(work_item)
+                except RuntimeError as exc:
+                    structured_event(
+                        logger,
+                        "work_item.failed",
+                        level=logging.ERROR,
+                        fields={"reason": str(exc)},
+                    )
+                    await queue.checkpoint_failed(work_item.id, reason=str(exc))
+                    await session.commit()
+                    return True
+
+                await queue.checkpoint_succeeded(work_item.id)
+                await session.commit()
+                structured_event(logger, "work_item.succeeded")
+                return True
+            finally:
+                reset_context(token)
     finally:
         await coordinator.close()
 
