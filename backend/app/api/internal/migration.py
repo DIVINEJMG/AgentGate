@@ -1,3 +1,9 @@
+import asyncio
+from pathlib import Path
+
+from alembic import command
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
 from app.bootstrap.settings import settings
@@ -70,3 +76,24 @@ async def run_migration(
             bool(result["matched"]) for result in shadow.values()
         ),
     }
+
+
+@router.post("/schema")
+async def upgrade_schema(
+    request: Request,
+    upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
+) -> dict[str, object]:
+    body = await request.body()
+    _verify_qstash(request, body, upstash_signature)
+    if not settings.migration_execution_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Migration execution is disabled.",
+        )
+
+    backend_root = Path(__file__).resolve().parents[3]
+    config = Config(str(backend_root / "alembic.ini"))
+    scripts = ScriptDirectory.from_config(config)
+    target = scripts.get_current_head()
+    await asyncio.to_thread(command.upgrade, config, "head")
+    return {"status": "completed", "targetRevision": target}
