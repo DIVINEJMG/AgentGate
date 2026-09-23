@@ -22,8 +22,13 @@ REFERENCE_ROUTE = re.compile(
     r"""(.+?)\2""",
     re.IGNORECASE,
 )
+REFERENCE_OBJECT_ROUTE = re.compile(
+    r"""([\`'"])(GET|POST|PUT|PATCH|DELETE)\s+(/api/[^\`'"]+)\1\s*:""",
+    re.IGNORECASE,
+)
 TEMPLATE_EXPR = re.compile(r"\$\{[^}]+\}")
 PATH_PARAM = re.compile(r"\{[^}]+\}")
+COLON_PARAM = re.compile(r":[A-Za-z_][A-Za-z0-9_]*")
 
 LIVE_VERIFIED = {
     ("GET", "/api/{param}/system/status"),
@@ -122,7 +127,7 @@ def main() -> int:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Validate that all three inventories are discoverable without gating incomplete migration.",
+        help="Validate all inventories are discoverable without gating incomplete migration.",
     )
     args = parser.parse_args()
 
@@ -139,6 +144,7 @@ def main() -> int:
 
     python_signatures = {signature(item) for item in python}
     reference_signatures = {signature(item) for item in reference}
+    frontend_signatures = {signature(item) for item in frontend}
 
     rows = []
     for endpoint in frontend:
@@ -156,8 +162,7 @@ def main() -> int:
     legacy_only = sorted(
         sig
         for sig in reference_signatures
-        if sig not in {signature(item) for item in frontend}
-        and sig not in python_signatures
+        if sig not in frontend_signatures and sig not in python_signatures
     )
     counts = Counter(row[0] for row in rows)
 
