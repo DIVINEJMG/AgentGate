@@ -20,9 +20,8 @@ class CredentialReference:
     def __post_init__(self) -> None:
         if self.strategy == "none" and self.reference is not None:
             raise ValueError("Credential strategy 'none' cannot carry a reference.")
-        if self.strategy != "none":
-            if not self.reference or not self.reference.startswith("secret://"):
-                raise ValueError("Credential references must use the secret:// scheme.")
+        if self.reference is not None and not self.reference.startswith("secret://"):
+            raise ValueError("Credential references must use the secret:// scheme.")
 
 
 @dataclass(frozen=True, slots=True)
