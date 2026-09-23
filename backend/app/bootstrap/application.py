@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.bootstrap.lifecycle import lifespan
 from app.bootstrap.settings import settings
+from app.observability.middleware import CorrelationContextMiddleware
 
 
 def create_application() -> FastAPI:
@@ -14,6 +15,7 @@ def create_application() -> FastAPI:
         docs_url="/docs" if settings.environment != "production" else None,
         redoc_url=None,
     )
+    application.add_middleware(CorrelationContextMiddleware)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_allowed_origins),
