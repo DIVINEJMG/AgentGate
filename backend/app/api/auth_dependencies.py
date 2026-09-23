@@ -5,9 +5,9 @@ from uuid import UUID
 
 from fastapi import Header, HTTPException, status
 from app.domain.identity.agents import AgentDomainError
+from app.domain.identity.errors import AuthenticationError, AuthorizationError
 from app.domain.identity.principals import AgentPrincipal, HumanPrincipal
 from app.infrastructure.auth.agent_credentials import AgentCredentialAuthenticator
-from app.domain.identity.errors import AuthenticationError, AuthorizationError
 from app.infrastructure.auth.identity_provider import RedisSessionIdentityProvider
 from app.infrastructure.auth.service import AuthenticatedUser, LocalAuthenticationService
 from app.infrastructure.auth.session_store import RedisSessionStore
