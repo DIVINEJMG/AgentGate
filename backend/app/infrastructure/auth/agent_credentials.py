@@ -8,7 +8,7 @@ from uuid import UUID
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.identity.agents import AGENT_AUTHENTICATE_SCOPE, AgentDomainError
+from app.domain.identity.agents import AgentDomainError
 from app.domain.identity.principals import AgentPrincipal
 from app.infrastructure.database.models import (
     AgentCredential,
