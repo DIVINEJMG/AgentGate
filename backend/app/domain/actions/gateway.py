@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from app.domain.identity.principals import AgentPrincipal
@@ -46,7 +46,13 @@ class ActionGuard(Protocol):
     ) -> AuthorizationDecision: ...
 
 
+@runtime_checkable
 class ProviderExecutor(Protocol):
+    async def execute(self, proposal: ActionProposal) -> IntegrationExecutionResult: ...
+
+
+@runtime_checkable
+class UniversalProviderExecutorProtocol(ProviderExecutor, Protocol):
     async def prepare(self, proposal: ActionProposal) -> UniversalActionRequest: ...
 
     async def execute_request(
@@ -54,8 +60,6 @@ class ProviderExecutor(Protocol):
         request: UniversalActionRequest,
         snapshot: ExecutionAuthorizationSnapshot,
     ) -> IntegrationExecutionResult: ...
-
-    async def execute(self, proposal: ActionProposal) -> IntegrationExecutionResult: ...
 
 
 class ActionGateway:
@@ -164,6 +168,8 @@ class ActionGateway:
             adapter=permissions.adapter,
             adapter_version=permissions.adapter_version,
         )
+        if not isinstance(self._executor, UniversalProviderExecutorProtocol):
+            raise RuntimeError("Universal Action Gateway requires a universal provider executor.")
         return await self._executor.execute_request(request, snapshot)
 
     async def execute(
@@ -180,10 +186,8 @@ class ActionGateway:
             idempotency_key=proposal.idempotency_key,
         )
 
-        prepare = getattr(self._executor, "prepare", None)
-        execute_request = getattr(self._executor, "execute_request", None)
-        if callable(prepare) and callable(execute_request):
-            universal_request = await prepare(proposal)
+        if isinstance(self._executor, UniversalProviderExecutorProtocol):
+            universal_request = await self._executor.prepare(proposal)
             return await self.execute_request(
                 principal=principal,
                 request=universal_request,
