@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from pydantic import SecretStr
 
 from app.bootstrap.settings import settings
@@ -7,7 +9,7 @@ from app.domain.secrets.vault import SecretVault
 class SettingsSecretVault(SecretVault):
     """Explicit server-side secret aliases. Values never cross API boundaries."""
 
-    _ALIASES = {
+    _ALIASES: ClassVar[dict[str, str]] = {
         "integration-encryption-key": "integration_encryption_key",
         "oidc-client-secret": "oidc_client_secret",
         "model-provider-api-key": "model_provider_api_key",
@@ -25,5 +27,5 @@ class SettingsSecretVault(SecretVault):
         if value is None:
             raise RuntimeError(f"Secret is not configured: {secret_id}")
         if not isinstance(value, SecretStr):
-            raise RuntimeError(f"Configured secret has invalid type: {secret_id}")
+            raise TypeError(f"Configured secret has invalid type: {secret_id}")
         return value.get_secret_value()
