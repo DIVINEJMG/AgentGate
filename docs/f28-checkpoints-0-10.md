@@ -92,11 +92,13 @@ lineage such as:
 - Approval -> Action
 - Result -> Worker / Job
 
-F28 Agent Identity also uses a Neon repository implementation rather than an in-memory
-product store.
+F28 Agent Identity uses the existing Neon Agent/credential schema rather than an in-memory
+product store. Schema expansion that requires table-owner DDL is intentionally deferred to
+F28.11+, where domain-by-domain migration begins; the Render application role remains
+non-owner and is not granted DDL authority.
 
-Status: **complete as the canonical persistence contract**. F28.11+ ports remaining
-product endpoints onto this schema.
+Status: **complete as the canonical persistence contract**. F28.11+ owns schema expansion
+and ports remaining product endpoints onto this schema.
 
 ## F28.4 — Redis is coordination-only
 
