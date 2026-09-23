@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, NoReturn
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -90,7 +90,7 @@ def _service(session: AsyncSession) -> AgentIdentityService:
     return AgentIdentityService(SQLAlchemyAgentRepository(session))
 
 
-def _raise(error: AgentDomainError) -> None:
+def _raise(error: AgentDomainError) -> NoReturn:
     raise HTTPException(status_code=error.status_code, detail=str(error)) from error
 
 
