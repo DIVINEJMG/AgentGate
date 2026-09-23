@@ -9,7 +9,7 @@ BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
 from app.application.migration_order import DOMAIN_MIGRATION_ORDER, assert_migration_order
-from app.domain.integrations.contracts import IntegrationManifest, IntegrationOperation
+from app.domain.integrations.contracts import IntegrationOperation, ProviderManifest
 from app.infrastructure.database.models import OutboxEvent
 
 violations: list[str] = []
@@ -23,7 +23,7 @@ except ValueError:
 else:
     violations.append("F28.12 migration order does not reject skipped prerequisites.")
 
-manifest_fields = set(IntegrationManifest.__dataclass_fields__)
+manifest_fields = set(ProviderManifest.__dataclass_fields__)
 for required in {"provider", "resources", "capabilities", "credential_strategy", "operations"}:
     if required not in manifest_fields:
         violations.append(f"F28.11 IntegrationManifest missing {required}.")
