@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import hashlib
-import math
 import secrets
 from collections import Counter, defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -13,7 +12,13 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_dependencies import authenticated_user, organization_principal
-from app.api.product_common import append_audit, latest_setting, not_found, require_permission, utcnow
+from app.api.product_common import (
+    append_audit,
+    latest_setting,
+    not_found,
+    require_permission,
+    utcnow,
+)
 from app.domain.identity.permissions import permissions_for_role
 from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.auth.service import AuthenticatedUser
@@ -28,10 +33,9 @@ from app.infrastructure.database.models import (
     Organization,
     OrganizationMembership,
     Policy,
-    Result,
     Run,
-    WorkItem,
     Worker,
+    WorkItem,
 )
 from app.infrastructure.database.session import database_session
 

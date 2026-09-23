@@ -21,8 +21,6 @@ from app.api.product_common import (
 from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.database.models import (
-    Action,
-    Approval,
     Artifact,
     AuditEvent,
     Job,
@@ -32,8 +30,8 @@ from app.infrastructure.database.models import (
     ResultVersion,
     Run,
     RunStep,
-    WorkItem,
     Worker,
+    WorkItem,
 )
 from app.infrastructure.database.session import database_session
 from app.infrastructure.storage.provider import object_storage_from_settings
@@ -442,7 +440,7 @@ async def retry_item_v2(
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
-    result = await retry_item_v1(
+    await retry_item_v1(
         organization_id, work_item_id, principal, session
     )
     item = await session.get(WorkItem, work_item_id)

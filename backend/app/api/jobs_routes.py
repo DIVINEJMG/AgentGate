@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
@@ -23,8 +22,8 @@ from app.infrastructure.database.models import (
     ResultVersion,
     Run,
     RunStep,
-    WorkItem,
     Worker,
+    WorkItem,
 )
 from app.infrastructure.database.session import database_session
 
@@ -680,7 +679,7 @@ async def job_status_v2(
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
-    result = await job_status_v1(
+    await job_status_v1(
         organization_id, job_id, payload, principal, session
     )
     job = await session.get(Job, job_id)

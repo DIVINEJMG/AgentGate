@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from typing import Annotated, Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
