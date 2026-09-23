@@ -8,6 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.actions.gateway import ActionProposal
 from app.domain.integrations.contracts import IntegrationExecutionResult
+from app.execution.authorization import (
+    ExecutionAuthorizationSnapshot,
+    UniversalActionRequest,
+)
 from app.execution.contracts import (
     ExecutionRequest,
     ProviderRuntimeContext,
@@ -16,10 +20,7 @@ from app.execution.contracts import (
 from app.execution.providers.registry import ProviderRegistry
 from app.execution.providers.resolver import ExecutionResolver
 from app.infrastructure.database.models import Integration, IntegrationCredential
-from app.infrastructure.secrets.integration_crypto import (
-    IntegrationCipherError,
-    decrypt_integration_secret,
-)
+from app.infrastructure.secrets.provider_vault import DatabaseSecretVault
 
 
 class ProviderContextLoader(Protocol):
@@ -34,6 +35,7 @@ class DatabaseProviderContextLoader:
     ) -> None:
         self._session = session
         self._registry = registry
+        self._vault = DatabaseSecretVault(session)
 
     async def load(self, proposal: ActionProposal) -> ProviderRuntimeContext:
         raw_id = proposal.resource_id
@@ -68,12 +70,12 @@ class DatabaseProviderContextLoader:
                 IntegrationCredential.integration_id == integration.id
             )
         )
+        credential_reference: str | None = None
         credential: str | None = None
         if credential_row is not None:
-            try:
-                credential = decrypt_integration_secret(credential_row.ciphertext)
-            except IntegrationCipherError as error:
-                raise LookupError("Integration credential is unavailable.") from error
+            credential_reference = self._vault.reference_for(credential_row.id)
+            # Raw secret resolution happens only here, at the provider edge.
+            credential = await self._vault.read(credential_reference)
 
         capabilities = provider.manifest.capabilities
         resource_type = (
@@ -106,14 +108,15 @@ class DatabaseProviderContextLoader:
             configuration=configuration,
             credential=credential,
             resource=resource,
+            credential_reference=credential_reference,
         )
 
 
 class UniversalProviderExecutor:
-    """Action Gateway executor backed by the F29 provider registry/resolver.
+    """Provider-neutral executor behind the Action Gateway.
 
-    The gateway still owns authorization. This class only resolves and invokes an
-    already-authorized provider capability; it contains no provider-specific branches.
+    Authorization is completed before execute_request is called. Provider-specific
+    behavior remains inside the registered adapters.
     """
 
     def __init__(
@@ -126,10 +129,7 @@ class UniversalProviderExecutor:
         self._resolver = ExecutionResolver(registry)
         self._context_loader = context_loader
 
-    async def execute(
-        self,
-        proposal: ActionProposal,
-    ) -> IntegrationExecutionResult:
+    async def prepare(self, proposal: ActionProposal) -> UniversalActionRequest:
         context = await self._context_loader.load(proposal)
         provider = self._registry.get(proposal.provider)
         capability = next(
@@ -157,12 +157,48 @@ class UniversalProviderExecutor:
             correlation_id=proposal.correlation_id,
             idempotency_key=proposal.idempotency_key,
         )
+        permissions = await provider.discover_permissions(
+            resource=context.resource,
+            configuration=context.configuration,
+            credential=context.credential,
+            credential_reference=context.credential_reference,
+        )
+        return UniversalActionRequest(
+            execution=request,
+            provider_permissions=permissions,
+        )
+
+    async def execute_request(
+        self,
+        request: UniversalActionRequest,
+        snapshot: ExecutionAuthorizationSnapshot,
+    ) -> IntegrationExecutionResult:
+        execution = request.execution
+        if snapshot.capability_scope != execution.capability.scope:
+            raise PermissionError("Authorization snapshot capability mismatch.")
+        if snapshot.resource_id != execution.resource.id:
+            raise PermissionError("Authorization snapshot resource mismatch.")
+        if snapshot.correlation_id != execution.correlation_id:
+            raise PermissionError("Authorization snapshot correlation mismatch.")
+
+        proposal = ActionProposal(
+            organization_id=execution.organization_id,
+            agent_id=execution.agent_id,
+            provider=execution.resource.provider,
+            operation=execution.operation,
+            scope=execution.capability.scope,
+            resource_id=execution.resource.id,
+            payload=execution.input,
+            correlation_id=execution.correlation_id,
+            idempotency_key=execution.idempotency_key,
+        )
+        context = await self._context_loader.load(proposal)
         resolved = await self._resolver.resolve(
-            request,
-            contexts={proposal.provider: context},
+            execution,
+            contexts={execution.resource.provider: context},
         )
         result = await resolved.provider.execute(
-            request=request,
+            request=execution,
             configuration=resolved.context.configuration,
             credential=resolved.context.credential,
         )
@@ -174,5 +210,22 @@ class UniversalProviderExecutor:
         return IntegrationExecutionResult(
             provider_operation=result.operation,
             summary=summary,
-            data=result.output,
+            data={
+                "output": result.output,
+                "authorization": snapshot.as_dict(),
+            },
+        )
+
+    async def execute(
+        self,
+        proposal: ActionProposal,
+    ) -> IntegrationExecutionResult:
+        """Compatibility path for direct pre-F29 callers.
+
+        The Action Gateway should call prepare + execute_request so authorization
+        snapshots are always present on real provider execution.
+        """
+        prepared = await self.prepare(proposal)
+        raise PermissionError(
+            "Direct provider execution is disabled; execute through ActionGateway."
         )
