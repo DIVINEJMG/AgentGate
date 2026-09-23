@@ -144,6 +144,7 @@ async def test_f29_action_gateway_authorizes_capability_and_resource_intersectio
     assert executor.snapshot.provider_permissions == (
         request.execution.capability.scope,
     )
+    assert executor.snapshot.credential_reference is not None
     assert executor.snapshot.credential_reference.startswith("secret://")
 
 
@@ -252,9 +253,9 @@ def test_f29_realtime_event_catalog_matches_contract() -> None:
 def test_f29_websocket_and_sse_routes_are_mounted() -> None:
     application = create_application()
     websocket_paths = {
-        route.path
+        str(getattr(route, "path"))
         for route in application.routes
-        if route.__class__.__name__ == "APIWebSocketRoute"
+        if route.__class__.__name__ == "APIWebSocketRoute" and hasattr(route, "path")
     }
     assert "/ws/v1/organizations/{organization_id}" in websocket_paths
 
