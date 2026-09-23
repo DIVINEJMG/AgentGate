@@ -57,8 +57,7 @@ class TenantModel(UUIDPrimaryKeyMixin, TimestampMixin):
 class AgentIdentity(TenantModel, Base):
     __tablename__ = "agent_identities"
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="draft")
     created_by: Mapped[UUID] = mapped_column(ForeignKey("human_identities.id"), nullable=False)
     __table_args__ = (Index("ix_agent_identities_org_status", "organization_id", "status"),)
 
@@ -69,13 +68,6 @@ class AgentCredential(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     secret_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    scopes: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=lambda: ["agent.authenticate"])
-    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    __table_args__ = (
-        UniqueConstraint("agent_id", "version", name="uq_agent_credential_version"),
-    )
 
 class WorkforceRole(TenantModel, Base):
     __tablename__ = "workforce_roles"
