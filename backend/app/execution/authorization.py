@@ -2,12 +2,9 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
-from typing import Literal
 from uuid import UUID
 
 from app.execution.contracts import CredentialStrategy, ExecutionRequest
-
-PermissionState = Literal["allowed", "denied", "unknown"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +28,8 @@ class ProviderPermissionSnapshot:
     capability_scopes: tuple[str, ...]
     credential: CredentialReference
     checked_at: datetime
+    adapter: str = "native_api"
+    adapter_version: str = "unknown"
     source: str = "provider"
     metadata: dict[str, object] = field(default_factory=dict)
 
