@@ -33,6 +33,7 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: pip install -e ".[dev]"
       - run: ruff check app tests migrations
+      - run: ruff format --check app tests migrations
       - run: pyright
       - run: pytest
       - run: pytest tests/test_security_invariants.py
@@ -51,3 +52,4 @@ jobs:
       - run: python ../scripts/verify_f28_contracts.py
       - run: python ../scripts/verify_f28_11_20.py
       - run: python ../scripts/verify_f28_security_invariants.py
+      - run: python ../scripts/verify_f28_21_26.py
