@@ -8,11 +8,11 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import StreamingResponse
 
+from app.domain.identity.errors import AuthenticationError, AuthorizationError
 from app.infrastructure.auth.identity_provider import RedisSessionIdentityProvider
 from app.infrastructure.auth.session_store import RedisSessionStore
 from app.infrastructure.database.session import session_factory
 from app.realtime.bus import RedisRealtimeBus
-from app.domain.identity.errors import AuthenticationError, AuthorizationError
 
 ws_router = APIRouter()
 v2_router = APIRouter()
