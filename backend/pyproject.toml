@@ -3,6 +3,11 @@ name = "audoryn-backend"
 version = "26.2.0"
 description = "Aduoryn control plane and autonomous execution backend"
 requires-python = ">=3.13"
+[project.scripts]
+audoryn-worker = "app.runtime.worker:main"
+audoryn-scheduler = "app.runtime.scheduler:main"
+audoryn-outbox = "app.runtime.outbox_worker:main"
+
 dependencies = [
   "alembic>=1.16,<2",
   "asyncpg>=0.30,<1",
