@@ -13,7 +13,12 @@ from app.domain.security.invariants import (
     require_human_approver,
     require_job_authority,
 )
-from app.observability.context import ExecutionContext, bind_context, reset_context, structured_event
+from app.observability.context import (
+    ExecutionContext,
+    bind_context,
+    reset_context,
+    structured_event,
+)
 
 
 def test_integration_manifest_describes_provider_operations() -> None:
