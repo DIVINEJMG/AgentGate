@@ -1,8 +1,6 @@
 import contextvars
 import json
 import logging
-from collections.abc import Mapping
-from dataclasses import dataclass
 
 
 _CONTEXT: contextvars.ContextVar[dict[str, str] | None] = contextvars.ContextVar(
@@ -11,16 +9,38 @@ _CONTEXT: contextvars.ContextVar[dict[str, str] | None] = contextvars.ContextVar
 )
 
 
-@dataclass(frozen=True, slots=True)
 class ExecutionContext:
-    organization_id: str | None = None
-    worker_id: str | None = None
-    job_id: str | None = None
-    work_item_id: str | None = None
-    run_id: str | None = None
-    agent_id: str | None = None
-    action_id: str | None = None
-    correlation_id: str | None = None
+    __slots__ = (
+        "organization_id",
+        "worker_id",
+        "job_id",
+        "work_item_id",
+        "run_id",
+        "agent_id",
+        "action_id",
+        "correlation_id",
+    )
+
+    def __init__(
+        self,
+        *,
+        organization_id: str | None = None,
+        worker_id: str | None = None,
+        job_id: str | None = None,
+        work_item_id: str | None = None,
+        run_id: str | None = None,
+        agent_id: str | None = None,
+        action_id: str | None = None,
+        correlation_id: str | None = None,
+    ) -> None:
+        self.organization_id = organization_id
+        self.worker_id = worker_id
+        self.job_id = job_id
+        self.work_item_id = work_item_id
+        self.run_id = run_id
+        self.agent_id = agent_id
+        self.action_id = action_id
+        self.correlation_id = correlation_id
 
     def fields(self) -> dict[str, str]:
         return {
@@ -52,7 +72,7 @@ def structured_event(
     event: str,
     *,
     level: int = logging.INFO,
-    fields: Mapping[str, object] | None = None,
+    fields: dict[str, object] | None = None,
 ) -> None:
     payload: dict[str, object] = {"event": event, **(_CONTEXT.get() or {})}
     if fields:
