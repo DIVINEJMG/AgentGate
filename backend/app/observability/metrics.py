@@ -1,6 +1,8 @@
+import logging
 from dataclasses import dataclass
 from typing import Protocol
 
+from app.observability.context import structured_event
 
 RUN_DURATION = "audoryn_run_duration"
 ACTION_LATENCY = "audoryn_action_latency"
@@ -23,9 +25,6 @@ class MetricsSink(Protocol):
 
 class LoggingMetricsSink:
     async def record(self, point: MetricPoint) -> None:
-        from app.observability.context import structured_event
-        import logging
-
         structured_event(
             logging.getLogger("audoryn.metrics"),
             "metric",
