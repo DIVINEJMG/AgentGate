@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Literal, get_args
 from uuid import UUID, uuid4
 
 RealtimeEventType = Literal[
@@ -28,7 +28,7 @@ RealtimeEventType = Literal[
     "integration.health.changed",
 ]
 
-REALTIME_EVENT_TYPES: frozenset[str] = frozenset(RealtimeEventType.__args__)  # type: ignore[attr-defined]
+REALTIME_EVENT_TYPES: frozenset[str] = frozenset(str(item) for item in get_args(RealtimeEventType))
 
 
 @dataclass(frozen=True, slots=True)
