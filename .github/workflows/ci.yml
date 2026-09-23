@@ -43,7 +43,7 @@ jobs:
       - run: python ../scripts/verify_no_legacy_platform.py
       - run: python ../scripts/verify_f27_boundaries.py
       - run: python ../scripts/verify_f28_architecture.py
-      - run: python ../scripts/audit_f28_endpoints.py --check
+      - run: python ../scripts/audit_f28_endpoints.py --check --require-complete
       - run: python ../scripts/verify_f28_baseline.py
       - run: python ../scripts/verify_f28_persistence.py
       - run: python ../scripts/verify_f28_redis_boundaries.py
