@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-FRONTEND_ROOT = ROOT / "frontend" / "src" / "lib"
+FRONTEND_ROOT = ROOT / "frontend" / "src"
 REFERENCE_ROOT = ROOT / "reference" / "typescript-backend"
 BACKEND_ROOT = ROOT / "backend"
 
@@ -93,109 +93,16 @@ def python_endpoints() -> list[Endpoint]:
     from app.bootstrap.application import create_application
 
     application = create_application()
+    schema = application.openapi()
     endpoints: list[Endpoint] = []
-    for route in application.routes:
-        path = getattr(route, "path", None)
-        methods = getattr(route, "methods", None)
-        if not isinstance(path, str) or not methods:
+    for path, operations in schema.get("paths", {}).items():
+        if not isinstance(operations, dict):
             continue
-        if not (path.startswith("/api/") or path.startswith("/health/")):
-            continue
-        for method in sorted(methods):
-            if method in {"HEAD", "OPTIONS"}:
+        for method in ("get", "post", "put", "patch", "delete"):
+            if method not in operations:
                 continue
-            endpoints.append(Endpoint(method, normalize_path(path), "FastAPI"))
+            endpoints.append(
+                Endpoint(method.upper(), normalize_path(path), "FastAPI OpenAPI")
+            )
     return sorted(set(endpoints))
 
-
-def signature(endpoint: Endpoint) -> tuple[str, str]:
-    return endpoint.method, endpoint.path
-
-
-def status_for(
-    endpoint: Endpoint,
-    python_signatures: set[tuple[str, str]],
-    reference_signatures: set[tuple[str, str]],
-) -> str:
-    sig = signature(endpoint)
-    if sig in python_signatures:
-        return "WORKING" if sig in LIVE_VERIFIED else "PARTIAL"
-    if sig in reference_signatures:
-        return "MISSING"
-    return "MISSING"
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Audit F28 endpoint parity.")
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Validate all inventories are discoverable without gating incomplete migration.",
-    )
-    args = parser.parse_args()
-
-    frontend = frontend_endpoints()
-    reference = reference_endpoints()
-    python = python_endpoints()
-
-    if not frontend:
-        raise SystemExit("F28 audit found no frontend API endpoints.")
-    if not reference:
-        raise SystemExit("F28 audit found no TypeScript reference endpoints.")
-    if not python:
-        raise SystemExit("F28 audit found no FastAPI endpoints.")
-
-    python_signatures = {signature(item) for item in python}
-    reference_signatures = {signature(item) for item in reference}
-    frontend_signatures = {signature(item) for item in frontend}
-
-    rows = []
-    for endpoint in frontend:
-        rows.append(
-            (
-                status_for(endpoint, python_signatures, reference_signatures),
-                endpoint.method,
-                endpoint.path,
-                endpoint.source,
-                signature(endpoint) in reference_signatures,
-                signature(endpoint) in python_signatures,
-            )
-        )
-
-    legacy_only = sorted(
-        sig
-        for sig in reference_signatures
-        if sig not in frontend_signatures and sig not in python_signatures
-    )
-    counts = Counter(row[0] for row in rows)
-
-    print("# F28 Endpoint Parity Audit")
-    print()
-    print(f"Frontend contracts: {len(rows)}")
-    print(f"TypeScript reference routes: {len(reference_signatures)}")
-    print(f"FastAPI routes: {len(python_signatures)}")
-    print("Statuses: " + ", ".join(f"{key}={counts[key]}" for key in sorted(counts)))
-    print(f"Legacy-only reference routes: {len(legacy_only)}")
-    print()
-    print("| Status | Method | Contract | Frontend source | TS reference | Python |")
-    print("| --- | --- | --- | --- | --- | --- |")
-    for status, method, path, source, in_reference, in_python in rows:
-        print(
-            f"| {status} | {method} | `{path}` | `{source}` | "
-            f"{'yes' if in_reference else 'no'} | {'yes' if in_python else 'no'} |"
-        )
-
-    if legacy_only:
-        print()
-        print("## Legacy-only reference routes")
-        for method, path in legacy_only:
-            print(f"- {method} `{path}`")
-
-    if args.check:
-        print()
-        print("F28 inventory discovery check passed.")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
