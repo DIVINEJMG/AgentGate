@@ -20,8 +20,8 @@ from app.domain.canonical import (
     Policy,
     Result,
     RiskAssessment,
-    WorkItem,
     Worker,
+    WorkItem,
 )
 from app.domain.identity.principals import HumanPrincipal
 
