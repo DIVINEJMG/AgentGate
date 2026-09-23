@@ -62,11 +62,13 @@ async def _run_public(
             )
         ).all()
     )
-    meta = (
+    raw_runtime = (
         item.payload.get("runtime")
-        if item and isinstance(item.payload, dict)
-        and isinstance(item.payload.get("runtime"), dict)
-        else {}
+        if item is not None and isinstance(item.payload, dict)
+        else None
+    )
+    meta: dict[str, Any] = (
+        dict(raw_runtime) if isinstance(raw_runtime, dict) else {}
     )
     return {
         "id": str(run.id),

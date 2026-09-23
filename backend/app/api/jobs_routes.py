@@ -168,11 +168,12 @@ async def update_job(
 
 async def job_public(session: AsyncSession, job: Job) -> dict[str, Any]:
     revision = await current_revision(session, job)
-    definition = revision.definition if isinstance(revision.definition, dict) else {}
-    trigger = (
-        definition.get("triggerConfig")
-        if isinstance(definition.get("triggerConfig"), dict)
-        else {}
+    definition: dict[str, Any] = (
+        dict(revision.definition) if isinstance(revision.definition, dict) else {}
+    )
+    raw_trigger = definition.get("triggerConfig")
+    trigger: dict[str, Any] = (
+        dict(raw_trigger) if isinstance(raw_trigger, dict) else {}
     )
     return {
         "id": str(job.id),
@@ -481,10 +482,13 @@ async def save_trigger_config(
     current = await current_revision(session, job)
     definition = dict(current.definition)
     now = utcnow()
-    existing = (
-        definition.get("triggerConfig")
-        if isinstance(definition.get("triggerConfig"), dict)
-        else {}
+    raw_existing = definition.get("triggerConfig")
+    existing: dict[str, Any] = (
+        dict(raw_existing) if isinstance(raw_existing, dict) else {}
+    )
+    raw_schedule = payload.get("schedule")
+    schedule: dict[str, Any] = (
+        dict(raw_schedule) if isinstance(raw_schedule, dict) else {}
     )
     config = {
         "id": str(existing.get("id") or uuid4()),
@@ -493,7 +497,7 @@ async def save_trigger_config(
         "workerId": str(job.worker_id),
         "revision": int(existing.get("revision", 0)) + 1,
         "schedule": {
-            **(payload.get("schedule") or {}),
+            **schedule,
             "nextDueAt": None,
         },
         "apiEnabled": bool(payload.get("apiEnabled", False)),
@@ -1007,11 +1011,12 @@ async def trigger_workspace(
     )
     history: list[dict[str, Any]] = []
     for item in items:
-        payload = item.payload if isinstance(item.payload, dict) else {}
-        trigger = (
-            payload.get("trigger")
-            if isinstance(payload.get("trigger"), dict)
-            else {}
+        payload: dict[str, Any] = (
+            dict(item.payload) if isinstance(item.payload, dict) else {}
+        )
+        raw_trigger = payload.get("trigger")
+        trigger: dict[str, Any] = (
+            dict(raw_trigger) if isinstance(raw_trigger, dict) else {}
         )
         job = await session.get(Job, item.job_id)
         history.append(
@@ -1184,10 +1189,9 @@ async def worker_quick_start(
     principal: HumanPrincipal,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    worker_input = (
-        payload.get("worker")
-        if isinstance(payload.get("worker"), dict)
-        else {}
+    raw_worker_input = payload.get("worker")
+    worker_input: dict[str, Any] = (
+        dict(raw_worker_input) if isinstance(raw_worker_input, dict) else {}
     )
     identity_mode = worker_input.get("identityMode", "existing")
     credential = None
@@ -1215,16 +1219,16 @@ async def worker_quick_start(
     for entry in payload.get("jobs", []):
         if not isinstance(entry, dict):
             continue
+        job_entry: dict[str, Any] = dict(entry)
         job = await create_job(
             session,
             organization_id,
             principal,
-            {**entry, "workerId": str(worker.id)},
+            {**job_entry, "workerId": str(worker.id)},
         )
-        timing = (
-            entry.get("timing")
-            if isinstance(entry.get("timing"), dict)
-            else {"mode": "manual"}
+        raw_timing = job_entry.get("timing")
+        timing: dict[str, Any] = (
+            dict(raw_timing) if isinstance(raw_timing, dict) else {"mode": "manual"}
         )
         if timing.get("mode") == "start_now":
             job.status = "active"
@@ -1284,16 +1288,14 @@ async def job_quick_start(
     principal: HumanPrincipal,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    job_payload = (
-        payload.get("job")
-        if isinstance(payload.get("job"), dict)
-        else {}
+    raw_job_payload = payload.get("job")
+    job_payload: dict[str, Any] = (
+        dict(raw_job_payload) if isinstance(raw_job_payload, dict) else {}
     )
     job = await create_job(session, organization_id, principal, job_payload)
-    timing = (
-        payload.get("timing")
-        if isinstance(payload.get("timing"), dict)
-        else {"mode": "manual"}
+    raw_timing = payload.get("timing")
+    timing: dict[str, Any] = (
+        dict(raw_timing) if isinstance(raw_timing, dict) else {"mode": "manual"}
     )
     if timing.get("mode") == "start_now":
         job.status = "active"

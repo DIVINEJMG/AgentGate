@@ -400,7 +400,10 @@ async def _connect(
     if provider not in PROVIDERS:
         raise HTTPException(404, "Integration provider is not supported.")
 
-    config = payload.get("config") if isinstance(payload.get("config"), dict) else {}
+    raw_config = payload.get("config")
+    config: dict[str, Any] = (
+        dict(raw_config) if isinstance(raw_config, dict) else {}
+    )
     credential = (
         str(payload.get("credential", "")).strip()
         if payload.get("credential") is not None

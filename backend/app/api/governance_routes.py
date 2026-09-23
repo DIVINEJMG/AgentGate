@@ -832,8 +832,13 @@ async def risk_v1(
     )
     assessments: list[dict[str, Any]] = []
     for event in events:
-        factors = event.factors if isinstance(event.factors, dict) else {}
-        context = factors.get("context") if isinstance(factors.get("context"), dict) else {}
+        factors: dict[str, Any] = (
+            dict(event.factors) if isinstance(event.factors, dict) else {}
+        )
+        raw_context = factors.get("context")
+        context: dict[str, Any] = (
+            dict(raw_context) if isinstance(raw_context, dict) else {}
+        )
         assessments.append(
             {
                 "actionId": str(factors.get("actionId", event.id)),
@@ -857,7 +862,12 @@ async def risk_v1(
         "summary": {
             "assessedActions": len(events),
             "elevated": sum(event.effective_risk in {"medium", "high", "critical"} for event in events),
-            "activeSignalHits": sum(len((event.factors or {}).get("signals", [])) for event in events),
+            "activeSignalHits": sum(
+                len(dict(event.factors).get("signals", []))
+                if isinstance(event.factors, dict)
+                else 0
+                for event in events
+            ),
             "highOrCritical": counts["high"] + counts["critical"],
             "byEffectiveRisk": {
                 risk: counts[risk] for risk in RISK_ORDER
@@ -912,12 +922,17 @@ async def risk_v2(
 async def _action_public(
     session: AsyncSession, action: Action
 ) -> dict[str, Any]:
-    data = action.payload if isinstance(action.payload, dict) else {}
+    data: dict[str, Any] = (
+        dict(action.payload) if isinstance(action.payload, dict) else {}
+    )
     agent = await session.get(AgentIdentity, action.agent_id)
     approval = await session.scalar(
         select(Approval).where(Approval.action_id == action.id)
     )
-    request = data.get("request") if isinstance(data.get("request"), dict) else {}
+    raw_request = data.get("request")
+    request: dict[str, Any] = (
+        dict(raw_request) if isinstance(raw_request, dict) else {}
+    )
     return {
         "id": str(action.id),
         "organizationId": str(action.organization_id),
