@@ -49,3 +49,5 @@ jobs:
       - run: python ../scripts/verify_f28_action_gateway.py
       - run: python ../scripts/verify_f28_api_parity.py
       - run: python ../scripts/verify_f28_contracts.py
+      - run: python ../scripts/verify_f28_11_20.py
+      - run: python ../scripts/verify_f28_security_invariants.py

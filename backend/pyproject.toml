@@ -16,6 +16,11 @@ dependencies = [
   "uvicorn[standard]>=0.35,<1"
 ]
 
+[project.scripts]
+audoryn-worker = "app.runtime.worker:main"
+audoryn-scheduler = "app.runtime.scheduler:main"
+audoryn-outbox = "app.runtime.outbox_worker:main"
+
 [project.optional-dependencies]
 dev = [
   "pyright>=1.1.405,<2",
