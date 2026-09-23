@@ -21,7 +21,7 @@ class RedisRealtimeBus:
         self._client: Any = client
 
     @classmethod
-    def from_settings(cls) -> "RedisRealtimeBus":
+    def from_settings(cls) -> RedisRealtimeBus:
         return cls(Redis.from_url(settings.redis_dsn, decode_responses=True))
 
     @staticmethod
