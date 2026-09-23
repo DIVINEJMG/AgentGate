@@ -67,3 +67,18 @@ def test_migration_run_requires_qstash_signature() -> None:
     response = client.post("/internal/v1/migration/run", json={})
     assert response.status_code == 401
     assert response.json()["detail"] == "QStash signature required."
+
+
+def test_agent_identity_routes_exist_in_v1_and_v2() -> None:
+    schema = app.openapi()
+    required = {
+        "/api/v1/organizations/{organization_id}/agents",
+        "/api/v2/organizations/{organization_id}/agents",
+        "/api/v1/organizations/{organization_id}/agents/{agent_id}/lifecycle",
+        "/api/v2/organizations/{organization_id}/agents/{agent_id}/lifecycle",
+        "/api/v1/organizations/{organization_id}/agents/{agent_id}/credentials/rotate",
+        "/api/v2/organizations/{organization_id}/agents/{agent_id}/credentials/rotate",
+        "/api/v1/organizations/{organization_id}/agents/{agent_id}/credentials/revoke",
+        "/api/v2/organizations/{organization_id}/agents/{agent_id}/credentials/revoke",
+    }
+    assert required <= set(schema["paths"])
