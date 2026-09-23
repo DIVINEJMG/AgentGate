@@ -82,3 +82,9 @@ def test_agent_identity_routes_exist_in_v1_and_v2() -> None:
         "/api/v2/organizations/{organization_id}/agents/{agent_id}/credentials/revoke",
     }
     assert required <= set(schema["paths"])
+
+
+def test_schema_upgrade_requires_qstash_signature() -> None:
+    response = client.post("/internal/v1/migration/schema", json={})
+    assert response.status_code == 401
+    assert response.json()["detail"] == "QStash signature required."
