@@ -169,7 +169,7 @@ class ActionGateway:
             adapter_version=permissions.adapter_version,
         )
         if not isinstance(self._executor, UniversalProviderExecutorProtocol):
-            raise RuntimeError("Universal Action Gateway requires a universal provider executor.")
+            raise TypeError("Universal Action Gateway requires a universal provider executor.")
         return await self._executor.execute_request(request, snapshot)
 
     async def execute(
