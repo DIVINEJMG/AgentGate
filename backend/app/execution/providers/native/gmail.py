@@ -59,9 +59,7 @@ class GmailProvider(NativeProvider):
         capabilities=CAPABILITIES,
     )
 
-    async def _profile(
-        self, credential: str | None
-    ) -> tuple[dict[str, object], str | None]:
+    async def _profile(self, credential: str | None) -> tuple[dict[str, object], str | None]:
         if not credential:
             raise self._execution_error(
                 operation="mailbox.profile.read",
@@ -117,9 +115,7 @@ class GmailProvider(NativeProvider):
                     "threadsTotal": number(payload.get("threadsTotal")),
                 },
                 health="healthy",
-                available_capabilities=tuple(
-                    item.scope for item in self.manifest.capabilities
-                ),
+                available_capabilities=tuple(item.scope for item in self.manifest.capabilities),
                 web_url="https://mail.google.com/",
                 configuration={"account": email},
             ),
@@ -177,13 +173,17 @@ class GmailProvider(NativeProvider):
                 )
                 root = mapping(listed.data)
                 rows = root.get("messages")
-                ids = [
-                    text(mapping(item).get("id"))
-                    for item in rows
+                ids = (
+                    [
+                        text(mapping(item).get("id"))
+                        for item in rows
+                        if isinstance(rows, list)
+                        and isinstance(item, dict)
+                        and text(mapping(item).get("id"))
+                    ]
                     if isinstance(rows, list)
-                    and isinstance(item, dict)
-                    and text(mapping(item).get("id"))
-                ] if isinstance(rows, list) else []
+                    else []
+                )
                 messages: list[dict[str, object]] = []
                 for message_id in ids[:5]:
                     detail = await self._http.request(

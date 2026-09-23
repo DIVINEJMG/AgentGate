@@ -71,15 +71,12 @@ class UniversalIntegrationAdapter:
             (
                 item
                 for item in self._provider.manifest.capabilities
-                if item.operation == operation
-                or item.scope == operation
+                if item.operation == operation or item.scope == operation
             ),
             None,
         )
         if capability is None:
-            raise RuntimeError(
-                f"{self.provider}:{operation} is not a registered capability."
-            )
+            raise RuntimeError(f"{self.provider}:{operation} is not a registered capability.")
         normalized = await self._provider.normalize_input(
             operation=capability.operation,
             input=payload,

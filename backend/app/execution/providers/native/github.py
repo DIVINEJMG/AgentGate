@@ -258,11 +258,7 @@ class GitHubProvider(NativeProvider):
                 safe_message="GitHub issue labels must be an array.",
             )
         labels = list(
-            dict.fromkeys(
-                label.strip()
-                for raw in labels_raw
-                if (label := text(raw).strip())
-            )
+            dict.fromkeys(label.strip() for raw in labels_raw if (label := text(raw).strip()))
         )
         if len(labels) > 10 or any(len(label) > 50 for label in labels):
             raise self._execution_error(
@@ -455,9 +451,7 @@ class GitHubProvider(NativeProvider):
         del configuration, credential
         if request.operation == "repository.issue.create":
             output = mapping(result.output)
-            verified = number(output.get("number")) is not None and bool(
-                text(output.get("webUrl"))
-            )
+            verified = number(output.get("number")) is not None and bool(text(output.get("webUrl")))
             return VerificationResult(
                 verified=verified,
                 summary=(

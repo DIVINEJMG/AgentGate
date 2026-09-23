@@ -83,6 +83,4 @@ class ExecutionResolver:
             if not preference.allow_fallback:
                 break
 
-        raise LookupError(
-            "No healthy execution provider can satisfy the requested capability."
-        )
+        raise LookupError("No healthy execution provider can satisfy the requested capability.")

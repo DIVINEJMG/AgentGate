@@ -59,9 +59,7 @@ class GoogleCalendarProvider(NativeProvider):
         capabilities=CAPABILITIES,
     )
 
-    async def _primary(
-        self, credential: str | None
-    ) -> tuple[dict[str, object], str | None]:
+    async def _primary(self, credential: str | None) -> tuple[dict[str, object], str | None]:
         if not credential:
             raise self._execution_error(
                 operation="calendar.primary.read",
@@ -119,9 +117,7 @@ class GoogleCalendarProvider(NativeProvider):
                     "accessRole": text(payload.get("accessRole")) or None,
                 },
                 health="healthy",
-                available_capabilities=tuple(
-                    item.scope for item in self.manifest.capabilities
-                ),
+                available_capabilities=tuple(item.scope for item in self.manifest.capabilities),
                 web_url="https://calendar.google.com/calendar/u/0/r",
                 configuration={"calendarId": "primary"},
             ),
@@ -185,22 +181,26 @@ class GoogleCalendarProvider(NativeProvider):
                 )
                 payload = mapping(response.data)
                 rows = payload.get("items")
-                output = [
-                    {
-                        "id": text(event.get("id")),
-                        "summary": text(event.get("summary")),
-                        "status": text(event.get("status")),
-                        "start": text(mapping(event.get("start")).get("dateTime"))
-                        or text(mapping(event.get("start")).get("date")),
-                        "end": text(mapping(event.get("end")).get("dateTime"))
-                        or text(mapping(event.get("end")).get("date")),
-                        "htmlLink": text(event.get("htmlLink")),
-                        "location": text(event.get("location")),
-                    }
-                    for raw in rows
-                    if isinstance(rows, list) and isinstance(raw, dict)
-                    for event in [dict(raw)]
-                ] if isinstance(rows, list) else []
+                output = (
+                    [
+                        {
+                            "id": text(event.get("id")),
+                            "summary": text(event.get("summary")),
+                            "status": text(event.get("status")),
+                            "start": text(mapping(event.get("start")).get("dateTime"))
+                            or text(mapping(event.get("start")).get("date")),
+                            "end": text(mapping(event.get("end")).get("dateTime"))
+                            or text(mapping(event.get("end")).get("date")),
+                            "htmlLink": text(event.get("htmlLink")),
+                            "location": text(event.get("location")),
+                        }
+                        for raw in rows
+                        if isinstance(rows, list) and isinstance(raw, dict)
+                        for event in [dict(raw)]
+                    ]
+                    if isinstance(rows, list)
+                    else []
+                )
                 request_id = response.request_id
             else:
                 raise self._execution_error(

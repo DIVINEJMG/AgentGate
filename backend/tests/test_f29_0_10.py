@@ -201,10 +201,7 @@ def test_default_registry_contains_only_f29_native_providers() -> None:
 
 def test_all_native_providers_conform_to_execution_protocol() -> None:
     registry = execution_provider_registry()
-    assert all(
-        isinstance(provider, ExecutionProvider)
-        for provider in registry.providers()
-    )
+    assert all(isinstance(provider, ExecutionProvider) for provider in registry.providers())
     for provider in registry.providers():
         scopes = [item.scope for item in provider.manifest.capabilities]
         operations = [item.operation for item in provider.manifest.capabilities]
@@ -315,8 +312,7 @@ def test_core_runtime_and_gateway_have_no_provider_name_branches() -> None:
         for file in files:
             text = file.read_text(encoding="utf-8")
             if any(
-                token in text
-                and ("provider ==" in text or "provider in" in text)
+                token in text and ("provider ==" in text or "provider in" in text)
                 for token in provider_literals
             ):
                 offenders.append(str(file.relative_to(root)))

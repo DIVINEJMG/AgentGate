@@ -47,16 +47,12 @@ class ProviderRegistry:
         enabled_only: bool = True,
     ) -> tuple[ProviderManifest, ...]:
         return tuple(
-            provider.manifest
-            for provider in self.providers(kind=kind, enabled_only=enabled_only)
+            provider.manifest for provider in self.providers(kind=kind, enabled_only=enabled_only)
         )
 
     def capability_providers(self, scope: str) -> tuple[ExecutionProvider, ...]:
         return tuple(
             provider
             for provider in self.providers()
-            if any(
-                capability.scope == scope
-                for capability in provider.manifest.capabilities
-            )
+            if any(capability.scope == scope for capability in provider.manifest.capabilities)
         )

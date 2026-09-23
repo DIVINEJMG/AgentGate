@@ -82,18 +82,15 @@ async def _discover_connection(
         )
     return resources[0]
 
+
 def _config(integration: Integration) -> dict[str, Any]:
     return integration.config if isinstance(integration.config, dict) else {}
 
 
-async def integration_public(
-    session: AsyncSession, integration: Integration
-) -> dict[str, Any]:
+async def integration_public(session: AsyncSession, integration: Integration) -> dict[str, Any]:
     config = _config(integration)
     credential = await session.scalar(
-        select(IntegrationCredential).where(
-            IntegrationCredential.integration_id == integration.id
-        )
+        select(IntegrationCredential).where(IntegrationCredential.integration_id == integration.id)
     )
     return {
         "id": str(integration.id),
@@ -102,9 +99,7 @@ async def integration_public(
         "displayName": integration.display_name,
         "resourceKey": str(config.get("resourceKey", str(integration.id))),
         "webUrl": str(config.get("webUrl", "")),
-        "metadata": config.get("metadata")
-        if isinstance(config.get("metadata"), dict)
-        else {},
+        "metadata": config.get("metadata") if isinstance(config.get("metadata"), dict) else {},
         "supportedOperations": list(config.get("supportedOperations", [])),
         "status": integration.status,
         "credential": {
@@ -114,9 +109,7 @@ async def integration_public(
         },
         "health": {
             "message": str(config.get("healthMessage", "")),
-            "lastCheckedAt": str(
-                config.get("lastCheckedAt") or integration.updated_at.isoformat()
-            ),
+            "lastCheckedAt": str(config.get("lastCheckedAt") or integration.updated_at.isoformat()),
         },
         "createdBy": str(config.get("createdBy", "")),
         "createdAt": integration.created_at.isoformat(),
@@ -167,13 +160,9 @@ async def _connect(
         else {}
     )
     credential = (
-        str(payload.get("credential", "")).strip()
-        if payload.get("credential") is not None
-        else ""
+        str(payload.get("credential", "")).strip() if payload.get("credential") is not None else ""
     )
-    resource = await _discover_connection(
-        provider_id, config, credential or None
-    )
+    resource = await _discover_connection(provider_id, config, credential or None)
     existing = await session.scalar(
         select(Integration).where(
             Integration.organization_id == organization_id,
@@ -186,9 +175,7 @@ async def _connect(
             raise HTTPException(409, "This provider resource is already connected.")
 
     fingerprint = (
-        f"sha256:{hashlib.sha256(credential.encode()).hexdigest()[:12]}"
-        if credential
-        else None
+        f"sha256:{hashlib.sha256(credential.encode()).hexdigest()[:12]}" if credential else None
     )
     now = utcnow()
     manifest = provider.manifest
@@ -203,9 +190,7 @@ async def _connect(
             "resourceType": resource.resource_type,
             "webUrl": resource.web_url or "",
             "metadata": resource.metadata,
-            "supportedOperations": [
-                item.operation for item in manifest.capabilities
-            ],
+            "supportedOperations": [item.operation for item in manifest.capabilities],
             "providerKind": manifest.kind,
             "adapterVersion": manifest.version,
             "credentialFingerprint": fingerprint,
@@ -275,9 +260,7 @@ async def _health(
 
     provider = _provider_or_404(integration.provider)
     credential_row = await session.scalar(
-        select(IntegrationCredential).where(
-            IntegrationCredential.integration_id == integration.id
-        )
+        select(IntegrationCredential).where(IntegrationCredential.integration_id == integration.id)
     )
     credential = None
     if credential_row is not None:
@@ -296,9 +279,7 @@ async def _health(
             configuration=config,
             credential=credential,
         )
-        integration.status = (
-            "connected" if health.state == "healthy" else "degraded"
-        )
+        integration.status = "connected" if health.state == "healthy" else "degraded"
         raw_config["metadata"] = health.metadata
         raw_config["healthMessage"] = health.message
         raw_config["lastCheckedAt"] = health.checked_at.isoformat()
@@ -328,9 +309,7 @@ async def _disconnect(
     if integration is None:
         raise not_found("Integration")
     await session.execute(
-        delete(IntegrationCredential).where(
-            IntegrationCredential.integration_id == integration.id
-        )
+        delete(IntegrationCredential).where(IntegrationCredential.integration_id == integration.id)
     )
     config = _config(integration)
     config["credentialFingerprint"] = None
@@ -383,9 +362,7 @@ async def list_integrations_v2(
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
-    result = await list_integrations_v1(
-        organization_id, principal, session
-    )
+    result = await list_integrations_v1(organization_id, principal, session)
     return {
         "items": [integration_v2(item) for item in result["integrations"]],
         "total": result["count"],
@@ -415,11 +392,7 @@ async def integration_security_v2(
     organization_id: UUID,
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
 ) -> dict[str, Any]:
-    return {
-        "data": (
-            await integration_security_v1(organization_id, principal)
-        )
-    }
+    return {"data": (await integration_security_v1(organization_id, principal))}
 
 
 @v1_router.post(
@@ -433,9 +406,7 @@ async def connect_v1(
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
-    integration = await _connect(
-        session, organization_id, principal, provider, payload
-    )
+    integration = await _connect(session, organization_id, principal, provider, payload)
     return {"integration": await integration_public(session, integration)}
 
 
@@ -450,16 +421,8 @@ async def connect_v2(
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
-    integration = await _connect(
-        session, organization_id, principal, provider, payload
-    )
-    return {
-        "data": {
-            "integration": integration_v2(
-                await integration_public(session, integration)
-            )
-        }
-    }
+    integration = await _connect(session, organization_id, principal, provider, payload)
+    return {"data": {"integration": integration_v2(await integration_public(session, integration))}}
 
 
 @v1_router.post("/organizations/{organization_id}/integrations/{integration_id}/check")
@@ -469,9 +432,7 @@ async def check_v1(
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
-    integration = await _health(
-        session, organization_id, principal, integration_id
-    )
+    integration = await _health(session, organization_id, principal, integration_id)
     return {"integration": await integration_public(session, integration)}
 
 
@@ -482,16 +443,8 @@ async def check_v2(
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
-    integration = await _health(
-        session, organization_id, principal, integration_id
-    )
-    return {
-        "data": {
-            "integration": integration_v2(
-                await integration_public(session, integration)
-            )
-        }
-    }
+    integration = await _health(session, organization_id, principal, integration_id)
+    return {"data": {"integration": integration_v2(await integration_public(session, integration))}}
 
 
 @v1_router.delete("/organizations/{organization_id}/integrations/{integration_id}")
@@ -501,9 +454,7 @@ async def disconnect_v1(
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
-    integration = await _disconnect(
-        session, organization_id, principal, integration_id
-    )
+    integration = await _disconnect(session, organization_id, principal, integration_id)
     return {"integration": await integration_public(session, integration)}
 
 
@@ -514,21 +465,11 @@ async def disconnect_v2(
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
-    integration = await _disconnect(
-        session, organization_id, principal, integration_id
-    )
-    return {
-        "data": {
-            "integration": integration_v2(
-                await integration_public(session, integration)
-            )
-        }
-    }
+    integration = await _disconnect(session, organization_id, principal, integration_id)
+    return {"data": {"integration": integration_v2(await integration_public(session, integration))}}
 
 
-async def _catalog(
-    session: AsyncSession, organization_id: UUID
-) -> dict[str, Any]:
+async def _catalog(session: AsyncSession, organization_id: UUID) -> dict[str, Any]:
     integrations = list(
         (
             await session.scalars(
@@ -732,11 +673,7 @@ async def profile_v2(
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
     require_permission(principal, "capabilities.read")
-    return {
-        "data": _profile_v2(
-            await _profile(session, organization_id, agent_id)
-        )
-    }
+    return {"data": _profile_v2(await _profile(session, organization_id, agent_id))}
 
 
 async def _save_profile(
@@ -755,11 +692,7 @@ async def _save_profile(
     )
     if agent is None:
         raise not_found("Agent Identity")
-    requested = {
-        str(scope).strip()
-        for scope in payload.get("scopes", [])
-        if str(scope).strip()
-    }
+    requested = {str(scope).strip() for scope in payload.get("scopes", []) if str(scope).strip()}
     await session.execute(
         delete(CapabilityProfile).where(
             CapabilityProfile.organization_id == organization_id,
@@ -808,11 +741,7 @@ async def save_profile_v1(
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
-    return {
-        "profile": await _save_profile(
-            session, organization_id, agent_id, principal, payload
-        )
-    }
+    return {"profile": await _save_profile(session, organization_id, agent_id, principal, payload)}
 
 
 @v2_router.put("/organizations/{organization_id}/agents/{agent_id}/capabilities")
@@ -825,8 +754,6 @@ async def save_profile_v2(
 ) -> dict[str, Any]:
     return {
         "data": _profile_v2(
-            await _save_profile(
-                session, organization_id, agent_id, principal, payload
-            )
+            await _save_profile(session, organization_id, agent_id, principal, payload)
         )
     }

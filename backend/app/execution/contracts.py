@@ -151,9 +151,7 @@ class ExecutionRequest:
     input: dict[str, object]
     correlation_id: str
     idempotency_key: str
-    execution_preferences: ExecutionPreferences = field(
-        default_factory=ExecutionPreferences
-    )
+    execution_preferences: ExecutionPreferences = field(default_factory=ExecutionPreferences)
 
     def __post_init__(self) -> None:
         if not self.correlation_id.strip():

@@ -58,9 +58,7 @@ class GoogleDriveProvider(NativeProvider):
         capabilities=CAPABILITIES,
     )
 
-    async def _about(
-        self, credential: str | None
-    ) -> tuple[dict[str, object], str | None]:
+    async def _about(self, credential: str | None) -> tuple[dict[str, object], str | None]:
         if not credential:
             raise self._execution_error(
                 operation="drive.profile.read",
@@ -125,9 +123,7 @@ class GoogleDriveProvider(NativeProvider):
                     "permissionId": permission_id or None,
                 },
                 health="healthy",
-                available_capabilities=tuple(
-                    item.scope for item in self.manifest.capabilities
-                ),
+                available_capabilities=tuple(item.scope for item in self.manifest.capabilities),
                 web_url="https://drive.google.com/drive/my-drive",
                 configuration={"account": email or external_id},
             ),
@@ -190,20 +186,24 @@ class GoogleDriveProvider(NativeProvider):
                 )
                 payload = mapping(response.data)
                 rows = payload.get("files")
-                output = [
-                    {
-                        "id": text(file.get("id")),
-                        "name": text(file.get("name")),
-                        "mimeType": text(file.get("mimeType")),
-                        "modifiedTime": text(file.get("modifiedTime")),
-                        "webViewLink": text(file.get("webViewLink")),
-                        "ownedByMe": file.get("ownedByMe") is True,
-                        "starred": file.get("starred") is True,
-                    }
-                    for raw in rows
-                    if isinstance(rows, list) and isinstance(raw, dict)
-                    for file in [dict(raw)]
-                ] if isinstance(rows, list) else []
+                output = (
+                    [
+                        {
+                            "id": text(file.get("id")),
+                            "name": text(file.get("name")),
+                            "mimeType": text(file.get("mimeType")),
+                            "modifiedTime": text(file.get("modifiedTime")),
+                            "webViewLink": text(file.get("webViewLink")),
+                            "ownedByMe": file.get("ownedByMe") is True,
+                            "starred": file.get("starred") is True,
+                        }
+                        for raw in rows
+                        if isinstance(rows, list) and isinstance(raw, dict)
+                        for file in [dict(raw)]
+                    ]
+                    if isinstance(rows, list)
+                    else []
+                )
                 request_id = response.request_id
             else:
                 raise self._execution_error(

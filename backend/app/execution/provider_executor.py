@@ -56,11 +56,7 @@ class DatabaseProviderContextLoader:
             raise LookupError("Action provider does not match the connected resource.")
 
         provider = self._registry.get(integration.provider)
-        config_raw = (
-            dict(integration.config)
-            if isinstance(integration.config, dict)
-            else {}
-        )
+        config_raw = dict(integration.config) if isinstance(integration.config, dict) else {}
         configuration = {
             str(key): str(value)
             for key, value in config_raw.items()
@@ -75,13 +71,9 @@ class DatabaseProviderContextLoader:
         credential: str | None = None
         if credential_row is not None:
             try:
-                credential = decrypt_integration_secret(
-                    credential_row.ciphertext
-                )
+                credential = decrypt_integration_secret(credential_row.ciphertext)
             except IntegrationCipherError as error:
-                raise LookupError(
-                    "Integration credential is unavailable."
-                ) from error
+                raise LookupError("Integration credential is unavailable.") from error
 
         capabilities = provider.manifest.capabilities
         resource_type = (
@@ -91,18 +83,12 @@ class DatabaseProviderContextLoader:
             if capabilities
             else "resource"
         )
-        health = (
-            "healthy"
-            if integration.status == "connected"
-            else "degraded"
-        )
+        health = "healthy" if integration.status == "connected" else "degraded"
         resource = ResourceDescriptor(
             id=proposal.resource_id,
             provider=integration.provider,
             resource_type=resource_type,
-            external_id=str(
-                config_raw.get("resourceKey") or integration.id
-            ),
+            external_id=str(config_raw.get("resourceKey") or integration.id),
             display_name=integration.display_name,
             metadata=(
                 dict(config_raw.get("metadata"))
@@ -110,14 +96,8 @@ class DatabaseProviderContextLoader:
                 else {}
             ),
             health=health,
-            available_capabilities=tuple(
-                capability.scope for capability in capabilities
-            ),
-            web_url=(
-                str(config_raw.get("webUrl"))
-                if config_raw.get("webUrl")
-                else None
-            ),
+            available_capabilities=tuple(capability.scope for capability in capabilities),
+            web_url=(str(config_raw.get("webUrl")) if config_raw.get("webUrl") else None),
             configuration=configuration,
         )
         return ProviderRuntimeContext(
@@ -151,17 +131,11 @@ class UniversalProviderExecutor:
         context = await self._context_loader.load(proposal)
         provider = self._registry.get(proposal.provider)
         capability = next(
-            (
-                item
-                for item in provider.manifest.capabilities
-                if item.scope == proposal.scope
-            ),
+            (item for item in provider.manifest.capabilities if item.scope == proposal.scope),
             None,
         )
         if capability is None:
-            raise LookupError(
-                "Connected provider does not expose the requested capability."
-            )
+            raise LookupError("Connected provider does not expose the requested capability.")
 
         normalized_input = await provider.normalize_input(
             operation=capability.operation,

@@ -83,9 +83,7 @@ class SlackProvider(NativeProvider):
         capabilities=CAPABILITIES,
     )
 
-    async def _auth(
-        self, credential: str | None
-    ) -> tuple[dict[str, object], str | None]:
+    async def _auth(self, credential: str | None) -> tuple[dict[str, object], str | None]:
         if not credential:
             raise self._execution_error(
                 operation="workspace.identity.read",
@@ -157,9 +155,7 @@ class SlackProvider(NativeProvider):
                     "enterpriseId": text(payload.get("enterprise_id")) or None,
                 },
                 health="healthy",
-                available_capabilities=tuple(
-                    item.scope for item in self.manifest.capabilities
-                ),
+                available_capabilities=tuple(item.scope for item in self.manifest.capabilities),
                 web_url=web_url,
                 configuration={"teamId": team_id},
             ),
@@ -275,19 +271,23 @@ class SlackProvider(NativeProvider):
                         ),
                     )
                 rows = payload.get("channels")
-                output = [
-                    {
-                        "id": text(channel.get("id")),
-                        "name": text(channel.get("name")),
-                        "isPrivate": channel.get("is_private") is True,
-                        "isMember": channel.get("is_member") is True,
-                        "topic": text(mapping(channel.get("topic")).get("value")),
-                        "purpose": text(mapping(channel.get("purpose")).get("value")),
-                    }
-                    for raw in rows
-                    if isinstance(rows, list) and isinstance(raw, dict)
-                    for channel in [dict(raw)]
-                ] if isinstance(rows, list) else []
+                output = (
+                    [
+                        {
+                            "id": text(channel.get("id")),
+                            "name": text(channel.get("name")),
+                            "isPrivate": channel.get("is_private") is True,
+                            "isMember": channel.get("is_member") is True,
+                            "topic": text(mapping(channel.get("topic")).get("value")),
+                            "purpose": text(mapping(channel.get("purpose")).get("value")),
+                        }
+                        for raw in rows
+                        if isinstance(rows, list) and isinstance(raw, dict)
+                        for channel in [dict(raw)]
+                    ]
+                    if isinstance(rows, list)
+                    else []
+                )
                 request_id = response.request_id
             elif operation == "chat.message.create":
                 if not credential:
