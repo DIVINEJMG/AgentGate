@@ -4,15 +4,15 @@ function trimTrailingSlashes(value: string) {
 
 const configuredApiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ?? '';
 const developmentApiBase = import.meta.env.DEV ? 'http://localhost:8000' : '';
+const productionApiBase = 'https://audoryn-api-staging.onrender.com';
 
 export const platformConfig = Object.freeze({
-  apiBaseUrl: trimTrailingSlashes(configuredApiBase || developmentApiBase),
+  apiBaseUrl: trimTrailingSlashes(
+    configuredApiBase || developmentApiBase || productionApiBase,
+  ),
 });
 
 export function apiUrl(path: string) {
-  if (!platformConfig.apiBaseUrl) {
-    throw new Error('VITE_API_BASE_URL is required outside local development.');
-  }
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${platformConfig.apiBaseUrl}${normalizedPath}`;
 }
