@@ -1,8 +1,8 @@
+from collections.abc import Mapping
+from dataclasses import dataclass
 import contextvars
 import json
 import logging
-from collections.abc import Mapping
-from dataclasses import dataclass
 
 
 _CONTEXT: contextvars.ContextVar[dict[str, str] | None] = contextvars.ContextVar(
