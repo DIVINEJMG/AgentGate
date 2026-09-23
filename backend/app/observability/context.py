@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 from contextvars import ContextVar, Token
 from json import dumps
 from logging import INFO, Logger
