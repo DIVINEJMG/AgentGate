@@ -88,7 +88,7 @@ def provider_manifest(adapter: IntegrationAdapter) -> ProviderManifest:
             credential_strategy="none",
             operations=(),
         )
-    strategies = {manifest.credential_strategy for manifest in manifests}
+    strategies: set[CredentialStrategy] = {manifest.credential_strategy for manifest in manifests}
     if len(strategies) != 1:
         raise ValueError(f"{adapter.provider} manifests disagree on credential strategy.")
     return ProviderManifest(
