@@ -84,17 +84,19 @@ class DatabaseProviderContextLoader:
             else "resource"
         )
         health = "healthy" if integration.status == "connected" else "degraded"
+        raw_metadata = config_raw.get("metadata")
+        metadata: dict[str, object] = (
+            {str(key): value for key, value in raw_metadata.items()}
+            if isinstance(raw_metadata, dict)
+            else {}
+        )
         resource = ResourceDescriptor(
             id=proposal.resource_id,
             provider=integration.provider,
             resource_type=resource_type,
             external_id=str(config_raw.get("resourceKey") or integration.id),
             display_name=integration.display_name,
-            metadata=(
-                dict(config_raw.get("metadata"))
-                if isinstance(config_raw.get("metadata"), dict)
-                else {}
-            ),
+            metadata=metadata,
             health=health,
             available_capabilities=tuple(capability.scope for capability in capabilities),
             web_url=(str(config_raw.get("webUrl")) if config_raw.get("webUrl") else None),
