@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-
 AGENT_AUTHENTICATE_SCOPE = "agent.authenticate"
 AGENT_STATUSES = frozenset({"active", "suspended", "disabled"})
 
