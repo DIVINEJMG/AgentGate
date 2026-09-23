@@ -119,3 +119,19 @@ async def test_side_effect_requires_stable_idempotency() -> None:
             proposal=proposal(org_id, agent_id, idempotency_key=""),
         )
     assert executor.called is False
+
+
+def test_human_and_agent_auth_schemes_are_disjoint() -> None:
+    from fastapi import HTTPException
+
+    from app.api.auth_dependencies import agent_secret, bearer_token
+
+    assert bearer_token("Bearer human-session") == "human-session"
+    assert agent_secret("Agent agt_sk_abcdefghijklmnopqrstuvwxyz012345") == (
+        "agt_sk_abcdefghijklmnopqrstuvwxyz012345"
+    )
+
+    with pytest.raises(HTTPException):
+        bearer_token("Agent agt_sk_abcdefghijklmnopqrstuvwxyz012345")
+    with pytest.raises(HTTPException):
+        agent_secret("Bearer human-session")
