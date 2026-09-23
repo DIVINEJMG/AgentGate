@@ -49,7 +49,7 @@ class AgentCredentialReveal:
     expires_at: datetime | None
 
 
-class AgentRepository(Protocol):
+class AgentRepository(typing.Protocol):
     async def membership_role(self, user_id: UUID, organization_id: UUID) -> str | None: ...
 
     async def list_agents(self, organization_id: UUID) -> list[AgentIdentityView]: ...
