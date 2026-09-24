@@ -15,8 +15,8 @@ from app.execution.providers.base import ExecutionProvider
 class BrowserExecutionProvider(ExecutionProvider, Protocol):
     """Interface only. F30 supplies the browser engine implementation.
 
-    Browser execution is still invoked only after ActionGateway authorization; this
-    protocol intentionally contains no policy or credential bypass.
+    Browser execution remains a universal ExecutionProvider and is therefore
+    selected only after the same ActionGateway governance used by native adapters.
     """
 
     async def open_session(self, request: ExecutionRequest) -> object: ...
@@ -38,16 +38,20 @@ class BrowserExecutionProvider(ExecutionProvider, Protocol):
     async def execute(
         self,
         *,
-        session: object,
         request: ExecutionRequest,
+        configuration: dict[str, str],
+        credential: str | None,
+        session: object | None = None,
     ) -> ExecutionResult: ...
 
     async def verify(
         self,
         *,
-        session: object,
         request: ExecutionRequest,
         result: ExecutionResult,
+        configuration: dict[str, str],
+        credential: str | None,
+        session: object | None = None,
         expected_state: dict[str, object] | None = None,
     ) -> VerificationResult: ...
 
