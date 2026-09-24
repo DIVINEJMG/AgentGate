@@ -5,7 +5,6 @@ from uuid import uuid4
 
 import pytest
 
-from app.bootstrap.application import create_application
 from app.domain.actions.gateway import ActionGateway, AuthorizationDecision
 from app.domain.identity.principals import AgentPrincipal
 from app.domain.integrations.contracts import IntegrationExecutionResult
@@ -251,6 +250,8 @@ def test_f29_realtime_event_catalog_matches_contract() -> None:
 
 
 def test_f29_websocket_and_sse_routes_are_mounted() -> None:
+    from app.bootstrap.application import create_application
+
     application = create_application()
     route_paths = {
         str(route.path)  # type: ignore[attr-defined]
