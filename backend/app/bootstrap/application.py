@@ -1,16 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.router import api_router
 from app.bootstrap.lifecycle import lifespan
 from app.bootstrap.settings import settings
 from app.observability.middleware import CorrelationContextMiddleware
 
 
 def create_application() -> FastAPI:
-    # Resolve the root router lazily so application construction never captures
-    # a partially initialized or stale router during import cycles/test reloads.
-    from app.api.router import api_router
-
     application = FastAPI(
         title="Aduoryn API",
         version="26.0.0",
