@@ -77,3 +77,18 @@ class ManagedExecutionProvider(Protocol):
     """Optional lifecycle surface for providers that own external processes."""
 
     async def shutdown(self) -> None: ...
+
+
+@runtime_checkable
+class RecoverableExecutionProvider(Protocol):
+    """Optional provider-neutral recovery surface for state refresh/replanning."""
+
+    async def recover_execution(
+        self,
+        *,
+        request: ExecutionRequest,
+        error,
+        result: ExecutionResult | None,
+        configuration: dict[str, str],
+        credential: str | None,
+    ) -> str | None: ...
