@@ -26,6 +26,13 @@ from app.execution.browser.credentials import (
     BrowserAuthenticationFailure,
     BrowserCredentialBundle,
 )
+from app.execution.browser.errors import (
+    BrowserDetachedFrame,
+    BrowserDownloadFailure,
+    BrowserElementNotFound,
+    BrowserRuntimeLimitExceeded,
+    BrowserStaleObservation,
+)
 from app.execution.browser.policy import (
     BrowserDomainPolicy,
     BrowserNavigationBlocked,
@@ -34,6 +41,7 @@ from app.execution.browser.runtime import BrowserRuntime, BrowserRuntimeContract
 from app.execution.browser.verification import BrowserVerificationExpectation
 from app.execution.contracts import (
     CapabilityDescriptor,
+    ExecutionError,
     ExecutionProviderError,
     ExecutionRequest,
     ExecutionResult,
@@ -42,10 +50,46 @@ from app.execution.contracts import (
     ResourceDescriptor,
     VerificationResult,
 )
-from app.execution.providers.base import ExecutionProvider
+from app.execution.providers.base import ExecutionProvider, RecoverableExecutionProvider
 from app.execution.redaction import redact_sensitive_structure, redact_text
 
 FILE_TRANSFER_SCOPES = frozenset({"browser.file.upload", "browser.file.download"})
+
+MAX_SESSION_TTL_SECONDS = 3600
+MAX_NAVIGATION_TIMEOUT_MS = 60_000
+MAX_ACTION_TIMEOUT_MS = 30_000
+MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024
+
+
+def _bounded_int(
+    configuration: dict[str, str],
+    key: str,
+    default: int,
+    *,
+    minimum: int,
+    maximum: int,
+) -> int:
+    raw = configuration.get(key)
+    if raw in (None, ""):
+        return default
+    try:
+        parsed = int(str(raw))
+    except ValueError as error:
+        raise ValueError(f"Browser configuration {key} must be an integer.") from error
+    return max(minimum, min(parsed, maximum))
+
+
+def _playwright_crash(error: PlaywrightError) -> bool:
+    message = str(error).lower()
+    markers = (
+        "target page, context or browser has been closed",
+        "browser has been closed",
+        "browser closed",
+        "page crashed",
+        "browser crashed",
+        "connection closed",
+    )
+    return any(marker in message for marker in markers)
 
 
 def _capability(
