@@ -56,7 +56,9 @@ async def evaluate_browser_egress(
     if host in _CLOUD_METADATA_HOSTS:
         return BrowserEgressDecision(False, host, "Browser egress to cloud metadata is blocked.")
     if _ip_is_private_or_special(host):
-        return BrowserEgressDecision(False, host, "Browser egress to private/internal IP space is blocked.")
+        return BrowserEgressDecision(
+            False, host, "Browser egress to private/internal IP space is blocked."
+        )
 
     try:
         records = await asyncio.to_thread(
@@ -67,7 +69,9 @@ async def evaluate_browser_egress(
         )
     except socket.gaierror:
         # DNS failure is handled by the browser as a normal navigation/provider error.
-        return BrowserEgressDecision(True, host, "Destination DNS could not be resolved during preflight.")
+        return BrowserEgressDecision(
+            True, host, "Destination DNS could not be resolved during preflight."
+        )
 
     addresses = {str(record[4][0]) for record in records if record and record[4]}
     if any(_ip_is_private_or_special(address) for address in addresses):
