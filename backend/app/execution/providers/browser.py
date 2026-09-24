@@ -1364,9 +1364,7 @@ class PlaywrightBrowserProvider:
                 request=request,
                 code="stale_observation",
                 retryable=False,
-                safe_message=(
-                    "Browser observation is stale; re-observe and replan before acting."
-                ),
+                safe_message=("Browser observation is stale; re-observe and replan before acting."),
                 internal_details=str(error),
             ) from error
         except BrowserDetachedFrame as error:
@@ -1374,9 +1372,7 @@ class PlaywrightBrowserProvider:
                 request=request,
                 code="detached_frame",
                 retryable=False,
-                safe_message=(
-                    "Browser frame is detached or no longer matches the observation."
-                ),
+                safe_message=("Browser frame is detached or no longer matches the observation."),
                 internal_details=str(error),
             ) from error
         except BrowserElementNotFound as error:
