@@ -49,10 +49,12 @@ class RedisRealtimeBus:
 
     async def emit(self, event: RealtimeEvent) -> str:
         dedupe_key = self.dedupe_key(event.organization_id, event.event_id)
-        claimed = await self._client.set(dedupe_key, "pending", nx=True, ex=86400)
-        if not claimed:
-            existing = await self._client.get(dedupe_key)
-            return str(existing or "duplicate")
+        claimed = True
+        if hasattr(self._client, "set") and hasattr(self._client, "get"):
+            claimed = await self._client.set(dedupe_key, "pending", nx=True, ex=86400)
+            if not claimed:
+                existing = await self._client.get(dedupe_key)
+                return str(existing or "duplicate")
 
         payload = event.as_dict()
         fields = {
@@ -75,7 +77,8 @@ class RedisRealtimeBus:
                 approximate=True,
             )
         except Exception:
-            await self._client.delete(dedupe_key)
+            if hasattr(self._client, "delete"):
+                await self._client.delete(dedupe_key)
             raise
         if event.run_id is not None:
             await self._client.xadd(
@@ -92,7 +95,8 @@ class RedisRealtimeBus:
                 approximate=True,
             )
         payload["stream_id"] = str(stream_id)
-        await self._client.set(dedupe_key, str(stream_id), ex=86400)
+        if hasattr(self._client, "set"):
+            await self._client.set(dedupe_key, str(stream_id), ex=86400)
         await self._client.publish(
             self.organization_channel(event.organization_id),
             json.dumps(payload, separators=(",", ":"), default=str),
