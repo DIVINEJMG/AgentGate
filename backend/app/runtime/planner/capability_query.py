@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.execution.capability_resolver import AuthorizedCapability, CapabilityResolver
 from app.execution.authorization import ProviderPermissionSnapshot
+from app.execution.capability_resolver import AuthorizedCapability, CapabilityResolver
 from app.execution.contracts import ResourceDescriptor
 
 
