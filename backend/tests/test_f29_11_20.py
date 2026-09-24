@@ -259,5 +259,5 @@ def test_f29_websocket_and_sse_routes_are_mounted() -> None:
     }
     assert "/ws/v1/organizations/{organization_id}" in route_paths
 
-    paths = set(app.openapi()["paths"])
+    paths = set(application.openapi()["paths"])
     assert "/api/v2/organizations/{organization_id}/events/stream" in paths
