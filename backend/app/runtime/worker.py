@@ -1,8 +1,12 @@
 import asyncio
 import logging
 
+from sqlalchemy import select
+
 from app.application.services.cutover import CutoverController
 from app.bootstrap.settings import settings
+from app.infrastructure.database.models import Run
+from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.database.session import session_factory
 from app.infrastructure.database.work_queue import SQLAlchemyWorkItemQueue
 from app.infrastructure.redis.coordination import RedisCoordinator
@@ -46,9 +50,31 @@ async def work_once() -> bool:
                     ttl_seconds=settings.worker_heartbeat_ttl_seconds,
                 )
 
+                run = await session.scalar(
+                    select(Run)
+                    .where(Run.work_item_id == work_item.id)
+                    .order_by(Run.created_at.desc())
+                    .limit(1)
+                )
+                outbox = TransactionalOutbox(session)
+                if run is not None:
+                    run.status = "running"
+                    await outbox.enqueue(
+                        topic="run.started",
+                        aggregate_type="run",
+                        aggregate_id=str(run.id),
+                        payload={
+                            "organization_id": str(work_item.organization_id),
+                            "run_id": str(run.id),
+                            "job_id": str(work_item.job_id),
+                            "correlation_id": work_item.correlation_id,
+                        },
+                    )
+                    await session.commit()
+
                 executor = UnconfiguredRuntimeExecutor()
                 try:
-                    await executor.execute(work_item)
+                    result = await executor.execute(work_item)
                 except RuntimeError as exc:
                     structured_event(
                         logger,
@@ -57,10 +83,40 @@ async def work_once() -> bool:
                         fields={"reason": str(exc)},
                     )
                     await queue.checkpoint_failed(work_item.id, reason=str(exc))
+                    if run is not None:
+                        run.status = "failed"
+                        run.failure = str(exc)
+                        await outbox.enqueue(
+                            topic="run.failed",
+                            aggregate_type="run",
+                            aggregate_id=str(run.id),
+                            payload={
+                                "organization_id": str(work_item.organization_id),
+                                "run_id": str(run.id),
+                                "job_id": str(work_item.job_id),
+                                "correlation_id": work_item.correlation_id,
+                                "error": str(exc),
+                            },
+                        )
                     await session.commit()
                     return True
 
                 await queue.checkpoint_succeeded(work_item.id)
+                if run is not None:
+                    run.status = "completed"
+                    run.result_summary = result.summary
+                    await outbox.enqueue(
+                        topic="run.completed",
+                        aggregate_type="run",
+                        aggregate_id=str(run.id),
+                        payload={
+                            "organization_id": str(work_item.organization_id),
+                            "run_id": str(run.id),
+                            "job_id": str(work_item.job_id),
+                            "correlation_id": work_item.correlation_id,
+                            "summary": result.summary,
+                        },
+                    )
                 await session.commit()
                 structured_event(logger, "work_item.succeeded")
                 return True
