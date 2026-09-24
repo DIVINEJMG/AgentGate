@@ -9,6 +9,7 @@ from app.domain.integrations.contracts import IntegrationExecutionResult
 from app.execution.authorization import (
     ExecutionAuthorizationSnapshot,
     UniversalActionRequest,
+    action_fingerprint,
     build_authorization_snapshot,
 )
 
@@ -29,6 +30,7 @@ class ActionProposal:
     payload: dict[str, object]
     correlation_id: str
     idempotency_key: str
+    risk: str = "low"
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +62,16 @@ class UniversalProviderExecutorProtocol(ProviderExecutor, Protocol):
         request: UniversalActionRequest,
         snapshot: ExecutionAuthorizationSnapshot,
     ) -> IntegrationExecutionResult: ...
+
+
+_RISK_WEIGHT = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+
+
+def _effective_risk(principal_risk: str, capability_risk: str) -> str:
+    return max(
+        (principal_risk, capability_risk),
+        key=lambda value: _RISK_WEIGHT.get(value, 0),
+    )
 
 
 class ActionGateway:
@@ -101,8 +113,7 @@ class ActionGateway:
         proposal: ActionProposal,
     ) -> tuple[str, str]:
         decisions = [
-            await guard.evaluate(principal=principal, proposal=proposal)
-            for guard in self._guards
+            await guard.evaluate(principal=principal, proposal=proposal) for guard in self._guards
         ]
         if not decisions:
             return ("ALLOW", "No additional gateway guards configured.")
@@ -136,10 +147,16 @@ class ActionGateway:
         if permissions.provider != execution.resource.provider:
             raise PermissionError("Provider permission snapshot is bound to another provider.")
         if not permissions.allows(execution.capability.scope):
-            raise PermissionError("Provider credential does not permit this capability on the resource.")
+            raise PermissionError(
+                "Provider credential does not permit this capability on the resource."
+            )
         if execution.capability.requires_credential and permissions.credential.reference is None:
             raise PermissionError("Capability requires an external credential.")
 
+        effective_risk = _effective_risk(
+            principal.risk_level,
+            execution.capability.risk,
+        )
         proposal = ActionProposal(
             organization_id=execution.organization_id,
             agent_id=execution.agent_id,
@@ -150,6 +167,7 @@ class ActionGateway:
             payload=execution.input,
             correlation_id=execution.correlation_id,
             idempotency_key=execution.idempotency_key,
+            risk=effective_risk,
         )
         outcome, reason = await self._evaluate_guards(
             principal=principal,
@@ -159,10 +177,16 @@ class ActionGateway:
             raise PermissionError(reason)
         if outcome == "REQUIRE_APPROVAL" and request.approval_status != "approved":
             raise PermissionError("Human approval required before execution.")
+        if request.approval_status == "approved":
+            if not request.approval_id:
+                raise PermissionError("Approved execution requires a bound approval ID.")
+            current_fingerprint = action_fingerprint(request)
+            if request.approval_action_fingerprint != current_fingerprint:
+                raise PermissionError("Approval is not bound to this exact governed action.")
 
         snapshot = build_authorization_snapshot(
             request=request,
-            risk=principal.risk_level,
+            risk=effective_risk,
             policy_outcome=outcome,
             policy_reason=reason,
             adapter=permissions.adapter,

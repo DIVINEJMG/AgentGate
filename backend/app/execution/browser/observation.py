@@ -10,6 +10,7 @@ from playwright.async_api import Page
 
 from app.execution.browser.contracts import (
     BrowserElement,
+    BrowserForm,
     BrowserFrame,
     BrowserObservation,
 )
@@ -41,13 +42,24 @@ def _safe_value(*, element_type: str | None, name: str | None, value: object) ->
     return str(value)[:500]
 
 
+def _redact_text(value: str, sensitive_values: tuple[str, ...]) -> str:
+    redacted = value
+    for sensitive in sorted((item for item in sensitive_values if item), key=len, reverse=True):
+        redacted = redacted.replace(sensitive, "[REDACTED]")
+    return redacted
+
+
 async def observe_page(
     page: Page,
     *,
     session_id: UUID,
+    sensitive_values: tuple[str, ...] = (),
 ) -> BrowserObservation:
-    title = await page.title()
-    visible_text = (await page.locator("body").inner_text(timeout=5_000))[:MAX_VISIBLE_TEXT]
+    title = _redact_text(await page.title(), sensitive_values)
+    visible_text = _redact_text(
+        (await page.locator("body").inner_text(timeout=5_000))[:MAX_VISIBLE_TEXT],
+        sensitive_values,
+    )
 
     raw_elements = await page.locator(
         "a,button,input,textarea,select,[role],[contenteditable='true']"
@@ -90,7 +102,7 @@ async def observe_page(
         }).filter(Boolean)"""
     )
 
-    sensitive_values: list[str] = []
+    discovered_sensitive_values: list[str] = []
     elements: list[BrowserElement] = []
     for position, item in enumerate(raw_elements[:MAX_ELEMENTS], start=1):
         if not isinstance(item, dict):
@@ -102,24 +114,34 @@ async def observe_page(
             (element_type or "").lower() in _SENSITIVE_INPUT_TYPES
             or (name is not None and _SECRET_NAME.search(name))
         ):
-            sensitive_values.append(str(raw_value))
+            discovered_sensitive_values.append(str(raw_value))
         elements.append(
             BrowserElement(
                 ref=f"e{int(item.get('index', position - 1)) + 1}",
                 tag=str(item.get("tag") or ""),
                 role=str(item["role"]) if item.get("role") is not None else None,
-                name=name,
-                text=str(item.get("text") or ""),
+                name=_redact_text(name, sensitive_values) if name is not None else None,
+                text=_redact_text(str(item.get("text") or ""), sensitive_values),
                 element_type=element_type,
-                value=_safe_value(
-                    element_type=element_type,
-                    name=name,
-                    value=item.get("value"),
-                ),
+                value=_redact_text(
+                    _safe_value(
+                        element_type=element_type,
+                        name=name,
+                        value=item.get("value"),
+                    )
+                    or "",
+                    sensitive_values,
+                )
+                if item.get("value") is not None
+                else None,
                 checked=item.get("checked") if isinstance(item.get("checked"), bool) else None,
                 selected=item.get("selected") if isinstance(item.get("selected"), bool) else None,
                 disabled=item.get("disabled") is True,
-                href=str(item["href"]) if item.get("href") is not None else None,
+                href=(
+                    _redact_text(str(item["href"]), sensitive_values)
+                    if item.get("href") is not None
+                    else None
+                ),
             )
         )
 
@@ -128,8 +150,10 @@ async def observe_page(
         aria_snapshot = (await body.aria_snapshot(timeout=5_000))[:MAX_ARIA_SNAPSHOT]
     except PlaywrightError:
         aria_snapshot = ""
-    for sensitive_value in sensitive_values:
-        aria_snapshot = aria_snapshot.replace(sensitive_value, "[REDACTED]")
+    all_sensitive_values = tuple(
+        dict.fromkeys((*sensitive_values, *tuple(discovered_sensitive_values)))
+    )
+    aria_snapshot = _redact_text(aria_snapshot, all_sensitive_values)
 
     dom_snapshot = await page.locator("body").evaluate(
         """(body) => {
@@ -149,10 +173,54 @@ async def observe_page(
         }"""
     )
 
+    dom_snapshot = _redact_text(str(dom_snapshot), all_sensitive_values)
+
+    raw_forms = await page.locator("form").evaluate_all(
+        """(forms) => {
+          const interactive = Array.from(
+            document.querySelectorAll("a,button,input,textarea,select,[role],[contenteditable='true']")
+          );
+          return forms.slice(0, 100).map((form, index) => {
+            const fields = Array.from(
+              form.querySelectorAll("input,textarea,select,[contenteditable='true']")
+            );
+            const submits = Array.from(
+              form.querySelectorAll("button[type='submit'],input[type='submit'],button:not([type])")
+            );
+            const refs = (nodes) => nodes
+              .map((node) => interactive.indexOf(node))
+              .filter((position) => position >= 0)
+              .map((position) => "e" + String(position + 1));
+            return {
+              ref: "f" + String(index + 1),
+              action: form.action || null,
+              method: (form.method || 'get').toLowerCase(),
+              fieldRefs: refs(fields),
+              submitRefs: refs(submits)
+            };
+          });
+        }"""
+    )
+    form_details = tuple(
+        BrowserForm(
+            ref=str(item.get("ref") or ""),
+            action=(
+                _redact_text(str(item["action"]), all_sensitive_values)
+                if item.get("action") is not None
+                else None
+            ),
+            method=str(item.get("method") or "get"),
+            field_refs=tuple(str(ref) for ref in item.get("fieldRefs", [])),
+            submit_refs=tuple(str(ref) for ref in item.get("submitRefs", [])),
+        )
+        for item in raw_forms
+        if isinstance(item, dict)
+    )
+
     frames = tuple(
         BrowserFrame(
             name=frame.name or None,
-            url=frame.url,
+            url=_redact_text(frame.url, all_sensitive_values),
             origin=_origin(frame.url),
             is_main=frame == page.main_frame,
         )
@@ -170,13 +238,14 @@ async def observe_page(
     return BrowserObservation(
         id=f"obs_{uuid4().hex}",
         session_id=session_id,
-        url=page.url,
+        url=_redact_text(page.url, all_sensitive_values),
         title=title[:1_000],
         visible_text=visible_text,
         aria_snapshot=aria_snapshot,
-        dom_snapshot=str(dom_snapshot)[:MAX_DOM_SNAPSHOT],
+        dom_snapshot=dom_snapshot[:MAX_DOM_SNAPSHOT],
         elements=tuple(elements),
         forms=forms,
+        form_details=form_details,
         links=links,
         buttons=buttons,
         inputs=inputs,

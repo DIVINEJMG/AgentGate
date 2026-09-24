@@ -89,6 +89,24 @@ class BrowserElement:
 
 
 @dataclass(frozen=True, slots=True)
+class BrowserForm:
+    ref: str
+    action: str | None
+    method: str
+    field_refs: tuple[str, ...]
+    submit_refs: tuple[str, ...]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "ref": self.ref,
+            "action": self.action,
+            "method": self.method,
+            "fieldRefs": list(self.field_refs),
+            "submitRefs": list(self.submit_refs),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class BrowserFrame:
     name: str | None
     url: str
@@ -110,6 +128,7 @@ class BrowserObservation:
     dom_snapshot: str
     elements: tuple[BrowserElement, ...]
     forms: tuple[str, ...] = ()
+    form_details: tuple[BrowserForm, ...] = ()
     links: tuple[str, ...] = ()
     buttons: tuple[str, ...] = ()
     inputs: tuple[str, ...] = ()
@@ -128,6 +147,7 @@ class BrowserObservation:
             "domSnapshot": self.dom_snapshot,
             "elements": [item.as_dict() for item in self.elements],
             "forms": list(self.forms),
+            "formDetails": [item.as_dict() for item in self.form_details],
             "links": list(self.links),
             "buttons": list(self.buttons),
             "inputs": list(self.inputs),

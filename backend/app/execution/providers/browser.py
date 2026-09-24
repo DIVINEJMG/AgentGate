@@ -15,6 +15,14 @@ from app.execution.browser.contracts import (
     BrowserObservation,
     BrowserSession,
 )
+from app.execution.browser.credentials import (
+    BrowserAuthenticationFailure,
+    BrowserCredentialBundle,
+)
+from app.execution.browser.policy import (
+    BrowserDomainPolicy,
+    BrowserNavigationBlocked,
+)
 from app.execution.browser.runtime import BrowserRuntime, BrowserRuntimeContract
 from app.execution.contracts import (
     CapabilityDescriptor,
@@ -28,6 +36,8 @@ from app.execution.contracts import (
 )
 from app.execution.providers.base import ExecutionProvider
 
+FILE_TRANSFER_SCOPES = frozenset({"browser.file.upload", "browser.file.download"})
+
 
 def _capability(
     *,
@@ -40,20 +50,27 @@ def _capability(
     description: str,
     requires_locator: bool = False,
     requires_value: bool = False,
+    requires_credential: bool = False,
+    properties: dict[str, object] | None = None,
+    required: tuple[str, ...] = (),
+    target: str = "page",
 ) -> CapabilityDescriptor:
-    properties: dict[str, object] = {
+    input_properties: dict[str, object] = {
         "sessionId": {"type": "string", "format": "uuid"},
     }
-    required: list[str] = ["sessionId"]
+    input_required: list[str] = ["sessionId"]
     if operation == "navigation.open":
-        properties["url"] = {"type": "string", "format": "uri"}
-        required = ["url"]
+        input_properties["url"] = {"type": "string", "format": "uri"}
+        input_required = ["url"]
     if requires_locator:
-        properties["locator"] = {"type": "object"}
-        required.append("locator")
+        input_properties["locator"] = {"type": "object"}
+        input_required.append("locator")
     if requires_value:
-        properties["value"] = {}
-        required.append("value")
+        input_properties["value"] = {}
+        input_required.append("value")
+    if properties:
+        input_properties.update(properties)
+    input_required.extend(item for item in required if item not in input_required)
     return CapabilityDescriptor(
         scope=scope,
         provider="browser",
@@ -61,18 +78,24 @@ def _capability(
         operation=operation,
         mode=mode,  # type: ignore[arg-type]
         risk=risk,  # type: ignore[arg-type]
-        requires_credential=False,
+        requires_credential=requires_credential,
         side_effect=side_effect,
         approval_recommendation=approval,  # type: ignore[arg-type]
         input_schema={
             "type": "object",
-            "properties": properties,
-            "required": required,
+            "properties": input_properties,
+            "required": input_required,
             "additionalProperties": False,
         },
-        output_schema={"type": "object"},
+        output_schema={
+            "type": "object",
+            "properties": {
+                "session": {"type": "object"},
+                "observation": {"type": "object"},
+            },
+        },
         description=description,
-        target="page",
+        target=target,
     )
 
 
@@ -93,7 +116,7 @@ CAPABILITIES = (
         risk="low",
         side_effect=False,
         approval="none",
-        description="Open a URL in an isolated governed browser session.",
+        description="Open an authorized URL in an isolated governed browser session.",
     ),
     _capability(
         scope="browser.navigation.back",
@@ -102,7 +125,7 @@ CAPABILITIES = (
         risk="low",
         side_effect=False,
         approval="none",
-        description="Navigate backward in the governed browser session.",
+        description="Navigate backward within the governed browser session.",
     ),
     _capability(
         scope="browser.navigation.forward",
@@ -111,7 +134,7 @@ CAPABILITIES = (
         risk="low",
         side_effect=False,
         approval="none",
-        description="Navigate forward in the governed browser session.",
+        description="Navigate forward within the governed browser session.",
     ),
     _capability(
         scope="browser.navigation.reload",
@@ -129,7 +152,7 @@ CAPABILITIES = (
         risk="low",
         side_effect=False,
         approval="none",
-        description="Follow a link selected by a normalized browser locator.",
+        description="Follow an authorized link selected by a normalized browser locator.",
         requires_locator=True,
     ),
     _capability(
@@ -139,7 +162,7 @@ CAPABILITIES = (
         risk="medium",
         side_effect=True,
         approval="recommended",
-        description="Click an element selected by a normalized browser locator.",
+        description="Click a non-submit element selected by a normalized browser locator.",
         requires_locator=True,
     ),
     _capability(
@@ -147,9 +170,9 @@ CAPABILITIES = (
         operation="element.type",
         mode="write",
         risk="medium",
-        side_effect=True,
-        approval="recommended",
-        description="Type into an editable element.",
+        side_effect=False,
+        approval="none",
+        description="Edit a single non-secret browser field without submitting its form.",
         requires_locator=True,
         requires_value=True,
     ),
@@ -158,9 +181,9 @@ CAPABILITIES = (
         operation="element.clear",
         mode="write",
         risk="medium",
-        side_effect=True,
-        approval="recommended",
-        description="Clear an editable element.",
+        side_effect=False,
+        approval="none",
+        description="Clear a single editable browser field without submitting its form.",
         requires_locator=True,
     ),
     _capability(
@@ -168,9 +191,9 @@ CAPABILITIES = (
         operation="element.select",
         mode="write",
         risk="medium",
-        side_effect=True,
-        approval="recommended",
-        description="Select an option in a select element.",
+        side_effect=False,
+        approval="none",
+        description="Select an option without submitting its form.",
         requires_locator=True,
         requires_value=True,
     ),
@@ -179,9 +202,9 @@ CAPABILITIES = (
         operation="element.check",
         mode="write",
         risk="medium",
-        side_effect=True,
-        approval="recommended",
-        description="Check a checkbox or radio element.",
+        side_effect=False,
+        approval="none",
+        description="Check a checkbox or radio field without submitting its form.",
         requires_locator=True,
     ),
     _capability(
@@ -189,9 +212,9 @@ CAPABILITIES = (
         operation="element.uncheck",
         mode="write",
         risk="medium",
-        side_effect=True,
-        approval="recommended",
-        description="Uncheck a checkbox element.",
+        side_effect=False,
+        approval="none",
+        description="Uncheck a checkbox without submitting its form.",
         requires_locator=True,
     ),
     _capability(
@@ -201,7 +224,7 @@ CAPABILITIES = (
         risk="medium",
         side_effect=True,
         approval="recommended",
-        description="Press a keyboard key while an element is targeted.",
+        description="Press a key outside form-submission shortcuts.",
         requires_locator=True,
         requires_value=True,
     ),
@@ -224,6 +247,101 @@ CAPABILITIES = (
         approval="none",
         description="Hover over a selected element.",
         requires_locator=True,
+    ),
+    _capability(
+        scope="browser.form.fill",
+        operation="form.fill",
+        mode="write",
+        risk="medium",
+        side_effect=False,
+        approval="none",
+        description="Fill structured form fields without submitting the form.",
+        properties={
+            "fields": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                    "type": "object",
+                    "properties": {"locator": {"type": "object"}, "value": {}},
+                    "required": ["locator", "value"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+        required=("fields",),
+        target="form",
+    ),
+    _capability(
+        scope="browser.form.submit",
+        operation="form.submit",
+        mode="action",
+        risk="high",
+        side_effect=True,
+        approval="recommended",
+        description="Submit a governed form after higher-risk policy evaluation.",
+        properties={
+            "formRef": {"type": "string"},
+            "submitLocator": {"type": "object"},
+        },
+        target="form",
+    ),
+    _capability(
+        scope="browser.auth.login",
+        operation="auth.login",
+        mode="action",
+        risk="medium",
+        side_effect=True,
+        approval="recommended",
+        description="Inject vaulted credentials into an authorized login form at runtime.",
+        requires_credential=True,
+        properties={
+            "bindings": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "locator": {"type": "object"},
+                        "credentialKey": {"type": "string"},
+                    },
+                    "required": ["locator", "credentialKey"],
+                    "additionalProperties": False,
+                },
+            },
+            "formRef": {"type": "string"},
+            "submitLocator": {"type": "object"},
+            "failureText": {"type": "string"},
+            "successUrlContains": {"type": "string"},
+        },
+        required=("bindings",),
+        target="authentication",
+    ),
+    _capability(
+        scope="browser.file.upload",
+        operation="file.upload",
+        mode="write",
+        risk="high",
+        side_effect=True,
+        approval="required",
+        description="Upload an authorized Aduoryn artifact through the governed browser boundary.",
+        properties={
+            "artifactId": {"type": "string", "format": "uuid"},
+            "locator": {"type": "object"},
+        },
+        required=("artifactId", "locator"),
+        target="file",
+    ),
+    _capability(
+        scope="browser.file.download",
+        operation="file.download",
+        mode="action",
+        risk="medium",
+        side_effect=True,
+        approval="recommended",
+        description="Download through the governed browser artifact boundary.",
+        properties={"locator": {"type": "object"}},
+        required=("locator",),
+        target="file",
     ),
 )
 
@@ -264,12 +382,23 @@ class PlaywrightBrowserProvider:
         display_name="Governed Browser",
         kind="browser",
         version="1.0.0",
-        credential_strategy="none",
+        credential_strategy="secret_reference",
         capabilities=CAPABILITIES,
     )
 
     def __init__(self, runtime: BrowserRuntimeContract | None = None) -> None:
         self._runtime = runtime or BrowserRuntime()
+
+    @staticmethod
+    def _domain_policy(
+        configuration: dict[str, str],
+        *,
+        fallback_url: str | None = None,
+    ) -> BrowserDomainPolicy:
+        return BrowserDomainPolicy.from_configuration(
+            configuration,
+            fallback_url=fallback_url,
+        )
 
     async def discover_resources(
         self,
@@ -278,20 +407,46 @@ class PlaywrightBrowserProvider:
         credential: str | None,
     ) -> tuple[ResourceDescriptor, ...]:
         del credential
-        external_id = configuration.get("resourceKey", "governed-web").strip() or "governed-web"
-        display_name = configuration.get("displayName", "Governed Web").strip() or "Governed Web"
         start_url = configuration.get("startUrl")
+        policy = self._domain_policy(configuration, fallback_url=start_url)
+        primary_origin = policy.primary_origin
+        if primary_origin is None:
+            raise ValueError(
+                "Browser resource requires startUrl or an explicit allowedOrigins policy."
+            )
+
+        external_id = f"origin:{primary_origin}"
+        display_name = (
+            configuration.get("displayName", "").strip()
+            or configuration.get("resourceKey", "").strip()
+            or primary_origin
+        )
+        file_transfer_enabled = (
+            configuration.get("enableFileTransfer", "false").strip().lower() == "true"
+        )
+        available = tuple(
+            item.scope
+            for item in self.manifest.capabilities
+            if file_transfer_enabled or item.scope not in FILE_TRANSFER_SCOPES
+        )
         return (
             ResourceDescriptor(
                 id=f"browser:{external_id}",
                 provider="browser",
-                resource_type="web",
+                resource_type="origin",
                 external_id=external_id,
                 display_name=display_name,
-                metadata={"startUrl": start_url} if start_url else {},
+                metadata={
+                    "origin": primary_origin,
+                    "allowedOrigins": list(policy.allowed_origins),
+                    "deniedOrigins": list(policy.denied_origins),
+                    "allowedPaths": list(policy.allowed_path_prefixes),
+                    "deniedPaths": list(policy.denied_path_prefixes),
+                    "fileTransferEnabled": file_transfer_enabled,
+                },
                 health="healthy",
-                available_capabilities=tuple(item.scope for item in self.manifest.capabilities),
-                web_url=start_url,
+                available_capabilities=available,
+                web_url=start_url or primary_origin,
                 configuration=dict(configuration),
             ),
         )
@@ -303,7 +458,10 @@ class PlaywrightBrowserProvider:
     ) -> tuple[CapabilityDescriptor, ...]:
         if resource is not None and resource.provider != self.manifest.provider:
             return ()
-        return self.manifest.capabilities
+        if resource is None:
+            return self.manifest.capabilities
+        allowed = set(resource.available_capabilities)
+        return tuple(item for item in self.manifest.capabilities if item.scope in allowed)
 
     async def check_health(
         self,
@@ -311,17 +469,34 @@ class PlaywrightBrowserProvider:
         configuration: dict[str, str],
         credential: str | None,
     ) -> ProviderHealth:
-        del configuration, credential
-        healthy = await self._runtime.health()
+        del credential
+        try:
+            policy = self._domain_policy(
+                configuration,
+                fallback_url=configuration.get("startUrl"),
+            )
+        except ValueError as error:
+            return ProviderHealth(
+                state="unavailable",
+                message=str(error),
+                checked_at=datetime.now(UTC),
+                metadata={"engine": "chromium", "policyConfigured": False},
+            )
+        healthy = bool(policy.allowed_origins) and await self._runtime.health()
         return ProviderHealth(
             state="healthy" if healthy else "unavailable",
             message=(
-                "Chromium browser runtime is available."
+                "Chromium browser runtime and destination policy are available."
                 if healthy
-                else "Chromium browser runtime is unavailable."
+                else "Chromium browser runtime or destination policy is unavailable."
             ),
             checked_at=datetime.now(UTC),
-            metadata={"engine": "chromium", "headless": True},
+            metadata={
+                "engine": "chromium",
+                "headless": True,
+                "policyConfigured": bool(policy.allowed_origins),
+                "allowedOrigins": list(policy.allowed_origins),
+            },
         )
 
     async def discover_permissions(
@@ -332,7 +507,7 @@ class PlaywrightBrowserProvider:
         credential: str | None,
         credential_reference: str | None,
     ) -> ProviderPermissionSnapshot:
-        del credential, credential_reference
+        del credential
         if resource.provider != self.manifest.provider:
             raise ValueError("Permission discovery resource belongs to another provider.")
         declared = set(resource.available_capabilities)
@@ -340,6 +515,16 @@ class PlaywrightBrowserProvider:
         configured = {item.strip() for item in configured_raw.split(",") if item.strip()}
         if configured:
             declared &= configured
+        if credential_reference is None:
+            declared -= {
+                item.scope for item in self.manifest.capabilities if item.requires_credential
+            }
+            credential_handle = CredentialReference(strategy="none", reference=None)
+        else:
+            credential_handle = CredentialReference(
+                strategy="secret_reference",
+                reference=credential_reference,
+            )
         allowed = tuple(
             sorted(item.scope for item in self.manifest.capabilities if item.scope in declared)
         )
@@ -347,11 +532,16 @@ class PlaywrightBrowserProvider:
             provider=self.manifest.provider,
             resource_id=resource.id,
             capability_scopes=allowed,
-            credential=CredentialReference(strategy="none", reference=None),
+            credential=credential_handle,
             checked_at=datetime.now(UTC),
             adapter=self.manifest.kind,
             adapter_version=self.manifest.version,
-            metadata={"configured_scope_filter": bool(configured), "engine": "chromium"},
+            metadata={
+                "configured_scope_filter": bool(configured),
+                "engine": "chromium",
+                "origin": resource.metadata.get("origin"),
+                "credentialConfigured": credential_reference is not None,
+            },
         )
 
     def _error(
@@ -384,9 +574,48 @@ class PlaywrightBrowserProvider:
             raise ValueError("Browser sessionId must be a UUID.") from error
 
     @staticmethod
-    def _locator(payload: dict[str, object]) -> BrowserLocator | None:
-        value = payload.get("locator")
-        return BrowserLocator.from_mapping(value) if value is not None else None
+    def _locator_from(value: object) -> BrowserLocator:
+        return BrowserLocator.from_mapping(value)
+
+    @classmethod
+    def _locator(cls, payload: dict[str, object], key: str = "locator") -> BrowserLocator | None:
+        value = payload.get(key)
+        return cls._locator_from(value) if value is not None else None
+
+    @classmethod
+    def _form_fields(
+        cls,
+        payload: dict[str, object],
+    ) -> tuple[tuple[BrowserLocator, object], ...]:
+        raw = payload.get("fields")
+        if not isinstance(raw, list) or not raw:
+            raise ValueError("Browser form fields must be a non-empty array.")
+        fields: list[tuple[BrowserLocator, object]] = []
+        for item in raw:
+            if not isinstance(item, dict) or set(item) - {"locator", "value"}:
+                raise ValueError("Browser form field is invalid.")
+            if "locator" not in item or "value" not in item:
+                raise ValueError("Browser form field requires locator and value.")
+            fields.append((cls._locator_from(item["locator"]), item["value"]))
+        return tuple(fields)
+
+    @classmethod
+    def _credential_bindings(
+        cls,
+        payload: dict[str, object],
+    ) -> tuple[tuple[BrowserLocator, str], ...]:
+        raw = payload.get("bindings")
+        if not isinstance(raw, list) or not raw:
+            raise ValueError("Browser credential bindings must be a non-empty array.")
+        bindings: list[tuple[BrowserLocator, str]] = []
+        for item in raw:
+            if not isinstance(item, dict) or set(item) - {"locator", "credentialKey"}:
+                raise ValueError("Browser credential binding is invalid.")
+            key = str(item.get("credentialKey", "")).strip()
+            if "locator" not in item or not key:
+                raise ValueError("Browser credential binding requires locator and credentialKey.")
+            bindings.append((cls._locator_from(item["locator"]), key))
+        return tuple(bindings)
 
     async def normalize_input(
         self,
@@ -410,6 +639,18 @@ class PlaywrightBrowserProvider:
             "element.press_key": {"sessionId", "locator", "value"},
             "page.scroll": {"sessionId", "value"},
             "element.hover": {"sessionId", "locator"},
+            "form.fill": {"sessionId", "fields"},
+            "form.submit": {"sessionId", "formRef", "submitLocator"},
+            "auth.login": {
+                "sessionId",
+                "bindings",
+                "formRef",
+                "submitLocator",
+                "failureText",
+                "successUrlContains",
+            },
+            "file.upload": {"sessionId", "artifactId", "locator"},
+            "file.download": {"sessionId", "locator"},
         }
         supported = allowed.get(operation)
         if supported is None:
@@ -442,6 +683,8 @@ class PlaywrightBrowserProvider:
             "element.uncheck",
             "element.press_key",
             "element.hover",
+            "file.upload",
+            "file.download",
         }
         if needs_locator:
             locator = self._locator(normalized)
@@ -457,13 +700,62 @@ class PlaywrightBrowserProvider:
         }
         if needs_value and "value" not in normalized:
             raise ValueError("Browser value is required for this operation.")
+
+        if operation == "form.fill":
+            fields = self._form_fields(normalized)
+            normalized["fields"] = [
+                {"locator": locator.as_dict(), "value": value} for locator, value in fields
+            ]
+        elif operation == "form.submit":
+            form_ref = str(normalized.get("formRef", "")).strip()
+            locator = self._locator(normalized, "submitLocator")
+            if not form_ref and locator is None:
+                raise ValueError("Form submission requires formRef or submitLocator.")
+            if form_ref:
+                normalized["formRef"] = form_ref
+            if locator is not None:
+                normalized["submitLocator"] = locator.as_dict()
+        elif operation == "auth.login":
+            bindings = self._credential_bindings(normalized)
+            normalized["bindings"] = [
+                {"locator": locator.as_dict(), "credentialKey": key} for locator, key in bindings
+            ]
+            form_ref = str(normalized.get("formRef", "")).strip()
+            submit = self._locator(normalized, "submitLocator")
+            if not form_ref and submit is None:
+                raise ValueError("Browser authentication requires formRef or submitLocator.")
+            if form_ref:
+                normalized["formRef"] = form_ref
+            if submit is not None:
+                normalized["submitLocator"] = submit.as_dict()
+        elif operation == "file.upload":
+            try:
+                UUID(str(normalized.get("artifactId", "")))
+            except ValueError as error:
+                raise ValueError("Browser upload artifactId must be a UUID.") from error
+
         return normalized
 
     async def open_session(self, request: ExecutionRequest) -> BrowserSession:
+        fallback_url = request.resource.web_url
+        if fallback_url is None and request.resource.external_id.startswith("origin:"):
+            fallback_url = request.resource.external_id.removeprefix("origin:")
+        policy = self._domain_policy(
+            request.resource.configuration,
+            fallback_url=fallback_url,
+        )
+        if not policy.allowed_origins:
+            raise BrowserNavigationBlocked(
+                policy.permits(
+                    str(request.input.get("url") or ""),
+                    source_url=None,
+                )
+            )
         return await self._runtime.create_session(
             organization_id=request.organization_id,
             worker_id=request.worker_id,
             run_id=request.run_id,
+            navigation_policy=policy,
         )
 
     async def close_session(self, session: BrowserSession) -> BrowserSession:
@@ -483,7 +775,8 @@ class PlaywrightBrowserProvider:
             organization_id=request.organization_id,
             worker_id=request.worker_id,
         )
-        return self.manifest.capabilities
+        allowed = set(request.resource.available_capabilities)
+        return tuple(item for item in self.manifest.capabilities if item.scope in allowed)
 
     async def observe(
         self,
@@ -504,11 +797,21 @@ class PlaywrightBrowserProvider:
         configuration: dict[str, str],
         credential: str | None,
     ) -> ExecutionResult:
-        del credential
         started_at = datetime.now(UTC)
         session_id: UUID | None = None
         session_owned = False
         try:
+            if request.operation in {"file.upload", "file.download"}:
+                raise self._error(
+                    request=request,
+                    code="unsupported_operation",
+                    retryable=False,
+                    safe_message=(
+                        "Browser file transfer is catalogued but remains disabled until "
+                        "the governed artifact boundary is enabled."
+                    ),
+                )
+
             session_id = self._session_id(request.input)
             if session_id is None:
                 if request.operation != "navigation.open":
@@ -541,6 +844,49 @@ class PlaywrightBrowserProvider:
                     locator=self._locator(request.input),
                     timeout_ms=int(configuration.get("navigationTimeoutMs", "30000")),
                 )
+            elif request.operation == "form.fill":
+                observation = await self._runtime.fill_form(
+                    session_id,
+                    organization_id=request.organization_id,
+                    worker_id=request.worker_id,
+                    fields=self._form_fields(request.input),
+                    timeout_ms=timeout_ms,
+                )
+            elif request.operation == "form.submit":
+                observation = await self._runtime.submit_form(
+                    session_id,
+                    organization_id=request.organization_id,
+                    worker_id=request.worker_id,
+                    form_ref=(
+                        str(request.input["formRef"]) if request.input.get("formRef") else None
+                    ),
+                    submit_locator=self._locator(request.input, "submitLocator"),
+                    timeout_ms=timeout_ms,
+                )
+            elif request.operation == "auth.login":
+                credentials = BrowserCredentialBundle.from_secret(credential)
+                observation = await self._runtime.authenticate(
+                    session_id,
+                    organization_id=request.organization_id,
+                    worker_id=request.worker_id,
+                    bindings=self._credential_bindings(request.input),
+                    credentials=credentials,
+                    form_ref=(
+                        str(request.input["formRef"]) if request.input.get("formRef") else None
+                    ),
+                    submit_locator=self._locator(request.input, "submitLocator"),
+                    failure_text=(
+                        str(request.input["failureText"])
+                        if request.input.get("failureText")
+                        else None
+                    ),
+                    success_url_contains=(
+                        str(request.input["successUrlContains"])
+                        if request.input.get("successUrlContains")
+                        else None
+                    ),
+                    timeout_ms=timeout_ms,
+                )
             else:
                 observation = await self._runtime.interact(
                     session_id,
@@ -572,6 +918,23 @@ class PlaywrightBrowserProvider:
         except asyncio.CancelledError:
             if session_owned and session_id is not None:
                 await self._terminate_quietly(session_id)
+            raise
+        except BrowserNavigationBlocked as error:
+            raise self._error(
+                request=request,
+                code="policy_blocked",
+                retryable=False,
+                safe_message="Browser navigation was blocked by destination policy.",
+                internal_details=str(error),
+            ) from error
+        except BrowserAuthenticationFailure as error:
+            raise self._error(
+                request=request,
+                code="authentication_error",
+                retryable=False,
+                safe_message=str(error),
+            ) from error
+        except ExecutionProviderError:
             raise
         except PermissionError as error:
             if session_owned and session_id is not None:
@@ -674,6 +1037,7 @@ class PlaywrightBrowserProvider:
                 "operation": request.operation,
                 "sessionId": session.get("id") if isinstance(session, dict) else None,
                 "url": observation.get("url") if isinstance(observation, dict) else None,
+                "resourceOrigin": request.resource.metadata.get("origin"),
             },
         )
 
