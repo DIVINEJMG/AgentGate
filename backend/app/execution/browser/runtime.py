@@ -81,6 +81,8 @@ class BrowserRuntimeContract(Protocol):
 
     async def terminate(self, session_id: UUID) -> BrowserSession: ...
 
+    async def fail(self, session_id: UUID) -> BrowserSession: ...
+
     async def observe(
         self,
         session_id: UUID,
@@ -584,6 +586,22 @@ class BrowserRuntime:
 
     async def terminate(self, session_id: UUID) -> BrowserSession:
         return await self._finish(session_id, "terminated")
+
+    async def fail(self, session_id: UUID) -> BrowserSession:
+        handle = self._sessions.get(session_id)
+        if handle is None:
+            raise LookupError("Browser session does not exist.")
+        try:
+            await handle.context.close()
+        finally:
+            handle.session = replace(
+                handle.session,
+                status="failed",
+                current_url=handle.page.url,
+                current_origin=origin_for_url(handle.page.url),
+            )
+            handle.sensitive_values.clear()
+        return handle.session
 
     async def shutdown(self) -> None:
         for session_id in tuple(self._sessions):
