@@ -50,7 +50,7 @@ from app.execution.contracts import (
     ResourceDescriptor,
     VerificationResult,
 )
-from app.execution.providers.base import ExecutionProvider, RecoverableExecutionProvider
+from app.execution.providers.base import ExecutionProvider
 from app.execution.redaction import redact_sensitive_structure, redact_text
 
 FILE_TRANSFER_SCOPES = frozenset({"browser.file.upload", "browser.file.download"})
@@ -1301,24 +1301,73 @@ class PlaywrightBrowserProvider:
                 safe_message="Browser session access was denied.",
                 internal_details=str(error),
             ) from error
-        except (PlaywrightTimeoutError, TimeoutError) as error:
+        except BrowserStaleObservation as error:
+            raise self._error(
+                request=request,
+                code="stale_observation",
+                retryable=False,
+                safe_message=(
+                    "Browser observation is stale; re-observe and replan before acting."
+                ),
+                internal_details=str(error),
+            ) from error
+        except BrowserDetachedFrame as error:
+            raise self._error(
+                request=request,
+                code="detached_frame",
+                retryable=False,
+                safe_message=(
+                    "Browser frame is detached or no longer matches the observation."
+                ),
+                internal_details=str(error),
+            ) from error
+        except BrowserElementNotFound as error:
+            raise self._error(
+                request=request,
+                code="element_not_found",
+                retryable=False,
+                safe_message="Browser target element was not found.",
+                internal_details=str(error),
+            ) from error
+        except BrowserDownloadFailure as error:
+            raise self._error(
+                request=request,
+                code="download_failure",
+                retryable=not request.capability.side_effect,
+                safe_message="Browser download failed before governed artifact persistence.",
+                internal_details=str(error),
+            ) from error
+        except BrowserRuntimeLimitExceeded as error:
             if session_owned and session_id is not None:
                 await self._terminate_quietly(session_id)
             raise self._error(
                 request=request,
-                code="timeout",
-                retryable=not request.capability.side_effect,
-                safe_message="Browser operation timed out.",
+                code="runtime_limit_exceeded",
+                retryable=False,
+                safe_message=str(error),
+                internal_details=str(error),
+            ) from error
+        except (PlaywrightTimeoutError, TimeoutError) as error:
+            if session_owned and session_id is not None and request.capability.side_effect:
+                await self._terminate_quietly(session_id)
+            navigation_timeout = request.operation.startswith("navigation.")
+            raise self._error(
+                request=request,
+                code="navigation_timeout" if navigation_timeout else "timeout",
+                retryable=(navigation_timeout and not request.capability.side_effect),
+                safe_message=(
+                    "Browser navigation timed out."
+                    if navigation_timeout
+                    else "Browser operation timed out."
+                ),
                 internal_details=str(error),
             ) from error
         except LookupError as error:
-            if session_owned and session_id is not None:
-                await self._terminate_quietly(session_id)
             raise self._error(
                 request=request,
                 code="resource_not_found",
                 retryable=False,
-                safe_message="Browser session, artifact, frame, or target element was not found.",
+                safe_message="Browser session or authorized resource was not found.",
                 internal_details=str(error),
             ) from error
         except ValueError as error:
@@ -1347,7 +1396,20 @@ class PlaywrightBrowserProvider:
                 internal_details=str(error),
             ) from error
         except PlaywrightError as error:
-            if session_owned and session_id is not None:
+            if _playwright_crash(error):
+                if session_owned and session_id is not None:
+                    await self._fail_quietly(session_id)
+                raise self._error(
+                    request=request,
+                    code="browser_crash",
+                    retryable=(
+                        request.operation == "navigation.open"
+                        and not request.capability.side_effect
+                    ),
+                    safe_message="Browser process or context crashed during execution.",
+                    internal_details=str(error),
+                ) from error
+            if session_owned and session_id is not None and request.capability.side_effect:
                 await self._terminate_quietly(session_id)
             raise self._error(
                 request=request,
@@ -1362,6 +1424,48 @@ class PlaywrightBrowserProvider:
             await self._runtime.terminate(session_id)
         except (LookupError, PlaywrightError):
             return
+
+    async def _fail_quietly(self, session_id: UUID) -> None:
+        try:
+            await self._runtime.fail(session_id)
+        except (LookupError, PlaywrightError):
+            return
+
+    async def recover_execution(
+        self,
+        *,
+        request: ExecutionRequest,
+        error: ExecutionError,
+        result: ExecutionResult | None,
+        configuration: dict[str, str],
+        credential: str | None,
+    ) -> str | None:
+        del result, configuration, credential
+        if error.code not in {"stale_observation", "detached_frame"}:
+            return None
+        session_id = self._session_id(request.input)
+        if session_id is None:
+            return "Browser state must be observed again before replanning."
+        session = await self._runtime.resume(
+            session_id,
+            organization_id=request.organization_id,
+            worker_id=request.worker_id,
+        )
+        current = await self.observe(session=session, request=request)
+        policy = self._domain_policy(
+            request.resource.configuration,
+            fallback_url=request.resource.web_url,
+        )
+        decision = policy.permits(current.url, source_url=session.current_url)
+        if not decision.allowed:
+            return (
+                "Browser re-observed after stale state, but the current destination "
+                "requires a new policy/resource decision before replanning."
+            )
+        return (
+            "Browser state re-observed successfully; discard stale locators and "
+            "replan from the new observation."
+        )
 
     async def recover(
         self,
