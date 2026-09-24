@@ -35,6 +35,7 @@ ROUTE_PROVIDER = {
     "google-drive": "google_drive",
     "slack": "slack",
     "google-calendar": "google_calendar",
+    "browser": "browser",
     "generic-mcp": "generic_mcp",
 }
 
@@ -193,6 +194,7 @@ async def _connect(
             "webUrl": resource.web_url or "",
             "metadata": resource.metadata,
             "supportedOperations": [item.operation for item in manifest.capabilities],
+            "availableCapabilities": list(resource.available_capabilities),
             "providerKind": manifest.kind,
             "adapterVersion": manifest.version,
             "credentialFingerprint": fingerprint,
@@ -494,7 +496,25 @@ async def _catalog(session: AsyncSession, organization_id: UUID) -> dict[str, An
         config = _config(integration)
         actions: list[dict[str, Any]] = []
         scopes: list[str] = []
+        configured_available = config.get("availableCapabilities")
+        available_capabilities = (
+            {str(scope) for scope in configured_available}
+            if isinstance(configured_available, list)
+            else {capability.scope for capability in manifest.capabilities}
+        )
+        credential_configured = (
+            await session.scalar(
+                select(IntegrationCredential.id).where(
+                    IntegrationCredential.integration_id == integration.id
+                )
+            )
+            is not None
+        )
         for capability in manifest.capabilities:
+            if capability.scope not in available_capabilities:
+                continue
+            if capability.requires_credential and not credential_configured:
+                continue
             action_name = capability.operation.rsplit(".", 1)[-1]
             action = {
                 "id": f"{integration.id}:{capability.operation}",
