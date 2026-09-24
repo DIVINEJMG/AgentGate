@@ -49,6 +49,7 @@ class ActionApprovalTransaction:
                 decision_reason=None,
             )
             self._session.add(approval)
+            await self._session.flush()
 
         audit = AuditEvent(
             id=uuid4(),
@@ -77,5 +78,17 @@ class ActionApprovalTransaction:
                 "approval_required": require_approval,
             },
         )
+        if approval is not None:
+            await self._outbox.enqueue(
+                topic="approval.created",
+                aggregate_type="approval",
+                aggregate_id=str(approval.id),
+                payload={
+                    "organization_id": str(organization_id),
+                    "approval_id": str(approval.id),
+                    "action_id": str(action.id),
+                    "correlation_id": correlation_id,
+                },
+            )
         await self._session.flush()
         return action, approval

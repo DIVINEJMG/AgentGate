@@ -33,6 +33,7 @@ from app.infrastructure.database.models import (
     Worker,
     WorkItem,
 )
+from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.database.session import database_session
 from app.infrastructure.storage.provider import object_storage_from_settings
 
@@ -314,6 +315,7 @@ async def process_item_v1(
         .order_by(desc(Run.created_at))
         .limit(1)
     )
+    created_run = run is None
     if run is None:
         run = Run(
             organization_id=organization_id,
@@ -324,6 +326,19 @@ async def process_item_v1(
         session.add(run)
         await session.flush()
     item.status = "queued"
+    if created_run:
+        await TransactionalOutbox(session).enqueue(
+            topic="run.created",
+            aggregate_type="run",
+            aggregate_id=str(run.id),
+            payload={
+                "organization_id": str(organization_id),
+                "run_id": str(run.id),
+                "job_id": str(item.job_id),
+                "correlation_id": item.correlation_id,
+                "status": run.status,
+            },
+        )
     await session.commit()
     return {
         "run": await _run_public(session, run),
@@ -1283,6 +1298,19 @@ async def results_backfill_v1(
                 },
                 created_at=utcnow(),
             )
+        )
+        await TransactionalOutbox(session).enqueue(
+            topic="result.created",
+            aggregate_type="result",
+            aggregate_id=str(result.id),
+            payload={
+                "organization_id": str(organization_id),
+                "worker_id": str(worker.id),
+                "job_id": str(job.id),
+                "run_id": str(run.id),
+                "result_id": str(result.id),
+                "correlation_id": run.correlation_id,
+            },
         )
         created += 1
     await session.commit()
