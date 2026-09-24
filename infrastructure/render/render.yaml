@@ -43,3 +43,21 @@ services:
         sync: false
       - key: RUNTIME_EXECUTION_ENABLED
         value: "false"
+
+  - type: worker
+    name: audoryn-outbox
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -e .
+    startCommand: python -m app.runtime.outbox_worker
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: QSTASH_URL
+        sync: false
+      - key: QSTASH_TOKEN
+        sync: false
