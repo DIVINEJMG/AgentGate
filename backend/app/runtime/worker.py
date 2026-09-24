@@ -85,7 +85,6 @@ async def work_once() -> bool:
                     await queue.checkpoint_failed(work_item.id, reason=str(exc))
                     if run is not None:
                         run.status = "failed"
-                        run.failure = str(exc)
                         await outbox.enqueue(
                             topic="run.failed",
                             aggregate_type="run",
