@@ -13,10 +13,12 @@ from app.execution.authorization import (
     UniversalActionRequest,
 )
 from app.execution.contracts import (
+    ExecutionProviderError,
     ExecutionRequest,
     ProviderRuntimeContext,
     ResourceDescriptor,
 )
+from app.execution.lifecycle import ObserveActVerifyLifecycle
 from app.execution.providers.registry import ProviderRegistry
 from app.execution.providers.resolver import ExecutionResolver
 from app.infrastructure.database.models import Integration, IntegrationCredential
@@ -128,6 +130,7 @@ class UniversalProviderExecutor:
         self._registry = registry
         self._resolver = ExecutionResolver(registry)
         self._context_loader = context_loader
+        self._lifecycle = ObserveActVerifyLifecycle()
 
     async def prepare(self, proposal: ActionProposal) -> UniversalActionRequest:
         context = await self._context_loader.load(proposal)
@@ -197,21 +200,54 @@ class UniversalProviderExecutor:
             execution,
             contexts={execution.resource.provider: context},
         )
-        result = await resolved.provider.execute(
+        outcome = await self._lifecycle.run(
             request=execution,
-            configuration=resolved.context.configuration,
-            credential=resolved.context.credential,
+            execute=lambda: resolved.provider.execute(
+                request=execution,
+                configuration=resolved.context.configuration,
+                credential=resolved.context.credential,
+            ),
+            verify=lambda result: resolved.provider.verify(
+                request=execution,
+                result=result,
+                configuration=resolved.context.configuration,
+                credential=resolved.context.credential,
+            ),
         )
-        summary = (
-            result.verification.summary
-            if result.verification is not None
-            else f"{result.provider}:{result.operation} executed."
-        )
+        if outcome.error is not None:
+            raise ExecutionProviderError(
+                code=outcome.error.code,
+                retryable=outcome.error.retryable,
+                provider=outcome.error.provider,
+                operation=outcome.error.operation,
+                correlation_id=outcome.error.correlation_id,
+                safe_message=outcome.error.safe_message,
+                internal_details=outcome.error.internal_details,
+            )
+        if outcome.result is None or outcome.verification is None:
+            raise RuntimeError("Execution lifecycle completed without a provider result.")
+
+        result = outcome.result
+        verification = outcome.verification
+        summary = verification.summary
         return IntegrationExecutionResult(
             provider_operation=result.operation,
             summary=summary,
             data={
                 "output": result.output,
+                "verification": {
+                    "verified": verification.verified,
+                    "summary": verification.summary,
+                    "details": verification.details,
+                },
+                "lifecycle": [
+                    {
+                        "stage": checkpoint.stage,
+                        "attempt": checkpoint.attempt,
+                        "detail": checkpoint.detail,
+                    }
+                    for checkpoint in outcome.checkpoints
+                ],
                 "authorization": snapshot.as_dict(),
             },
         )
