@@ -19,6 +19,7 @@ from app.execution.contracts import (
     ResourceDescriptor,
 )
 from app.execution.lifecycle import ObserveActVerifyLifecycle
+from app.execution.providers.base import RecoverableExecutionProvider
 from app.execution.providers.registry import ProviderRegistry
 from app.execution.providers.resolver import ExecutionResolver
 from app.infrastructure.database.models import (
@@ -290,6 +291,16 @@ class UniversalProviderExecutor:
             execution,
             contexts={execution.resource.provider: context},
         )
+        recover = None
+        if isinstance(resolved.provider, RecoverableExecutionProvider):
+            recover = lambda error, result: resolved.provider.recover_execution(
+                request=execution,
+                error=error,
+                result=result,
+                configuration=resolved.context.configuration,
+                credential=resolved.context.credential,
+            )
+
         outcome = await self._lifecycle.run(
             request=execution,
             execute=lambda: resolved.provider.execute(
@@ -303,6 +314,7 @@ class UniversalProviderExecutor:
                 configuration=resolved.context.configuration,
                 credential=resolved.context.credential,
             ),
+            recover=recover,
         )
         if outcome.error is not None:
             raise ExecutionProviderError(
