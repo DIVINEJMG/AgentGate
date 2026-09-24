@@ -1171,6 +1171,15 @@ class PlaywrightBrowserProvider:
         session_owned = False
         artifact_references: list[BrowserArtifactReference] = []
         operation_output: dict[str, object] = {}
+        realtime_events: list[dict[str, object]] = [
+            {
+                "type": "browser.action.started",
+                "payload": {
+                    "capability": request.capability.scope,
+                    "operation": request.operation,
+                },
+            }
+        ]
         try:
             session_id = self._session_id(request.input)
             if session_id is None:
@@ -1179,6 +1188,12 @@ class PlaywrightBrowserProvider:
                 session = await self.open_session(request)
                 session_id = session.id
                 session_owned = True
+                realtime_events.append(
+                    {
+                        "type": "browser.session.created",
+                        "payload": {"sessionId": str(session_id)},
+                    }
+                )
             else:
                 session = await self._runtime.resume(
                     session_id,
@@ -1206,6 +1221,17 @@ class PlaywrightBrowserProvider:
                 if before_screenshot is not None:
                     artifact_references.append(before_screenshot)
 
+            if request.operation.startswith("navigation."):
+                realtime_events.append(
+                    {
+                        "type": "browser.navigation.started",
+                        "payload": {
+                            "sessionId": str(session_id),
+                            "fromUrl": before_observation.url,
+                        },
+                    }
+                )
+
             observation, operation_output, operation_artifacts = await self._execute_operation(
                 request=request,
                 configuration=configuration,
@@ -1214,6 +1240,26 @@ class PlaywrightBrowserProvider:
                 before_observation=before_observation,
             )
             artifact_references.extend(operation_artifacts)
+            if request.operation.startswith("navigation."):
+                realtime_events.append(
+                    {
+                        "type": "browser.navigation.completed",
+                        "payload": {
+                            "sessionId": str(session_id),
+                            "url": observation.url,
+                        },
+                    }
+                )
+            realtime_events.append(
+                {
+                    "type": "browser.observation.created",
+                    "payload": {
+                        "sessionId": str(session_id),
+                        "observationId": observation.id,
+                        "url": observation.url,
+                    },
+                }
+            )
 
             if request.operation != "page.observe":
                 after_screenshot = await self._store_screenshot(
@@ -1254,10 +1300,22 @@ class PlaywrightBrowserProvider:
             }
             redacted_evidence = redact_sensitive_structure(evidence_raw)
             assert isinstance(redacted_evidence, dict)
+            realtime_events.append(
+                {
+                    "type": "browser.action.completed",
+                    "payload": {
+                        "sessionId": str(session_id),
+                        "capability": request.capability.scope,
+                        "operation": request.operation,
+                        "result": "executed",
+                    },
+                }
+            )
             output: dict[str, object] = {
                 "session": current.as_dict(),
                 "observation": observation.as_dict(),
                 "actionEvidence": redacted_evidence,
+                "realtimeEvents": realtime_events,
                 **operation_output,
             }
             return ExecutionResult.successful(
@@ -1561,6 +1619,22 @@ class PlaywrightBrowserProvider:
 
         if failure_artifact is not None:
             details["verificationEvidenceArtifact"] = failure_artifact.as_dict()
+
+        if not verified:
+            realtime_events = output.get("realtimeEvents")
+            if isinstance(realtime_events, list):
+                realtime_events.append(
+                    {
+                        "type": "browser.verification.failed",
+                        "payload": {
+                            "capability": request.capability.scope,
+                            "operation": request.operation,
+                            "summary": (
+                                "Browser outcome could not be verified from observable state."
+                            ),
+                        },
+                    }
+                )
 
         evidence_with_verification = {
             **(evidence if isinstance(evidence, dict) else {}),
