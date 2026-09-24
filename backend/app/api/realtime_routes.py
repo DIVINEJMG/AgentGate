@@ -27,7 +27,10 @@ async def _authenticate(organization_id: UUID, token: str):
             RedisSessionStore.from_settings(),
             organization_id=organization_id,
         )
-        return await provider.authenticate(token)
+        principal = await provider.authenticate(token)
+        if principal.organization_id != organization_id:
+            raise AuthorizationError("Cross-organization realtime subscription denied.")
+        return principal
 
 
 def _bearer_from_request(request: Request) -> str:
@@ -59,6 +62,44 @@ async def organization_events_websocket(websocket: WebSocket, organization_id: U
         pass
     finally:
         await bus.close()
+
+
+@v2_router.get(
+    "/organizations/{organization_id}/events",
+    tags=["realtime"],
+)
+async def organization_events_replay(
+    request: Request,
+    organization_id: UUID,
+    cursor: str = Query(default="0-0"),
+    limit: int = Query(default=200, ge=1, le=500),
+) -> dict[str, object]:
+    token = _bearer_from_request(request)
+    try:
+        await _authenticate(organization_id, token)
+    except AuthenticationError as error:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(error)) from error
+    except AuthorizationError as error:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error)) from error
+
+    bus = RedisRealtimeBus.from_settings()
+    try:
+        events = await bus.read(
+            organization_id=organization_id,
+            after=cursor,
+            count=limit,
+            block_ms=None,
+        )
+    finally:
+        await bus.close()
+
+    next_cursor = cursor
+    if events:
+        next_cursor = str(events[-1]["stream_id"])
+    return {
+        "events": events,
+        "cursor": next_cursor,
+    }
 
 
 @v2_router.get(
@@ -97,7 +138,11 @@ async def organization_events_sse(
                 for event in batch:
                     current = str(event["stream_id"])
                     data = json.dumps(event, separators=(",", ":"), default=str)
-                    yield f"id: {current}\nevent: {event.get('event_type', 'message')}\ndata: {data}\n\n"
+                    yield (
+                        f"id: {current}\n"
+                        f"event: {event.get('event_type', 'message')}\n"
+                        f"data: {data}\n\n"
+                    )
         finally:
             await bus.close()
 

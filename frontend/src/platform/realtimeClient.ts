@@ -1,6 +1,7 @@
 import { apiUrl, realtimeUrl } from './config';
 
 export interface RealtimeEvent {
+  stream_id?: string;
   event_id?: string;
   event_type: string;
   organization_id?: string;
@@ -51,6 +52,18 @@ function accessToken() {
   return window.localStorage.getItem('audoryn.access_token');
 }
 
+function cursorKey(organizationId: string) {
+  return `audoryn.realtime.cursor.${organizationId}`;
+}
+
+function readCursor(organizationId: string) {
+  return window.localStorage.getItem(cursorKey(organizationId));
+}
+
+function writeCursor(organizationId: string, cursor: string | undefined) {
+  if (cursor) window.localStorage.setItem(cursorKey(organizationId), cursor);
+}
+
 function parseEvent(value: string): RealtimeEvent | null {
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
@@ -86,9 +99,24 @@ export function subscribeOrganizationRealtime({
   let fallbackTimer: number | null = null;
   const allowed = eventTypes ? new Set(eventTypes) : null;
   const token = accessToken();
+  const seen = new Set<string>();
 
   const changeTransport = (transport: RealtimeTransport) => {
     if (!closed) onTransportChange?.(transport);
+  };
+
+  const deliver = (event: RealtimeEvent) => {
+    if (event.organization_id && event.organization_id !== organizationId) return;
+    if (event.event_id && seen.has(event.event_id)) return;
+    if (event.event_id) {
+      seen.add(event.event_id);
+      if (seen.size > 512) {
+        const oldest = seen.values().next().value;
+        if (typeof oldest === 'string') seen.delete(oldest);
+      }
+    }
+    writeCursor(organizationId, event.stream_id);
+    if (accepts(event, allowed)) onEvent(event);
   };
 
   const stopPolling = () => {
@@ -112,7 +140,7 @@ export function subscribeOrganizationRealtime({
     }
     const query = new URLSearchParams({
       access_token: token,
-      cursor: '$',
+      cursor: readCursor(organizationId) ?? '$',
     });
     source = new EventSource(
       apiUrl(`/api/v2/organizations/${organizationId}/events/stream?${query.toString()}`),
@@ -122,8 +150,13 @@ export function subscribeOrganizationRealtime({
       changeTransport('sse');
     };
     const receive = (message: Event) => {
-      const event = parseEvent((message as MessageEvent<string>).data);
-      if (event && accepts(event, allowed)) onEvent(event);
+      const realtimeMessage = message as MessageEvent<string>;
+      const event = parseEvent(realtimeMessage.data);
+      if (!event) return;
+      if (!event.stream_id && realtimeMessage.lastEventId) {
+        event.stream_id = realtimeMessage.lastEventId;
+      }
+      deliver(event);
     };
     source.onmessage = receive;
     for (const eventType of NORMALIZED_EVENT_TYPES) {
@@ -136,8 +169,11 @@ export function subscribeOrganizationRealtime({
     };
   };
 
-  changeTransport('connecting');
-  if (token) {
+  const startWebSocket = () => {
+    if (closed || !token) {
+      if (!token) startPolling();
+      return;
+    }
     const query = new URLSearchParams({ access_token: token });
     socket = new WebSocket(
       realtimeUrl(`/ws/v1/organizations/${organizationId}?${query.toString()}`),
@@ -150,7 +186,7 @@ export function subscribeOrganizationRealtime({
     };
     socket.onmessage = (message) => {
       const event = parseEvent(String(message.data));
-      if (event && accepts(event, allowed)) onEvent(event);
+      if (event) deliver(event);
     };
     socket.onerror = () => {
       if (socket?.readyState !== WebSocket.OPEN) startSse();
@@ -161,9 +197,38 @@ export function subscribeOrganizationRealtime({
     fallbackTimer = window.setTimeout(() => {
       if (socket?.readyState !== WebSocket.OPEN) startSse();
     }, 2500);
-  } else {
-    startPolling();
-  }
+  };
+
+  const replayThenConnect = async () => {
+    if (!token) {
+      startPolling();
+      return;
+    }
+    const cursor = readCursor(organizationId);
+    if (cursor) {
+      try {
+        const query = new URLSearchParams({ cursor, limit: '500' });
+        const response = await fetch(
+          apiUrl(`/api/v2/organizations/${organizationId}/events?${query.toString()}`),
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (response.ok) {
+          const payload = (await response.json()) as {
+            events?: RealtimeEvent[];
+            cursor?: string;
+          };
+          for (const event of payload.events ?? []) deliver(event);
+          writeCursor(organizationId, payload.cursor);
+        }
+      } catch {
+        // WebSocket/SSE/polling still provide bounded fallback below.
+      }
+    }
+    startWebSocket();
+  };
+
+  changeTransport('connecting');
+  void replayThenConnect();
 
   return () => {
     closed = true;
