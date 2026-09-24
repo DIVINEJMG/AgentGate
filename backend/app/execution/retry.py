@@ -49,6 +49,8 @@ class RetryPolicy:
             "temporary_provider_error",
             "timeout",
             "provider_unavailable",
+            "navigation_timeout",
+            "browser_crash",
         }
         if error.retryable and error.code in retryable_codes:
             delay = min(
