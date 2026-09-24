@@ -22,6 +22,7 @@ from app.execution.lifecycle import ObserveActVerifyLifecycle
 from app.execution.providers.base import RecoverableExecutionProvider
 from app.execution.providers.registry import ProviderRegistry
 from app.execution.providers.resolver import ExecutionResolver
+from app.execution.redaction import redacted_dict
 from app.infrastructure.database.models import (
     AuditEvent,
     Integration,
@@ -214,7 +215,7 @@ class DatabaseProviderContextLoader:
                         "capability": request.capability.scope,
                         "operation": request.operation,
                         "correlation_id": request.correlation_id,
-                        **event_payload,
+                        **redacted_dict(event_payload),
                     },
                 )
         await TransactionalOutbox(self._session).enqueue(
