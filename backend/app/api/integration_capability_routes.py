@@ -35,6 +35,7 @@ ROUTE_PROVIDER = {
     "google-drive": "google_drive",
     "slack": "slack",
     "google-calendar": "google_calendar",
+    "browser": "browser",
     "generic-mcp": "generic_mcp",
 }
 
@@ -501,8 +502,18 @@ async def _catalog(session: AsyncSession, organization_id: UUID) -> dict[str, An
             if isinstance(configured_available, list)
             else {capability.scope for capability in manifest.capabilities}
         )
+        credential_configured = (
+            await session.scalar(
+                select(IntegrationCredential.id).where(
+                    IntegrationCredential.integration_id == integration.id
+                )
+            )
+            is not None
+        )
         for capability in manifest.capabilities:
             if capability.scope not in available_capabilities:
+                continue
+            if capability.requires_credential and not credential_configured:
                 continue
             action_name = capability.operation.rsplit(".", 1)[-1]
             action = {
