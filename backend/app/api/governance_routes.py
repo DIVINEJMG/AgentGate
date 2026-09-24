@@ -31,6 +31,7 @@ from app.infrastructure.database.models import (
     PolicyRevision,
     RiskEvent,
 )
+from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.database.session import database_session
 
 v1_router = APIRouter(tags=["governance"])
@@ -1141,15 +1142,65 @@ async def _gateway_test(
     )
     session.add(action)
     await session.flush()
+    approval: Approval | None = None
     if outcome == "REQUIRE_APPROVAL":
-        session.add(
-            Approval(
-                organization_id=organization_id,
-                action_id=action.id,
-                status="pending",
-                decided_by=None,
-                decision_reason=None,
-            )
+        approval = Approval(
+            organization_id=organization_id,
+            action_id=action.id,
+            status="pending",
+            decided_by=None,
+            decision_reason=None,
+        )
+        session.add(approval)
+        await session.flush()
+    outbox = TransactionalOutbox(session)
+    await outbox.enqueue(
+        topic="action.proposed",
+        aggregate_type="action",
+        aggregate_id=str(action.id),
+        payload={
+            "organization_id": str(organization_id),
+            "action_id": str(action.id),
+            "resource_id": resource_id,
+            "correlation_id": correlation_id,
+        },
+    )
+    if approval is not None:
+        await outbox.enqueue(
+            topic="approval.created",
+            aggregate_type="approval",
+            aggregate_id=str(approval.id),
+            payload={
+                "organization_id": str(organization_id),
+                "approval_id": str(approval.id),
+                "action_id": str(action.id),
+                "resource_id": resource_id,
+                "correlation_id": correlation_id,
+            },
+        )
+    elif status_value == "blocked":
+        await outbox.enqueue(
+            topic="action.blocked",
+            aggregate_type="action",
+            aggregate_id=str(action.id),
+            payload={
+                "organization_id": str(organization_id),
+                "action_id": str(action.id),
+                "resource_id": resource_id,
+                "correlation_id": correlation_id,
+            },
+        )
+    else:
+        await outbox.enqueue(
+            topic="action.executed",
+            aggregate_type="action",
+            aggregate_id=str(action.id),
+            payload={
+                "organization_id": str(organization_id),
+                "action_id": str(action.id),
+                "resource_id": resource_id,
+                "correlation_id": correlation_id,
+            },
         )
     await append_audit(
         session,
@@ -1358,6 +1409,31 @@ async def approval_decision_v1(
         summary=f"Approval {approval.status}.",
         metadata={"actionId": str(approval.action_id)},
     )
+    outbox = TransactionalOutbox(session)
+    await outbox.enqueue(
+        topic="approval.decided",
+        aggregate_type="approval",
+        aggregate_id=str(approval.id),
+        payload={
+            "organization_id": str(organization_id),
+            "approval_id": str(approval.id),
+            "action_id": str(approval.action_id),
+            "correlation_id": str((action.payload or {}).get("correlationId", "")) if action else "",
+            "decision": decision,
+        },
+    )
+    if action is not None:
+        await outbox.enqueue(
+            topic="action.approved" if decision == "approve" else "action.blocked",
+            aggregate_type="action",
+            aggregate_id=str(action.id),
+            payload={
+                "organization_id": str(organization_id),
+                "action_id": str(action.id),
+                "resource_id": action.resource_id,
+                "correlation_id": str((action.payload or {}).get("correlationId", "")),
+            },
+        )
     await session.commit()
     await session.refresh(approval)
     return {"approval": await _approval_public(session, approval)}
@@ -1566,6 +1642,18 @@ async def create_incident_v1(
             "createdBy": str(principal.user_id),
         },
     )
+    await TransactionalOutbox(session).enqueue(
+        topic="incident.created",
+        aggregate_type="incident",
+        aggregate_id=str(incident.id),
+        payload={
+            "organization_id": str(organization_id),
+            "incident_id": str(incident.id),
+            "resource_id": target_id,
+            "correlation_id": str(payload.get("correlationId", "")),
+            "severity": severity,
+        },
+    )
     await session.commit()
     await session.refresh(incident)
     return {"incident": await _incident_public(session, incident)}
@@ -1636,6 +1724,17 @@ async def incident_status_v1(
         outcome=new_status,
         summary=f"Incident {new_status}.",
         metadata=metadata,
+    )
+    await TransactionalOutbox(session).enqueue(
+        topic="incident.updated",
+        aggregate_type="incident",
+        aggregate_id=str(incident.id),
+        payload={
+            "organization_id": str(organization_id),
+            "incident_id": str(incident.id),
+            "status": new_status,
+            "correlation_id": str((await _incident_public(session, incident)).get("correlationId", "")),
+        },
     )
     await session.commit()
     await session.refresh(incident)
@@ -1807,6 +1906,18 @@ async def set_control_v1(
             "incidentId": payload.get("incidentId"),
             "changedBy": str(principal.user_id),
             "changedAt": now,
+        },
+    )
+    await TransactionalOutbox(session).enqueue(
+        topic="incident.updated",
+        aggregate_type="execution_control",
+        aggregate_id=f"{target_type}:{target_id}",
+        payload={
+            "organization_id": str(organization_id),
+            "resource_id": target_id,
+            "state": state,
+            "incident_id": payload.get("incidentId"),
+            "correlation_id": str(payload.get("correlationId", "")),
         },
     )
     await session.commit()
