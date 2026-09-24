@@ -67,7 +67,9 @@ class ObserveActVerifyLifecycle:
             LifecycleCheckpoint("observe", 0, "Execution context observed."),
             LifecycleCheckpoint("locate", 0, "Authorized resource located."),
             LifecycleCheckpoint("plan", 0, "Provider-neutral execution request prepared."),
-            LifecycleCheckpoint(\n                "policy_check", 0, "Action Gateway authorization already satisfied."\n            ),
+            LifecycleCheckpoint(
+                "policy_check", 0, "Action Gateway authorization already satisfied."
+            ),
         ]
 
         attempt = 0
