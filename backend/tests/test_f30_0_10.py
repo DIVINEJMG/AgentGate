@@ -84,6 +84,10 @@ class FakeBrowserRuntime:
         self.terminated.append(session_id)
         return self.sessions.pop(session_id)
 
+    async def fail(self, session_id) -> BrowserSession:
+        session = self.sessions.pop(session_id)
+        return replace(session, status="failed")
+
     def _observation(self, session_id: UUID, url: str) -> BrowserObservation:
         return BrowserObservation(
             id=f"obs_{uuid4().hex}",
