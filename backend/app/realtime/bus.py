@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
 from redis.asyncio import Redis
 
 from app.bootstrap.settings import settings
+from app.observability.metrics import ExecutionMetrics
 from app.realtime.contracts import RealtimeEvent
 
 
@@ -19,6 +21,7 @@ class RedisRealtimeBus:
 
     def __init__(self, client: Redis) -> None:
         self._client: Any = client
+        self._metrics = ExecutionMetrics()
 
     @classmethod
     def from_settings(cls) -> RedisRealtimeBus:
@@ -40,7 +43,17 @@ class RedisRealtimeBus:
     def organization_channel(organization_id: UUID | str) -> str:
         return f"audoryn:realtime:{organization_id}"
 
+    @staticmethod
+    def dedupe_key(organization_id: UUID | str, event_id: str) -> str:
+        return f"audoryn:event-dedupe:{organization_id}:{event_id}"
+
     async def emit(self, event: RealtimeEvent) -> str:
+        dedupe_key = self.dedupe_key(event.organization_id, event.event_id)
+        claimed = await self._client.set(dedupe_key, "pending", nx=True, ex=86400)
+        if not claimed:
+            existing = await self._client.get(dedupe_key)
+            return str(existing or "duplicate")
+
         payload = event.as_dict()
         fields = {
             "event_id": event.event_id,
@@ -54,12 +67,16 @@ class RedisRealtimeBus:
             "timestamp": event.timestamp.isoformat(),
             "payload": json.dumps(event.payload, separators=(",", ":"), default=str),
         }
-        stream_id = await self._client.xadd(
-            self.organization_stream(event.organization_id),
-            fields,
-            maxlen=10000,
-            approximate=True,
-        )
+        try:
+            stream_id = await self._client.xadd(
+                self.organization_stream(event.organization_id),
+                fields,
+                maxlen=10000,
+                approximate=True,
+            )
+        except Exception:
+            await self._client.delete(dedupe_key)
+            raise
         if event.run_id is not None:
             await self._client.xadd(
                 self.run_stream(event.run_id),
@@ -75,9 +92,19 @@ class RedisRealtimeBus:
                 approximate=True,
             )
         payload["stream_id"] = str(stream_id)
+        await self._client.set(dedupe_key, str(stream_id), ex=86400)
         await self._client.publish(
             self.organization_channel(event.organization_id),
             json.dumps(payload, separators=(",", ":"), default=str),
+        )
+        latency_ms = max(
+            0.0,
+            (datetime.now(UTC) - event.timestamp).total_seconds() * 1000,
+        )
+        await self._metrics.realtime_delivery(
+            event_type=event.event_type,
+            correlation_id=event.correlation_id or "",
+            latency_ms=latency_ms,
         )
         return str(stream_id)
 
