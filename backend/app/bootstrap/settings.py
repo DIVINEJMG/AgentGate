@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     shadow_mode_enabled: bool = True
     runtime_execution_enabled: bool = False
     worker_poll_seconds: float = 2.0
+    outbox_poll_seconds: float = 1.0
     worker_heartbeat_ttl_seconds: int = 60
     auth_session_ttl_seconds: int = 60 * 60 * 24 * 7
     auth_login_failure_window_seconds: int = 60 * 15
