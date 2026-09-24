@@ -47,7 +47,9 @@ class FakeBrowserRuntime:
         worker_id,
         run_id,
         ttl_seconds=1800,
+        navigation_policy=None,
     ) -> BrowserSession:
+        del navigation_policy
         now = datetime.now(UTC)
         session = BrowserSession(
             id=uuid4(),
@@ -168,17 +170,87 @@ class FakeBrowserRuntime:
         self.operations.append(("interact", operation))
         return self._observation(session_id, "https://example.com/current")
 
+    async def fill_form(
+        self,
+        session_id,
+        *,
+        organization_id,
+        worker_id,
+        fields,
+        timeout_ms=15000,
+    ):
+        del fields, timeout_ms
+        await self.resume(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        self.operations.append(("form", "form.fill"))
+        return self._observation(session_id, "https://example.com/current")
+
+    async def submit_form(
+        self,
+        session_id,
+        *,
+        organization_id,
+        worker_id,
+        form_ref=None,
+        submit_locator=None,
+        timeout_ms=15000,
+    ):
+        del form_ref, submit_locator, timeout_ms
+        await self.resume(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        self.operations.append(("form", "form.submit"))
+        return self._observation(session_id, "https://example.com/current")
+
+    async def authenticate(
+        self,
+        session_id,
+        *,
+        organization_id,
+        worker_id,
+        bindings,
+        credentials,
+        form_ref=None,
+        submit_locator=None,
+        failure_text=None,
+        success_url_contains=None,
+        timeout_ms=15000,
+    ):
+        del (
+            bindings,
+            credentials,
+            form_ref,
+            submit_locator,
+            failure_text,
+            success_url_contains,
+            timeout_ms,
+        )
+        await self.resume(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        self.operations.append(("auth", "auth.login"))
+        return self._observation(session_id, "https://example.com/current")
+
 
 def resource(provider: PlaywrightBrowserProvider) -> ResourceDescriptor:
     return ResourceDescriptor(
         id="integration:browser-test",
         provider="browser",
-        resource_type="web",
-        external_id="browser-test",
+        resource_type="origin",
+        external_id="origin:https://example.com",
         display_name="Browser Test",
-        metadata={},
+        metadata={"origin": "https://example.com"},
         health="healthy",
         available_capabilities=tuple(item.scope for item in provider.manifest.capabilities),
+        web_url="https://example.com",
+        configuration={"allowedOrigins": "https://example.com"},
     )
 
 
@@ -252,7 +324,7 @@ async def test_f30_universal_resolver_selects_browser_without_special_case() -> 
         payload={"url": "https://example.com"},
     )
     context = ProviderRuntimeContext(
-        configuration={},
+        configuration={"allowedOrigins": "https://example.com"},
         credential=None,
         resource=request.resource,
     )

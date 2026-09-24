@@ -75,6 +75,8 @@ async def _discover_connection(
         )
     except ExecutionProviderError as error:
         raise _provider_http_error(error) from error
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
     if len(resources) != 1:
         raise HTTPException(
             503,
