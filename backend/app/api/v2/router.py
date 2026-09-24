@@ -8,6 +8,7 @@ from app.api.integration_capability_routes import v2_router as integration_route
 from app.api.jobs_routes import v2_router as jobs_router
 from app.api.organization_routes import v2_router as organization_router
 from app.api.product_ops_routes import v2_router as product_ops_router
+from app.api.realtime_routes import v2_router as realtime_router
 from app.api.runtime_result_routes import v2_router as runtime_result_router
 from app.api.template_routes import v2_router as template_router
 from app.api.workforce_routes import v2_router as workforce_router
@@ -21,6 +22,7 @@ router.include_router(integration_router)
 router.include_router(governance_router)
 router.include_router(runtime_result_router)
 router.include_router(product_ops_router)
+router.include_router(realtime_router)
 router.include_router(agent_router)
 router.include_router(auth_router)
 router.include_router(organization_router)

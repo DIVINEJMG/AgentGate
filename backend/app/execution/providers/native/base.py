@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import Any
 
+from app.execution.authorization import CredentialReference, ProviderPermissionSnapshot
 from app.execution.contracts import (
     CapabilityDescriptor,
     ExecutionProviderError,
@@ -34,6 +35,47 @@ class NativeProvider(ABC):
         if resource is not None and resource.provider != self.manifest.provider:
             return ()
         return self.manifest.capabilities
+
+    async def discover_permissions(
+        self,
+        *,
+        resource: ResourceDescriptor,
+        configuration: dict[str, str],
+        credential: str | None,
+        credential_reference: str | None,
+    ) -> ProviderPermissionSnapshot:
+        if resource.provider != self.manifest.provider:
+            raise ValueError("Permission discovery resource belongs to another provider.")
+
+        declared = set(resource.available_capabilities)
+        configured_raw = configuration.get("permissionScopes", "").strip()
+        configured = {item.strip() for item in configured_raw.split(",") if item.strip()}
+        if configured:
+            declared &= configured
+
+        allowed: list[str] = []
+        for capability in self.manifest.capabilities:
+            if capability.scope not in declared:
+                continue
+            if capability.requires_credential and not credential:
+                continue
+            allowed.append(capability.scope)
+
+        strategy = self.manifest.credential_strategy
+        reference = credential_reference if strategy != "none" else None
+        return ProviderPermissionSnapshot(
+            provider=self.manifest.provider,
+            resource_id=resource.id,
+            capability_scopes=tuple(sorted(allowed)),
+            credential=CredentialReference(
+                strategy=strategy,
+                reference=reference,
+            ),
+            checked_at=datetime.now(UTC),
+            adapter=self.manifest.kind,
+            adapter_version=self.manifest.version,
+            metadata={"configured_scope_filter": bool(configured)},
+        )
 
     async def normalize_input(
         self,

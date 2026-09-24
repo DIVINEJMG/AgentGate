@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+from app.execution.authorization import ProviderPermissionSnapshot
 from app.execution.contracts import (
     CapabilityDescriptor,
     ExecutionRequest,
@@ -36,6 +37,15 @@ class ExecutionProvider(Protocol):
         configuration: dict[str, str],
         credential: str | None,
     ) -> ProviderHealth: ...
+
+    async def discover_permissions(
+        self,
+        *,
+        resource: ResourceDescriptor,
+        configuration: dict[str, str],
+        credential: str | None,
+        credential_reference: str | None,
+    ) -> ProviderPermissionSnapshot: ...
 
     async def normalize_input(
         self,
