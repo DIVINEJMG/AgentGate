@@ -14,10 +14,12 @@ jobs:
         run: |
           grep -q '"framework": "vite"' vercel.json
           grep -q 'frontend/dist' vercel.json
+          grep -q '"deploymentEnabled": false' vercel.json
           ! grep -R -E 'DATABASE_URL|REDIS_URL|INTEGRATION_ENCRYPTION_KEY|MODEL_PROVIDER_API_KEY' frontend
       - name: Verify Render process boundaries
         run: |
           grep -q 'name: audoryn-api' infrastructure/render/render.yaml
           grep -q 'name: audoryn-worker' infrastructure/render/render.yaml
+          grep -q 'name: audoryn-outbox' infrastructure/render/render.yaml
           ! grep -q 'name: audoryn-scheduler' infrastructure/render/render.yaml
           grep -q 'RUNTIME_EXECUTION_ENABLED' infrastructure/render/render.yaml
