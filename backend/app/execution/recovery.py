@@ -56,10 +56,10 @@ class RecoveryPolicy:
             and request.execution_preferences.allow_fallback
             and policy_allows_fallback
         ):
-            risky_browser_fallback = (
-                alternate_kind == "browser"
-                and request.capability.risk in {"high", "critical"}
-            )
+            risky_browser_fallback = alternate_kind == "browser" and request.capability.risk in {
+                "high",
+                "critical",
+            }
             if risky_browser_fallback:
                 return RecoveryPlan(
                     action="escalate",
