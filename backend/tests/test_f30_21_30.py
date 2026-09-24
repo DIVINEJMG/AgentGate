@@ -724,6 +724,7 @@ def runtime_handle(
         context=cast(BrowserContext, object()),
         page=cast(Page, page),
         navigation_policy=policy,
+        max_pages=8,
     )
 
 
