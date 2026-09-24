@@ -30,11 +30,12 @@ class ExternalToolDescriptor:
 class CustomExecutionProvider(ExecutionProvider, Protocol):
     """Discovery contract for MCP/OpenAPI/internal/custom tools.
 
-    Discovered tools must be normalized into F29 capability/resource descriptors
-    before they can reach the Action Gateway and universal execution path.
+    Discovered tools are normalized into F29 capability/resource descriptors before
+    they can reach the Action Gateway and universal execution path.
     """
 
-    provider_type: ExtensibleProviderType
+    @property
+    def provider_type(self) -> ExtensibleProviderType: ...
 
     async def discover_tools(self) -> tuple[ExternalToolDescriptor, ...]: ...
 
@@ -46,7 +47,8 @@ class CustomExecutionProvider(ExecutionProvider, Protocol):
 
 @runtime_checkable
 class MCPExecutionProvider(CustomExecutionProvider, Protocol):
-    provider_type: Literal["mcp"]
+    @property
+    def provider_type(self) -> Literal["mcp"]: ...
 
     async def connect(self) -> None: ...
 
