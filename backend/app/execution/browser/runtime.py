@@ -35,6 +35,14 @@ from app.execution.browser.credentials import (
     BrowserAuthenticationFailure,
     BrowserCredentialBundle,
 )
+from app.execution.browser.egress import evaluate_browser_egress
+from app.execution.browser.errors import (
+    BrowserDetachedFrame,
+    BrowserDownloadFailure,
+    BrowserElementNotFound,
+    BrowserRuntimeLimitExceeded,
+    BrowserStaleObservation,
+)
 from app.execution.browser.observation import observe_page, origin_for_url
 from app.execution.browser.policy import (
     BrowserDomainPolicy,
@@ -57,6 +65,7 @@ class BrowserRuntimeContract(Protocol):
         run_id: UUID | None,
         ttl_seconds: int = 1800,
         navigation_policy: BrowserDomainPolicy | None = None,
+        max_pages: int = 8,
     ) -> BrowserSession: ...
 
     async def resume(
@@ -202,11 +211,14 @@ class _SessionHandle:
         context: BrowserContext,
         page: Page,
         navigation_policy: BrowserDomainPolicy | None,
+        max_pages: int,
     ) -> None:
         self.session = session
         self.context = context
         self.page = page
         self.navigation_policy = navigation_policy
+        self.max_pages = max_pages
+        self.limit_error: str | None = None
         self.last_observation: BrowserObservation | None = None
         self.transition_trail: list[BrowserNavigationDecision] = []
         self.blocked_navigation: BrowserNavigationDecision | None = None
@@ -291,6 +303,12 @@ class BrowserRuntime:
         if page in handle.pages.values():
             handle.page = page
             return
+        if len(handle.pages) >= handle.max_pages:
+            handle.limit_error = (
+                f"Browser page limit exceeded ({handle.max_pages} pages per session)."
+            )
+            asyncio.create_task(page.close())
+            return
         page_id = f"p{len(handle.pages) + 1}"
         handle.pages[page_id] = page
         handle.page = page
@@ -346,6 +364,13 @@ class BrowserRuntime:
         handle.dialog_action = action
         handle.dialog_prompt_text = prompt_text
 
+    @staticmethod
+    def _raise_if_limit(handle: _SessionHandle) -> None:
+        if handle.limit_error is not None:
+            message = handle.limit_error
+            handle.limit_error = None
+            raise BrowserRuntimeLimitExceeded(message)
+
     async def _route_request(
         self,
         handle: _SessionHandle,
@@ -381,6 +406,21 @@ class BrowserRuntime:
             if source_url == "about:blank":
                 source_url = handle.page.url if handle.page.url != "about:blank" else None
             decision = policy.permits(request.url, source_url=source_url)
+
+        if decision.allowed and policy is not None:
+            egress = await evaluate_browser_egress(
+                request.url,
+                allow_private_network=policy.allow_private_network,
+            )
+            if not egress.allowed:
+                decision = BrowserNavigationDecision(
+                    allowed=False,
+                    source_url=source_url,
+                    target_url=request.url,
+                    target_origin=origin_for_url(request.url),
+                    reason=egress.reason,
+                    cross_origin=decision.cross_origin,
+                )
 
         handle.transition_trail.append(decision)
         del handle.transition_trail[:-50]
@@ -418,6 +458,20 @@ class BrowserRuntime:
                         cross_origin=False,
                     )
                 )
+                if redirect_decision.allowed and handle.navigation_policy is not None:
+                    redirect_egress = await evaluate_browser_egress(
+                        redirect_decision.target_url,
+                        allow_private_network=handle.navigation_policy.allow_private_network,
+                    )
+                    if not redirect_egress.allowed:
+                        redirect_decision = BrowserNavigationDecision(
+                            allowed=False,
+                            source_url=request.url,
+                            target_url=redirect_decision.target_url,
+                            target_origin=redirect_decision.target_origin,
+                            reason=redirect_egress.reason,
+                            cross_origin=redirect_decision.cross_origin,
+                        )
                 handle.transition_trail.append(redirect_decision)
                 del handle.transition_trail[:-50]
                 if not redirect_decision.allowed:
@@ -436,6 +490,7 @@ class BrowserRuntime:
         run_id: UUID | None,
         ttl_seconds: int = 1800,
         navigation_policy: BrowserDomainPolicy | None = None,
+        max_pages: int = 8,
     ) -> BrowserSession:
         browser = await self._ensure_browser()
         context = await browser.new_context()
@@ -450,7 +505,7 @@ class BrowserRuntime:
                 run_id=run_id,
                 browser_context_id=f"ctx_{uuid4().hex}",
                 created_at=now,
-                expires_at=now + timedelta(seconds=max(60, ttl_seconds)),
+                expires_at=now + timedelta(seconds=max(60, min(ttl_seconds, 3600))),
                 status="active",
             )
             handle = _SessionHandle(
@@ -458,6 +513,7 @@ class BrowserRuntime:
                 context=context,
                 page=page,
                 navigation_policy=navigation_policy,
+                max_pages=max(1, max_pages),
             )
             self._register_page(handle, page)
             context.on("page", lambda popup: self._register_page(handle, popup))
@@ -674,14 +730,20 @@ class BrowserRuntime:
             if observation is None:
                 raise LookupError("No browser observation is available for this session.")
             if locator.observation_id and locator.observation_id != observation.id:
-                raise LookupError("Browser locator refers to a stale observation.")
+                raise BrowserStaleObservation(
+                    "Browser locator refers to a stale observation."
+                )
             refs = {item.ref for item in observation.elements}
             if locator.value not in refs:
-                raise LookupError("Browser observation element reference was not found.")
+                raise BrowserElementNotFound(
+                    "Browser observation element reference was not found."
+                )
             try:
                 index = int(locator.value.removeprefix("e")) - 1
             except ValueError as error:
-                raise LookupError("Browser observation element reference was invalid.") from error
+                raise BrowserElementNotFound(
+                    "Browser observation element reference was invalid."
+                ) from error
             return root.locator(
                 "a,button,input,textarea,select,[role],[contenteditable='true']"
             ).nth(index)
@@ -892,6 +954,7 @@ class BrowserRuntime:
         except PlaywrightError as error:
             await self._raise_blocked(handle, error)
         await self._raise_if_blocked(handle)
+        self._raise_if_limit(handle)
         return await self.observe(
             session_id,
             organization_id=organization_id,
@@ -1217,7 +1280,9 @@ class BrowserRuntime:
         download = await download_info.value
         failure = await download.failure()
         if failure:
-            raise RuntimeError("Browser download failed before artifact persistence.")
+            raise BrowserDownloadFailure(
+                "Browser download failed before artifact persistence."
+            )
 
         source_url = download.url
         policy = handle.navigation_policy
@@ -1231,11 +1296,15 @@ class BrowserRuntime:
 
         download_path = await download.path()
         if download_path is None:
-            raise RuntimeError("Browser download did not expose managed temporary content.")
+            raise BrowserDownloadFailure(
+                "Browser download did not expose managed temporary content."
+            )
         content = await asyncio.to_thread(Path(download_path).read_bytes)
         if len(content) > max_bytes:
             await download.delete()
-            raise ValueError("Browser download exceeds the configured size limit.")
+            raise BrowserRuntimeLimitExceeded(
+                "Browser download exceeds the configured size limit."
+            )
         name = download.suggested_filename or "download.bin"
         media_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
         await download.delete()
