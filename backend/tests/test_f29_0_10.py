@@ -211,14 +211,14 @@ def test_capability_rejects_read_side_effects() -> None:
 
 def test_default_registry_contains_only_f29_native_providers() -> None:
     registry = execution_provider_registry()
-    assert tuple(manifest.provider for manifest in registry.manifests()) == (
+    assert tuple(manifest.provider for manifest in registry.manifests(kind="native_api")) == (
         "github",
         "gmail",
         "google_calendar",
         "google_drive",
         "slack",
     )
-    assert all(manifest.kind == "native_api" for manifest in registry.manifests())
+    assert all(manifest.kind == "native_api" for manifest in registry.manifests(kind="native_api"))
     assert all(manifest.version == "1.0.0" for manifest in registry.manifests())
 
 

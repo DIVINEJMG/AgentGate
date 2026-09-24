@@ -56,3 +56,4 @@ jobs:
       - run: python ../scripts/verify_f28_21_26.py
       - run: python ../scripts/verify_f29_0_10.py
       - run: python ../scripts/verify_f29_31_40.py
+      - run: python ../scripts/verify_f30_0_10.py
