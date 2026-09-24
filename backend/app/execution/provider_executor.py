@@ -23,6 +23,7 @@ from app.execution.providers.registry import ProviderRegistry
 from app.execution.providers.resolver import ExecutionResolver
 from app.infrastructure.database.models import Integration, IntegrationCredential
 from app.infrastructure.secrets.provider_vault import DatabaseSecretVault
+from app.observability.metrics import ExecutionMetrics
 
 
 class ProviderContextLoader(Protocol):
@@ -131,6 +132,7 @@ class UniversalProviderExecutor:
         self._resolver = ExecutionResolver(registry)
         self._context_loader = context_loader
         self._lifecycle = ObserveActVerifyLifecycle()
+        self._metrics = ExecutionMetrics()
 
     async def prepare(self, proposal: ActionProposal) -> UniversalActionRequest:
         context = await self._context_loader.load(proposal)
@@ -229,6 +231,21 @@ class UniversalProviderExecutor:
 
         result = outcome.result
         verification = outcome.verification
+        retry_count = max(
+            0,
+            len([item for item in outcome.checkpoints if item.stage == "act"]) - 1,
+        )
+        await self._metrics.execution(
+            provider=result.provider,
+            capability=execution.capability.scope,
+            adapter=result.adapter,
+            correlation_id=execution.correlation_id,
+            latency_ms=result.latency_ms,
+            verified=verification.verified,
+            retries=retry_count,
+            fallback_used=outcome.recovery is not None
+            and outcome.recovery.action == "fallback_provider",
+        )
         summary = verification.summary
         return IntegrationExecutionResult(
             provider_operation=result.operation,
