@@ -20,7 +20,9 @@ from app.api.product_common import (
 )
 from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
+from app.execution.provenance import ExecutionProvenance, provenance_from_action_payload
 from app.infrastructure.database.models import (
+    Action,
     Artifact,
     AuditEvent,
     Job,
@@ -959,6 +961,78 @@ async def artifact_url_v2(
     }
 
 
+
+
+async def _run_execution_provenance(
+    session: AsyncSession,
+    run: Run,
+) -> tuple[ExecutionProvenance, ...]:
+    rows = list(
+        (
+            await session.scalars(
+                select(Action)
+                .where(
+                    Action.organization_id == run.organization_id,
+                    Action.run_id == run.id,
+                )
+                .order_by(Action.created_at)
+            )
+        ).all()
+    )
+    provenance: list[ExecutionProvenance] = []
+    for action in rows:
+        payload = action.payload if isinstance(action.payload, dict) else {}
+        provenance.append(
+            provenance_from_action_payload(
+                scope=action.scope,
+                resource_id=action.resource_id,
+                payload=payload,
+                action_id=str(action.id),
+            )
+        )
+
+    steps = list(
+        (
+            await session.scalars(
+                select(RunStep)
+                .where(RunStep.run_id == run.id)
+                .order_by(RunStep.step_index)
+            )
+        ).all()
+    )
+    known = {
+        (item.capability, item.resource_id, item.action_id)
+        for item in provenance
+    }
+    for step in steps:
+        data = step.input if isinstance(step.input, dict) else {}
+        scope = str(data.get("scope", "")).strip()
+        resource_id = str(data.get("resourceId", "")).strip()
+        if not scope or not resource_id:
+            continue
+        output = step.output if isinstance(step.output, dict) else {}
+        action_id = str(output.get("actionId", "")).strip() or None
+        key = (scope, resource_id, action_id)
+        if key in known:
+            continue
+        provenance.append(
+            ExecutionProvenance(
+                provider=str(data.get("provider")) if data.get("provider") else None,
+                capability=scope,
+                resource_id=resource_id,
+                adapter=str(data.get("adapter")) if data.get("adapter") else None,
+                adapter_version=(
+                    str(data.get("adapterVersion"))
+                    if data.get("adapterVersion")
+                    else None
+                ),
+                action_id=action_id,
+            )
+        )
+        known.add(key)
+
+    return tuple(provenance)
+
 async def _result_detail(
     session: AsyncSession, result: Result
 ) -> dict[str, Any]:
@@ -997,6 +1071,7 @@ async def _result_detail(
         "capabilitiesUsed": list(body.get("capabilitiesUsed", [])),
         "actionIds": list(body.get("actionIds", [])),
         "approvalIds": list(body.get("approvalIds", [])),
+        "executionProvenance": list(body.get("executionProvenance", [])),
         "correlationId": str(body.get("correlationId", "")),
         "runStartedAt": str(body.get("runStartedAt", "")),
         "durationMs": body.get("durationMs"),
@@ -1259,6 +1334,8 @@ async def results_backfill_v1(
         )
         if existing is not None:
             continue
+        execution_provenance = await _run_execution_provenance(session, run)
+        provenance_rows = [item.as_dict() for item in execution_provenance]
         result = Result(
             organization_id=organization_id,
             worker_id=worker.id,
@@ -1287,9 +1364,16 @@ async def results_backfill_v1(
                     ],
                     "artifactIds": [],
                     "sourceReferences": [],
-                    "capabilitiesUsed": [],
-                    "actionIds": [],
+                    "capabilitiesUsed": sorted(
+                        {item.capability for item in execution_provenance}
+                    ),
+                    "actionIds": [
+                        item.action_id
+                        for item in execution_provenance
+                        if item.action_id is not None
+                    ],
                     "approvalIds": [],
+                    "executionProvenance": provenance_rows,
                     "correlationId": run.correlation_id,
                     "runStartedAt": run.created_at.isoformat(),
                     "durationMs": None,
