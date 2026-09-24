@@ -67,7 +67,7 @@ class ObserveActVerifyLifecycle:
             LifecycleCheckpoint("observe", 0, "Execution context observed."),
             LifecycleCheckpoint("locate", 0, "Authorized resource located."),
             LifecycleCheckpoint("plan", 0, "Provider-neutral execution request prepared."),
-            LifecycleCheckpoint("policy_check", 0, "Action Gateway authorization already satisfied."),
+            LifecycleCheckpoint(\n                "policy_check", 0, "Action Gateway authorization already satisfied."\n            ),
         ]
 
         attempt = 0
@@ -84,15 +84,11 @@ class ObserveActVerifyLifecycle:
                     alternate_kind=alternate_kind,
                     policy_allows_fallback=policy_allows_fallback,
                 )
-                checkpoints.append(
-                    LifecycleCheckpoint("recover", attempt, recovery.reason)
-                )
+                checkpoints.append(LifecycleCheckpoint("recover", attempt, recovery.reason))
                 if recovery.action == "retry_same_provider":
                     await asyncio.sleep(recovery.delay_seconds)
                     continue
-                checkpoints.append(
-                    LifecycleCheckpoint("escalate", attempt, recovery.reason)
-                )
+                checkpoints.append(LifecycleCheckpoint("escalate", attempt, recovery.reason))
                 return LifecycleOutcome(
                     result=None,
                     verification=None,
@@ -102,13 +98,9 @@ class ObserveActVerifyLifecycle:
                 )
 
             verification = await verify(result)
-            checkpoints.append(
-                LifecycleCheckpoint("verify", attempt, verification.summary)
-            )
+            checkpoints.append(LifecycleCheckpoint("verify", attempt, verification.summary))
             if verification.verified:
-                checkpoints.append(
-                    LifecycleCheckpoint("completed", attempt, "Execution verified.")
-                )
+                checkpoints.append(LifecycleCheckpoint("completed", attempt, "Execution verified."))
                 return LifecycleOutcome(
                     result=result,
                     verification=verification,
@@ -132,12 +124,8 @@ class ObserveActVerifyLifecycle:
                 alternate_kind=alternate_kind,
                 policy_allows_fallback=policy_allows_fallback,
             )
-            checkpoints.append(
-                LifecycleCheckpoint("recover", attempt, recovery.reason)
-            )
-            checkpoints.append(
-                LifecycleCheckpoint("escalate", attempt, recovery.reason)
-            )
+            checkpoints.append(LifecycleCheckpoint("recover", attempt, recovery.reason))
+            checkpoints.append(LifecycleCheckpoint("escalate", attempt, recovery.reason))
             return LifecycleOutcome(
                 result=result,
                 verification=verification,
