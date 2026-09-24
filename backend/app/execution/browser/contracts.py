@@ -43,6 +43,8 @@ class BrowserLocator:
     value: str
     name: str | None = None
     observation_id: str | None = None
+    frame_name: str | None = None
+    frame_origin: str | None = None
     exact: bool = True
 
     @classmethod
@@ -58,16 +60,46 @@ class BrowserLocator:
             raise ValueError("Browser locator value is required.")
         name_raw = value.get("name")
         observation_raw = value.get("observationId")
+        frame_name_raw = value.get("frameName")
+        frame_origin_raw = value.get("frameOrigin")
         return cls(
             strategy=strategy,  # type: ignore[arg-type]
             value=locator_value,
             name=str(name_raw) if name_raw is not None else None,
             observation_id=str(observation_raw) if observation_raw is not None else None,
+            frame_name=str(frame_name_raw) if frame_name_raw is not None else None,
+            frame_origin=str(frame_origin_raw) if frame_origin_raw is not None else None,
             exact=value.get("exact") is not False,
         )
 
     def as_dict(self) -> dict[str, object]:
-        return asdict(self)
+        return {
+            "strategy": self.strategy,
+            "value": self.value,
+            "name": self.name,
+            "observationId": self.observation_id,
+            "frameName": self.frame_name,
+            "frameOrigin": self.frame_origin,
+            "exact": self.exact,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class BrowserDownload:
+    name: str
+    source_url: str
+    content: bytes
+    media_type: str
+
+    @property
+    def size_bytes(self) -> int:
+        return len(self.content)
+
+
+@dataclass(frozen=True, slots=True)
+class BrowserVerificationProbe:
+    verified: bool
+    details: dict[str, object]
 
 
 @dataclass(frozen=True, slots=True)

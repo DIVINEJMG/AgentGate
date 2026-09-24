@@ -17,10 +17,12 @@ from app.execution.authorization import (
     action_fingerprint,
 )
 from app.execution.browser.contracts import (
+    BrowserDownload,
     BrowserElement,
     BrowserFrame,
     BrowserObservation,
     BrowserSession,
+    BrowserVerificationProbe,
 )
 from app.execution.browser.credentials import (
     BrowserAuthenticationFailure,
@@ -106,9 +108,9 @@ class FakeGovernedRuntime:
             session_id=session_id,
             url="https://portal.example.test/account",
             title="Portal",
-            visible_text="Account ready",
-            aria_snapshot='- heading "Account"',
-            dom_snapshot="<main>Account ready</main>",
+            visible_text=f"Account ready {self.operations!r}",
+            aria_snapshot=f'- heading "Account" {self.operations!r}',
+            dom_snapshot=f"<main>Account ready {self.operations!r}</main>",
             elements=(
                 BrowserElement(
                     ref="e1",
@@ -177,9 +179,11 @@ class FakeGovernedRuntime:
         operation,
         locator=None,
         value=None,
+        dialog_action=None,
+        prompt_text=None,
         timeout_ms=15000,
     ):
-        del locator, value, timeout_ms
+        del locator, value, dialog_action, prompt_text, timeout_ms
         await self.resume(
             session_id,
             organization_id=organization_id,
@@ -214,9 +218,11 @@ class FakeGovernedRuntime:
         worker_id,
         form_ref=None,
         submit_locator=None,
+        dialog_action=None,
+        prompt_text=None,
         timeout_ms=15000,
     ):
-        del form_ref, submit_locator, timeout_ms
+        del form_ref, submit_locator, dialog_action, prompt_text, timeout_ms
         await self.resume(
             session_id,
             organization_id=organization_id,
@@ -255,6 +261,81 @@ class FakeGovernedRuntime:
         self.last_credential_values = credentials.sensitive_values()
         self.operations.append("auth.login")
         return self.observation(session_id)
+
+    async def screenshot(self, session_id, *, organization_id, worker_id):
+        await self.resume(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        return b"fake-png"
+
+    async def upload_file(
+        self,
+        session_id,
+        *,
+        organization_id,
+        worker_id,
+        locator,
+        name,
+        media_type,
+        content,
+        dialog_action=None,
+        prompt_text=None,
+        timeout_ms=15000,
+    ):
+        del locator, name, media_type, content, dialog_action, prompt_text, timeout_ms
+        await self.resume(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        self.operations.append("file.upload")
+        return self.observation(session_id)
+
+    async def download_file(
+        self,
+        session_id,
+        *,
+        organization_id,
+        worker_id,
+        locator,
+        timeout_ms=30000,
+        max_bytes=20 * 1024 * 1024,
+    ):
+        del locator, timeout_ms, max_bytes
+        await self.resume(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        self.operations.append("file.download")
+        return (
+            BrowserDownload(
+                name="report.txt",
+                source_url="https://portal.example.test/report.txt",
+                content=b"report",
+                media_type="text/plain",
+            ),
+            self.observation(session_id),
+        )
+
+    async def verify_browser_state(
+        self,
+        session_id,
+        *,
+        organization_id,
+        worker_id,
+        expectation,
+        result_output,
+    ):
+        del expectation, result_output
+        await self.resume(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        return BrowserVerificationProbe(verified=True, details={"fake": True})
 
 
 class ApprovalGuard:
