@@ -26,6 +26,14 @@ RealtimeEventType = Literal[
     "incident.created",
     "incident.updated",
     "integration.health.changed",
+    "browser.session.created",
+    "browser.navigation.started",
+    "browser.navigation.completed",
+    "browser.observation.created",
+    "browser.action.started",
+    "browser.action.completed",
+    "browser.verification.failed",
+    "browser.session.closed",
 ]
 
 REALTIME_EVENT_TYPES: frozenset[str] = frozenset(str(item) for item in get_args(RealtimeEventType))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -101,6 +102,10 @@ class FakeGovernedRuntime:
 
     async def terminate(self, session_id: UUID) -> BrowserSession:
         return self.sessions.pop(session_id)
+
+    async def fail(self, session_id: UUID) -> BrowserSession:
+        session = self.sessions.pop(session_id)
+        return replace(session, status="failed")
 
     def observation(self, session_id: UUID) -> BrowserObservation:
         return BrowserObservation(

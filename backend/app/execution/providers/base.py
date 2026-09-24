@@ -5,6 +5,7 @@ from typing import Protocol, runtime_checkable
 from app.execution.authorization import ProviderPermissionSnapshot
 from app.execution.contracts import (
     CapabilityDescriptor,
+    ExecutionError,
     ExecutionRequest,
     ExecutionResult,
     ProviderHealth,
@@ -77,3 +78,18 @@ class ManagedExecutionProvider(Protocol):
     """Optional lifecycle surface for providers that own external processes."""
 
     async def shutdown(self) -> None: ...
+
+
+@runtime_checkable
+class RecoverableExecutionProvider(Protocol):
+    """Optional provider-neutral recovery surface for state refresh/replanning."""
+
+    async def recover_execution(
+        self,
+        *,
+        request: ExecutionRequest,
+        error: ExecutionError,
+        result: ExecutionResult | None,
+        configuration: dict[str, str],
+        credential: str | None,
+    ) -> str | None: ...

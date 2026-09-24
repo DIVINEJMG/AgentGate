@@ -60,6 +60,8 @@ class ObserveActVerifyLifecycle:
         request: ExecutionRequest,
         execute: Callable[[], Awaitable[ExecutionResult]],
         verify: Callable[[ExecutionResult], Awaitable[VerificationResult]],
+        recover: Callable[[ExecutionError, ExecutionResult | None], Awaitable[str | None]]
+        | None = None,
         policy_allows_fallback: bool = False,
         alternate_kind: ProviderKind | None = None,
     ) -> LifecycleOutcome:
@@ -90,6 +92,10 @@ class ObserveActVerifyLifecycle:
                 if recovery.action == "retry_same_provider":
                     await asyncio.sleep(recovery.delay_seconds)
                     continue
+                if recovery.action == "reobserve_replan" and recover is not None:
+                    recovery_detail = await recover(error.error, None)
+                    if recovery_detail:
+                        checkpoints.append(LifecycleCheckpoint("recover", attempt, recovery_detail))
                 checkpoints.append(LifecycleCheckpoint("escalate", attempt, recovery.reason))
                 return LifecycleOutcome(
                     result=None,

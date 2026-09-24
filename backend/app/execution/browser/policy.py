@@ -46,6 +46,7 @@ class BrowserDomainPolicy:
     denied_origins: tuple[str, ...] = ()
     allowed_path_prefixes: tuple[str, ...] = ()
     denied_path_prefixes: tuple[str, ...] = ()
+    allow_private_network: bool = False
 
     @classmethod
     def from_configuration(
@@ -79,6 +80,9 @@ class BrowserDomainPolicy:
             denied_origins=tuple(denied),
             allowed_path_prefixes=_split_csv(configuration.get("allowedPaths")),
             denied_path_prefixes=_split_csv(configuration.get("deniedPaths")),
+            allow_private_network=(
+                configuration.get("allowPrivateNetwork", "false").strip().lower() == "true"
+            ),
         )
 
     @property

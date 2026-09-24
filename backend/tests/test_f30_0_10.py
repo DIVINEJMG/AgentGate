@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -83,6 +84,10 @@ class FakeBrowserRuntime:
     async def terminate(self, session_id) -> BrowserSession:
         self.terminated.append(session_id)
         return self.sessions.pop(session_id)
+
+    async def fail(self, session_id) -> BrowserSession:
+        session = self.sessions.pop(session_id)
+        return replace(session, status="failed")
 
     def _observation(self, session_id: UUID, url: str) -> BrowserObservation:
         return BrowserObservation(

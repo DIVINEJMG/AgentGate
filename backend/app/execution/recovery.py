@@ -10,6 +10,7 @@ RecoveryAction = Literal[
     "retry_same_provider",
     "refresh_credentials",
     "fallback_provider",
+    "reobserve_replan",
     "escalate",
 ]
 
@@ -38,6 +39,24 @@ class RecoveryPolicy:
         alternate_kind: ProviderKind | None = None,
         policy_allows_fallback: bool = False,
     ) -> RecoveryPlan:
+        if error.code in {"stale_observation", "detached_frame"}:
+            return RecoveryPlan(
+                action="reobserve_replan",
+                reason=(
+                    "Observed browser state is stale or detached; refresh state and "
+                    "replan instead of replaying the previous target."
+                ),
+            )
+
+        if error.code == "browser_crash" and request.capability.side_effect:
+            return RecoveryPlan(
+                action="escalate",
+                reason=(
+                    "Browser crashed during a side-effect action; completion state "
+                    "cannot be proven, so automatic replay is unsafe."
+                ),
+            )
+
         retry: RetryDecision = self._retry_policy.decide(error, attempt=attempt)
         if retry.disposition == "retry":
             return RecoveryPlan(

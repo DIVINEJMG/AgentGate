@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
@@ -177,6 +178,10 @@ class EvidenceRuntime:
 
     async def terminate(self, session_id: UUID) -> BrowserSession:
         return self.sessions.pop(session_id)
+
+    async def fail(self, session_id: UUID) -> BrowserSession:
+        session = self.sessions.pop(session_id)
+        return replace(session, status="failed")
 
     def observation(self, session_id: UUID) -> BrowserObservation:
         return BrowserObservation(
@@ -719,6 +724,7 @@ def runtime_handle(
         context=cast(BrowserContext, object()),
         page=cast(Page, page),
         navigation_policy=policy,
+        max_pages=8,
     )
 
 

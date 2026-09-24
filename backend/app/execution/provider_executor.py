@@ -19,8 +19,10 @@ from app.execution.contracts import (
     ResourceDescriptor,
 )
 from app.execution.lifecycle import ObserveActVerifyLifecycle
+from app.execution.providers.base import RecoverableExecutionProvider
 from app.execution.providers.registry import ProviderRegistry
 from app.execution.providers.resolver import ExecutionResolver
+from app.execution.redaction import redacted_dict
 from app.infrastructure.database.models import (
     AuditEvent,
     Integration,
@@ -29,6 +31,7 @@ from app.infrastructure.database.models import (
 from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.secrets.provider_vault import DatabaseSecretVault
 from app.observability.metrics import ExecutionMetrics
+from app.realtime.contracts import REALTIME_EVENT_TYPES
 
 
 class ProviderContextLoader(Protocol):
@@ -183,6 +186,36 @@ class DatabaseProviderContextLoader:
             },
         )
         self._session.add(audit)
+        provider_events = output.get("realtimeEvents")
+        if isinstance(provider_events, list):
+            for index, event in enumerate(provider_events):
+                if not isinstance(event, dict):
+                    continue
+                event_type = str(event.get("type") or "")
+                if event_type not in REALTIME_EVENT_TYPES:
+                    continue
+                raw_payload = event.get("payload")
+                event_payload = (
+                    {str(key): value for key, value in raw_payload.items()}
+                    if isinstance(raw_payload, dict)
+                    else {}
+                )
+                await TransactionalOutbox(self._session).enqueue(
+                    topic=event_type,
+                    aggregate_type="browser_execution",
+                    aggregate_id=f"{request.idempotency_key}:{index}",
+                    payload={
+                        "organization_id": str(request.organization_id),
+                        "worker_id": (str(request.worker_id) if request.worker_id else None),
+                        "run_id": str(request.run_id) if request.run_id else None,
+                        "resource_id": request.resource.id,
+                        "provider": result.provider,
+                        "capability": request.capability.scope,
+                        "operation": request.operation,
+                        "correlation_id": request.correlation_id,
+                        **redacted_dict(event_payload),
+                    },
+                )
         await TransactionalOutbox(self._session).enqueue(
             topic="action.executed",
             aggregate_type="execution",
@@ -290,6 +323,21 @@ class UniversalProviderExecutor:
             execution,
             contexts={execution.resource.provider: context},
         )
+        recoverable_provider = (
+            resolved.provider
+            if isinstance(resolved.provider, RecoverableExecutionProvider)
+            else None
+        )
+        recover = None
+        if recoverable_provider is not None:
+            recover = lambda error, result: recoverable_provider.recover_execution(
+                request=execution,
+                error=error,
+                result=result,
+                configuration=resolved.context.configuration,
+                credential=resolved.context.credential,
+            )
+
         outcome = await self._lifecycle.run(
             request=execution,
             execute=lambda: resolved.provider.execute(
@@ -303,6 +351,7 @@ class UniversalProviderExecutor:
                 configuration=resolved.context.configuration,
                 credential=resolved.context.credential,
             ),
+            recover=recover,
         )
         if outcome.error is not None:
             raise ExecutionProviderError(

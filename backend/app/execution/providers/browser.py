@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol, runtime_checkable
 from urllib.parse import urlsplit
@@ -26,6 +27,13 @@ from app.execution.browser.credentials import (
     BrowserAuthenticationFailure,
     BrowserCredentialBundle,
 )
+from app.execution.browser.errors import (
+    BrowserDetachedFrame,
+    BrowserDownloadFailure,
+    BrowserElementNotFound,
+    BrowserRuntimeLimitExceeded,
+    BrowserStaleObservation,
+)
 from app.execution.browser.policy import (
     BrowserDomainPolicy,
     BrowserNavigationBlocked,
@@ -34,6 +42,7 @@ from app.execution.browser.runtime import BrowserRuntime, BrowserRuntimeContract
 from app.execution.browser.verification import BrowserVerificationExpectation
 from app.execution.contracts import (
     CapabilityDescriptor,
+    ExecutionError,
     ExecutionProviderError,
     ExecutionRequest,
     ExecutionResult,
@@ -46,6 +55,49 @@ from app.execution.providers.base import ExecutionProvider
 from app.execution.redaction import redact_sensitive_structure, redact_text
 
 FILE_TRANSFER_SCOPES = frozenset({"browser.file.upload", "browser.file.download"})
+
+MAX_SESSION_TTL_SECONDS = 3600
+MAX_NAVIGATION_TIMEOUT_MS = 60_000
+MAX_ACTION_TIMEOUT_MS = 30_000
+MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024
+
+
+@dataclass(slots=True)
+class _BrowserExecutionState:
+    started_at: datetime
+    session_id: UUID | None = None
+    session_owned: bool = False
+
+
+def _bounded_int(
+    configuration: dict[str, str],
+    key: str,
+    default: int,
+    *,
+    minimum: int,
+    maximum: int,
+) -> int:
+    raw = configuration.get(key)
+    if raw in (None, ""):
+        return default
+    try:
+        parsed = int(str(raw))
+    except ValueError as error:
+        raise ValueError(f"Browser configuration {key} must be an integer.") from error
+    return max(minimum, min(parsed, maximum))
+
+
+def _playwright_crash(error: PlaywrightError) -> bool:
+    message = str(error).lower()
+    markers = (
+        "target page, context or browser has been closed",
+        "browser has been closed",
+        "browser closed",
+        "page crashed",
+        "browser crashed",
+        "connection closed",
+    )
+    return any(marker in message for marker in markers)
 
 
 def _capability(
@@ -885,10 +937,18 @@ class PlaywrightBrowserProvider:
                     source_url=None,
                 )
             )
+        ttl_seconds = _bounded_int(
+            request.resource.configuration,
+            "sessionTtlSeconds",
+            1800,
+            minimum=60,
+            maximum=MAX_SESSION_TTL_SECONDS,
+        )
         return await self._runtime.create_session(
             organization_id=request.organization_id,
             worker_id=request.worker_id,
             run_id=request.run_id,
+            ttl_seconds=ttl_seconds,
             navigation_policy=policy,
         )
 
@@ -937,7 +997,13 @@ class PlaywrightBrowserProvider:
         dict[str, object],
         tuple[BrowserArtifactReference, ...],
     ]:
-        timeout_ms = int(configuration.get("actionTimeoutMs", "15000"))
+        timeout_ms = _bounded_int(
+            configuration,
+            "actionTimeoutMs",
+            15_000,
+            minimum=1_000,
+            maximum=MAX_ACTION_TIMEOUT_MS,
+        )
         dialog_action, dialog_prompt = self._dialog(request.input)
 
         if request.operation == "page.observe":
@@ -951,7 +1017,13 @@ class PlaywrightBrowserProvider:
                 operation=request.operation,
                 url=(str(request.input.get("url")) if request.input.get("url") else None),
                 locator=self._locator(request.input),
-                timeout_ms=int(configuration.get("navigationTimeoutMs", "30000")),
+                timeout_ms=_bounded_int(
+                    configuration,
+                    "navigationTimeoutMs",
+                    30_000,
+                    minimum=1_000,
+                    maximum=MAX_NAVIGATION_TIMEOUT_MS,
+                ),
             )
             return (observation, {}, ())
 
@@ -1048,12 +1120,19 @@ class PlaywrightBrowserProvider:
                 organization_id=request.organization_id,
                 worker_id=request.worker_id,
                 locator=locator,
-                timeout_ms=int(configuration.get("downloadTimeoutMs", "30000")),
-                max_bytes=int(
-                    configuration.get(
-                        "maxDownloadBytes",
-                        str(20 * 1024 * 1024),
-                    )
+                timeout_ms=_bounded_int(
+                    configuration,
+                    "downloadTimeoutMs",
+                    30_000,
+                    minimum=1_000,
+                    maximum=MAX_NAVIGATION_TIMEOUT_MS,
+                ),
+                max_bytes=_bounded_int(
+                    configuration,
+                    "maxDownloadBytes",
+                    MAX_DOWNLOAD_BYTES,
+                    minimum=1,
+                    maximum=MAX_DOWNLOAD_BYTES,
                 ),
             )
             persisted = await store.store(
@@ -1088,6 +1167,178 @@ class PlaywrightBrowserProvider:
         )
         return (observation, {}, ())
 
+    async def _execute_authorized(
+        self,
+        *,
+        request: ExecutionRequest,
+        configuration: dict[str, str],
+        credential: str | None,
+        state: _BrowserExecutionState,
+    ) -> ExecutionResult:
+        artifact_references: list[BrowserArtifactReference] = []
+        operation_output: dict[str, object] = {}
+        realtime_events: list[dict[str, object]] = [
+            {
+                "type": "browser.action.started",
+                "payload": {
+                    "capability": request.capability.scope,
+                    "operation": request.operation,
+                },
+            }
+        ]
+
+        session_id = self._session_id(request.input)
+        if session_id is None:
+            if request.operation != "navigation.open":
+                raise ValueError("A browser session is required for this operation.")
+            session = await self.open_session(request)
+            session_id = session.id
+            state.session_id = session_id
+            state.session_owned = True
+            realtime_events.append(
+                {
+                    "type": "browser.session.created",
+                    "payload": {"sessionId": str(session_id)},
+                }
+            )
+        else:
+            state.session_id = session_id
+            session = await self._runtime.resume(
+                session_id,
+                organization_id=request.organization_id,
+                worker_id=request.worker_id,
+            )
+            state.session_owned = True
+
+        before_observation = await self._runtime.observe(
+            session_id,
+            organization_id=request.organization_id,
+            worker_id=request.worker_id,
+        )
+        sensitive_action = request.capability.side_effect or request.capability.risk in {
+            "high",
+            "critical",
+        }
+        if sensitive_action:
+            before_screenshot = await self._store_screenshot(
+                request=request,
+                session_id=session_id,
+                kind="browser_before_action",
+                source_url=before_observation.url,
+            )
+            if before_screenshot is not None:
+                artifact_references.append(before_screenshot)
+
+        if request.operation.startswith("navigation."):
+            realtime_events.append(
+                {
+                    "type": "browser.navigation.started",
+                    "payload": {
+                        "sessionId": str(session_id),
+                        "fromUrl": before_observation.url,
+                    },
+                }
+            )
+
+        observation, operation_output, operation_artifacts = await self._execute_operation(
+            request=request,
+            configuration=configuration,
+            credential=credential,
+            session_id=session_id,
+            before_observation=before_observation,
+        )
+        artifact_references.extend(operation_artifacts)
+
+        if request.operation.startswith("navigation."):
+            realtime_events.append(
+                {
+                    "type": "browser.navigation.completed",
+                    "payload": {
+                        "sessionId": str(session_id),
+                        "url": observation.url,
+                    },
+                }
+            )
+        realtime_events.append(
+            {
+                "type": "browser.observation.created",
+                "payload": {
+                    "sessionId": str(session_id),
+                    "observationId": observation.id,
+                    "url": observation.url,
+                },
+            }
+        )
+
+        if request.operation != "page.observe":
+            after_screenshot = await self._store_screenshot(
+                request=request,
+                session_id=session_id,
+                kind="browser_after_action",
+                source_url=observation.url,
+            )
+            if after_screenshot is not None:
+                artifact_references.append(after_screenshot)
+
+        current = await self._runtime.resume(
+            session_id,
+            organization_id=request.organization_id,
+            worker_id=request.worker_id,
+        )
+        before_fingerprint = self._observation_fingerprint(before_observation)
+        after_fingerprint = self._observation_fingerprint(observation)
+        evidence_locator = self._locator(request.input)
+        evidence_raw: dict[str, object] = {
+            "sessionId": str(session_id),
+            "pageUrl": observation.url,
+            "capability": request.capability.scope,
+            "elementReference": self._element_reference(request.input),
+            "operation": request.operation,
+            "result": "executed",
+            "verification": "pending",
+            "correlationId": request.correlation_id,
+            "beforeUrl": before_observation.url,
+            "afterUrl": observation.url,
+            "beforeObservationId": before_observation.id,
+            "afterObservationId": observation.id,
+            "stateChanged": before_fingerprint != after_fingerprint,
+            "frameOrigin": (
+                evidence_locator.frame_origin if evidence_locator is not None else None
+            ),
+            "artifacts": [item.as_dict() for item in artifact_references],
+        }
+        redacted_evidence = redact_sensitive_structure(evidence_raw)
+        assert isinstance(redacted_evidence, dict)
+
+        realtime_events.append(
+            {
+                "type": "browser.action.completed",
+                "payload": {
+                    "sessionId": str(session_id),
+                    "capability": request.capability.scope,
+                    "operation": request.operation,
+                    "result": "executed",
+                },
+            }
+        )
+        output: dict[str, object] = {
+            "session": current.as_dict(),
+            "observation": observation.as_dict(),
+            "actionEvidence": redacted_evidence,
+            "realtimeEvents": realtime_events,
+            **operation_output,
+        }
+        return ExecutionResult.successful(
+            provider=self.manifest.provider,
+            adapter=self.manifest.kind,
+            adapter_version=self.manifest.version,
+            operation=request.operation,
+            output=output,
+            artifacts=tuple(str(item.id) for item in artifact_references),
+            provider_request_id=str(session_id),
+            started_at=state.started_at,
+        )
+
     async def execute(
         self,
         *,
@@ -1095,113 +1346,17 @@ class PlaywrightBrowserProvider:
         configuration: dict[str, str],
         credential: str | None,
     ) -> ExecutionResult:
-        started_at = datetime.now(UTC)
-        session_id: UUID | None = None
-        session_owned = False
-        artifact_references: list[BrowserArtifactReference] = []
-        operation_output: dict[str, object] = {}
+        state = _BrowserExecutionState(started_at=datetime.now(UTC))
         try:
-            session_id = self._session_id(request.input)
-            if session_id is None:
-                if request.operation != "navigation.open":
-                    raise ValueError("A browser session is required for this operation.")
-                session = await self.open_session(request)
-                session_id = session.id
-                session_owned = True
-            else:
-                session = await self._runtime.resume(
-                    session_id,
-                    organization_id=request.organization_id,
-                    worker_id=request.worker_id,
-                )
-                session_owned = True
-
-            before_observation = await self._runtime.observe(
-                session_id,
-                organization_id=request.organization_id,
-                worker_id=request.worker_id,
-            )
-            sensitive_action = request.capability.side_effect or request.capability.risk in {
-                "high",
-                "critical",
-            }
-            if sensitive_action:
-                before_screenshot = await self._store_screenshot(
-                    request=request,
-                    session_id=session_id,
-                    kind="browser_before_action",
-                    source_url=before_observation.url,
-                )
-                if before_screenshot is not None:
-                    artifact_references.append(before_screenshot)
-
-            observation, operation_output, operation_artifacts = await self._execute_operation(
+            return await self._execute_authorized(
                 request=request,
                 configuration=configuration,
                 credential=credential,
-                session_id=session_id,
-                before_observation=before_observation,
-            )
-            artifact_references.extend(operation_artifacts)
-
-            if request.operation != "page.observe":
-                after_screenshot = await self._store_screenshot(
-                    request=request,
-                    session_id=session_id,
-                    kind="browser_after_action",
-                    source_url=observation.url,
-                )
-                if after_screenshot is not None:
-                    artifact_references.append(after_screenshot)
-
-            current = await self._runtime.resume(
-                session_id,
-                organization_id=request.organization_id,
-                worker_id=request.worker_id,
-            )
-            before_fingerprint = self._observation_fingerprint(before_observation)
-            after_fingerprint = self._observation_fingerprint(observation)
-            evidence_locator = self._locator(request.input)
-            evidence_raw: dict[str, object] = {
-                "sessionId": str(session_id),
-                "pageUrl": observation.url,
-                "capability": request.capability.scope,
-                "elementReference": self._element_reference(request.input),
-                "operation": request.operation,
-                "result": "executed",
-                "verification": "pending",
-                "correlationId": request.correlation_id,
-                "beforeUrl": before_observation.url,
-                "afterUrl": observation.url,
-                "beforeObservationId": before_observation.id,
-                "afterObservationId": observation.id,
-                "stateChanged": before_fingerprint != after_fingerprint,
-                "frameOrigin": (
-                    evidence_locator.frame_origin if evidence_locator is not None else None
-                ),
-                "artifacts": [item.as_dict() for item in artifact_references],
-            }
-            redacted_evidence = redact_sensitive_structure(evidence_raw)
-            assert isinstance(redacted_evidence, dict)
-            output: dict[str, object] = {
-                "session": current.as_dict(),
-                "observation": observation.as_dict(),
-                "actionEvidence": redacted_evidence,
-                **operation_output,
-            }
-            return ExecutionResult.successful(
-                provider=self.manifest.provider,
-                adapter=self.manifest.kind,
-                adapter_version=self.manifest.version,
-                operation=request.operation,
-                output=output,
-                artifacts=tuple(str(item.id) for item in artifact_references),
-                provider_request_id=str(session_id),
-                started_at=started_at,
+                state=state,
             )
         except asyncio.CancelledError:
-            if session_owned and session_id is not None:
-                await self._terminate_quietly(session_id)
+            if state.session_owned and state.session_id is not None:
+                await self._terminate_quietly(state.session_id)
             raise
         except BrowserNavigationBlocked as error:
             raise self._error(
@@ -1221,8 +1376,8 @@ class PlaywrightBrowserProvider:
         except ExecutionProviderError:
             raise
         except PermissionError as error:
-            if session_owned and session_id is not None:
-                await self._terminate_quietly(session_id)
+            if state.session_owned and state.session_id is not None:
+                await self._terminate_quietly(state.session_id)
             raise self._error(
                 request=request,
                 code="authorization_error",
@@ -1230,29 +1385,78 @@ class PlaywrightBrowserProvider:
                 safe_message="Browser session access was denied.",
                 internal_details=str(error),
             ) from error
-        except (PlaywrightTimeoutError, TimeoutError) as error:
-            if session_owned and session_id is not None:
-                await self._terminate_quietly(session_id)
+        except BrowserStaleObservation as error:
             raise self._error(
                 request=request,
-                code="timeout",
+                code="stale_observation",
+                retryable=False,
+                safe_message=("Browser observation is stale; re-observe and replan before acting."),
+                internal_details=str(error),
+            ) from error
+        except BrowserDetachedFrame as error:
+            raise self._error(
+                request=request,
+                code="detached_frame",
+                retryable=False,
+                safe_message=("Browser frame is detached or no longer matches the observation."),
+                internal_details=str(error),
+            ) from error
+        except BrowserElementNotFound as error:
+            raise self._error(
+                request=request,
+                code="element_not_found",
+                retryable=False,
+                safe_message="Browser target element was not found.",
+                internal_details=str(error),
+            ) from error
+        except BrowserDownloadFailure as error:
+            raise self._error(
+                request=request,
+                code="download_failure",
                 retryable=not request.capability.side_effect,
-                safe_message="Browser operation timed out.",
+                safe_message="Browser download failed before governed artifact persistence.",
+                internal_details=str(error),
+            ) from error
+        except BrowserRuntimeLimitExceeded as error:
+            if state.session_owned and state.session_id is not None:
+                await self._terminate_quietly(state.session_id)
+            raise self._error(
+                request=request,
+                code="runtime_limit_exceeded",
+                retryable=False,
+                safe_message=str(error),
+                internal_details=str(error),
+            ) from error
+        except (PlaywrightTimeoutError, TimeoutError) as error:
+            if (
+                state.session_owned
+                and state.session_id is not None
+                and request.capability.side_effect
+            ):
+                await self._terminate_quietly(state.session_id)
+            navigation_timeout = request.operation.startswith("navigation.")
+            raise self._error(
+                request=request,
+                code="navigation_timeout" if navigation_timeout else "timeout",
+                retryable=(navigation_timeout and not request.capability.side_effect),
+                safe_message=(
+                    "Browser navigation timed out."
+                    if navigation_timeout
+                    else "Browser operation timed out."
+                ),
                 internal_details=str(error),
             ) from error
         except LookupError as error:
-            if session_owned and session_id is not None:
-                await self._terminate_quietly(session_id)
             raise self._error(
                 request=request,
                 code="resource_not_found",
                 retryable=False,
-                safe_message="Browser session, artifact, frame, or target element was not found.",
+                safe_message="Browser session or authorized resource was not found.",
                 internal_details=str(error),
             ) from error
         except ValueError as error:
-            if session_owned and session_id is not None:
-                await self._terminate_quietly(session_id)
+            if state.session_owned and state.session_id is not None:
+                await self._terminate_quietly(state.session_id)
             raise self._error(
                 request=request,
                 code="validation_error",
@@ -1276,8 +1480,25 @@ class PlaywrightBrowserProvider:
                 internal_details=str(error),
             ) from error
         except PlaywrightError as error:
-            if session_owned and session_id is not None:
-                await self._terminate_quietly(session_id)
+            if _playwright_crash(error):
+                if state.session_owned and state.session_id is not None:
+                    await self._fail_quietly(state.session_id)
+                raise self._error(
+                    request=request,
+                    code="browser_crash",
+                    retryable=(
+                        request.operation == "navigation.open"
+                        and not request.capability.side_effect
+                    ),
+                    safe_message="Browser process or context crashed during execution.",
+                    internal_details=str(error),
+                ) from error
+            if (
+                state.session_owned
+                and state.session_id is not None
+                and request.capability.side_effect
+            ):
+                await self._terminate_quietly(state.session_id)
             raise self._error(
                 request=request,
                 code="temporary_provider_error",
@@ -1291,6 +1512,48 @@ class PlaywrightBrowserProvider:
             await self._runtime.terminate(session_id)
         except (LookupError, PlaywrightError):
             return
+
+    async def _fail_quietly(self, session_id: UUID) -> None:
+        try:
+            await self._runtime.fail(session_id)
+        except (LookupError, PlaywrightError):
+            return
+
+    async def recover_execution(
+        self,
+        *,
+        request: ExecutionRequest,
+        error: ExecutionError,
+        result: ExecutionResult | None,
+        configuration: dict[str, str],
+        credential: str | None,
+    ) -> str | None:
+        del result, configuration, credential
+        if error.code not in {"stale_observation", "detached_frame"}:
+            return None
+        session_id = self._session_id(request.input)
+        if session_id is None:
+            return "Browser state must be observed again before replanning."
+        session = await self._runtime.resume(
+            session_id,
+            organization_id=request.organization_id,
+            worker_id=request.worker_id,
+        )
+        current = await self.observe(session=session, request=request)
+        policy = self._domain_policy(
+            request.resource.configuration,
+            fallback_url=request.resource.web_url,
+        )
+        decision = policy.permits(current.url, source_url=session.current_url)
+        if not decision.allowed:
+            return (
+                "Browser re-observed after stale state, but the current destination "
+                "requires a new policy/resource decision before replanning."
+            )
+        return (
+            "Browser state re-observed successfully; discard stale locators and "
+            "replan from the new observation."
+        )
 
     async def recover(
         self,
@@ -1386,6 +1649,22 @@ class PlaywrightBrowserProvider:
 
         if failure_artifact is not None:
             details["verificationEvidenceArtifact"] = failure_artifact.as_dict()
+
+        if not verified:
+            realtime_events = output.get("realtimeEvents")
+            if isinstance(realtime_events, list):
+                realtime_events.append(
+                    {
+                        "type": "browser.verification.failed",
+                        "payload": {
+                            "capability": request.capability.scope,
+                            "operation": request.operation,
+                            "summary": (
+                                "Browser outcome could not be verified from observable state."
+                            ),
+                        },
+                    }
+                )
 
         evidence_with_verification = {
             **(evidence if isinstance(evidence, dict) else {}),
