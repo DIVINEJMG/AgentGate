@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 import ipaddress
 import socket
+from dataclasses import dataclass
 from urllib.parse import urlsplit
-
 
 _CLOUD_METADATA_HOSTS = {
     "169.254.169.254",
