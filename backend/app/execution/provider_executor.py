@@ -206,9 +206,7 @@ class DatabaseProviderContextLoader:
                     aggregate_id=f"{request.idempotency_key}:{index}",
                     payload={
                         "organization_id": str(request.organization_id),
-                        "worker_id": (
-                            str(request.worker_id) if request.worker_id else None
-                        ),
+                        "worker_id": (str(request.worker_id) if request.worker_id else None),
                         "run_id": str(request.run_id) if request.run_id else None,
                         "resource_id": request.resource.id,
                         "provider": result.provider,
