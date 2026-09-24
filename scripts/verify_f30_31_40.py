@@ -34,6 +34,7 @@ def main() -> None:
     action_tx = text(APP / "infrastructure" / "database" / "action_transaction.py")
     observation = text(APP / "execution" / "browser" / "observation.py")
     redaction = text(APP / "execution" / "redaction.py")
+    f30_0_10 = text(TESTS / "test_f30_0_10.py")
     f30_11_20 = text(TESTS / "test_f30_11_20.py")
     f30_21_30 = text(TESTS / "test_f30_21_30.py")
     f30_31_40 = text(TESTS / "test_f30_31_40.py")
@@ -202,7 +203,7 @@ def main() -> None:
         "artifact",
         "approval",
     ):
-        combined = f30_11_20 + f30_21_30 + f30_31_40
+        combined = f30_0_10 + f30_11_20 + f30_21_30 + f30_31_40
         require(
             invariant.lower() in combined.lower(),
             f"Browser security coverage missing invariant: {invariant}",
@@ -224,7 +225,8 @@ def main() -> None:
         "core provider executor contains Browser-specific branches",
     )
     require(
-        "Action Gateway authorization already satisfied." in lifecycle
+        "class ActionGateway" in action_gateway
+        and "Action Gateway authorization already satisfied." in lifecycle
         and "snapshot" in executor
         and "Authorization snapshot" in executor,
         "Browser execution is not downstream of Action Gateway authorization",
