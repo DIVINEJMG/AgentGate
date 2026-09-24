@@ -20,6 +20,7 @@ jobs:
         run: |
           grep -q 'name: audoryn-api' infrastructure/render/render.yaml
           grep -q 'name: audoryn-worker' infrastructure/render/render.yaml
-          grep -q 'name: audoryn-outbox' infrastructure/render/render.yaml
+          ! grep -q 'name: audoryn-outbox' infrastructure/render/render.yaml
           ! grep -q 'name: audoryn-scheduler' infrastructure/render/render.yaml
+          grep -q 'QSTASH_OUTBOX_DRAIN_URL' infrastructure/render/render.yaml
           grep -q 'RUNTIME_EXECUTION_ENABLED' infrastructure/render/render.yaml
