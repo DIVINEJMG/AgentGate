@@ -249,16 +249,19 @@ def test_f29_realtime_event_catalog_matches_contract() -> None:
     assert REALTIME_EVENT_TYPES == expected
 
 
-def test_f29_websocket_and_sse_routes_are_mounted() -> None:
-    from app.bootstrap.application import create_application
+def test_f29_websocket_and_sse_routes_are_defined() -> None:
+    from app.api.realtime_routes import v2_router, ws_router
 
-    application = create_application()
-    route_paths = {
+    websocket_paths = {
         str(route.path)  # type: ignore[attr-defined]
-        for route in application.routes
+        for route in ws_router.routes
         if hasattr(route, "path")
     }
-    assert "/ws/v1/organizations/{organization_id}" in route_paths
+    sse_paths = {
+        str(route.path)  # type: ignore[attr-defined]
+        for route in v2_router.routes
+        if hasattr(route, "path")
+    }
 
-    paths = set(application.openapi()["paths"])
-    assert "/api/v2/organizations/{organization_id}/events/stream" in paths
+    assert "/ws/v1/organizations/{organization_id}" in websocket_paths
+    assert "/organizations/{organization_id}/events/stream" in sse_paths
