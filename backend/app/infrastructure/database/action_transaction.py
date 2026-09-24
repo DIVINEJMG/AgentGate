@@ -3,8 +3,8 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.infrastructure.database.models import Action, Approval, AuditEvent
 from app.execution.provenance import audit_provenance_payload
+from app.infrastructure.database.models import Action, Approval, AuditEvent
 from app.infrastructure.database.outbox import TransactionalOutbox
 
 
