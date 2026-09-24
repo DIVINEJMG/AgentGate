@@ -41,8 +41,7 @@ class CapabilityResolver:
         suspended_resources: frozenset[str] = frozenset(),
     ) -> tuple[AuthorizedCapability, ...]:
         permissions = {
-            (snapshot.provider, snapshot.resource_id): snapshot
-            for snapshot in permission_snapshots
+            (snapshot.provider, snapshot.resource_id): snapshot for snapshot in permission_snapshots
         }
         resolved: list[AuthorizedCapability] = []
 
