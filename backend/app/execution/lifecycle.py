@@ -95,9 +95,7 @@ class ObserveActVerifyLifecycle:
                 if recovery.action == "reobserve_replan" and recover is not None:
                     recovery_detail = await recover(error.error, None)
                     if recovery_detail:
-                        checkpoints.append(
-                            LifecycleCheckpoint("recover", attempt, recovery_detail)
-                        )
+                        checkpoints.append(LifecycleCheckpoint("recover", attempt, recovery_detail))
                 checkpoints.append(LifecycleCheckpoint("escalate", attempt, recovery.reason))
                 return LifecycleOutcome(
                     result=None,
