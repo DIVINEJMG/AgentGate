@@ -29,6 +29,7 @@ class TransactionalOutbox:
         )
         self._session.add(event)
         await self._session.flush()
+        self._session.info["outbox_pending"] = True
         return event
 
     async def unpublished(self, *, limit: int = 100) -> list[OutboxEvent]:

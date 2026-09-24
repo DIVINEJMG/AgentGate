@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.api.internal.outbox import _verify_qstash as verify_outbox_qstash
 from app.api.realtime_routes import _ensure_organization_access
 from app.domain.identity.errors import AuthorizationError
 from app.domain.identity.principals import HumanPrincipal
@@ -471,3 +472,50 @@ def test_f29_audit_and_result_provenance_retain_execution_identity() -> None:
         "adapter": "native_api",
         "adapter_version": "1.0.0",
     }
+
+
+def test_f29_qstash_outbox_drain_requires_signed_delivery() -> None:
+    from fastapi import HTTPException
+    from starlette.requests import Request
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/internal/v1/outbox/drain",
+            "headers": [],
+            "query_string": b"",
+            "server": ("testserver", 80),
+            "scheme": "http",
+        }
+    )
+
+    with pytest.raises(HTTPException) as error:
+        verify_outbox_qstash(request, b"{}", None)
+
+    assert error.value.status_code == 401
+
+
+def test_f29_outbox_after_commit_requests_immediate_qstash_drain(monkeypatch) -> None:
+    from app.infrastructure.database import session as session_module
+
+    requested: list[str] = []
+
+    def fake_request(*, reason: str) -> None:
+        requested.append(reason)
+
+    monkeypatch.setattr(
+        session_module,
+        "request_outbox_drain_after_commit",
+        fake_request,
+    )
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.info = {"outbox_pending": True}
+
+    fake_session = FakeSession()
+    session_module._request_outbox_drain_after_commit(fake_session)  # type: ignore[arg-type]
+
+    assert requested == ["transaction_committed"]
+    assert fake_session.info == {}

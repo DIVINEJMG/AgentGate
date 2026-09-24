@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Response, status
 
 from app.api.internal.migration import router as internal_migration_router
+from app.api.internal.outbox import router as internal_outbox_router
 from app.api.internal.runtime import router as internal_runtime_router
 from app.api.realtime_routes import ws_router as realtime_ws_router
 from app.api.v1.router import router as v1_router
@@ -28,6 +29,7 @@ async def ready(response: Response) -> dict[str, object]:
 
 api_router.include_router(realtime_ws_router)
 api_router.include_router(internal_migration_router)
+api_router.include_router(internal_outbox_router)
 api_router.include_router(internal_runtime_router)
 api_router.include_router(v1_router, prefix="/api/v1")
 api_router.include_router(v2_router, prefix="/api/v2")

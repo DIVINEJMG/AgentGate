@@ -63,12 +63,21 @@ def main() -> None:
     require("audoryn.realtime.cursor." in frontend_realtime, "frontend replay cursor persistence missing")
     require("replayThenConnect" in frontend_realtime, "frontend reconnect replay missing")
 
-    outbox = text(APP / "runtime" / "outbox_worker.py")
-    require("run_outbox_publisher" in outbox, "dedicated outbox publisher loop missing")
+    outbox = text(APP / "runtime" / "outbox_publisher.py")
+    require("drain_outbox_batch" in outbox, "outbox drain publisher missing")
     require("event_id=str(event.id)" in outbox, "stable outbox realtime event identity missing")
 
+    outbox_route = text(APP / "api" / "internal" / "outbox.py")
+    require("/drain" in outbox_route, "QStash outbox drain endpoint missing")
+    require("QStashSignatureVerifier" in outbox_route, "outbox drain signature verification missing")
+
+    session = text(APP / "infrastructure" / "database" / "session.py")
+    require("after_commit" in session, "post-commit outbox trigger missing")
+    require("outbox_pending" in text(APP / "infrastructure" / "database" / "outbox.py"), "outbox commit marker missing")
+
     render = text(ROOT / "infrastructure" / "render" / "render.yaml")
-    require("name: audoryn-outbox" in render, "audoryn-outbox Render process missing")
+    require("name: audoryn-outbox" not in render, "paid Render outbox worker must remain removed")
+    require("QSTASH_OUTBOX_DRAIN_URL" in render, "QStash outbox drain URL config missing")
 
     metrics = text(APP / "observability" / "metrics.py")
     for metric in (

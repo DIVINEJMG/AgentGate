@@ -21,6 +21,8 @@ services:
         sync: false
       - key: QSTASH_NEXT_SIGNING_KEY
         sync: false
+      - key: QSTASH_OUTBOX_DRAIN_URL
+        sync: false
       - key: UPSTASH_BLOB_BUCKET
         sync: false
       - key: UPSTASH_BLOB_TOKEN
@@ -43,21 +45,3 @@ services:
         sync: false
       - key: RUNTIME_EXECUTION_ENABLED
         value: "false"
-
-  - type: worker
-    name: audoryn-outbox
-    runtime: python
-    rootDir: backend
-    buildCommand: pip install -e .
-    startCommand: python -m app.runtime.outbox_worker
-    envVars:
-      - key: ENVIRONMENT
-        value: production
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: QSTASH_URL
-        sync: false
-      - key: QSTASH_TOKEN
-        sync: false

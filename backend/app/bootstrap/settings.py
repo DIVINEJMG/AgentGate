@@ -55,6 +55,13 @@ class Settings(BaseSettings):
         ),
     )
     qstash_failure_callback_url: str | None = None
+    qstash_outbox_drain_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "UPSTASH_QSTASH_OUTBOX_DRAIN_URL",
+            "QSTASH_OUTBOX_DRAIN_URL",
+        ),
+    )
     legacy_database_url: SecretStr | None = None
     migration_execution_enabled: bool = False
     integration_encryption_key: SecretStr | None = None
