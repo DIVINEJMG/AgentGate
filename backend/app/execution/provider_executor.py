@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from sqlalchemy import select
@@ -21,13 +21,30 @@ from app.execution.contracts import (
 from app.execution.lifecycle import ObserveActVerifyLifecycle
 from app.execution.providers.registry import ProviderRegistry
 from app.execution.providers.resolver import ExecutionResolver
-from app.infrastructure.database.models import Integration, IntegrationCredential
+from app.infrastructure.database.models import (
+    AuditEvent,
+    Integration,
+    IntegrationCredential,
+)
+from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.secrets.provider_vault import DatabaseSecretVault
 from app.observability.metrics import ExecutionMetrics
 
 
 class ProviderContextLoader(Protocol):
     async def load(self, proposal: ActionProposal) -> ProviderRuntimeContext: ...
+
+
+@runtime_checkable
+class ExecutionEvidenceRecorder(Protocol):
+    async def record_execution_evidence(
+        self,
+        *,
+        request: ExecutionRequest,
+        result,
+        verification,
+        snapshot: ExecutionAuthorizationSnapshot,
+    ) -> None: ...
 
 
 class DatabaseProviderContextLoader:
@@ -113,6 +130,77 @@ class DatabaseProviderContextLoader:
             resource=resource,
             credential_reference=credential_reference,
         )
+
+    async def record_execution_evidence(
+        self,
+        *,
+        request: ExecutionRequest,
+        result,
+        verification,
+        snapshot: ExecutionAuthorizationSnapshot,
+    ) -> None:
+        output = result.output if isinstance(result.output, dict) else {}
+        action_evidence = output.get("actionEvidence")
+        evidence = action_evidence if isinstance(action_evidence, dict) else {}
+        verification_failure_artifact = verification.details.get("verificationEvidenceArtifact")
+        artifact_ids = list(result.artifacts)
+        if isinstance(verification_failure_artifact, dict):
+            raw_id = verification_failure_artifact.get("id")
+            if raw_id is not None and str(raw_id) not in artifact_ids:
+                artifact_ids.append(str(raw_id))
+
+        audit = AuditEvent(
+            organization_id=request.organization_id,
+            event_type="action.executed",
+            category="execution",
+            severity="info" if verification.verified else "warning",
+            correlation_id=request.correlation_id,
+            actor={"type": "agent", "id": str(request.agent_id)},
+            resource={
+                "type": "execution_resource",
+                "id": request.resource.id,
+                "name": request.resource.display_name,
+            },
+            payload={
+                "outcome": "verified" if verification.verified else "verification_failed",
+                "summary": verification.summary,
+                "metadata": {
+                    "provider": result.provider,
+                    "adapter": result.adapter,
+                    "adapterVersion": result.adapter_version,
+                    "capability": request.capability.scope,
+                    "operation": request.operation,
+                    "resourceId": request.resource.id,
+                    "actionEvidence": evidence,
+                    "verification": {
+                        "verified": verification.verified,
+                        "summary": verification.summary,
+                        "details": verification.details,
+                    },
+                    "artifactIds": artifact_ids,
+                    "authorization": snapshot.as_dict(),
+                },
+            },
+        )
+        self._session.add(audit)
+        await TransactionalOutbox(self._session).enqueue(
+            topic="action.executed",
+            aggregate_type="execution",
+            aggregate_id=request.idempotency_key,
+            payload={
+                "organization_id": str(request.organization_id),
+                "worker_id": str(request.worker_id) if request.worker_id else None,
+                "run_id": str(request.run_id) if request.run_id else None,
+                "resource_id": request.resource.id,
+                "provider": result.provider,
+                "capability": request.capability.scope,
+                "operation": request.operation,
+                "verified": verification.verified,
+                "artifact_ids": artifact_ids,
+                "correlation_id": request.correlation_id,
+            },
+        )
+        await self._session.flush()
 
 
 class UniversalProviderExecutor:
@@ -246,6 +334,14 @@ class UniversalProviderExecutor:
             fallback_used=outcome.recovery is not None
             and outcome.recovery.action == "fallback_provider",
         )
+        if isinstance(self._context_loader, ExecutionEvidenceRecorder):
+            await self._context_loader.record_execution_evidence(
+                request=execution,
+                result=result,
+                verification=verification,
+                snapshot=snapshot,
+            )
+
         summary = verification.summary
         return IntegrationExecutionResult(
             provider_operation=result.operation,

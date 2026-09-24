@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.execution.provenance import audit_provenance_payload
+from app.execution.redaction import redacted_dict
 from app.infrastructure.database.models import Action, Approval, AuditEvent
 from app.infrastructure.database.outbox import TransactionalOutbox
 
@@ -35,7 +36,7 @@ class ActionApprovalTransaction:
             resource_id=resource_id,
             scope=scope,
             idempotency_key=idempotency_key,
-            payload=dict(payload),
+            payload=redacted_dict(payload),
         )
         self._session.add(action)
         await self._session.flush()

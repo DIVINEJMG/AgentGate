@@ -8,11 +8,13 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.execution.browser.contracts import (
+    BrowserDownload,
     BrowserElement,
     BrowserFrame,
     BrowserLocator,
     BrowserObservation,
     BrowserSession,
+    BrowserVerificationProbe,
 )
 from app.execution.contracts import (
     ExecutionPreferences,
@@ -88,9 +90,9 @@ class FakeBrowserRuntime:
             session_id=session_id,
             url=url,
             title="Aduoryn Browser Test",
-            visible_text="Open settings Submit",
-            aria_snapshot='- button "Submit"',
-            dom_snapshot="<main><button>Submit</button></main>",
+            visible_text=f"Open settings Submit {self.operations!r}",
+            aria_snapshot=f'- button "Submit" {self.operations!r}',
+            dom_snapshot=f"<main><button>Submit</button>{self.operations!r}</main>",
             elements=(
                 BrowserElement(
                     ref="e1",
@@ -159,9 +161,11 @@ class FakeBrowserRuntime:
         operation,
         locator=None,
         value=None,
+        dialog_action=None,
+        prompt_text=None,
         timeout_ms=15000,
     ):
-        del locator, value, timeout_ms
+        del locator, value, dialog_action, prompt_text, timeout_ms
         await self.resume(
             session_id,
             organization_id=organization_id,
@@ -196,9 +200,11 @@ class FakeBrowserRuntime:
         worker_id,
         form_ref=None,
         submit_locator=None,
+        dialog_action=None,
+        prompt_text=None,
         timeout_ms=15000,
     ):
-        del form_ref, submit_locator, timeout_ms
+        del form_ref, submit_locator, dialog_action, prompt_text, timeout_ms
         await self.resume(
             session_id,
             organization_id=organization_id,
@@ -237,6 +243,81 @@ class FakeBrowserRuntime:
         )
         self.operations.append(("auth", "auth.login"))
         return self._observation(session_id, "https://example.com/current")
+
+    async def screenshot(self, session_id, *, organization_id, worker_id):
+        await self.resume(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        return b"fake-png"
+
+    async def upload_file(
+        self,
+        session_id,
+        *,
+        organization_id,
+        worker_id,
+        locator,
+        name,
+        media_type,
+        content,
+        dialog_action=None,
+        prompt_text=None,
+        timeout_ms=15000,
+    ):
+        del locator, name, media_type, content, dialog_action, prompt_text, timeout_ms
+        await self.resume(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        self.operations.append(("file", "file.upload"))
+        return self._observation(session_id, "https://example.com/current")
+
+    async def download_file(
+        self,
+        session_id,
+        *,
+        organization_id,
+        worker_id,
+        locator,
+        timeout_ms=30000,
+        max_bytes=20 * 1024 * 1024,
+    ):
+        del locator, timeout_ms, max_bytes
+        await self.resume(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        self.operations.append(("file", "file.download"))
+        return (
+            BrowserDownload(
+                name="report.txt",
+                source_url="https://example.com/report.txt",
+                content=b"report",
+                media_type="text/plain",
+            ),
+            self._observation(session_id, "https://example.com/current"),
+        )
+
+    async def verify_browser_state(
+        self,
+        session_id,
+        *,
+        organization_id,
+        worker_id,
+        expectation,
+        result_output,
+    ):
+        del expectation, result_output
+        await self.resume(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        return BrowserVerificationProbe(verified=True, details={"fake": True})
 
 
 def resource(provider: PlaywrightBrowserProvider) -> ResourceDescriptor:
