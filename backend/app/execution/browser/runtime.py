@@ -716,7 +716,7 @@ class BrowserRuntime:
             selected = frame
             break
         if selected is None:
-            raise LookupError("Browser frame target was not found.")
+            raise BrowserDetachedFrame("Browser frame target was not found.")
 
         decision = policy.permits(selected.url, source_url=handle.page.url)
         if not decision.allowed:
