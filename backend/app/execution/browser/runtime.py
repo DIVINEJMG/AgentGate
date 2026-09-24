@@ -65,7 +65,6 @@ class BrowserRuntimeContract(Protocol):
         run_id: UUID | None,
         ttl_seconds: int = 1800,
         navigation_policy: BrowserDomainPolicy | None = None,
-        max_pages: int = 8,
     ) -> BrowserSession: ...
 
     async def resume(
@@ -490,7 +489,6 @@ class BrowserRuntime:
         run_id: UUID | None,
         ttl_seconds: int = 1800,
         navigation_policy: BrowserDomainPolicy | None = None,
-        max_pages: int = 8,
     ) -> BrowserSession:
         browser = await self._ensure_browser()
         context = await browser.new_context()
@@ -513,7 +511,7 @@ class BrowserRuntime:
                 context=context,
                 page=page,
                 navigation_policy=navigation_policy,
-                max_pages=max(1, max_pages),
+                max_pages=8,
             )
             self._register_page(handle, page)
             context.on("page", lambda popup: self._register_page(handle, popup))
