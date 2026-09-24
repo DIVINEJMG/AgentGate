@@ -746,14 +746,10 @@ class BrowserRuntime:
             if observation is None:
                 raise LookupError("No browser observation is available for this session.")
             if locator.observation_id and locator.observation_id != observation.id:
-                raise BrowserStaleObservation(
-                    "Browser locator refers to a stale observation."
-                )
+                raise BrowserStaleObservation("Browser locator refers to a stale observation.")
             refs = {item.ref for item in observation.elements}
             if locator.value not in refs:
-                raise BrowserElementNotFound(
-                    "Browser observation element reference was not found."
-                )
+                raise BrowserElementNotFound("Browser observation element reference was not found.")
             try:
                 index = int(locator.value.removeprefix("e")) - 1
             except ValueError as error:
@@ -1296,9 +1292,7 @@ class BrowserRuntime:
         download = await download_info.value
         failure = await download.failure()
         if failure:
-            raise BrowserDownloadFailure(
-                "Browser download failed before artifact persistence."
-            )
+            raise BrowserDownloadFailure("Browser download failed before artifact persistence.")
 
         source_url = download.url
         policy = handle.navigation_policy
@@ -1318,9 +1312,7 @@ class BrowserRuntime:
         content = await asyncio.to_thread(Path(download_path).read_bytes)
         if len(content) > max_bytes:
             await download.delete()
-            raise BrowserRuntimeLimitExceeded(
-                "Browser download exceeds the configured size limit."
-            )
+            raise BrowserRuntimeLimitExceeded("Browser download exceeds the configured size limit.")
         name = download.suggested_filename or "download.bin"
         media_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
         await download.delete()
