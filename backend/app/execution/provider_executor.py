@@ -324,9 +324,14 @@ class UniversalProviderExecutor:
             execution,
             contexts={execution.resource.provider: context},
         )
+        recoverable_provider = (
+            resolved.provider
+            if isinstance(resolved.provider, RecoverableExecutionProvider)
+            else None
+        )
         recover = None
-        if isinstance(resolved.provider, RecoverableExecutionProvider):
-            recover = lambda error, result: resolved.provider.recover_execution(
+        if recoverable_provider is not None:
+            recover = lambda error, result: recoverable_provider.recover_execution(
                 request=execution,
                 error=error,
                 result=result,
