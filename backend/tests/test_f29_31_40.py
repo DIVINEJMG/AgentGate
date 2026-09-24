@@ -511,9 +511,11 @@ def test_f29_outbox_after_commit_requests_immediate_qstash_drain(monkeypatch) ->
     )
 
     class FakeSession:
-        info = {"outbox_pending": True}
+        def __init__(self) -> None:
+            self.info = {"outbox_pending": True}
 
-    session_module._request_outbox_drain_after_commit(FakeSession())  # type: ignore[arg-type]
+    fake_session = FakeSession()
+    session_module._request_outbox_drain_after_commit(fake_session)  # type: ignore[arg-type]
 
     assert requested == ["transaction_committed"]
-    assert FakeSession.info == {}
+    assert fake_session.info == {}
