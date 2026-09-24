@@ -5,6 +5,7 @@ from typing import Protocol, runtime_checkable
 from app.execution.authorization import ProviderPermissionSnapshot
 from app.execution.contracts import (
     CapabilityDescriptor,
+    ExecutionError,
     ExecutionRequest,
     ExecutionResult,
     ProviderHealth,
@@ -87,7 +88,7 @@ class RecoverableExecutionProvider(Protocol):
         self,
         *,
         request: ExecutionRequest,
-        error,
+        error: ExecutionError,
         result: ExecutionResult | None,
         configuration: dict[str, str],
         credential: str | None,
