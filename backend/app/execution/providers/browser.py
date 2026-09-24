@@ -8,10 +8,11 @@ from app.execution.contracts import (
     ExecutionResult,
     VerificationResult,
 )
+from app.execution.providers.base import ExecutionProvider
 
 
 @runtime_checkable
-class BrowserExecutionProvider(Protocol):
+class BrowserExecutionProvider(ExecutionProvider, Protocol):
     """Interface only. F30 supplies the browser engine implementation.
 
     Browser execution is still invoked only after ActionGateway authorization; this
