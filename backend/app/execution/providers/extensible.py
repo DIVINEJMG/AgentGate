@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Literal, Protocol, runtime_checkable
 
 from app.execution.contracts import CapabilityDescriptor, ResourceDescriptor
+from app.execution.providers.base import ExecutionProvider
 
 ExtensibleProviderType = Literal[
     "mcp",
@@ -26,7 +27,7 @@ class ExternalToolDescriptor:
 
 
 @runtime_checkable
-class CustomExecutionProvider(Protocol):
+class CustomExecutionProvider(ExecutionProvider, Protocol):
     """Discovery contract for MCP/OpenAPI/internal/custom tools.
 
     Discovered tools must be normalized into F29 capability/resource descriptors
