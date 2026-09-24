@@ -10,6 +10,7 @@ from app.execution.contracts import (
     ExecutionProviderError,
     ExecutionRequest,
     ExecutionResult,
+    ProviderKind,
     VerificationResult,
 )
 from app.execution.recovery import RecoveryPlan, RecoveryPolicy
@@ -60,7 +61,7 @@ class ObserveActVerifyLifecycle:
         execute: Callable[[], Awaitable[ExecutionResult]],
         verify: Callable[[ExecutionResult], Awaitable[VerificationResult]],
         policy_allows_fallback: bool = False,
-        alternate_kind=None,
+        alternate_kind: ProviderKind | None = None,
     ) -> LifecycleOutcome:
         checkpoints: list[LifecycleCheckpoint] = [
             LifecycleCheckpoint("observe", 0, "Execution context observed."),
