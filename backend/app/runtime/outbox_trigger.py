@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from uuid import uuid4
 
 from app.bootstrap.settings import settings
 from app.infrastructure.qstash.provider import UpstashQStashProvider
+
+logger = logging.getLogger(__name__)
 
 
 async def request_outbox_drain(*, reason: str) -> str | None:
@@ -44,11 +47,16 @@ def request_outbox_drain_after_commit(*, reason: str) -> None:
     task = loop.create_task(request_outbox_drain(reason=reason))
 
     def _consume_result(completed: asyncio.Task[str | None]) -> None:
-        try:
-            completed.result()
-        except Exception:
+        if completed.cancelled():
+            logger.warning("Post-commit QStash outbox signal was cancelled.")
+            return
+        error = completed.exception()
+        if error is not None:
             # Never turn an already-successful DB commit into an application failure.
             # The scheduled QStash recovery sweep is the durability backstop.
-            pass
+            logger.warning(
+                "Post-commit QStash outbox signal failed; recovery sweep will retry: %s",
+                error,
+            )
 
     task.add_done_callback(_consume_result)
