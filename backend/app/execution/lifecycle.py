@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from app.execution.contracts import (
+    ExecutionError,
     ExecutionProviderError,
     ExecutionRequest,
     ExecutionResult,
@@ -38,6 +39,7 @@ class LifecycleOutcome:
     result: ExecutionResult | None
     verification: VerificationResult | None
     recovery: RecoveryPlan | None
+    error: ExecutionError | None
     checkpoints: tuple[LifecycleCheckpoint, ...]
 
 
@@ -94,6 +96,7 @@ class ObserveActVerifyLifecycle:
                     result=None,
                     verification=None,
                     recovery=recovery,
+                    error=error.error,
                     checkpoints=tuple(checkpoints),
                 )
 
@@ -109,6 +112,7 @@ class ObserveActVerifyLifecycle:
                     result=result,
                     verification=verification,
                     recovery=None,
+                    error=None,
                     checkpoints=tuple(checkpoints),
                 )
 
@@ -137,5 +141,6 @@ class ObserveActVerifyLifecycle:
                 result=result,
                 verification=verification,
                 recovery=recovery,
+                error=verification_error.error,
                 checkpoints=tuple(checkpoints),
             )
