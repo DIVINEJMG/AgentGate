@@ -929,10 +929,18 @@ class PlaywrightBrowserProvider:
                     source_url=None,
                 )
             )
+        ttl_seconds = _bounded_int(
+            request.resource.configuration,
+            "sessionTtlSeconds",
+            1800,
+            minimum=60,
+            maximum=MAX_SESSION_TTL_SECONDS,
+        )
         return await self._runtime.create_session(
             organization_id=request.organization_id,
             worker_id=request.worker_id,
             run_id=request.run_id,
+            ttl_seconds=ttl_seconds,
             navigation_policy=policy,
         )
 
@@ -981,7 +989,13 @@ class PlaywrightBrowserProvider:
         dict[str, object],
         tuple[BrowserArtifactReference, ...],
     ]:
-        timeout_ms = int(configuration.get("actionTimeoutMs", "15000"))
+        timeout_ms = _bounded_int(
+            configuration,
+            "actionTimeoutMs",
+            15_000,
+            minimum=1_000,
+            maximum=MAX_ACTION_TIMEOUT_MS,
+        )
         dialog_action, dialog_prompt = self._dialog(request.input)
 
         if request.operation == "page.observe":
@@ -995,7 +1009,13 @@ class PlaywrightBrowserProvider:
                 operation=request.operation,
                 url=(str(request.input.get("url")) if request.input.get("url") else None),
                 locator=self._locator(request.input),
-                timeout_ms=int(configuration.get("navigationTimeoutMs", "30000")),
+                timeout_ms=_bounded_int(
+                    configuration,
+                    "navigationTimeoutMs",
+                    30_000,
+                    minimum=1_000,
+                    maximum=MAX_NAVIGATION_TIMEOUT_MS,
+                ),
             )
             return (observation, {}, ())
 
@@ -1092,12 +1112,19 @@ class PlaywrightBrowserProvider:
                 organization_id=request.organization_id,
                 worker_id=request.worker_id,
                 locator=locator,
-                timeout_ms=int(configuration.get("downloadTimeoutMs", "30000")),
-                max_bytes=int(
-                    configuration.get(
-                        "maxDownloadBytes",
-                        str(20 * 1024 * 1024),
-                    )
+                timeout_ms=_bounded_int(
+                    configuration,
+                    "downloadTimeoutMs",
+                    30_000,
+                    minimum=1_000,
+                    maximum=MAX_NAVIGATION_TIMEOUT_MS,
+                ),
+                max_bytes=_bounded_int(
+                    configuration,
+                    "maxDownloadBytes",
+                    MAX_DOWNLOAD_BYTES,
+                    minimum=1,
+                    maximum=MAX_DOWNLOAD_BYTES,
                 ),
             )
             persisted = await store.store(
