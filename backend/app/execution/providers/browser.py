@@ -1428,7 +1428,11 @@ class PlaywrightBrowserProvider:
                 internal_details=str(error),
             ) from error
         except (PlaywrightTimeoutError, TimeoutError) as error:
-            if state.session_owned and state.session_id is not None and request.capability.side_effect:
+            if (
+                state.session_owned
+                and state.session_id is not None
+                and request.capability.side_effect
+            ):
                 await self._terminate_quietly(state.session_id)
             navigation_timeout = request.operation.startswith("navigation.")
             raise self._error(
@@ -1489,7 +1493,11 @@ class PlaywrightBrowserProvider:
                     safe_message="Browser process or context crashed during execution.",
                     internal_details=str(error),
                 ) from error
-            if state.session_owned and state.session_id is not None and request.capability.side_effect:
+            if (
+                state.session_owned
+                and state.session_id is not None
+                and request.capability.side_effect
+            ):
                 await self._terminate_quietly(state.session_id)
             raise self._error(
                 request=request,
