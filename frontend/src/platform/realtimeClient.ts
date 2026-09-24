@@ -15,6 +15,29 @@ export interface RealtimeEvent {
 
 export type RealtimeTransport = 'connecting' | 'websocket' | 'sse' | 'polling';
 
+const NORMALIZED_EVENT_TYPES = [
+  'run.created',
+  'run.started',
+  'run.progress',
+  'run.step.started',
+  'run.step.completed',
+  'run.waiting_approval',
+  'run.failed',
+  'run.completed',
+  'result.created',
+  'result.updated',
+  'worker.status.changed',
+  'action.proposed',
+  'action.approved',
+  'action.blocked',
+  'action.executed',
+  'approval.created',
+  'approval.decided',
+  'incident.created',
+  'incident.updated',
+  'integration.health.changed',
+] as const;
+
 interface SubscriptionOptions {
   organizationId: string;
   eventTypes?: Iterable<string>;
@@ -98,14 +121,14 @@ export function subscribeOrganizationRealtime({
       stopPolling();
       changeTransport('sse');
     };
-    source.onmessage = (message) => {
-      const event = parseEvent(message.data);
-      if (event && accepts(event, allowed)) onEvent(event);
-    };
-    source.addEventListener('run.progress', (message) => {
+    const receive = (message: Event) => {
       const event = parseEvent((message as MessageEvent<string>).data);
       if (event && accepts(event, allowed)) onEvent(event);
-    });
+    };
+    source.onmessage = receive;
+    for (const eventType of NORMALIZED_EVENT_TYPES) {
+      source.addEventListener(eventType, receive);
+    }
     source.onerror = () => {
       source?.close();
       source = null;
