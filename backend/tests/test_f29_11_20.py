@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.bootstrap.application import create_application
 from app.domain.actions.gateway import ActionGateway, AuthorizationDecision
 from app.domain.identity.principals import AgentPrincipal
 from app.domain.integrations.contracts import IntegrationExecutionResult
@@ -15,7 +16,6 @@ from app.execution.authorization import (
     UniversalActionRequest,
 )
 from app.execution.contracts import CapabilityDescriptor, ExecutionRequest, ResourceDescriptor
-from app.bootstrap.application import create_application
 from app.realtime.bus import RedisRealtimeBus
 from app.realtime.contracts import REALTIME_EVENT_TYPES, RealtimeEvent
 
