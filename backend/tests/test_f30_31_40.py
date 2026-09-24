@@ -3,9 +3,11 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
+from playwright.async_api import Browser, BrowserContext, Page
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
@@ -31,6 +33,7 @@ from app.execution.browser.observation import (
     MAX_VISIBLE_TEXT,
 )
 from app.execution.browser.policy import BrowserDomainPolicy
+from app.execution.browser.runtime import BrowserRuntime
 from app.execution.browser.verification import BrowserVerificationExpectation
 from app.execution.contracts import (
     ExecutionError,
@@ -49,6 +52,58 @@ from app.execution.providers.browser import (
 )
 from app.execution.recovery import RecoveryPolicy
 from app.realtime.contracts import REALTIME_EVENT_TYPES
+
+
+class IsolationPage:
+    def __init__(self) -> None:
+        self.url = "about:blank"
+        self.handlers: dict[str, object] = {}
+        self.closed = False
+
+    def on(self, event: str, callback) -> None:
+        self.handlers[event] = callback
+
+    def is_closed(self) -> bool:
+        return self.closed
+
+
+class IsolationContext:
+    def __init__(self) -> None:
+        self.cookie_jar: dict[str, str] = {}
+        self.local_storage: dict[str, str] = {}
+        self.handlers: dict[str, object] = {}
+        self.closed = False
+
+    async def new_page(self):
+        return cast(Page, IsolationPage())
+
+    async def route(self, pattern: str, callback) -> None:
+        del pattern, callback
+
+    def on(self, event: str, callback) -> None:
+        self.handlers[event] = callback
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class IsolationBrowser:
+    def __init__(self) -> None:
+        self.contexts: list[IsolationContext] = []
+
+    async def new_context(self):
+        context = IsolationContext()
+        self.contexts.append(context)
+        return cast(BrowserContext, context)
+
+
+class IsolationRuntime(BrowserRuntime):
+    def __init__(self, browser: IsolationBrowser) -> None:
+        super().__init__()
+        self._test_browser = browser
+
+    async def _ensure_browser(self) -> Browser:
+        return cast(Browser, self._test_browser)
 
 
 class HardeningRuntime:
@@ -757,6 +812,34 @@ async def test_f30_38_browser_provider_conforms_to_universal_provider_surface() 
         input={"url": "https://portal.example.test/home"},
     )
     assert normalized["url"] == "https://portal.example.test/home"
+
+
+@pytest.mark.asyncio
+async def test_f30_39_cookie_and_localstorage_are_isolated_per_browser_context() -> None:
+    browser = IsolationBrowser()
+    runtime = IsolationRuntime(browser)
+    organization_id = uuid4()
+
+    first = await runtime.create_session(
+        organization_id=organization_id,
+        worker_id=uuid4(),
+        run_id=uuid4(),
+    )
+    second = await runtime.create_session(
+        organization_id=organization_id,
+        worker_id=uuid4(),
+        run_id=uuid4(),
+    )
+
+    first_context = cast(IsolationContext, runtime._sessions[first.id].context)
+    second_context = cast(IsolationContext, runtime._sessions[second.id].context)
+    assert first_context is not second_context
+
+    first_context.cookie_jar["session"] = "worker-one-cookie"
+    first_context.local_storage["token"] = "worker-one-localStorage"
+
+    assert second_context.cookie_jar.get("session") is None
+    assert second_context.local_storage.get("token") is None
 
 
 @pytest.mark.asyncio
