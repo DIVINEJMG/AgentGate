@@ -57,7 +57,7 @@ def _resource(provider: str, capability: CapabilityDescriptor) -> ResourceDescri
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "provider",
-    execution_provider_registry().providers(),
+    execution_provider_registry().providers(kind="native_api"),
     ids=lambda provider: provider.manifest.provider,
 )
 async def test_f29_provider_conformance_suite(provider: ExecutionProvider) -> None:

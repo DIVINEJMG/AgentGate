@@ -70,3 +70,10 @@ class ExecutionProvider(Protocol):
         configuration: dict[str, str],
         credential: str | None,
     ) -> VerificationResult: ...
+
+
+@runtime_checkable
+class ManagedExecutionProvider(Protocol):
+    """Optional lifecycle surface for providers that own external processes."""
+
+    async def shutdown(self) -> None: ...
