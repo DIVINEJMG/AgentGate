@@ -57,6 +57,7 @@ def main() -> None:
     require("/events/stream" in realtime_routes, "SSE route missing")
     require("/events" in realtime_routes, "replay endpoint missing")
     require("Cross-organization realtime subscription denied" in realtime_routes, "cross-org realtime isolation missing")
+    require("_ensure_organization_access" in realtime_routes, "testable realtime tenant guard missing")
 
     frontend_realtime = text(ROOT / "frontend" / "src" / "platform" / "realtimeClient.ts")
     require("audoryn.realtime.cursor." in frontend_realtime, "frontend replay cursor persistence missing")
@@ -80,6 +81,14 @@ def main() -> None:
         "PROVIDER_HEALTH",
     ):
         require(metric in metrics, f"observability metric missing: {metric}")
+
+    provenance = text(APP / "execution" / "provenance.py")
+    require("adapter_version" in provenance, "canonical adapter-version provenance missing")
+    action_tx = text(APP / "infrastructure" / "database" / "action_transaction.py")
+    require("audit_provenance_payload" in action_tx, "Audit execution provenance persistence missing")
+    results = text(APP / "api" / "runtime_result_routes.py")
+    require("executionProvenance" in results, "Results execution provenance missing")
+    require("_run_execution_provenance" in results, "Result provenance aggregation missing")
 
     require((APP / "environment" / "model.py").exists(), "Environment Model foundation missing")
     require((APP / "execution" / "capability_resolver.py").exists(), "Capability Resolver missing")
