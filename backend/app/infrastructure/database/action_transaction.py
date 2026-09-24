@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database.models import Action, Approval, AuditEvent
+from app.execution.provenance import audit_provenance_payload
 from app.infrastructure.database.outbox import TransactionalOutbox
 
 
@@ -64,6 +65,11 @@ class ActionApprovalTransaction:
                 "scope": scope,
                 "resource_id": resource_id,
                 "approval_required": require_approval,
+                **audit_provenance_payload(
+                    scope=scope,
+                    resource_id=resource_id,
+                    payload=payload,
+                ),
             },
         )
         self._session.add(audit)
@@ -76,6 +82,11 @@ class ActionApprovalTransaction:
                 "action_id": str(action.id),
                 "correlation_id": correlation_id,
                 "approval_required": require_approval,
+                **audit_provenance_payload(
+                    scope=scope,
+                    resource_id=resource_id,
+                    payload=payload,
+                ),
             },
         )
         if approval is not None:
