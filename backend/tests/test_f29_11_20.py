@@ -15,7 +15,7 @@ from app.execution.authorization import (
     UniversalActionRequest,
 )
 from app.execution.contracts import CapabilityDescriptor, ExecutionRequest, ResourceDescriptor
-from app.main import app
+from app.bootstrap.application import create_application
 from app.realtime.bus import RedisRealtimeBus
 from app.realtime.contracts import REALTIME_EVENT_TYPES, RealtimeEvent
 
@@ -251,9 +251,10 @@ def test_f29_realtime_event_catalog_matches_contract() -> None:
 
 
 def test_f29_websocket_and_sse_routes_are_mounted() -> None:
+    application = create_application()
     route_paths = {
         str(route.path)  # type: ignore[attr-defined]
-        for route in app.routes
+        for route in application.routes
         if hasattr(route, "path")
     }
     assert "/ws/v1/organizations/{organization_id}" in route_paths
