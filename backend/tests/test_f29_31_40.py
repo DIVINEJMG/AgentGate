@@ -6,6 +6,9 @@ from uuid import uuid4
 
 import pytest
 
+from app.api.realtime_routes import _ensure_organization_access
+from app.domain.identity.errors import AuthorizationError
+from app.domain.identity.principals import HumanPrincipal
 from app.environment.model import (
     EnvironmentSnapshot,
     EnvironmentSystem,
@@ -20,6 +23,7 @@ from app.execution.contracts import (
     ExecutionResult,
     ResourceDescriptor,
 )
+from app.execution.provenance import audit_provenance_payload, provenance_from_action_payload
 from app.execution.providers.base import ExecutionProvider
 from app.execution.providers.native.http import ProviderTransportError
 from app.observability.metrics import (
@@ -407,3 +411,63 @@ def test_f29_final_cutover_keeps_vercel_auto_deploy_disabled() -> None:
     root = Path(__file__).resolve().parents[2]
     vercel = (root / "vercel.json").read_text(encoding="utf-8")
     assert '"deploymentEnabled": false' in vercel
+
+
+def test_f29_realtime_cross_organization_access_is_explicitly_rejected() -> None:
+    principal = HumanPrincipal(
+        user_id=uuid4(),
+        organization_id=uuid4(),
+        membership_id=uuid4(),
+        role="owner",
+        permissions=frozenset({"jobs.read"}),
+    )
+    other_organization = uuid4()
+
+    with pytest.raises(AuthorizationError, match="Cross-organization"):
+        _ensure_organization_access(principal, other_organization)
+
+    assert _ensure_organization_access(principal, principal.organization_id) is principal
+
+
+def test_f29_audit_and_result_provenance_retain_execution_identity() -> None:
+    payload = {
+        "request": {
+            "provider": "github",
+            "scope": "github.repository.issues.create",
+            "resourceId": "integration:repo-a",
+            "adapterVersion": "1.0.0",
+        },
+        "authorization": {
+            "provider": "github",
+            "capability_scope": "github.repository.issues.create",
+            "resource_id": "integration:repo-a",
+            "adapter": "native_api",
+            "adapter_version": "1.0.0",
+        },
+    }
+    provenance = provenance_from_action_payload(
+        scope="github.repository.issues.create",
+        resource_id="integration:repo-a",
+        payload=payload,
+        action_id="action-1",
+    )
+
+    assert provenance.provider == "github"
+    assert provenance.capability == "github.repository.issues.create"
+    assert provenance.resource_id == "integration:repo-a"
+    assert provenance.adapter == "native_api"
+    assert provenance.adapter_version == "1.0.0"
+    assert provenance.action_id == "action-1"
+
+    audit = audit_provenance_payload(
+        scope=provenance.capability,
+        resource_id=provenance.resource_id,
+        payload=payload,
+    )
+    assert audit == {
+        "provider": "github",
+        "capability": "github.repository.issues.create",
+        "resource_id": "integration:repo-a",
+        "adapter": "native_api",
+        "adapter_version": "1.0.0",
+    }

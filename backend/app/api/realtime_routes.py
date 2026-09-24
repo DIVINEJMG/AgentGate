@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSock
 from fastapi.responses import StreamingResponse
 
 from app.domain.identity.errors import AuthenticationError, AuthorizationError
+from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.auth.identity_provider import RedisSessionIdentityProvider
 from app.infrastructure.auth.session_store import RedisSessionStore
 from app.infrastructure.database.session import session_factory
@@ -16,6 +17,15 @@ from app.realtime.bus import RedisRealtimeBus
 
 ws_router = APIRouter()
 v2_router = APIRouter()
+
+
+def _ensure_organization_access(
+    principal: HumanPrincipal,
+    organization_id: UUID,
+) -> HumanPrincipal:
+    if principal.organization_id != organization_id:
+        raise AuthorizationError("Cross-organization realtime subscription denied.")
+    return principal
 
 
 async def _authenticate(organization_id: UUID, token: str):
@@ -28,9 +38,7 @@ async def _authenticate(organization_id: UUID, token: str):
             organization_id=organization_id,
         )
         principal = await provider.authenticate(token)
-        if principal.organization_id != organization_id:
-            raise AuthorizationError("Cross-organization realtime subscription denied.")
-        return principal
+        return _ensure_organization_access(principal, organization_id)
 
 
 def _bearer_from_request(request: Request) -> str:
