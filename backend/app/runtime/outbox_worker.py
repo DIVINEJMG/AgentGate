@@ -19,7 +19,7 @@ def _uuid(value: object) -> UUID | None:
         return None
 
 
-async def _publish_realtime(topic: str, payload: dict[str, object]) -> None:
+async def _publish_realtime(topic: str, payload: dict[str, object], *, event_id: str) -> None:
     if topic not in REALTIME_EVENT_TYPES:
         return
     organization_id = _uuid(payload.get("organization_id") or payload.get("organizationId"))
@@ -31,6 +31,7 @@ async def _publish_realtime(topic: str, payload: dict[str, object]) -> None:
         await bus.emit(
             RealtimeEvent(
                 event_type=topic,  # type: ignore[arg-type]
+                event_id=event_id,
                 organization_id=organization_id,
                 worker_id=_uuid(payload.get("worker_id") or payload.get("workerId")),
                 job_id=_uuid(payload.get("job_id") or payload.get("jobId")),
@@ -74,16 +75,24 @@ async def publish_outbox_once() -> int:
             # Outbox rows are created by earlier committed business transactions.
             # F29.18 mirrors normalized events into durable Streams + Pub/Sub only
             # from this publisher path, never from inside the business transaction.
-            await _publish_realtime(event.topic, payload)
+            await _publish_realtime(event.topic, payload, event_id=str(event.id))
             await outbox.mark_published(event)
 
         await session.commit()
         return len(events)
 
 
+async def run_outbox_publisher() -> None:
+    while True:
+        count = await publish_outbox_once()
+        if count == 0:
+            await asyncio.sleep(settings.outbox_poll_seconds)
+        else:
+            await asyncio.sleep(0)
+
+
 def main() -> None:
-    count = asyncio.run(publish_outbox_once())
-    print(f"Aduoryn outbox published {count} event(s).")
+    asyncio.run(run_outbox_publisher())
 
 
 if __name__ == "__main__":
