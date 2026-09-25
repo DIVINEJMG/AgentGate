@@ -38,6 +38,7 @@ from app.infrastructure.database.models import (
 from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.database.session import database_session
 from app.infrastructure.storage.provider import object_storage_from_settings
+from app.runtime.qstash_trigger import request_runtime_execution
 
 v1_router = APIRouter(tags=["runtime", "memory", "results"])
 v2_router = APIRouter(tags=["runtime", "memory", "results"])
@@ -216,7 +217,11 @@ async def runtime_v1(
         "window": {"limit": 200, "truncated": len(runs) >= 200},
         "runtime": {
             "executionEnabled": settings.runtime_execution_enabled,
-            "mode": "worker" if settings.runtime_execution_enabled else "fail_closed",
+            "mode": "qstash" if settings.runtime_execution_enabled else "fail_closed",
+            "autonomousCadence": "every minute",
+            "maxAiRunsPerCron": settings.runtime_sweep_limit,
+            "maxPlanSteps": 8,
+            "maxRetries": 3,
         },
     }
 
@@ -342,11 +347,23 @@ async def process_item_v1(
             },
         )
     await session.commit()
+    expected_step = int(
+        ((item.payload or {}).get("runtime") or {}).get("currentStep", 0)
+        if isinstance((item.payload or {}).get("runtime"), dict)
+        else 0
+    )
+    execution_message_id = await request_runtime_execution(
+        organization_id=organization_id,
+        work_item_id=item.id,
+        expected_step=expected_step,
+        reason="manual-process",
+    )
     return {
         "run": await _run_public(session, run),
         "workItem": await work_item_public(session, item),
         "waitingForApproval": False,
         "retryScheduled": False,
+        "executionQueued": execution_message_id is not None,
     }
 
 
@@ -380,6 +397,7 @@ async def continue_run_v1(
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
+    require_permission(principal, "jobs.run")
     await _runtime_disabled()
     run = await session.scalar(
         select(Run).where(
@@ -391,11 +409,23 @@ async def continue_run_v1(
     item = await session.get(WorkItem, run.work_item_id)
     if item is None:
         raise HTTPException(500, "Run work item is unavailable.")
+    expected_step = int(
+        ((item.payload or {}).get("runtime") or {}).get("currentStep", 0)
+        if isinstance((item.payload or {}).get("runtime"), dict)
+        else 0
+    )
+    execution_message_id = await request_runtime_execution(
+        organization_id=organization_id,
+        work_item_id=item.id,
+        expected_step=expected_step,
+        reason="manual-continue",
+    )
     return {
         "run": await _run_public(session, run),
         "workItem": await work_item_public(session, item),
         "waitingForApproval": run.status == "waiting_approval",
         "retryScheduled": False,
+        "executionQueued": execution_message_id is not None,
     }
 
 
@@ -444,11 +474,21 @@ async def retry_item_v1(
     payload["retryCount"] = int(payload.get("retryCount", 0)) + 1
     for key in ("lastError", "cancelledBy", "cancelledAt", "completedAt"):
         payload.pop(key, None)
+    payload["runtime"] = {
+        "attempt": int(payload["retryCount"]) + 1,
+        "currentStep": 0,
+    }
     item.payload = payload
     item.status = "queued"
     item.scheduled_at = utcnow()
     await session.commit()
     await session.refresh(item)
+    await request_runtime_execution(
+        organization_id=organization_id,
+        work_item_id=item.id,
+        expected_step=0,
+        reason="retry",
+    )
     return {"workItem": await work_item_public(session, item)}
 
 
