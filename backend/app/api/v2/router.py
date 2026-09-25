@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.ai_operations_routes import v2_router as ai_operations_router
 from app.api.adapters.system_status import serialize_v2
 from app.api.agent_routes import v2_router as agent_router
 from app.api.auth_routes import router as auth_router
@@ -16,6 +17,7 @@ from app.api.workforce_routes import v2_router as workforce_router
 from app.application.queries.system_status import get_system_status
 
 router = APIRouter()
+router.include_router(ai_operations_router)
 router.include_router(conversation_router)
 router.include_router(workforce_router)
 router.include_router(jobs_router)
