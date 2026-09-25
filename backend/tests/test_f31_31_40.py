@@ -252,9 +252,9 @@ def test_normal_worker_ux_is_conversational_and_manual_setup_remains() -> None:
 
 
 def test_nvidia_defaults_remain_preconfigured_without_a_secret() -> None:
-    config = Settings(_env_file=None)
-    assert config.ai_provider == "nvidia_nim"
-    assert config.ai_provider_base_url == "https://integrate.api.nvidia.com/v1"
-    assert config.ai_coordinator_model == "nvidia/nemotron-3-ultra-550b-a55b"
-    assert config.ai_vision_model == "nvidia/ising-calibration-1.5-31b"
-    assert config.ai_provider_api_key is None
+    fields = Settings.model_fields
+    assert fields["ai_provider"].default == "nvidia_nim"
+    assert fields["ai_provider_base_url"].default == "https://integrate.api.nvidia.com/v1"
+    assert fields["ai_coordinator_model"].default == "nvidia/nemotron-3-ultra-550b-a55b"
+    assert fields["ai_vision_model"].default == "nvidia/ising-calibration-1.5-31b"
+    assert fields["ai_provider_api_key"].default is None
