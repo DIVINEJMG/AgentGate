@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
+from pydantic import SecretStr
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,13 +23,15 @@ _MAX_INVOCATIONS = 100
 _MAX_WAITING = 500
 
 
-def _ai_configured() -> bool:
-    key = settings.ai_provider_api_key
-    return bool(
-        settings.ai_enabled
-        and key is not None
-        and key.get_secret_value().strip()
-    )
+def _secret_configured(secret: SecretStr | None) -> bool:
+    return bool(secret is not None and secret.get_secret_value().strip())
+
+
+def _credential_status() -> tuple[bool, bool]:
+    legacy = _secret_configured(settings.ai_provider_api_key)
+    coordinator = _secret_configured(settings.ai_coordinator_api_key) or legacy
+    vision = _secret_configured(settings.ai_vision_api_key) or legacy
+    return coordinator, vision
 
 
 async def _snapshot(
@@ -83,7 +86,8 @@ async def _snapshot(
             "invocations": role_counts[role],
         }
 
-    configured = _ai_configured()
+    coordinator_configured, vision_configured = _credential_status()
+    configured = settings.ai_enabled and coordinator_configured and vision_configured
     if not settings.ai_enabled:
         provider_health = "disabled"
     elif not configured:
@@ -97,6 +101,8 @@ async def _snapshot(
         "configuration": {
             "enabled": settings.ai_enabled,
             "configured": configured,
+            "coordinatorConfigured": coordinator_configured,
+            "visionConfigured": vision_configured,
             "provider": settings.ai_provider,
             "providerHealth": provider_health,
             "coordinatorModel": settings.ai_coordinator_model,

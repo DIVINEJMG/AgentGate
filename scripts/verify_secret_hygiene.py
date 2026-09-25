@@ -25,9 +25,9 @@ PATTERNS = (
     ("NVIDIA API key", re.compile(r"\bnvapi-[A-Za-z0-9_-]{32,}\b")),
     ("OpenAI-style API key", re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{32,}\b")),
     (
-        "assigned AI provider key",
+        "assigned AI credential",
         re.compile(
-            r"AI_PROVIDER_API_KEY\s*=\s*['\"]?([^<\s'\"]{24,})",
+            r"AI_(?:PROVIDER|COORDINATOR|VISION)_API_KEY\s*=\s*['\"]?([^<\s'\"]{24,})",
             re.IGNORECASE,
         ),
     ),

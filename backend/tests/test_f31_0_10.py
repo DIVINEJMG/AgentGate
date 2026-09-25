@@ -234,6 +234,58 @@ async def test_nvidia_image_completion_contract() -> None:
     assert response.text == "visual finding"
 
 
+
+@pytest.mark.asyncio
+async def test_nvidia_uses_separate_coordinator_and_vision_credentials() -> None:
+    seen: list[tuple[str, str]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        seen.append((payload["model"], request.headers["authorization"]))
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "OK"}}]},
+        )
+
+    provider = NvidiaNimProvider(
+        coordinator_api_key="coordinator-key",
+        vision_api_key="vision-key",
+        transport=httpx.MockTransport(handler),
+    )
+
+    await provider.generate_text(
+        model="nvidia/nemotron-3-ultra-550b-a55b",
+        request=AITextRequest(system="system", prompt="hello"),
+    )
+    await provider.analyze_media(
+        model="nvidia/ising-calibration-1.5-31b",
+        request=AITextRequest(system="system", prompt="inspect"),
+        media=AIMediaInput(media_type="image/png", data_base64="AA=="),
+    )
+
+    assert seen == [
+        ("nvidia/nemotron-3-ultra-550b-a55b", "Bearer coordinator-key"),
+        ("nvidia/ising-calibration-1.5-31b", "Bearer vision-key"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_nvidia_missing_role_credential_fails_closed() -> None:
+    provider = NvidiaNimProvider(
+        coordinator_api_key="coordinator-key",
+        vision_api_key=None,
+    )
+
+    with pytest.raises(AIProviderError) as caught:
+        await provider.analyze_media(
+            model="nvidia/ising-calibration-1.5-31b",
+            request=AITextRequest(system="system", prompt="inspect"),
+            media=AIMediaInput(media_type="image/png", data_base64="AA=="),
+        )
+
+    assert caught.value.category == "configuration_missing"
+    assert "vision credential" in str(caught.value)
+
 @pytest.mark.asyncio
 async def test_nvidia_rate_limit_is_normalized_and_retryable() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:

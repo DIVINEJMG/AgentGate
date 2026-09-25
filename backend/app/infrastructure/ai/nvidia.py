@@ -98,21 +98,25 @@ class NvidiaNimProvider:
     def __init__(
         self,
         *,
-        api_key: str,
+        api_key: str | None = None,
+        coordinator_api_key: str | None = None,
+        vision_api_key: str | None = None,
         base_url: str = "https://integrate.api.nvidia.com/v1",
         timeout_seconds: int = 60,
         extra_body: dict[str, object] | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        self._api_key = api_key
+        legacy = (api_key or "").strip() or None
+        self._coordinator_api_key = (coordinator_api_key or "").strip() or legacy
+        self._vision_api_key = (vision_api_key or "").strip() or legacy
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = max(10, timeout_seconds)
         self._extra_body = dict(extra_body or {})
         self._transport = transport
 
-    def _headers(self, correlation_id: str | None) -> dict[str, str]:
+    def _headers(self, correlation_id: str | None, api_key: str) -> dict[str, str]:
         headers = {
-            "Authorization": f"Bearer {self._api_key}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
         if correlation_id:
@@ -191,7 +195,15 @@ class NvidiaNimProvider:
         model: str,
         request: AITextRequest,
         messages: list[dict[str, object]],
+        api_key: str | None,
+        credential_role: str,
     ) -> AIResponse:
+        if not api_key:
+            raise AIProviderError(
+                "configuration_missing",
+                f"NVIDIA {credential_role} credential is not configured.",
+                retryable=False,
+            )
         body = self._body(model=model, request=request, messages=messages)
         try:
             async with httpx.AsyncClient(
@@ -202,7 +214,7 @@ class NvidiaNimProvider:
                     async with client.stream(
                         "POST",
                         f"{self._base_url}/chat/completions",
-                        headers=self._headers(request.correlation_id),
+                        headers=self._headers(request.correlation_id, api_key),
                         json=body,
                     ) as response:
                         if response.status_code >= 400:
@@ -212,7 +224,7 @@ class NvidiaNimProvider:
                 else:
                     response = await client.post(
                         f"{self._base_url}/chat/completions",
-                        headers=self._headers(request.correlation_id),
+                        headers=self._headers(request.correlation_id, api_key),
                         json=body,
                     )
                     if response.status_code >= 400:
@@ -269,7 +281,13 @@ class NvidiaNimProvider:
         if request.system:
             messages.append({"role": "system", "content": request.system})
         messages.append({"role": "user", "content": request.prompt})
-        return await self._invoke(model=model, request=request, messages=messages)
+        return await self._invoke(
+            model=model,
+            request=request,
+            messages=messages,
+            api_key=self._coordinator_api_key,
+            credential_role="coordinator",
+        )
 
     async def analyze_media(
         self,
@@ -300,4 +318,10 @@ class NvidiaNimProvider:
                 ],
             }
         )
-        return await self._invoke(model=model, request=request, messages=messages)
+        return await self._invoke(
+            model=model,
+            request=request,
+            messages=messages,
+            api_key=self._vision_api_key,
+            credential_role="vision",
+        )
