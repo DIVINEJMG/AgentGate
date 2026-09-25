@@ -1274,20 +1274,51 @@ class ManagedRuntimeExecutor:
         job: Job,
         worker: Worker,
         steps: list[RunStep],
+        *,
+        completion_summary: str | None = None,
+        finish_title: str = "Finish",
+        finish_instruction: str = "Verify completion from recorded execution evidence.",
     ) -> RuntimeStepOutcome:
         current = max(0, int(_runtime_meta(item).get("currentStep", 0)))
-        if current < len(steps):
+        finish_output = completion_summary or "Runtime completion checkpoint verified."
+        if current >= len(steps):
+            finish = RunStep(
+                run_id=run.id,
+                step_index=current,
+                kind="finish",
+                status="completed",
+                input={
+                    "title": finish_title or "Finish",
+                    "instruction": finish_instruction
+                    or "Verify completion from recorded execution evidence.",
+                    "resourceId": "",
+                    "scope": "",
+                },
+                output={
+                    "output": finish_output,
+                    "completedAt": utcnow().isoformat(),
+                },
+            )
+            self._session.add(finish)
+            await self._session.flush()
+            steps.append(finish)
+        else:
             finish = steps[current]
             if finish.kind == "finish":
                 finish.status = "completed"
-                finish.output = {"output": "Runtime completion checkpoint verified."}
+                finish.output = {
+                    "output": finish_output,
+                    "completedAt": utcnow().isoformat(),
+                }
 
         action_summaries = [
             str(_step_output(step).get("summary") or "").strip()
             for step in steps
             if step.kind == "action" and step.status == "completed"
         ]
-        summary = " ".join(value for value in action_summaries if value).strip()
+        summary = (completion_summary or "").strip()
+        if not summary:
+            summary = " ".join(value for value in action_summaries if value).strip()
         if not summary:
             summary = f"{job.name} completed by Managed Runtime."
 
