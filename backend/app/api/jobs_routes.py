@@ -1496,6 +1496,59 @@ async def emit_event_v2(
     }
 
 
+async def _apply_quick_timing(
+    session: AsyncSession,
+    organization_id: UUID,
+    job: Job,
+    principal: HumanPrincipal,
+    timing: dict[str, Any],
+) -> None:
+    mode = str(timing.get("mode") or "manual")
+    job.status = "active"
+    job.updated_at = utcnow()
+    await session.commit()
+
+    if mode in {"interval", "daily", "weekly", "custom", "event", "dependency"}:
+        await save_trigger_config(
+            session,
+            organization_id,
+            job.id,
+            principal,
+            _quick_trigger_payload(timing),
+        )
+
+    if mode in {"start_now", "interval", "daily", "weekly", "custom"}:
+        await queue_job(session, organization_id, job, principal)
+        return
+
+    if mode == "once":
+        scheduled_for = _parse_timestamp(timing.get("at"))
+        if scheduled_for is None:
+            raise HTTPException(400, "One-time scheduling requires a valid timestamp.")
+        trigger = {
+            "type": "schedule",
+            "requestedByType": "human",
+            "requestedBy": str(principal.user_id),
+            "requestedAt": utcnow().isoformat(),
+            "key": None,
+            "eventId": None,
+            "payload": None,
+            "scheduledFor": scheduled_for.isoformat(),
+            "dedupeKey": f"once:{job.id}:{scheduled_for.isoformat()}",
+            "sourceJobId": None,
+            "sourceWorkItemId": None,
+            "configId": None,
+        }
+        await queue_job(
+            session,
+            organization_id,
+            job,
+            principal,
+            trigger=trigger,
+            scheduled_at=scheduled_for,
+        )
+
+
 async def worker_quick_start(
     session: AsyncSession,
     organization_id: UUID,
@@ -1543,10 +1596,13 @@ async def worker_quick_start(
         timing: dict[str, Any] = (
             dict(raw_timing) if isinstance(raw_timing, dict) else {"mode": "manual"}
         )
-        if timing.get("mode") == "start_now":
-            job.status = "active"
-            await session.commit()
-            await queue_job(session, organization_id, job, principal)
+        await _apply_quick_timing(
+            session,
+            organization_id,
+            job,
+            principal,
+            timing,
+        )
         job_ids.append(str(job.id))
     return {
         "workerId": str(worker.id),
@@ -1610,10 +1666,13 @@ async def job_quick_start(
     timing: dict[str, Any] = (
         dict(raw_timing) if isinstance(raw_timing, dict) else {"mode": "manual"}
     )
-    if timing.get("mode") == "start_now":
-        job.status = "active"
-        await session.commit()
-        await queue_job(session, organization_id, job, principal)
+    await _apply_quick_timing(
+        session,
+        organization_id,
+        job,
+        principal,
+        timing,
+    )
     return {
         "jobId": str(job.id),
         "workerId": str(job.worker_id),
