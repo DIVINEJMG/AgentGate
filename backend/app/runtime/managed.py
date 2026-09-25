@@ -835,7 +835,7 @@ class ManagedRuntimeExecutor:
             resource_id=resource_id,
             payload=input_payload,
             correlation_id=item.correlation_id,
-            idempotency_key=f"runtime:{item.id}:{current_step}",
+            idempotency_key=f"runtime:{run.id}:{current_step}",
             risk=str((decision.get("riskAssessment") or {}).get("effectiveRisk") or "low"),
         )
         universal = await self._universal_request(
