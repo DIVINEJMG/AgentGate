@@ -85,7 +85,7 @@ class AIProviderError(RuntimeError):
         status_code: int | None = None,
     ) -> None:
         super().__init__(message)
-        self.category = category
+        self.category: AIErrorCategory = category
         self.retryable = retryable
         self.status_code = status_code
 
