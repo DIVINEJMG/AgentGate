@@ -6,6 +6,11 @@ from app.bootstrap.settings import settings
 from app.domain.queue.provider import QueueMessage, QueueProvider
 
 
+def _destination_path(destination: str) -> str:
+    """Preserve the URL scheme/path QStash expects while escaping URL query data."""
+    return quote(destination, safe=":/")
+
+
 class UpstashQStashProvider(QueueProvider):
     def __init__(self, *, base_url: str, token: str) -> None:
         self._base_url = base_url.rstrip("/")
@@ -52,7 +57,7 @@ class UpstashQStashProvider(QueueProvider):
         timeout_seconds: int = 15,
         failure_callback: str | None = None,
     ) -> QueueMessage:
-        encoded = quote(destination, safe="")
+        encoded = _destination_path(destination)
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 f"{self._base_url}/v2/publish/{encoded}",
@@ -81,7 +86,7 @@ class UpstashQStashProvider(QueueProvider):
         timeout_seconds: int = 15,
         failure_callback: str | None = None,
     ) -> str:
-        encoded = quote(destination, safe="")
+        encoded = _destination_path(destination)
         headers = self._headers(
             retries=retries,
             timeout_seconds=timeout_seconds,
