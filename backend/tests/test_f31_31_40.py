@@ -222,7 +222,9 @@ def test_ai_operations_surface_never_returns_secret_configuration() -> None:
     from app.api import ai_operations_routes
 
     source = inspect.getsource(ai_operations_routes)
-    assert "ai_provider_api_key" in source  # used only to compute configured/unconfigured
+    assert "ai_provider_api_key" in source  # legacy fallback readiness only
+    assert "ai_coordinator_api_key" in source
+    assert "ai_vision_api_key" in source
     assert '"provider": settings.ai_provider' in source
     assert '"coordinatorModel": settings.ai_coordinator_model' in source
     assert '"visionModel": settings.ai_vision_model' in source
@@ -258,3 +260,5 @@ def test_nvidia_defaults_remain_preconfigured_without_a_secret() -> None:
     assert fields["ai_coordinator_model"].default == "nvidia/nemotron-3-ultra-550b-a55b"
     assert fields["ai_vision_model"].default == "nvidia/ising-calibration-1.5-31b"
     assert fields["ai_provider_api_key"].default is None
+    assert fields["ai_coordinator_api_key"].default is None
+    assert fields["ai_vision_api_key"].default is None
