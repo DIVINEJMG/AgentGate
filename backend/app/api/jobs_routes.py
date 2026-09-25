@@ -628,11 +628,34 @@ async def queue_job(
     principal: HumanPrincipal,
     *,
     trigger: dict[str, Any] | None = None,
+    scheduled_at: datetime | None = None,
 ) -> WorkItem:
     require_permission(principal, "jobs.run")
     revision = await current_revision(session, job)
     definition = revision.definition if isinstance(revision.definition, dict) else {}
     now = utcnow()
+    dedupe_key = (
+        str(trigger.get("dedupeKey"))
+        if trigger is not None and trigger.get("dedupeKey")
+        else None
+    )
+    idempotency_key = dedupe_key or f"queue:{job.id}:{uuid4()}"
+    if dedupe_key:
+        existing = await session.scalar(
+            select(WorkItem).where(
+                WorkItem.organization_id == organization_id,
+                WorkItem.idempotency_key == idempotency_key,
+            )
+        )
+        if existing is not None:
+            await request_runtime_execution(
+                organization_id=organization_id,
+                work_item_id=existing.id,
+                expected_step=0,
+                reason="queue-dedupe",
+            )
+            return existing
+
     correlation_id = str(uuid4())
     item = WorkItem(
         organization_id=organization_id,
@@ -641,8 +664,8 @@ async def queue_job(
         status="queued",
         priority=str(definition.get("priority", "normal")),
         correlation_id=correlation_id,
-        idempotency_key=f"queue:{job.id}:{uuid4()}",
-        scheduled_at=now,
+        idempotency_key=idempotency_key,
+        scheduled_at=scheduled_at or now,
         payload={
             "requestedBy": str(principal.user_id),
             "retryCount": 0,
