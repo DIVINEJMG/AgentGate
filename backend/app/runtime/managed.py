@@ -102,6 +102,26 @@ def _integration_config(integration: Integration | None) -> dict[str, Any]:
     return dict(integration.config or {}) if integration and isinstance(integration.config, dict) else {}
 
 
+def _attach_observation_id(value: object, observation_id: str | None) -> object:
+    if observation_id is None:
+        return value
+    if isinstance(value, dict):
+        result = {
+            str(key): _attach_observation_id(nested, observation_id)
+            for key, nested in value.items()
+        }
+        if (
+            result.get("strategy") == "observation_ref"
+            and result.get("value")
+            and not result.get("observationId")
+        ):
+            result["observationId"] = observation_id
+        return result
+    if isinstance(value, list):
+        return [_attach_observation_id(item, observation_id) for item in value]
+    return value
+
+
 class ManagedRuntimeExecutor:
     """Durable, provider-neutral Managed Runtime executed one step at a time.
 
@@ -638,11 +658,24 @@ class ManagedRuntimeExecutor:
         scope = str(spec.get("scope", ""))
         operation = str(spec.get("operation", ""))
         payload = dict(item.payload or {})
+
+        planned_raw = spec.get("actionInput")
+        action_input: dict[str, object] = (
+            {str(key): value for key, value in planned_raw.items()}
+            if isinstance(planned_raw, dict)
+            else {}
+        )
+
         explicit = payload.get("actionInputs")
+        trigger = payload.get("trigger")
+        if not isinstance(explicit, dict) and isinstance(trigger, dict):
+            trigger_payload = trigger.get("payload")
+            if isinstance(trigger_payload, dict):
+                explicit = trigger_payload.get("actionInputs")
         if isinstance(explicit, dict):
             raw = explicit.get(scope, explicit.get(operation))
             if isinstance(raw, dict):
-                return {str(key): value for key, value in raw.items()}
+                action_input.update({str(key): value for key, value in raw.items()})
 
         resource_id = str(spec.get("resourceId", ""))
         integration: Integration | None = None
@@ -652,20 +685,28 @@ class ManagedRuntimeExecutor:
             integration = None
         config = _integration_config(integration)
 
-        if scope == "browser.navigation.open":
+        if scope == "browser.navigation.open" and not action_input.get("url"):
             start_url = str(config.get("startUrl", "")).strip()
             if start_url:
-                return {"url": start_url}
+                action_input["url"] = start_url
 
-        if scope.startswith("browser."):
-            session_id = await self._latest_browser_session(step.run_id, step.step_index)
-            if session_id and scope in {
-                "browser.page.read",
-                "browser.navigation.back",
-                "browser.navigation.forward",
-                "browser.navigation.reload",
-            }:
-                return {"sessionId": session_id}
+        if scope.startswith("browser.") and scope != "browser.navigation.open":
+            session_id, observation_id = await self._latest_browser_context(
+                step.run_id,
+                step.step_index,
+            )
+            if not session_id:
+                raise RuntimeError(
+                    f"Runtime capability {scope} requires an active browser session. "
+                    "The planner must open the governed browser first."
+                )
+            action_input.setdefault("sessionId", session_id)
+            normalized = _attach_observation_id(action_input, observation_id)
+            action_input = (
+                {str(key): value for key, value in normalized.items()}
+                if isinstance(normalized, dict)
+                else action_input
+            )
 
         provider = self._registry.get(str(spec.get("provider", "")))
         capability = next(
@@ -674,15 +715,26 @@ class ManagedRuntimeExecutor:
         )
         if capability is None:
             raise RuntimeError(f"Runtime capability is not registered: {scope}.")
-        required = capability.input_schema.get("required", [])
-        if not required:
-            return {}
-        raise RuntimeError(
-            f"Runtime capability {scope} needs structured input. "
-            f"Provide trigger payload actionInputs['{scope}']."
-        )
+        raw_required = capability.input_schema.get("required", [])
+        required = [str(key) for key in raw_required] if isinstance(raw_required, list) else []
+        missing = [
+            key
+            for key in required
+            if key not in action_input or action_input.get(key) in (None, "")
+        ]
+        if missing:
+            raise RuntimeError(
+                f"Planner produced incomplete structured input for {scope}: "
+                + ", ".join(missing)
+                + "."
+            )
+        return action_input
 
-    async def _latest_browser_session(self, run_id: UUID, before_index: int) -> str | None:
+    async def _latest_browser_context(
+        self,
+        run_id: UUID,
+        before_index: int,
+    ) -> tuple[str | None, str | None]:
         rows = list(
             (
                 await self._session.scalars(
@@ -704,10 +756,16 @@ class ManagedRuntimeExecutor:
             provider_output = provider_output if isinstance(provider_output, dict) else {}
             session = provider_output.get("session")
             session = session if isinstance(session, dict) else {}
-            raw_id = session.get("id")
-            if raw_id:
-                return str(raw_id)
-        return None
+            observation = provider_output.get("observation")
+            observation = observation if isinstance(observation, dict) else {}
+            raw_session_id = session.get("id") or observation.get("sessionId")
+            if raw_session_id:
+                raw_observation_id = observation.get("id")
+                return (
+                    str(raw_session_id),
+                    str(raw_observation_id) if raw_observation_id else None,
+                )
+        return None, None
 
     async def _policy_decision(
         self,
