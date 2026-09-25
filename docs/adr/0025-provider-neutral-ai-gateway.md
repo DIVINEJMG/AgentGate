@@ -8,7 +8,7 @@ Aduoryn needs an intelligence layer for conversational intent, autonomous planni
 
 ## Decision
 
-Aduoryn introduces a provider-neutral `AIGateway` with model roles:
+Aduoryn introduces a provider-neutral **AI Gateway** implemented by the `AIGateway` contract with model roles:
 
 - `conversation`
 - `intent`
