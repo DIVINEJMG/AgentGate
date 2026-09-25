@@ -220,7 +220,15 @@ class Memory(TenantModel, Base):
     owner_id: Mapped[str] = mapped_column(String(128), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    memory_type: Mapped[str] = mapped_column(String(32), nullable=False, default="operational")
+    source: Mapped[str] = mapped_column(String(64), nullable=False, default="human")
+    provenance: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    sensitivity: Mapped[str] = mapped_column(String(24), nullable=False, default="internal")
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        Index("ix_memories_org_owner_type", "organization_id", "owner_id", "memory_type"),
+    )
 
 class Artifact(TenantModel, Base):
     __tablename__ = "artifacts"
@@ -230,6 +238,22 @@ class Artifact(TenantModel, Base):
     size_bytes: Mapped[int | None] = mapped_column(BigInteger)
     checksum_sha256: Mapped[str | None] = mapped_column(String(64))
     metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
+
+class ArtifactAnalysis(TenantModel, Base):
+    __tablename__ = "artifact_analyses"
+    artifact_id: Mapped[UUID] = mapped_column(
+        ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    analyzer_role: Mapped[str] = mapped_column(String(32), nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(64))
+    model: Mapped[str | None] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    findings: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    provenance: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    sensitivity: Mapped[str] = mapped_column(String(24), nullable=False, default="internal")
+    __table_args__ = (
+        Index("ix_artifact_analyses_org_created", "organization_id", "created_at"),
+    )
 
 class Result(TenantModel, Base):
     __tablename__ = "results"
