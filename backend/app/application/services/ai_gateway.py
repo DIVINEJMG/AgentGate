@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 from collections.abc import Awaitable, Callable
+from typing import NoReturn
 
 from jsonschema import Draft202012Validator
 
@@ -49,20 +50,53 @@ class UnconfiguredAIGateway(AIGateway):
     def __init__(self, message: str = "Aduoryn AI is not configured.") -> None:
         self._message = message
 
-    def _raise(self) -> None:
+    def _raise(self) -> NoReturn:
         raise AIProviderError(
             "configuration_missing",
             self._message,
             retryable=False,
         )
 
-    async def generate_text(self, **_: object) -> AIResponse:
+    async def generate_text(
+        self,
+        *,
+        role: AIModelRole,
+        system: str,
+        prompt: str,
+        context: AIInvocationContext | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float = 0.0,
+        stream: bool = False,
+    ) -> AIResponse:
+        del role, system, prompt, context, max_output_tokens, temperature, stream
         self._raise()
 
-    async def generate_structured(self, **_: object) -> dict[str, object]:
+    async def generate_structured(
+        self,
+        *,
+        role: AIModelRole,
+        system: str,
+        prompt: str,
+        schema_name: str,
+        schema: dict[str, object],
+        context: AIInvocationContext | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float = 0.0,
+    ) -> dict[str, object]:
+        del role, system, prompt, schema_name, schema, context, max_output_tokens, temperature
         self._raise()
 
-    async def analyze_media(self, **_: object) -> AIResponse:
+    async def analyze_media(
+        self,
+        *,
+        role: AIModelRole,
+        system: str,
+        prompt: str,
+        media: AIMediaInput,
+        context: AIInvocationContext | None = None,
+        max_output_tokens: int | None = None,
+    ) -> AIResponse:
+        del role, system, prompt, media, context, max_output_tokens
         self._raise()
 
 
