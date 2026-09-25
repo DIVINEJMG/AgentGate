@@ -10,7 +10,6 @@ from jsonschema import Draft202012Validator
 
 from app.domain.ai.providers import (
     AIGateway,
-    AIErrorCategory,
     AIInvocationContext,
     AIInvocationRecorder,
     AIMediaInput,
