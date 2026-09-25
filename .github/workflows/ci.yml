@@ -61,3 +61,4 @@ jobs:
       - run: python ../scripts/verify_f30_21_30.py
       - run: python ../scripts/verify_f30_31_40.py
       - run: python ../scripts/verify_f30_ui_exposure.py
+      - run: python ../scripts/verify_qstash_runtime_cutover.py

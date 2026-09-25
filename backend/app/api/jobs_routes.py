@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, desc, select
@@ -11,12 +13,16 @@ from app.api.auth_dependencies import organization_principal
 from app.api.product_common import append_audit, not_found, require_permission, utcnow
 from app.api.workforce_routes import automatic_agent, create_worker
 from app.domain.identity.principals import HumanPrincipal
+from app.execution.bootstrap import execution_provider_registry
 from app.infrastructure.database.models import (
     Action,
     Approval,
     Artifact,
+    CapabilityProfile,
     Job,
     JobRevision,
+    Policy,
+    PolicyRevision,
     Result,
     ResultExport,
     ResultVersion,
@@ -26,9 +32,286 @@ from app.infrastructure.database.models import (
     WorkItem,
 )
 from app.infrastructure.database.session import database_session
+from app.runtime.qstash_trigger import request_runtime_execution
 
 v1_router = APIRouter(tags=["jobs", "scheduler"])
 v2_router = APIRouter(tags=["jobs", "scheduler"])
+
+_WEEKDAY_INDEX = {
+    "monday": 0,
+    "tuesday": 1,
+    "wednesday": 2,
+    "thursday": 3,
+    "friday": 4,
+    "saturday": 5,
+    "sunday": 6,
+}
+
+
+def _parse_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _schedule_zone(schedule: dict[str, Any]) -> ZoneInfo:
+    raw = str(schedule.get("timezone") or "UTC")
+    try:
+        return ZoneInfo(raw)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
+
+
+def _local_clock(schedule: dict[str, Any]) -> tuple[int, int]:
+    raw = str(schedule.get("localTime") or "09:00")
+    try:
+        hour_text, minute_text = raw.split(":", 1)
+        hour = min(23, max(0, int(hour_text)))
+        minute = min(59, max(0, int(minute_text)))
+    except (TypeError, ValueError):
+        return (9, 0)
+    return (hour, minute)
+
+
+def _next_schedule_occurrence(
+    schedule: dict[str, Any],
+    after: datetime,
+) -> datetime:
+    after = after.astimezone(UTC)
+    cadence = str(schedule.get("cadence") or "daily")
+    if cadence == "interval":
+        minutes = min(10080, max(5, int(schedule.get("intervalMinutes") or 60)))
+        return after + timedelta(minutes=minutes)
+
+    zone = _schedule_zone(schedule)
+    local_after = after.astimezone(zone)
+    hour, minute = _local_clock(schedule)
+    allowed_days = {
+        _WEEKDAY_INDEX[value]
+        for value in schedule.get("weekdays", [])
+        if value in _WEEKDAY_INDEX
+    }
+    if cadence != "weekly" or not allowed_days:
+        allowed_days = set(range(7))
+
+    for offset in range(8):
+        day = local_after.date() + timedelta(days=offset)
+        candidate = datetime(
+            day.year,
+            day.month,
+            day.day,
+            hour,
+            minute,
+            tzinfo=zone,
+        )
+        if candidate.weekday() not in allowed_days:
+            continue
+        if candidate <= local_after:
+            continue
+        return candidate.astimezone(UTC)
+    return (local_after + timedelta(days=1)).astimezone(UTC)
+
+
+def _quick_trigger_payload(timing: dict[str, Any]) -> dict[str, Any]:
+    mode = str(timing.get("mode") or "manual")
+    timezone = str(timing.get("timezone") or "UTC")
+    schedule = {
+        "enabled": mode in {"interval", "daily", "weekly", "custom"},
+        "cadence": (
+            "interval"
+            if mode == "interval"
+            else "weekly"
+            if mode in {"weekly", "custom"}
+            else "daily"
+        ),
+        "timezone": timezone,
+        "localTime": str(timing.get("localTime") or "09:00"),
+        "weekdays": list(
+            timing.get(
+                "weekdays",
+                ["monday", "tuesday", "wednesday", "thursday", "friday"],
+            )
+        ),
+        "intervalMinutes": int(timing.get("intervalMinutes") or 60),
+        "missedRunPolicy": "queue_once",
+        "outsideWorkingHoursPolicy": "next_open",
+    }
+    return {
+        "schedule": schedule,
+        "apiEnabled": False,
+        "internalEventKeys": (
+            [str(timing.get("eventKey"))]
+            if mode == "event" and timing.get("eventKey")
+            else []
+        ),
+        "dependencyJobIds": (
+            list(timing.get("dependencyJobIds", []))
+            if mode == "dependency"
+            else []
+        ),
+    }
+
+
+def _system_jobs_principal(organization_id: UUID) -> HumanPrincipal:
+    zero = UUID(int=0)
+    return HumanPrincipal(
+        user_id=zero,
+        organization_id=organization_id,
+        membership_id=zero,
+        role="system",
+        permissions=frozenset({"jobs.run"}),
+    )
+
+
+def _next_worker_open(worker: Worker, when: datetime) -> datetime:
+    profile = worker.profile if isinstance(worker.profile, dict) else {}
+    raw_hours = profile.get("workingHours")
+    hours = raw_hours if isinstance(raw_hours, dict) else {}
+    zone_name = str(hours.get("timezone") or "UTC")
+    try:
+        zone = ZoneInfo(zone_name)
+    except ZoneInfoNotFoundError:
+        zone = ZoneInfo("UTC")
+    days = hours.get("days")
+    days = days if isinstance(days, dict) else {}
+    local = when.astimezone(zone)
+    names = tuple(_WEEKDAY_INDEX)
+
+    for offset in range(8):
+        day_date = local.date() + timedelta(days=offset)
+        name = names[day_date.weekday()]
+        raw = days.get(name)
+        day = raw if isinstance(raw, dict) else {}
+        if not bool(day.get("enabled", offset < 5)):
+            continue
+        start_raw = str(day.get("start") or "09:00")
+        end_raw = str(day.get("end") or "17:00")
+        try:
+            start_h, start_m = (int(part) for part in start_raw.split(":", 1))
+            end_h, end_m = (int(part) for part in end_raw.split(":", 1))
+        except (TypeError, ValueError):
+            start_h, start_m, end_h, end_m = 9, 0, 17, 0
+        opening = datetime(
+            day_date.year,
+            day_date.month,
+            day_date.day,
+            start_h,
+            start_m,
+            tzinfo=zone,
+        )
+        closing = datetime(
+            day_date.year,
+            day_date.month,
+            day_date.day,
+            end_h,
+            end_m,
+            tzinfo=zone,
+        )
+        if offset == 0 and opening <= local <= closing:
+            return when
+        if opening > local:
+            return opening.astimezone(UTC)
+    return when
+
+
+async def queue_due_schedules(
+    session: AsyncSession,
+    *,
+    now: datetime,
+    limit: int = 50,
+) -> int:
+    jobs = list(
+        (
+            await session.scalars(
+                select(Job)
+                .where(Job.status == "active")
+                .order_by(Job.updated_at, Job.id)
+                .limit(max(limit * 4, 50))
+            )
+        ).all()
+    )
+    queued = 0
+    for job in jobs:
+        if queued >= limit:
+            break
+        revision = await current_revision(session, job)
+        definition = (
+            dict(revision.definition)
+            if isinstance(revision.definition, dict)
+            else {}
+        )
+        raw_config = definition.get("triggerConfig")
+        config = dict(raw_config) if isinstance(raw_config, dict) else {}
+        raw_schedule = config.get("schedule")
+        schedule = dict(raw_schedule) if isinstance(raw_schedule, dict) else {}
+        if not bool(schedule.get("enabled")):
+            continue
+
+        due = _parse_timestamp(schedule.get("nextDueAt"))
+        if due is None:
+            anchor_time = (
+                _parse_timestamp(config.get("updatedAt"))
+                or _parse_timestamp(config.get("createdAt"))
+                or job.updated_at
+            )
+            due = _next_schedule_occurrence(schedule, anchor_time)
+        if due > now:
+            continue
+
+        next_due = _next_schedule_occurrence(schedule, due)
+        if str(schedule.get("missedRunPolicy") or "queue_once") == "skip":
+            while next_due <= now:
+                next_due = _next_schedule_occurrence(schedule, next_due)
+            schedule["nextDueAt"] = next_due.isoformat()
+            config["schedule"] = schedule
+            definition["triggerConfig"] = config
+            revision.definition = definition
+            await session.commit()
+            continue
+
+        worker = await session.get(Worker, job.worker_id)
+        scheduled_for = due
+        if (
+            worker is not None
+            and str(schedule.get("outsideWorkingHoursPolicy") or "next_open")
+            == "next_open"
+        ):
+            scheduled_for = _next_worker_open(worker, due)
+
+        schedule["nextDueAt"] = next_due.isoformat()
+        config["schedule"] = schedule
+        definition["triggerConfig"] = config
+        revision.definition = definition
+        trigger = {
+            "type": "schedule",
+            "requestedByType": "system",
+            "requestedBy": "qstash-scheduler",
+            "requestedAt": now.isoformat(),
+            "key": None,
+            "eventId": None,
+            "payload": None,
+            "scheduledFor": due.isoformat(),
+            "dedupeKey": f"schedule:{config.get('id', job.id)}:{due.isoformat()}",
+            "sourceJobId": None,
+            "sourceWorkItemId": None,
+            "configId": config.get("id"),
+        }
+        await queue_job(
+            session,
+            job.organization_id,
+            job,
+            _system_jobs_principal(job.organization_id),
+            trigger=trigger,
+            scheduled_at=scheduled_for,
+        )
+        queued += 1
+    return queued
 
 
 async def current_revision(session: AsyncSession, job: Job) -> JobRevision:
@@ -349,11 +632,34 @@ async def queue_job(
     principal: HumanPrincipal,
     *,
     trigger: dict[str, Any] | None = None,
+    scheduled_at: datetime | None = None,
 ) -> WorkItem:
     require_permission(principal, "jobs.run")
     revision = await current_revision(session, job)
     definition = revision.definition if isinstance(revision.definition, dict) else {}
     now = utcnow()
+    dedupe_key = (
+        str(trigger.get("dedupeKey"))
+        if trigger is not None and trigger.get("dedupeKey")
+        else None
+    )
+    idempotency_key = dedupe_key or f"queue:{job.id}:{uuid4()}"
+    if dedupe_key:
+        existing = await session.scalar(
+            select(WorkItem).where(
+                WorkItem.organization_id == organization_id,
+                WorkItem.idempotency_key == idempotency_key,
+            )
+        )
+        if existing is not None:
+            await request_runtime_execution(
+                organization_id=organization_id,
+                work_item_id=existing.id,
+                expected_step=0,
+                reason="queue-dedupe",
+            )
+            return existing
+
     correlation_id = str(uuid4())
     item = WorkItem(
         organization_id=organization_id,
@@ -362,8 +668,8 @@ async def queue_job(
         status="queued",
         priority=str(definition.get("priority", "normal")),
         correlation_id=correlation_id,
-        idempotency_key=f"queue:{job.id}:{uuid4()}",
-        scheduled_at=now,
+        idempotency_key=idempotency_key,
+        scheduled_at=scheduled_at or now,
         payload={
             "requestedBy": str(principal.user_id),
             "retryCount": 0,
@@ -401,6 +707,12 @@ async def queue_job(
     )
     await session.commit()
     await session.refresh(item)
+    await request_runtime_execution(
+        organization_id=organization_id,
+        work_item_id=item.id,
+        expected_step=0,
+        reason="queue",
+    )
     return item
 
 
@@ -490,6 +802,11 @@ async def save_trigger_config(
     schedule: dict[str, Any] = (
         dict(raw_schedule) if isinstance(raw_schedule, dict) else {}
     )
+    next_due = (
+        _next_schedule_occurrence(schedule, now).isoformat()
+        if bool(schedule.get("enabled"))
+        else None
+    )
     config = {
         "id": str(existing.get("id") or uuid4()),
         "organizationId": str(organization_id),
@@ -498,7 +815,7 @@ async def save_trigger_config(
         "revision": int(existing.get("revision", 0)) + 1,
         "schedule": {
             **schedule,
-            "nextDueAt": None,
+            "nextDueAt": next_due,
         },
         "apiEnabled": bool(payload.get("apiEnabled", False)),
         "internalEventKeys": list(payload.get("internalEventKeys", [])),
@@ -1068,7 +1385,7 @@ async def trigger_workspace(
             "configsTruncated": False,
             "historyTruncated": False,
         },
-        "scheduler": {"cadenceMinutes": 5, "mode": "queue_only"},
+        "scheduler": {"cadenceMinutes": 1, "mode": "queue_only"},
     }
 
 
@@ -1183,6 +1500,210 @@ async def emit_event_v2(
     }
 
 
+async def _provision_managed_job_authority(
+    session: AsyncSession,
+    organization_id: UUID,
+    worker: Worker,
+    principal: HumanPrincipal,
+    scopes: list[str],
+) -> None:
+    profile = worker.profile if isinstance(worker.profile, dict) else {}
+    if profile.get("agentIdentityProvisioning") != "automatic":
+        return
+
+    requested = {scope.strip() for scope in scopes if scope.strip()}
+    if not requested:
+        return
+
+    existing_rows = list(
+        (
+            await session.scalars(
+                select(CapabilityProfile).where(
+                    CapabilityProfile.organization_id == organization_id,
+                    CapabilityProfile.agent_id == worker.agent_identity_id,
+                )
+            )
+        ).all()
+    )
+    by_scope = {row.scope: row for row in existing_rows}
+    now = utcnow()
+    for scope in sorted(requested):
+        existing = by_scope.get(scope)
+        if existing is not None:
+            existing.active = True
+            existing.updated_at = now
+            continue
+        session.add(
+            CapabilityProfile(
+                organization_id=organization_id,
+                agent_id=worker.agent_identity_id,
+                scope=scope,
+                active=True,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
+    registry = execution_provider_registry()
+    async def upsert_policy(
+        *,
+        effect: str,
+        selected_scopes: set[str],
+        priority: int,
+    ) -> None:
+        name = f"Managed Runtime {effect} · {worker.id}"
+        policy = await session.scalar(
+            select(Policy).where(
+                Policy.organization_id == organization_id,
+                Policy.name == name,
+            )
+        )
+        if policy is None:
+            policy = Policy(
+                organization_id=organization_id,
+                name=name,
+                status="enabled",
+                current_revision=1,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(policy)
+            await session.flush()
+            revision_number = 1
+            created_at = now.isoformat()
+        else:
+            policy.status = "enabled"
+            policy.current_revision += 1
+            policy.updated_at = now
+            revision_number = policy.current_revision
+            created_at = policy.created_at.isoformat()
+
+        session.add(
+            PolicyRevision(
+                policy_id=policy.id,
+                revision=revision_number,
+                effect=effect,
+                priority=priority,
+                selectors={
+                    "agentIds": [str(worker.agent_identity_id)],
+                    "resourceIds": [],
+                    "actions": [],
+                    "scopes": sorted(selected_scopes),
+                    "risks": [],
+                    "_meta": {
+                        "description": "Automatic least-authority policy for managed Worker Jobs.",
+                        "createdBy": str(principal.user_id),
+                        "updatedBy": str(principal.user_id),
+                        "createdAt": created_at,
+                    },
+                },
+                created_at=now,
+            )
+        )
+
+    all_active_scopes = {row.scope for row in existing_rows if row.active} | requested
+    allow_all: set[str] = set()
+    approval_all: set[str] = set()
+    for scope in all_active_scopes:
+        providers = registry.capability_providers(scope)
+        capability = next(
+            (
+                capability
+                for provider in providers
+                for capability in provider.manifest.capabilities
+                if capability.scope == scope
+            ),
+            None,
+        )
+        if capability is not None and (
+            capability.approval_recommendation == "none"
+            and capability.risk not in {"high", "critical"}
+        ):
+            allow_all.add(scope)
+        else:
+            approval_all.add(scope)
+
+    if allow_all:
+        await upsert_policy(effect="allow", selected_scopes=allow_all, priority=100)
+    if approval_all:
+        await upsert_policy(
+            effect="require_approval",
+            selected_scopes=approval_all,
+            priority=200,
+        )
+
+    await append_audit(
+        session,
+        organization_id=organization_id,
+        principal=principal,
+        event_type="managed_authority.provisioned",
+        category="security",
+        resource_type="worker",
+        resource_id=str(worker.id),
+        resource_name=worker.name,
+        outcome="updated",
+        summary=f"Managed Runtime authority provisioned for {worker.name}.",
+        metadata={
+            "scopes": sorted(all_active_scopes),
+            "automatic": True,
+        },
+    )
+    await session.commit()
+
+
+async def _apply_quick_timing(
+    session: AsyncSession,
+    organization_id: UUID,
+    job: Job,
+    principal: HumanPrincipal,
+    timing: dict[str, Any],
+) -> None:
+    mode = str(timing.get("mode") or "manual")
+    job.status = "active"
+    job.updated_at = utcnow()
+    await session.commit()
+
+    if mode in {"interval", "daily", "weekly", "custom", "event", "dependency"}:
+        await save_trigger_config(
+            session,
+            organization_id,
+            job.id,
+            principal,
+            _quick_trigger_payload(timing),
+        )
+
+    if mode in {"start_now", "interval", "daily", "weekly", "custom"}:
+        await queue_job(session, organization_id, job, principal)
+        return
+
+    if mode == "once":
+        scheduled_for = _parse_timestamp(timing.get("at"))
+        if scheduled_for is None:
+            raise HTTPException(400, "One-time scheduling requires a valid timestamp.")
+        trigger = {
+            "type": "schedule",
+            "requestedByType": "human",
+            "requestedBy": str(principal.user_id),
+            "requestedAt": utcnow().isoformat(),
+            "key": None,
+            "eventId": None,
+            "payload": None,
+            "scheduledFor": scheduled_for.isoformat(),
+            "dedupeKey": f"once:{job.id}:{scheduled_for.isoformat()}",
+            "sourceJobId": None,
+            "sourceWorkItemId": None,
+            "configId": None,
+        }
+        await queue_job(
+            session,
+            organization_id,
+            job,
+            principal,
+            trigger=trigger,
+            scheduled_at=scheduled_for,
+        )
+
+
 async def worker_quick_start(
     session: AsyncSession,
     organization_id: UUID,
@@ -1215,6 +1736,9 @@ async def worker_quick_start(
         worker_input,
         provisioning="automatic" if created_auto else "existing",
     )
+    worker.status = "active"
+    worker.updated_at = utcnow()
+    await session.commit()
     job_ids: list[str] = []
     for entry in payload.get("jobs", []):
         if not isinstance(entry, dict):
@@ -1226,14 +1750,24 @@ async def worker_quick_start(
             principal,
             {**job_entry, "workerId": str(worker.id)},
         )
+        await _provision_managed_job_authority(
+            session,
+            organization_id,
+            worker,
+            principal,
+            [str(scope) for scope in job_entry.get("requiredCapabilities", [])],
+        )
         raw_timing = job_entry.get("timing")
         timing: dict[str, Any] = (
             dict(raw_timing) if isinstance(raw_timing, dict) else {"mode": "manual"}
         )
-        if timing.get("mode") == "start_now":
-            job.status = "active"
-            await session.commit()
-            await queue_job(session, organization_id, job, principal)
+        await _apply_quick_timing(
+            session,
+            organization_id,
+            job,
+            principal,
+            timing,
+        )
         job_ids.append(str(job.id))
     return {
         "workerId": str(worker.id),
@@ -1293,14 +1827,27 @@ async def job_quick_start(
         dict(raw_job_payload) if isinstance(raw_job_payload, dict) else {}
     )
     job = await create_job(session, organization_id, principal, job_payload)
+    worker = await session.get(Worker, job.worker_id)
+    if worker is None:
+        raise HTTPException(500, "Job Worker is unavailable.")
+    await _provision_managed_job_authority(
+        session,
+        organization_id,
+        worker,
+        principal,
+        [str(scope) for scope in job_payload.get("requiredCapabilities", [])],
+    )
     raw_timing = payload.get("timing")
     timing: dict[str, Any] = (
         dict(raw_timing) if isinstance(raw_timing, dict) else {"mode": "manual"}
     )
-    if timing.get("mode") == "start_now":
-        job.status = "active"
-        await session.commit()
-        await queue_job(session, organization_id, job, principal)
+    await _apply_quick_timing(
+        session,
+        organization_id,
+        job,
+        principal,
+        timing,
+    )
     return {
         "jobId": str(job.id),
         "workerId": str(job.worker_id),

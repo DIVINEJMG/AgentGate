@@ -2,22 +2,68 @@ import base64
 import binascii
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from app.api.jobs_routes import queue_due_schedules
+from app.application.services.cutover import CutoverController
+from app.bootstrap.settings import settings
 from app.domain.jobs.dispatch import ScheduledDispatch
 from app.infrastructure.database.dispatch import WorkItemDispatchRepository
-from app.infrastructure.database.models import QueueDeliveryFailure
+from app.infrastructure.database.models import (
+    Approval,
+    QueueDeliveryFailure,
+    Run,
+    RunStep,
+    WorkItem,
+)
 from app.infrastructure.database.session import session_factory
 from app.infrastructure.qstash.verifier import QStashSignatureVerifier
+from app.infrastructure.redis.coordination import RedisCoordinator
 from app.infrastructure.storage.provider import object_storage_from_settings
+from app.runtime.managed import ManagedRuntimeExecutor
+from app.runtime.qstash_trigger import request_runtime_execution
 
 router = APIRouter(prefix="/internal/v1/runtime", tags=["internal-runtime"])
 logger = logging.getLogger(__name__)
+
+
+def _verify_qstash(request: Request, raw: bytes, signature: str | None) -> None:
+    if not signature:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="QStash signature required.",
+        )
+    try:
+        QStashSignatureVerifier().verify(
+            body=raw.decode("utf-8"),
+            signature=signature,
+            url=str(request.url),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid QStash signature.",
+        ) from exc
+
+
+def _runtime_step(item: WorkItem) -> int:
+    payload = item.payload if isinstance(item.payload, dict) else {}
+    raw = payload.get("runtime")
+    runtime = raw if isinstance(raw, dict) else {}
+    return max(0, int(runtime.get("currentStep", 0)))
+
+
+class ExecutePayload(BaseModel):
+    organization_id: UUID
+    work_item_id: UUID
+    expected_step: int = Field(default=0, ge=0)
+    reason: str = Field(default="qstash", max_length=80)
+
 
 
 class DispatchPayload(BaseModel):
@@ -45,7 +91,7 @@ class DispatchPayload(BaseModel):
 async def heartbeat(
     request: Request,
     upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
-) -> dict[str, str]:
+) -> dict[str, object]:
     if not upstash_signature:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -203,7 +249,7 @@ async def storage_smoke(
 async def dispatch(
     request: Request,
     upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
-) -> dict[str, str]:
+) -> dict[str, object]:
     if not upstash_signature:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -235,5 +281,232 @@ async def dispatch(
         repo = WorkItemDispatchRepository(session)
         item = await repo.create(message.to_dispatch())
         await session.commit()
+        organization_id = item.organization_id
+        work_item_id = item.id
 
-    return {"status": "accepted", "workItemId": str(item.id)}
+    queued = await request_runtime_execution(
+        organization_id=organization_id,
+        work_item_id=work_item_id,
+        expected_step=0,
+        reason="dispatch",
+    )
+    return {
+        "status": "accepted",
+        "workItemId": str(work_item_id),
+        "executionQueued": queued is not None,
+    }
+
+
+@router.post("/execute")
+async def execute(
+    request: Request,
+    upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
+) -> dict[str, object]:
+    raw = await request.body()
+    _verify_qstash(request, raw, upstash_signature)
+    try:
+        message = ExecutePayload.model_validate(json.loads(raw))
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid runtime execution payload.",
+        ) from exc
+
+    if not settings.runtime_execution_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Runtime execution is disabled.",
+        )
+    try:
+        CutoverController(settings.cutover_stage).require_authoritative("runtime")
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    coordinator = RedisCoordinator.from_settings()
+    lease = await coordinator.acquire_lock(
+        f"runtime:{message.work_item_id}:{message.expected_step}",
+        ttl_seconds=settings.runtime_delivery_timeout_seconds + 30,
+    )
+    if lease is None:
+        await coordinator.close()
+        return {
+            "status": "busy",
+            "workItemId": str(message.work_item_id),
+            "currentStep": message.expected_step,
+        }
+
+    outcome = None
+    try:
+        async with session_factory() as session:
+            item = await session.scalar(
+                select(WorkItem).where(
+                    WorkItem.organization_id == message.organization_id,
+                    WorkItem.id == message.work_item_id,
+                )
+            )
+            if item is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Work item not found.",
+                )
+            if item.scheduled_at > datetime.now(UTC):
+                return {
+                    "status": "not_due",
+                    "workItemId": str(item.id),
+                    "scheduledAt": item.scheduled_at.isoformat(),
+                    "currentStep": _runtime_step(item),
+                }
+            if item.status in {"completed", "failed", "cancelled"}:
+                return {
+                    "status": "noop",
+                    "workItemId": str(item.id),
+                    "state": item.status,
+                    "currentStep": _runtime_step(item),
+                }
+            try:
+                outcome = await ManagedRuntimeExecutor(session).execute_step(
+                    item=item,
+                    expected_step=message.expected_step,
+                )
+            except RuntimeError as exc:
+                item.status = "failed"
+                payload = dict(item.payload or {})
+                payload["lastError"] = str(exc)[:1000]
+                payload["completedAt"] = datetime.now(UTC).isoformat()
+                item.payload = payload
+                run = await session.scalar(
+                    select(Run)
+                    .where(Run.work_item_id == item.id)
+                    .order_by(Run.created_at.desc())
+                    .limit(1)
+                )
+                if run is not None and run.status not in {"completed", "failed", "cancelled"}:
+                    run.status = "failed"
+                    run.result_summary = str(exc)[:4000]
+                await session.commit()
+                return {
+                    "status": "failed",
+                    "workItemId": str(item.id),
+                    "state": "failed",
+                    "currentStep": _runtime_step(item),
+                    "summary": str(exc),
+                }
+    finally:
+        await coordinator.release_lock(lease)
+        await coordinator.close()
+
+    assert outcome is not None
+    continuation_id = None
+    if outcome.state == "continue":
+        continuation_id = await request_runtime_execution(
+            organization_id=message.organization_id,
+            work_item_id=message.work_item_id,
+            expected_step=outcome.current_step,
+            reason="continuation",
+        )
+
+    return {
+        "status": "ok",
+        "workItemId": str(outcome.work_item_id),
+        "runId": str(outcome.run_id),
+        "state": outcome.state,
+        "currentStep": outcome.current_step,
+        "summary": outcome.summary,
+        "continuationQueued": continuation_id is not None,
+    }
+
+
+@router.post("/sweep")
+async def sweep(
+    request: Request,
+    upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
+) -> dict[str, object]:
+    raw = await request.body()
+    _verify_qstash(request, raw, upstash_signature)
+    if not settings.runtime_execution_enabled:
+        return {"status": "disabled", "scanned": 0, "queued": 0}
+
+    try:
+        CutoverController(settings.cutover_stage).require_authoritative("runtime")
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    now = datetime.now(UTC)
+    async with session_factory() as session:
+        scheduled_queued = await queue_due_schedules(
+            session,
+            now=now,
+            limit=settings.runtime_sweep_limit,
+        )
+        items = list(
+            (
+                await session.scalars(
+                    select(WorkItem)
+                    .where(
+                        WorkItem.status.in_(["queued", "running", "waiting_approval"]),
+                        WorkItem.scheduled_at <= now,
+                    )
+                    .order_by(WorkItem.scheduled_at, WorkItem.id)
+                    .limit(settings.runtime_sweep_limit)
+                )
+            ).all()
+        )
+
+        candidates: list[tuple[UUID, UUID, int]] = []
+        for item in items:
+            if item.status == "waiting_approval":
+                run = await session.scalar(
+                    select(Run)
+                    .where(Run.work_item_id == item.id)
+                    .order_by(Run.created_at.desc())
+                    .limit(1)
+                )
+                if run is None:
+                    continue
+                step = await session.scalar(
+                    select(RunStep).where(
+                        RunStep.run_id == run.id,
+                        RunStep.step_index == _runtime_step(item),
+                    )
+                )
+                output = (
+                    dict(step.output or {})
+                    if step is not None and isinstance(step.output, dict)
+                    else {}
+                )
+                raw_approval_id = output.get("approvalId")
+                if not raw_approval_id:
+                    continue
+                try:
+                    approval_id = UUID(str(raw_approval_id))
+                except ValueError:
+                    continue
+                approval = await session.get(Approval, approval_id)
+                if approval is None or approval.status != "approved":
+                    continue
+            candidates.append((item.organization_id, item.id, _runtime_step(item)))
+
+    queued = 0
+    for organization_id, work_item_id, expected_step in candidates:
+        message_id = await request_runtime_execution(
+            organization_id=organization_id,
+            work_item_id=work_item_id,
+            expected_step=expected_step,
+            reason="recovery",
+        )
+        if message_id is not None:
+            queued += 1
+
+    return {
+        "status": "ok",
+        "scanned": len(items),
+        "eligible": len(candidates),
+        "queued": queued,
+        "scheduledQueued": scheduled_queued,
+    }

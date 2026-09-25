@@ -23,25 +23,15 @@ services:
         sync: false
       - key: QSTASH_OUTBOX_DRAIN_URL
         sync: false
+      - key: QSTASH_RUNTIME_EXECUTE_URL
+        sync: false
+      - key: QSTASH_RUNTIME_SWEEP_URL
+        sync: false
       - key: UPSTASH_BLOB_BUCKET
         sync: false
       - key: UPSTASH_BLOB_TOKEN
         sync: false
+      - key: CUTOVER_STAGE
+        value: runtime
       - key: RUNTIME_EXECUTION_ENABLED
-        value: "false"
-
-  - type: worker
-    name: audoryn-worker
-    runtime: python
-    rootDir: backend
-    buildCommand: pip install -e .
-    startCommand: python -m app.runtime.worker
-    envVars:
-      - key: ENVIRONMENT
-        value: production
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: RUNTIME_EXECUTION_ENABLED
-        value: "false"
+        value: "true"
