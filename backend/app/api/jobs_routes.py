@@ -52,7 +52,7 @@ def _parse_timestamp(value: object) -> datetime | None:
     if not isinstance(value, str) or not value.strip():
         return None
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value)
     except ValueError:
         return None
     if parsed.tzinfo is None:
@@ -100,7 +100,7 @@ def _next_schedule_occurrence(
     if cadence != "weekly" or not allowed_days:
         allowed_days = set(range(7))
 
-    for offset in range(0, 8):
+    for offset in range(8):
         day = local_after.date() + timedelta(days=offset)
         candidate = datetime(
             day.year,
@@ -183,7 +183,7 @@ def _next_worker_open(worker: Worker, when: datetime) -> datetime:
     local = when.astimezone(zone)
     names = tuple(_WEEKDAY_INDEX)
 
-    for offset in range(0, 8):
+    for offset in range(8):
         day_date = local.date() + timedelta(days=offset)
         name = names[day_date.weekday()]
         raw = days.get(name)
