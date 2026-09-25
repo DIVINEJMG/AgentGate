@@ -4,7 +4,7 @@ import asyncio
 import json
 import time
 from collections.abc import Awaitable, Callable
-from typing import NoReturn
+from typing import Any, NoReturn, cast
 
 from jsonschema import Draft202012Validator
 
@@ -301,7 +301,7 @@ class ProviderAIGateway(AIGateway):
                 continue
 
             errors = sorted(
-                Draft202012Validator(schema).iter_errors(parsed),
+                Draft202012Validator(schema).iter_errors(cast(Any, parsed)),
                 key=lambda item: list(item.path),
             )
             if not errors:
