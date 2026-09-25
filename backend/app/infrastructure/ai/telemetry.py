@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.ai.providers import (
@@ -22,7 +24,7 @@ class SQLAlchemyAIInvocationRecorder:
         provider: str,
         model: str,
         schema_name: str | None,
-    ):
+    ) -> UUID:
         row = AIInvocation(
             organization_id=context.organization_id,
             worker_id=context.worker_id,
@@ -43,7 +45,7 @@ class SQLAlchemyAIInvocationRecorder:
 
     async def finish(
         self,
-        invocation_id,
+        invocation_id: UUID,
         *,
         latency_ms: int,
         success: bool,
