@@ -37,6 +37,15 @@ def model_registry_from_settings(config: Settings = settings) -> ModelRegistry:
     )
 
 
+def _secret_value(secret: object | None) -> str | None:
+    if secret is None:
+        return None
+    get_secret_value = getattr(secret, "get_secret_value", None)
+    raw = get_secret_value() if callable(get_secret_value) else str(secret)
+    value = raw.strip()
+    return value or None
+
+
 def ai_gateway_from_settings(
     config: Settings = settings,
     *,
@@ -44,18 +53,19 @@ def ai_gateway_from_settings(
 ) -> AIGateway:
     if not config.ai_enabled:
         return UnconfiguredAIGateway("Aduoryn AI is disabled for this environment.")
-    if config.ai_provider_api_key is None:
-        return UnconfiguredAIGateway("AI provider credential is not configured.")
-    api_key = config.ai_provider_api_key.get_secret_value().strip()
-    if not api_key:
-        return UnconfiguredAIGateway("AI provider credential is not configured.")
+    legacy_key = _secret_value(config.ai_provider_api_key)
+    coordinator_key = _secret_value(config.ai_coordinator_api_key) or legacy_key
+    vision_key = _secret_value(config.ai_vision_api_key) or legacy_key
+    if not coordinator_key and not vision_key:
+        return UnconfiguredAIGateway("AI provider credentials are not configured.")
     if config.ai_provider != "nvidia_nim":
         return UnconfiguredAIGateway(
             f"AI provider {config.ai_provider} is not supported by this deployment."
         )
 
     provider = NvidiaNimProvider(
-        api_key=api_key,
+        coordinator_api_key=coordinator_key,
+        vision_api_key=vision_key,
         base_url=config.ai_provider_base_url,
         timeout_seconds=config.ai_timeout_seconds,
     )
