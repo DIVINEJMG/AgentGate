@@ -63,7 +63,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 from app.domain.jobs.dispatch import ScheduledDispatch
 from app.infrastructure.database.dispatch import WorkItemDispatchRepository
-from app.infrastructure.qstash.provider import UpstashQStashProvider, _destination_path
+from app.infrastructure.qstash.provider import (
+    UpstashQStashProvider,
+    _deduplication_id,
+    _destination_path,
+)
 from app.infrastructure.storage.upstash_blob import UpstashBlobObjectStorage
 
 
@@ -88,7 +92,7 @@ def test_qstash_headers_include_retry_timeout_and_deduplication() -> None:
     headers = provider._headers(retries=4, timeout_seconds=20, idempotency_key="idem-123")
     assert headers["Upstash-Retries"] == "4"
     assert headers["Upstash-Timeout"] == "20s"
-    assert headers["Upstash-Deduplication-Id"] == "idem-123"
+    assert headers["Upstash-Deduplication-Id"] == _deduplication_id("idem-123")
     assert headers["Authorization"].startswith("Bearer ")
 
 
@@ -98,6 +102,15 @@ def test_qstash_destination_path_preserves_url_scheme_and_slashes() -> None:
     assert encoded.startswith("https://audoryn.example/internal/v1/runtime/execute")
     assert "%3Fstep%3D1" in encoded
     assert "https%3A%2F%2F" not in encoded
+
+
+def test_qstash_deduplication_id_hashes_internal_delimiters() -> None:
+    raw = "runtime:00000000-0000-0000-0000-000000000001:0:recovery"
+    deduplication_id = _deduplication_id(raw)
+    assert deduplication_id.startswith("audoryn-")
+    assert ":" not in deduplication_id
+    assert deduplication_id == _deduplication_id(raw)
+    assert deduplication_id != _deduplication_id(raw + ":next")
 
 
 @pytest.mark.asyncio

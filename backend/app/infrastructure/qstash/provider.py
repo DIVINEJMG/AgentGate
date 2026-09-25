@@ -1,3 +1,4 @@
+import hashlib
 from urllib.parse import quote
 
 import httpx
@@ -9,6 +10,12 @@ from app.domain.queue.provider import QueueMessage, QueueProvider
 def _destination_path(destination: str) -> str:
     """Preserve the URL scheme/path QStash expects while escaping URL query data."""
     return quote(destination, safe=":/")
+
+
+def _deduplication_id(idempotency_key: str) -> str:
+    """Map arbitrary internal idempotency keys to QStash-safe stable IDs."""
+    digest = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
+    return f"audoryn-{digest}"
 
 
 class UpstashQStashProvider(QueueProvider):
@@ -41,7 +48,7 @@ class UpstashQStashProvider(QueueProvider):
             "Upstash-Timeout": f"{timeout_seconds}s",
         }
         if idempotency_key:
-            headers["Upstash-Deduplication-Id"] = idempotency_key
+            headers["Upstash-Deduplication-Id"] = _deduplication_id(idempotency_key)
         callback = failure_callback or settings.qstash_failure_callback_url
         if callback:
             headers["Upstash-Failure-Callback"] = callback
