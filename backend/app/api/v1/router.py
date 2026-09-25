@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
-from app.api.ai_operations_routes import v1_router as ai_operations_router
 from app.api.adapters.system_status import serialize_v1
 from app.api.agent_routes import v1_router as agent_router
+from app.api.ai_operations_routes import v1_router as ai_operations_router
 from app.api.conversation_routes import v1_router as conversation_router
 from app.api.governance_routes import v1_router as governance_router
 from app.api.integration_capability_routes import v1_router as integration_router
