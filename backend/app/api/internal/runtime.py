@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.application.services.cutover import CutoverController
+from app.api.jobs_routes import queue_due_schedules
 from app.bootstrap.settings import settings
 from app.domain.jobs.dispatch import ScheduledDispatch
 from app.infrastructure.database.dispatch import WorkItemDispatchRepository
@@ -351,6 +352,13 @@ async def execute(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Work item not found.",
                 )
+            if item.scheduled_at > datetime.now(UTC):
+                return {
+                    "status": "not_due",
+                    "workItemId": str(item.id),
+                    "scheduledAt": item.scheduled_at.isoformat(),
+                    "currentStep": _runtime_step(item),
+                }
             if item.status in {"completed", "failed", "cancelled"}:
                 return {
                     "status": "noop",
@@ -431,6 +439,11 @@ async def sweep(
 
     now = datetime.now(UTC)
     async with session_factory() as session:
+        scheduled_queued = await queue_due_schedules(
+            session,
+            now=now,
+            limit=settings.runtime_sweep_limit,
+        )
         items = list(
             (
                 await session.scalars(
@@ -495,4 +508,5 @@ async def sweep(
         "scanned": len(items),
         "eligible": len(candidates),
         "queued": queued,
+        "scheduledQueued": scheduled_queued,
     }
