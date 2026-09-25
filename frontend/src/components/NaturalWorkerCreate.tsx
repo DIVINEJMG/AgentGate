@@ -18,6 +18,19 @@ function errorText(value: unknown) {
   return data.response?.data?.error || data.message || 'Worker creation could not be completed.';
 }
 
+function safeMediaType(file: File) {
+  if (file.type) return file.type;
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.json')) return 'application/json';
+  if (name.endsWith('.md')) return 'text/markdown';
+  if (name.endsWith('.csv')) return 'text/csv';
+  if (name.endsWith('.xlsx')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (name.endsWith('.py')) return 'text/x-python';
+  if (name.endsWith('.ts') || name.endsWith('.tsx')) return 'text/x-typescript';
+  if (name.endsWith('.js')) return 'text/javascript';
+  return 'text/plain';
+}
+
 async function fileBase64(file: File) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = '';
@@ -65,7 +78,7 @@ export default function NaturalWorkerCreate({
       for (const file of files) {
         const uploaded = await uploadConversationAttachment(apiVersion, organization.id, thread.id, {
           name: file.name,
-          mediaType: file.type || 'application/octet-stream',
+          mediaType: safeMediaType(file),
           contentBase64: await fileBase64(file),
           question: 'Use this file only as context for the worker I am asking you to create.',
         });
