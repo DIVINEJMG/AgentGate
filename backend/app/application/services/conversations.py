@@ -13,7 +13,7 @@ from app.application.services.conversation_commands import (
 from app.application.services.conversation_context import ConversationContextAssembler
 from app.application.services.intent_interpreter import IntentInterpreter
 from app.domain.ai.providers import AIInvocationContext, AIProviderError
-from app.domain.conversation.intent import CommandReceipt
+from app.domain.conversation.intent import CommandReceipt, FailureCategory
 from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.ai.provider import ai_gateway_from_settings
 from app.infrastructure.database.models import (
@@ -231,6 +231,7 @@ class ConversationService:
             receipt = CommandReceipt(
                 status="unavailable",
                 message=self._provider_message(exc),
+                failure_category=self._provider_failure_category(exc),
             )
             command_refs = []
 
@@ -359,6 +360,13 @@ class ConversationService:
                 "role": message.role,
             },
         )
+
+    def _provider_failure_category(self, error: AIProviderError) -> FailureCategory:
+        if error.category == "authentication_failed":
+            return "authentication_expiry"
+        if error.category == "configuration_missing":
+            return "internal_platform_failure"
+        return "provider_model_outage"
 
     def _provider_message(self, error: AIProviderError) -> str:
         if error.category in {

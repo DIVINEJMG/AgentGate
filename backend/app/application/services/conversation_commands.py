@@ -260,6 +260,15 @@ class ConversationCommandCompiler:
                     ),
                     references=list(result.references),
                     command_id=command.id,
+                    failure_category="missing_integration",
+                    action_hints=[
+                        {
+                            "kind": "connect_integration",
+                            "provider": provider,
+                            "label": f"Connect {provider.replace('_', ' ').title()}",
+                        }
+                        for provider in result.missing_integrations
+                    ],
                 )
             job_names = ", ".join(job.name for job in result.jobs)
             return CommandReceipt(
@@ -365,6 +374,13 @@ class ConversationCommandCompiler:
                         ),
                         references=[self._ref("worker", worker.id, worker.name)],
                         command_id=command.id,
+                        failure_category="approval_wait",
+                        action_hints=[
+                            {
+                                "kind": "confirm_command",
+                                "label": "Confirm deletion",
+                            }
+                        ],
                     )
                 jobs = list(
                     (
@@ -637,6 +653,13 @@ class ConversationCommandCompiler:
                     message=f"Removing {policy.name} disables a governance rule. Confirm this command to continue.",
                     references=[self._ref("policy", policy.id, policy.name)],
                     command_id=command.id,
+                    failure_category="approval_wait",
+                    action_hints=[
+                        {
+                            "kind": "confirm_command",
+                            "label": "Confirm policy removal",
+                        }
+                    ],
                 )
             await policy_status_v1(
                 organization_id,
@@ -699,6 +722,14 @@ class ConversationCommandCompiler:
                     message=f"{provider} needs to be connected before this work can continue.",
                     references=[],
                     command_id=command.id,
+                    failure_category="missing_integration",
+                    action_hints=[
+                        {
+                            "kind": "connect_integration",
+                            "provider": provider,
+                            "label": f"Connect {provider.replace('_', ' ').title()}",
+                        }
+                    ],
                 )
             return CommandReceipt(
                 status="completed",

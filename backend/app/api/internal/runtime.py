@@ -59,6 +59,32 @@ def _runtime_step(item: WorkItem) -> int:
     return max(0, int(runtime.get("currentStep", 0)))
 
 
+def _runtime_failure_category(message: str) -> str:
+    lowered = message.lower()
+    if "policy" in lowered or "denied" in lowered:
+        return "policy_denial"
+    if any(token in lowered for token in ("browser", "navigation", "page", "site")):
+        return "browser_site_failure"
+    if "integration" in lowered:
+        return "missing_integration"
+    if "approval" in lowered:
+        return "approval_wait"
+    if any(token in lowered for token in ("authentication", "credential", "unauthorized")):
+        return "authentication_expiry"
+    if any(
+        token in lowered
+        for token in (
+            "database",
+            "storage",
+            "runtime job definition is unavailable",
+            "runtime worker is unavailable",
+            "runtime agent identity is unavailable",
+        )
+    ):
+        return "internal_platform_failure"
+    return "task_failure"
+
+
 class ExecutePayload(BaseModel):
     organization_id: UUID
     work_item_id: UUID
@@ -410,6 +436,13 @@ async def execute(
 
                 runtime_meta["aiRetryCount"] = retry_count
                 runtime_meta["lastAIErrorCategory"] = exc.category
+                runtime_meta["failureCategory"] = (
+                    "authentication_expiry"
+                    if exc.category == "authentication_failed"
+                    else "internal_platform_failure"
+                    if exc.category in {"configuration_missing", "model_not_found"}
+                    else "provider_model_outage"
+                )
                 runtime_meta["lastAIErrorAt"] = now.isoformat()
                 if retry_at is not None:
                     runtime_meta["aiRetryAt"] = retry_at.isoformat()
@@ -442,12 +475,18 @@ async def execute(
                     "currentStep": _runtime_step(item),
                     "summary": summary,
                     "aiErrorCategory": exc.category,
+                    "failureCategory": runtime_meta["failureCategory"],
                     "retryScheduled": retry_scheduled,
                     "retryAt": retry_at.isoformat() if retry_at is not None else None,
                 }
             except RuntimeError as exc:
                 item.status = "failed"
                 payload = dict(item.payload or {})
+                failure_category = _runtime_failure_category(str(exc))
+                raw_runtime = payload.get("runtime")
+                runtime_meta = dict(raw_runtime) if isinstance(raw_runtime, dict) else {}
+                runtime_meta["failureCategory"] = failure_category
+                payload["runtime"] = runtime_meta
                 payload["lastError"] = str(exc)[:1000]
                 payload["completedAt"] = datetime.now(UTC).isoformat()
                 item.payload = payload
@@ -467,6 +506,7 @@ async def execute(
                     "state": "failed",
                     "currentStep": _runtime_step(item),
                     "summary": str(exc),
+                    "failureCategory": failure_category,
                 }
     finally:
         await coordinator.release_lock(lease)
