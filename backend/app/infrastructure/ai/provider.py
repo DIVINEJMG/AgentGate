@@ -112,7 +112,7 @@ class OpenAIResponsesModelProvider(ModelProvider):
 
         payload = response.json()
         if not isinstance(payload, dict):
-            raise RuntimeError("Managed Runtime model provider returned an invalid response.")
+            raise TypeError("Managed Runtime model provider returned an invalid response.")
         text = _output_text(payload)
         if not text:
             raise RuntimeError("Managed Runtime model provider returned no text output.")
