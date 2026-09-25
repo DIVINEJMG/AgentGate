@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.services.ai_gateway import ProviderAIGateway, UnconfiguredAIGateway
@@ -37,12 +38,10 @@ def model_registry_from_settings(config: Settings = settings) -> ModelRegistry:
     )
 
 
-def _secret_value(secret: object | None) -> str | None:
+def _secret_value(secret: SecretStr | None) -> str | None:
     if secret is None:
         return None
-    get_secret_value = getattr(secret, "get_secret_value", None)
-    raw = get_secret_value() if callable(get_secret_value) else str(secret)
-    value = raw.strip()
+    value = secret.get_secret_value().strip()
     return value or None
 
 
