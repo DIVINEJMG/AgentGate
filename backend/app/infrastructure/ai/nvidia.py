@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
-
 import httpx
 
 from app.domain.ai.providers import (
@@ -103,11 +101,13 @@ class NvidiaNimProvider:
         base_url: str = "https://integrate.api.nvidia.com/v1",
         timeout_seconds: int = 60,
         extra_body: dict[str, object] | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = max(10, timeout_seconds)
         self._extra_body = dict(extra_body or {})
+        self._transport = transport
 
     def _headers(self, correlation_id: str | None) -> dict[str, str]:
         headers = {
@@ -193,7 +193,10 @@ class NvidiaNimProvider:
     ) -> AIResponse:
         body = self._body(model=model, request=request, messages=messages)
         try:
-            async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+            async with httpx.AsyncClient(
+                timeout=self._timeout_seconds,
+                transport=self._transport,
+            ) as client:
                 if request.stream:
                     async with client.stream(
                         "POST",
