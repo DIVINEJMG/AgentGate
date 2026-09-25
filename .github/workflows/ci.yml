@@ -37,6 +37,7 @@ jobs:
       - run: ruff format --check app/execution app/integrations/builtin.py app/api/integration_capability_routes.py tests/test_f29_0_10.py
       - run: pyright
       - run: pytest
+      - run: pytest tests/test_f31_0_10.py
       - run: pytest tests/test_security_invariants.py
       - run: pytest tests/parity
       - run: pytest tests/contract
@@ -61,4 +62,6 @@ jobs:
       - run: python ../scripts/verify_f30_21_30.py
       - run: python ../scripts/verify_f30_31_40.py
       - run: python ../scripts/verify_f30_ui_exposure.py
+      - run: python ../scripts/verify_f31_0_10.py
+      - run: python ../scripts/verify_ai_provider_boundary.py
       - run: python ../scripts/verify_qstash_runtime_cutover.py

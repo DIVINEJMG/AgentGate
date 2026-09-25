@@ -1,30 +1,68 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 
 import pytest
 
-from app.domain.ai.providers import ModelRequest, ModelResponse
-from app.infrastructure.ai.provider import _output_text
+from app.domain.ai.providers import (
+    AIInvocationContext,
+    AIMediaInput,
+    AIModelRole,
+    AIResponse,
+)
 from app.runtime.managed import _attach_observation_id
 from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
 
 
 @dataclass
-class FakeModel:
+class FakeGateway:
     outputs: list[dict[str, object]]
     calls: int = 0
 
-    async def generate(self, request: ModelRequest) -> ModelResponse:
-        assert request.response_format == "json_schema"
+    async def generate_structured(
+        self,
+        *,
+        role: AIModelRole,
+        system: str,
+        prompt: str,
+        schema_name: str,
+        schema: dict[str, object],
+        context: AIInvocationContext | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float = 0.0,
+    ) -> dict[str, object]:
+        del system, prompt, schema_name, schema, context, max_output_tokens, temperature
+        assert role == "planner"
         index = min(self.calls, len(self.outputs) - 1)
         self.calls += 1
-        return ModelResponse(
-            text=json.dumps(self.outputs[index]),
-            provider="fake",
-            model="fake-planner",
-        )
+        return self.outputs[index]
+
+    async def generate_text(
+        self,
+        *,
+        role: AIModelRole,
+        system: str,
+        prompt: str,
+        context: AIInvocationContext | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float = 0.0,
+        stream: bool = False,
+    ) -> AIResponse:
+        del role, system, prompt, context, max_output_tokens, temperature, stream
+        raise AssertionError("planner test must use structured generation")
+
+    async def analyze_media(
+        self,
+        *,
+        role: AIModelRole,
+        system: str,
+        prompt: str,
+        media: AIMediaInput,
+        context: AIInvocationContext | None = None,
+        max_output_tokens: int | None = None,
+    ) -> AIResponse:
+        del role, system, prompt, media, context, max_output_tokens
+        raise AssertionError("planner test must not analyze media")
 
 
 def _browser_tools() -> list[dict[str, object]]:
@@ -80,7 +118,7 @@ def _worker() -> dict[str, object]:
 
 @pytest.mark.asyncio
 async def test_adaptive_planner_treats_capabilities_as_tools_not_checklist() -> None:
-    model = FakeModel(
+    gateway = FakeGateway(
         [
             {
                 "decision": "act",
@@ -93,7 +131,7 @@ async def test_adaptive_planner_treats_capabilities_as_tools_not_checklist() -> 
             }
         ]
     )
-    planner = AdaptiveRuntimePlanner(model)
+    planner = AdaptiveRuntimePlanner(gateway)
 
     decision = await planner.choose_next(
         job=_job(),
@@ -107,12 +145,12 @@ async def test_adaptive_planner_treats_capabilities_as_tools_not_checklist() -> 
 
     assert decision.scope == "browser.navigation.open"
     assert decision.action_input == {}
-    assert model.calls == 1
+    assert gateway.calls == 1
 
 
 @pytest.mark.asyncio
 async def test_adaptive_planner_rejects_element_action_before_browser_observation() -> None:
-    model = FakeModel(
+    gateway = FakeGateway(
         [
             {
                 "decision": "act",
@@ -136,7 +174,7 @@ async def test_adaptive_planner_rejects_element_action_before_browser_observatio
             },
         ]
     )
-    planner = AdaptiveRuntimePlanner(model)
+    planner = AdaptiveRuntimePlanner(gateway)
 
     decision = await planner.choose_next(
         job=_job(),
@@ -149,12 +187,12 @@ async def test_adaptive_planner_rejects_element_action_before_browser_observatio
     )
 
     assert decision.scope == "browser.navigation.open"
-    assert model.calls == 2
+    assert gateway.calls == 2
 
 
 @pytest.mark.asyncio
 async def test_adaptive_planner_uses_only_observed_browser_refs() -> None:
-    model = FakeModel(
+    gateway = FakeGateway(
         [
             {
                 "decision": "act",
@@ -180,7 +218,7 @@ async def test_adaptive_planner_uses_only_observed_browser_refs() -> None:
             },
         ]
     )
-    planner = AdaptiveRuntimePlanner(model)
+    planner = AdaptiveRuntimePlanner(gateway)
     observations = [
         {
             "step": 1,
@@ -211,13 +249,12 @@ async def test_adaptive_planner_uses_only_observed_browser_refs() -> None:
         "strategy": "observation_ref",
         "value": "e2",
     }
-    assert model.calls == 2
-
+    assert gateway.calls == 2
 
 
 @pytest.mark.asyncio
 async def test_adaptive_planner_allows_reasoning_only_finish_without_tools() -> None:
-    model = FakeModel(
+    gateway = FakeGateway(
         [
             {
                 "decision": "finish",
@@ -230,7 +267,7 @@ async def test_adaptive_planner_allows_reasoning_only_finish_without_tools() -> 
             }
         ]
     )
-    planner = AdaptiveRuntimePlanner(model)
+    planner = AdaptiveRuntimePlanner(gateway)
 
     decision = await planner.choose_next(
         job={
@@ -269,17 +306,3 @@ def test_runtime_injects_observation_id_into_nested_browser_locators() -> None:
     assert isinstance(fields, list)
     assert fields[0]["locator"]["observationId"] == "obs-123"
     assert result["submitLocator"]["observationId"] == "obs-123"
-
-
-def test_openai_response_text_parser_reads_output_message() -> None:
-    payload: dict[str, object] = {
-        "output": [
-            {
-                "type": "message",
-                "content": [
-                    {"type": "output_text", "text": "{\"decision\":\"finish\"}"}
-                ],
-            }
-        ]
-    }
-    assert _output_text(payload) == '{"decision":"finish"}'

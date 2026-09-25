@@ -2,7 +2,7 @@ import base64
 import binascii
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
@@ -12,6 +12,7 @@ from sqlalchemy import select
 from app.api.jobs_routes import queue_due_schedules
 from app.application.services.cutover import CutoverController
 from app.bootstrap.settings import settings
+from app.domain.ai.providers import AIProviderError
 from app.domain.jobs.dispatch import ScheduledDispatch
 from app.infrastructure.database.dispatch import WorkItemDispatchRepository
 from app.infrastructure.database.models import (
@@ -371,6 +372,79 @@ async def execute(
                     item=item,
                     expected_step=message.expected_step,
                 )
+            except AIProviderError as exc:
+                now = datetime.now(UTC)
+                payload = dict(item.payload or {})
+                raw_runtime = payload.get("runtime")
+                runtime_meta = (
+                    dict(raw_runtime)
+                    if isinstance(raw_runtime, dict)
+                    else {}
+                )
+                retry_count = max(0, int(runtime_meta.get("aiRetryCount", 0)))
+                configuration_error = exc.category in {
+                    "configuration_missing",
+                    "authentication_failed",
+                    "model_not_found",
+                }
+                retry_scheduled = False
+                retry_at: datetime | None = None
+
+                if configuration_error:
+                    state = "waiting_configuration"
+                    item.status = state
+                    summary = "AI configuration is required before this work can continue."
+                elif exc.retryable and retry_count < settings.ai_max_retries:
+                    retry_count += 1
+                    delay_seconds = min(300, 15 * (2 ** (retry_count - 1)))
+                    retry_at = now + timedelta(seconds=delay_seconds)
+                    item.status = "queued"
+                    item.scheduled_at = retry_at
+                    state = "waiting_ai"
+                    retry_scheduled = True
+                    summary = "AI planner is temporarily unavailable; retry is scheduled."
+                else:
+                    state = "waiting_ai"
+                    item.status = state
+                    summary = "AI planner is unavailable; no external action was taken."
+
+                runtime_meta["aiRetryCount"] = retry_count
+                runtime_meta["lastAIErrorCategory"] = exc.category
+                runtime_meta["lastAIErrorAt"] = now.isoformat()
+                if retry_at is not None:
+                    runtime_meta["aiRetryAt"] = retry_at.isoformat()
+                payload["runtime"] = runtime_meta
+                payload["lastError"] = {
+                    "kind": "ai_provider",
+                    "category": exc.category,
+                    "retryable": exc.retryable,
+                }
+                item.payload = payload
+
+                run = await session.scalar(
+                    select(Run)
+                    .where(Run.work_item_id == item.id)
+                    .order_by(Run.created_at.desc())
+                    .limit(1)
+                )
+                if run is not None and run.status not in {
+                    "completed",
+                    "failed",
+                    "cancelled",
+                }:
+                    run.status = state
+                    run.result_summary = summary
+                await session.commit()
+                return {
+                    "status": state,
+                    "workItemId": str(item.id),
+                    "state": state,
+                    "currentStep": _runtime_step(item),
+                    "summary": summary,
+                    "aiErrorCategory": exc.category,
+                    "retryScheduled": retry_scheduled,
+                    "retryAt": retry_at.isoformat() if retry_at is not None else None,
+                }
             except RuntimeError as exc:
                 item.status = "failed"
                 payload = dict(item.payload or {})

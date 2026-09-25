@@ -38,8 +38,10 @@ if "AdaptiveRuntimePlanner" not in managed:
     errors.append("Managed Runtime is not wired to adaptive next-action planning")
 if "Execute {len(required)} governed capability step(s)" in managed:
     errors.append("Managed Runtime still treats capabilities as a forced checklist")
-if "MODEL_PROVIDER_API_KEY" not in render:
-    errors.append("Render blueprint is missing the planner model credential boundary")
+if "AI_PROVIDER_API_KEY" not in render:
+    errors.append("Render blueprint is missing the AI provider credential boundary")
+if "ai_gateway_from_settings" not in managed:
+    errors.append("Managed Runtime planner is not wired through AIGateway")
 if "request_runtime_execution" not in jobs:
     errors.append("new WorkItems are not signaled to QStash")
 if "reason=\"approval\"" not in governance:

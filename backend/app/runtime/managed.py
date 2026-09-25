@@ -19,6 +19,7 @@ from app.domain.actions.gateway import (
     ActionProposal,
     AuthorizationDecision,
 )
+from app.domain.ai.providers import AIInvocationContext
 from app.domain.identity.principals import AgentPrincipal, HumanPrincipal
 from app.execution.authorization import UniversalActionRequest, action_fingerprint
 from app.execution.bootstrap import execution_provider_registry
@@ -41,7 +42,7 @@ from app.infrastructure.database.models import (
     Worker,
     WorkItem,
 )
-from app.infrastructure.ai.provider import model_provider_from_settings
+from app.infrastructure.ai.provider import ai_gateway_from_settings
 from app.infrastructure.database.outbox import TransactionalOutbox
 from app.runtime.planner.adaptive import AdaptivePlanDecision, AdaptiveRuntimePlanner
 
@@ -137,7 +138,9 @@ class ManagedRuntimeExecutor:
             registry=self._registry,
             context_loader=DatabaseProviderContextLoader(session, self._registry),
         )
-        self._planner = AdaptiveRuntimePlanner(model_provider_from_settings())
+        self._planner = AdaptiveRuntimePlanner(
+            ai_gateway_from_settings(session=session)
+        )
 
     async def execute_step(
         self,
@@ -552,12 +555,19 @@ class ManagedRuntimeExecutor:
             observations=self._planner_observations(steps),
             action_count=len([step for step in steps if step.kind == "action"]),
             max_actions=settings.runtime_max_action_steps,
+            invocation_context=AIInvocationContext(
+                organization_id=item.organization_id,
+                worker_id=worker.id,
+                job_id=job.id,
+                run_id=run.id,
+                correlation_id=item.correlation_id,
+            ),
         )
         _write_runtime_meta(
             item,
             planSummary=decision.summary,
             plannerMode="adaptive",
-            plannerModel=settings.model_provider_model,
+            plannerModel=settings.ai_coordinator_model,
         )
         await self._session.flush()
         return decision

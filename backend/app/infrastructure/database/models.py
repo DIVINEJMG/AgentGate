@@ -274,6 +274,38 @@ class OutboxEvent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (Index("ix_outbox_unpublished", "published_at", "created_at"),)
 
 
+
+
+class AIInvocation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "ai_invocations"
+    organization_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL")
+    )
+    worker_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("workers.id", ondelete="SET NULL")
+    )
+    job_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("jobs.id", ondelete="SET NULL")
+    )
+    run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("runs.id", ondelete="SET NULL")
+    )
+    thread_id: Mapped[UUID | None] = mapped_column()
+    role: Mapped[str] = mapped_column(String(32), nullable=False)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    model: Mapped[str] = mapped_column(String(255), nullable=False)
+    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    success: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    request_id: Mapped[str | None] = mapped_column(String(255))
+    usage: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    error_category: Mapped[str | None] = mapped_column(String(64))
+    schema_name: Mapped[str | None] = mapped_column(String(128))
+    correlation_id: Mapped[str | None] = mapped_column(String(128))
+    __table_args__ = (
+        Index("ix_ai_invocations_org_created", "organization_id", "created_at"),
+        Index("ix_ai_invocations_role_created", "role", "created_at"),
+    )
+
 class QueueDeliveryFailure(TenantModel, Base):
     __tablename__ = "queue_delivery_failures"
     source_message_id: Mapped[str] = mapped_column(String(180), nullable=False, unique=True)
