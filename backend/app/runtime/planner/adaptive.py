@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
-
 from app.domain.ai.providers import ModelProvider, ModelRequest
 
 
@@ -39,7 +37,7 @@ def _parse_json(text: str) -> dict[str, object]:
     except json.JSONDecodeError as exc:
         raise RuntimeError("Managed Runtime planner returned invalid JSON.") from exc
     if not isinstance(parsed, dict):
-        raise RuntimeError("Managed Runtime planner returned a non-object decision.")
+        raise TypeError("Managed Runtime planner returned a non-object decision.")
     return {str(key): value for key, value in parsed.items()}
 
 
@@ -242,11 +240,14 @@ class AdaptiveRuntimePlanner:
         if tool is None:
             raise RuntimeError("Planner selected an unavailable resource/capability pair.")
 
-        if scope.startswith("browser.") and latest_browser is None:
-            if scope != "browser.navigation.open":
-                raise RuntimeError(
-                    "Browser session is not open yet; choose browser.navigation.open first."
-                )
+        if (
+            scope.startswith("browser.")
+            and latest_browser is None
+            and scope != "browser.navigation.open"
+        ):
+            raise RuntimeError(
+                "Browser session is not open yet; choose browser.navigation.open first."
+            )
 
         input_schema = tool.get("inputSchema")
         schema = input_schema if isinstance(input_schema, dict) else {}
