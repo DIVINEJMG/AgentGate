@@ -83,6 +83,10 @@ class Settings(BaseSettings):
     integration_encryption_key: SecretStr | None = None
     oidc_client_secret: SecretStr | None = None
     model_provider_api_key: SecretStr | None = None
+    model_provider_base_url: str = "https://api.openai.com/v1"
+    model_provider_model: str = "gpt-5.6-luna"
+    model_provider_timeout_seconds: int = 60
+    runtime_max_action_steps: int = 8
     object_storage_access_key: SecretStr | None = None
     object_storage_secret_key: SecretStr | None = None
 

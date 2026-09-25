@@ -316,6 +316,15 @@ async def process_item_v1(
     )
     if item is None:
         raise not_found("Work item")
+    if item.status != "queued":
+        guidance = (
+            "Use Retry for failed/cancelled work."
+            if item.status in {"failed", "cancelled"}
+            else "Use Continue for approval-held work."
+            if item.status == "waiting_approval"
+            else "Only queued work can be manually processed."
+        )
+        raise HTTPException(409, guidance)
     run = await session.scalar(
         select(Run)
         .where(Run.work_item_id == item.id)
@@ -471,6 +480,8 @@ async def retry_item_v1(
     if item.status not in {"failed", "cancelled"}:
         raise HTTPException(409, "Only failed or cancelled work can be retried.")
     payload = dict(item.payload or {})
+    if int(payload.get("retryCount", 0)) >= 2:
+        raise HTTPException(409, "This Work Item reached the bounded retry limit.")
     payload["retryCount"] = int(payload.get("retryCount", 0)) + 1
     for key in ("lastError", "cancelledBy", "cancelledAt", "completedAt"):
         payload.pop(key, None)

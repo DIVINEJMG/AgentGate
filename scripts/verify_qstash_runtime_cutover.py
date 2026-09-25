@@ -34,6 +34,12 @@ if "UniversalProviderExecutor" not in managed or "ActionGateway" not in managed:
     errors.append("Managed Runtime does not use universal governed execution")
 if "UnconfiguredRuntimeExecutor" in managed:
     errors.append("Managed Runtime still uses the placeholder executor")
+if "AdaptiveRuntimePlanner" not in managed:
+    errors.append("Managed Runtime is not wired to adaptive next-action planning")
+if "Execute {len(required)} governed capability step(s)" in managed:
+    errors.append("Managed Runtime still treats capabilities as a forced checklist")
+if "MODEL_PROVIDER_API_KEY" not in render:
+    errors.append("Render blueprint is missing the planner model credential boundary")
 if "request_runtime_execution" not in jobs:
     errors.append("new WorkItems are not signaled to QStash")
 if "reason=\"approval\"" not in governance:

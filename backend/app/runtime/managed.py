@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.governance_routes import _evaluate
 from app.api.integration_capability_routes import _catalog
 from app.api.product_common import utcnow
+from app.bootstrap.settings import settings
 from app.domain.actions.gateway import (
     ActionGateway,
     ActionProposal,
@@ -40,7 +41,9 @@ from app.infrastructure.database.models import (
     Worker,
     WorkItem,
 )
+from app.infrastructure.ai.provider import model_provider_from_settings
 from app.infrastructure.database.outbox import TransactionalOutbox
+from app.runtime.planner.adaptive import AdaptivePlanDecision, AdaptiveRuntimePlanner
 
 
 RuntimeState = Literal["completed", "continue", "waiting_approval", "failed", "noop"]
@@ -99,6 +102,26 @@ def _integration_config(integration: Integration | None) -> dict[str, Any]:
     return dict(integration.config or {}) if integration and isinstance(integration.config, dict) else {}
 
 
+def _attach_observation_id(value: object, observation_id: str | None) -> object:
+    if observation_id is None:
+        return value
+    if isinstance(value, dict):
+        result = {
+            str(key): _attach_observation_id(nested, observation_id)
+            for key, nested in value.items()
+        }
+        if (
+            result.get("strategy") == "observation_ref"
+            and result.get("value")
+            and not result.get("observationId")
+        ):
+            result["observationId"] = observation_id
+        return result
+    if isinstance(value, list):
+        return [_attach_observation_id(item, observation_id) for item in value]
+    return value
+
+
 class ManagedRuntimeExecutor:
     """Durable, provider-neutral Managed Runtime executed one step at a time.
 
@@ -114,6 +137,7 @@ class ManagedRuntimeExecutor:
             registry=self._registry,
             context_loader=DatabaseProviderContextLoader(session, self._registry),
         )
+        self._planner = AdaptiveRuntimePlanner(model_provider_from_settings())
 
     async def execute_step(
         self,
@@ -123,7 +147,7 @@ class ManagedRuntimeExecutor:
     ) -> RuntimeStepOutcome:
         job, revision, worker, agent = await self._load_context(item)
         run = await self._ensure_run(item)
-        steps = await self._ensure_plan(item, run, job, revision)
+        steps = await self._load_steps(run)
 
         meta = _runtime_meta(item)
         current_step = max(0, int(meta.get("currentStep", 0)))
@@ -146,7 +170,33 @@ class ManagedRuntimeExecutor:
             )
 
         if current_step >= len(steps):
-            return await self._complete(item, run, job, worker, steps)
+            decision = await self._plan_next_step(
+                item=item,
+                run=run,
+                job=job,
+                revision=revision,
+                worker=worker,
+                agent=agent,
+                steps=steps,
+            )
+            if decision.decision == "finish":
+                return await self._complete(
+                    item,
+                    run,
+                    job,
+                    worker,
+                    steps,
+                    completion_summary=decision.summary,
+                    finish_title=decision.title,
+                    finish_instruction=decision.instruction,
+                )
+            step = await self._append_action_step(
+                item=item,
+                run=run,
+                decision=decision,
+                step_index=current_step,
+            )
+            steps.append(step)
 
         step = steps[current_step]
         if step.status == "completed":
@@ -291,14 +341,8 @@ class ManagedRuntimeExecutor:
         await self._session.flush()
         return run
 
-    async def _ensure_plan(
-        self,
-        item: WorkItem,
-        run: Run,
-        job: Job,
-        revision: JobRevision,
-    ) -> list[RunStep]:
-        existing = list(
+    async def _load_steps(self, run: Run) -> list[RunStep]:
+        return list(
             (
                 await self._session.scalars(
                     select(RunStep)
@@ -307,75 +351,281 @@ class ManagedRuntimeExecutor:
                 )
             ).all()
         )
-        if existing:
-            return existing
 
-        definition = dict(revision.definition or {}) if isinstance(revision.definition, dict) else {}
-        required = [str(scope) for scope in definition.get("requiredCapabilities", []) if str(scope)]
+    async def _planner_tools(
+        self,
+        *,
+        item: WorkItem,
+        revision: JobRevision,
+        agent: AgentIdentity,
+    ) -> list[dict[str, object]]:
+        definition = (
+            dict(revision.definition or {})
+            if isinstance(revision.definition, dict)
+            else {}
+        )
+        selected = {
+            str(scope)
+            for scope in definition.get("requiredCapabilities", [])
+            if str(scope)
+        }
+        active = await self._active_scopes(agent.id)
         catalog = await _catalog(self._session, item.organization_id)
         resources = list(catalog.get("resources", []))
-        steps: list[RunStep] = []
+        tools: list[dict[str, object]] = []
 
-        for index, scope in enumerate(required):
-            resource = next(
-                (
-                    candidate
-                    for candidate in resources
-                    if scope in list(candidate.get("scopes", []))
-                    and candidate.get("status") == "connected"
-                ),
-                None,
-            )
-            if resource is None:
-                raise RuntimeError(f"Required runtime capability is unavailable: {scope}.")
-            action = next(
-                (entry for entry in list(resource.get("actions", [])) if entry.get("scope") == scope),
-                None,
-            )
-            if action is None:
-                raise RuntimeError(f"Runtime capability has no executable operation: {scope}.")
-            steps.append(
-                RunStep(
-                    run_id=run.id,
-                    step_index=index,
-                    kind="action",
-                    status="pending",
-                    input={
-                        "title": f"Use {scope}",
-                        "instruction": str(definition.get("instructions", "")) or str(definition.get("objective", "")),
-                        "resourceId": str(resource["id"]),
-                        "scope": scope,
-                        "provider": str(resource["provider"]),
-                        "operation": str(action["providerOperation"]),
-                    },
-                    output={},
+        for resource in resources:
+            if resource.get("status") != "connected":
+                continue
+            provider_name = str(resource.get("provider", ""))
+            try:
+                provider = self._registry.get(provider_name)
+            except KeyError:
+                continue
+            resource_id = str(resource.get("id", ""))
+            integration: Integration | None = None
+            try:
+                integration = await self._session.get(Integration, UUID(resource_id))
+            except ValueError:
+                integration = None
+            config = _integration_config(integration)
+            actions = list(resource.get("actions", []))
+            for action in actions:
+                scope = str(action.get("scope", ""))
+                if scope not in selected or scope not in active:
+                    continue
+                capability = next(
+                    (
+                        entry
+                        for entry in provider.manifest.capabilities
+                        if entry.scope == scope
+                    ),
+                    None,
                 )
-            )
+                if capability is None:
+                    continue
+                policy = await self._policy_decision(
+                    item=item,
+                    agent=agent,
+                    resource_id=resource_id,
+                    scope=scope,
+                )
+                if policy.get("outcome") == "DENY":
+                    continue
+                tools.append(
+                    {
+                        "resourceId": resource_id,
+                        "resourceName": str(resource.get("displayName", resource_id)),
+                        "provider": provider_name,
+                        "scope": scope,
+                        "operation": capability.operation,
+                        "description": capability.description,
+                        "risk": str(
+                            (policy.get("riskAssessment") or {}).get("effectiveRisk")
+                            or capability.risk
+                        ),
+                        "sideEffect": capability.side_effect,
+                        "approvalRecommendation": capability.approval_recommendation,
+                        "inputSchema": capability.input_schema,
+                        "defaultStartUrl": (
+                            str(config.get("startUrl", ""))
+                            if scope == "browser.navigation.open"
+                            else ""
+                        ),
+                    }
+                )
 
-        steps.append(
-            RunStep(
-                run_id=run.id,
-                step_index=len(steps),
-                kind="finish",
-                status="pending",
-                input={
-                    "title": "Finish",
-                    "instruction": "Verify the durable capability steps completed and publish the Result.",
-                    "resourceId": "",
-                    "scope": "",
-                },
-                output={},
-            )
+        return tools
+
+    def _planner_observations(self, steps: list[RunStep]) -> list[dict[str, object]]:
+        observations: list[dict[str, object]] = []
+        for step in steps:
+            if step.status != "completed":
+                continue
+            spec = dict(step.input or {}) if isinstance(step.input, dict) else {}
+            output = _step_output(step)
+            entry: dict[str, object] = {
+                "step": step.step_index + 1,
+                "title": str(spec.get("title", "")),
+                "scope": str(spec.get("scope", "")),
+                "summary": str(output.get("summary", ""))[:2000],
+            }
+            data = output.get("data")
+            data_map = data if isinstance(data, dict) else {}
+            provider_output = data_map.get("output")
+            provider_map = provider_output if isinstance(provider_output, dict) else {}
+            browser_observation = provider_map.get("observation")
+            if isinstance(browser_observation, dict):
+                raw_elements = browser_observation.get("elements")
+                elements = raw_elements if isinstance(raw_elements, list) else []
+                compact_elements = [
+                    {
+                        key: element.get(key)
+                        for key in (
+                            "ref",
+                            "tag",
+                            "role",
+                            "name",
+                            "text",
+                            "element_type",
+                            "value",
+                            "checked",
+                            "selected",
+                            "disabled",
+                            "href",
+                        )
+                        if key in element
+                    }
+                    for element in elements[:120]
+                    if isinstance(element, dict)
+                ]
+                entry["browserObservation"] = {
+                    "id": browser_observation.get("id"),
+                    "sessionId": browser_observation.get("sessionId"),
+                    "url": browser_observation.get("url"),
+                    "title": browser_observation.get("title"),
+                    "visibleText": str(browser_observation.get("visibleText") or "")[:7000],
+                    "ariaSnapshot": str(browser_observation.get("ariaSnapshot") or "")[:4000],
+                    "elements": compact_elements,
+                    "formDetails": browser_observation.get("formDetails", []),
+                    "pageState": browser_observation.get("pageState", {}),
+                }
+            else:
+                entry["providerOutput"] = str(provider_map)[:4000]
+            verification = data_map.get("verification")
+            if isinstance(verification, dict):
+                entry["verification"] = {
+                    "verified": verification.get("verified"),
+                    "summary": verification.get("summary"),
+                }
+            observations.append(entry)
+        return observations
+
+    async def _plan_next_step(
+        self,
+        *,
+        item: WorkItem,
+        run: Run,
+        job: Job,
+        revision: JobRevision,
+        worker: Worker,
+        agent: AgentIdentity,
+        steps: list[RunStep],
+    ) -> AdaptivePlanDecision:
+        tools = await self._planner_tools(
+            item=item,
+            revision=revision,
+            agent=agent,
         )
-        self._session.add_all(steps)
-        plan_summary = (
-            f"Execute {len(required)} governed capability step(s) for {job.name}."
-            if required
-            else f"Complete {job.name} with no external capability step."
+        definition = (
+            dict(revision.definition or {})
+            if isinstance(revision.definition, dict)
+            else {}
         )
-        _write_runtime_meta(item, planSummary=plan_summary, currentStep=0)
+        payload = dict(item.payload or {})
+        raw_trigger = payload.get("trigger")
+        trigger = (
+            {str(key): value for key, value in raw_trigger.items()}
+            if isinstance(raw_trigger, dict)
+            else {}
+        )
+        profile = dict(worker.profile or {}) if isinstance(worker.profile, dict) else {}
+        decision = await self._planner.choose_next(
+            job={
+                "name": job.name,
+                "objective": str(definition.get("objective", "")),
+                "instructions": str(definition.get("instructions", "")),
+                "completionCriteria": list(definition.get("completionCriteria", [])),
+                "availableCapabilityScopes": [
+                    str(tool.get("scope", "")) for tool in tools
+                ],
+            },
+            worker={
+                "name": worker.name,
+                "role": profile.get("role"),
+                "department": profile.get("department"),
+                "responsibilities": profile.get("responsibilities", []),
+                "instructions": profile.get("instructions", ""),
+            },
+            trigger=trigger,
+            tools=tools,
+            observations=self._planner_observations(steps),
+            action_count=len([step for step in steps if step.kind == "action"]),
+            max_actions=settings.runtime_max_action_steps,
+        )
+        _write_runtime_meta(
+            item,
+            planSummary=decision.summary,
+            plannerMode="adaptive",
+            plannerModel=settings.model_provider_model,
+        )
         await self._session.flush()
-        return steps
+        return decision
+
+    async def _append_action_step(
+        self,
+        *,
+        item: WorkItem,
+        run: Run,
+        decision: AdaptivePlanDecision,
+        step_index: int,
+    ) -> RunStep:
+        catalog = await _catalog(self._session, item.organization_id)
+        resource = next(
+            (
+                candidate
+                for candidate in list(catalog.get("resources", []))
+                if str(candidate.get("id", "")) == decision.resource_id
+                and decision.scope in list(candidate.get("scopes", []))
+            ),
+            None,
+        )
+        if resource is None:
+            raise RuntimeError("Planner-selected execution resource is no longer available.")
+        action = next(
+            (
+                entry
+                for entry in list(resource.get("actions", []))
+                if entry.get("scope") == decision.scope
+            ),
+            None,
+        )
+        if action is None:
+            raise RuntimeError("Planner-selected capability is no longer executable.")
+
+        step = RunStep(
+            run_id=run.id,
+            step_index=step_index,
+            kind="action",
+            status="pending",
+            input={
+                "title": decision.title,
+                "instruction": decision.instruction,
+                "resourceId": decision.resource_id,
+                "scope": decision.scope,
+                "provider": str(resource.get("provider", "")),
+                "operation": str(action.get("providerOperation", "")),
+                "actionInput": decision.action_input,
+            },
+            output={},
+        )
+        self._session.add(step)
+        await self._session.flush()
+        await TransactionalOutbox(self._session).enqueue(
+            topic="run.progress",
+            aggregate_type="run",
+            aggregate_id=str(run.id),
+            payload={
+                "organization_id": str(item.organization_id),
+                "run_id": str(run.id),
+                "job_id": str(item.job_id),
+                "current_step": step_index,
+                "planner_scope": decision.scope,
+                "correlation_id": item.correlation_id,
+            },
+        )
+        await self._session.commit()
+        return step
 
     async def _active_scopes(self, agent_id: UUID) -> frozenset[str]:
         rows = list(
@@ -400,11 +650,24 @@ class ManagedRuntimeExecutor:
         scope = str(spec.get("scope", ""))
         operation = str(spec.get("operation", ""))
         payload = dict(item.payload or {})
+
+        planned_raw = spec.get("actionInput")
+        action_input: dict[str, object] = (
+            {str(key): value for key, value in planned_raw.items()}
+            if isinstance(planned_raw, dict)
+            else {}
+        )
+
         explicit = payload.get("actionInputs")
+        trigger = payload.get("trigger")
+        if not isinstance(explicit, dict) and isinstance(trigger, dict):
+            trigger_payload = trigger.get("payload")
+            if isinstance(trigger_payload, dict):
+                explicit = trigger_payload.get("actionInputs")
         if isinstance(explicit, dict):
             raw = explicit.get(scope, explicit.get(operation))
             if isinstance(raw, dict):
-                return {str(key): value for key, value in raw.items()}
+                action_input.update({str(key): value for key, value in raw.items()})
 
         resource_id = str(spec.get("resourceId", ""))
         integration: Integration | None = None
@@ -414,20 +677,28 @@ class ManagedRuntimeExecutor:
             integration = None
         config = _integration_config(integration)
 
-        if scope == "browser.navigation.open":
+        if scope == "browser.navigation.open" and not action_input.get("url"):
             start_url = str(config.get("startUrl", "")).strip()
             if start_url:
-                return {"url": start_url}
+                action_input["url"] = start_url
 
-        if scope.startswith("browser."):
-            session_id = await self._latest_browser_session(step.run_id, step.step_index)
-            if session_id and scope in {
-                "browser.page.read",
-                "browser.navigation.back",
-                "browser.navigation.forward",
-                "browser.navigation.reload",
-            }:
-                return {"sessionId": session_id}
+        if scope.startswith("browser.") and scope != "browser.navigation.open":
+            session_id, observation_id = await self._latest_browser_context(
+                step.run_id,
+                step.step_index,
+            )
+            if not session_id:
+                raise RuntimeError(
+                    f"Runtime capability {scope} requires an active browser session. "
+                    "The planner must open the governed browser first."
+                )
+            action_input.setdefault("sessionId", session_id)
+            normalized = _attach_observation_id(action_input, observation_id)
+            action_input = (
+                {str(key): value for key, value in normalized.items()}
+                if isinstance(normalized, dict)
+                else action_input
+            )
 
         provider = self._registry.get(str(spec.get("provider", "")))
         capability = next(
@@ -436,15 +707,26 @@ class ManagedRuntimeExecutor:
         )
         if capability is None:
             raise RuntimeError(f"Runtime capability is not registered: {scope}.")
-        required = capability.input_schema.get("required", [])
-        if not required:
-            return {}
-        raise RuntimeError(
-            f"Runtime capability {scope} needs structured input. "
-            f"Provide trigger payload actionInputs['{scope}']."
-        )
+        raw_required = capability.input_schema.get("required", [])
+        required = [str(key) for key in raw_required] if isinstance(raw_required, list) else []
+        missing = [
+            key
+            for key in required
+            if key not in action_input or action_input.get(key) in (None, "")
+        ]
+        if missing:
+            raise RuntimeError(
+                f"Planner produced incomplete structured input for {scope}: "
+                + ", ".join(missing)
+                + "."
+            )
+        return action_input
 
-    async def _latest_browser_session(self, run_id: UUID, before_index: int) -> str | None:
+    async def _latest_browser_context(
+        self,
+        run_id: UUID,
+        before_index: int,
+    ) -> tuple[str | None, str | None]:
         rows = list(
             (
                 await self._session.scalars(
@@ -466,10 +748,16 @@ class ManagedRuntimeExecutor:
             provider_output = provider_output if isinstance(provider_output, dict) else {}
             session = provider_output.get("session")
             session = session if isinstance(session, dict) else {}
-            raw_id = session.get("id")
-            if raw_id:
-                return str(raw_id)
-        return None
+            observation = provider_output.get("observation")
+            observation = observation if isinstance(observation, dict) else {}
+            raw_session_id = session.get("id") or observation.get("sessionId")
+            if raw_session_id:
+                raw_observation_id = observation.get("id")
+                return (
+                    str(raw_session_id),
+                    str(raw_observation_id) if raw_observation_id else None,
+                )
+        return None, None
 
     async def _policy_decision(
         self,
@@ -539,7 +827,7 @@ class ManagedRuntimeExecutor:
             resource_id=resource_id,
             payload=input_payload,
             correlation_id=item.correlation_id,
-            idempotency_key=f"runtime:{item.id}:{current_step}",
+            idempotency_key=f"runtime:{run.id}:{current_step}",
             risk=str((decision.get("riskAssessment") or {}).get("effectiveRisk") or "low"),
         )
         universal = await self._universal_request(
@@ -978,20 +1266,51 @@ class ManagedRuntimeExecutor:
         job: Job,
         worker: Worker,
         steps: list[RunStep],
+        *,
+        completion_summary: str | None = None,
+        finish_title: str = "Finish",
+        finish_instruction: str = "Verify completion from recorded execution evidence.",
     ) -> RuntimeStepOutcome:
         current = max(0, int(_runtime_meta(item).get("currentStep", 0)))
-        if current < len(steps):
+        finish_output = completion_summary or "Runtime completion checkpoint verified."
+        if current >= len(steps):
+            finish = RunStep(
+                run_id=run.id,
+                step_index=current,
+                kind="finish",
+                status="completed",
+                input={
+                    "title": finish_title or "Finish",
+                    "instruction": finish_instruction
+                    or "Verify completion from recorded execution evidence.",
+                    "resourceId": "",
+                    "scope": "",
+                },
+                output={
+                    "output": finish_output,
+                    "completedAt": utcnow().isoformat(),
+                },
+            )
+            self._session.add(finish)
+            await self._session.flush()
+            steps.append(finish)
+        else:
             finish = steps[current]
             if finish.kind == "finish":
                 finish.status = "completed"
-                finish.output = {"output": "Runtime completion checkpoint verified."}
+                finish.output = {
+                    "output": finish_output,
+                    "completedAt": utcnow().isoformat(),
+                }
 
         action_summaries = [
             str(_step_output(step).get("summary") or "").strip()
             for step in steps
             if step.kind == "action" and step.status == "completed"
         ]
-        summary = " ".join(value for value in action_summaries if value).strip()
+        summary = (completion_summary or "").strip()
+        if not summary:
+            summary = " ".join(value for value in action_summaries if value).strip()
         if not summary:
             summary = f"{job.name} completed by Managed Runtime."
 
