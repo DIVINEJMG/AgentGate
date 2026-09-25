@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.governance_routes import _evaluate
 from app.api.integration_capability_routes import _catalog
 from app.api.product_common import utcnow
+from app.bootstrap.settings import settings
 from app.domain.actions.gateway import (
     ActionGateway,
     ActionProposal,
@@ -40,7 +41,9 @@ from app.infrastructure.database.models import (
     Worker,
     WorkItem,
 )
+from app.infrastructure.ai.provider import model_provider_from_settings
 from app.infrastructure.database.outbox import TransactionalOutbox
+from app.runtime.planner.adaptive import AdaptivePlanDecision, AdaptiveRuntimePlanner
 
 
 RuntimeState = Literal["completed", "continue", "waiting_approval", "failed", "noop"]
@@ -114,6 +117,7 @@ class ManagedRuntimeExecutor:
             registry=self._registry,
             context_loader=DatabaseProviderContextLoader(session, self._registry),
         )
+        self._planner = AdaptiveRuntimePlanner(model_provider_from_settings())
 
     async def execute_step(
         self,
