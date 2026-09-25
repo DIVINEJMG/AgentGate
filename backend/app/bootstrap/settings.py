@@ -62,6 +62,22 @@ class Settings(BaseSettings):
             "QSTASH_OUTBOX_DRAIN_URL",
         ),
     )
+    qstash_runtime_execute_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "UPSTASH_QSTASH_RUNTIME_EXECUTE_URL",
+            "QSTASH_RUNTIME_EXECUTE_URL",
+        ),
+    )
+    qstash_runtime_sweep_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "UPSTASH_QSTASH_RUNTIME_SWEEP_URL",
+            "QSTASH_RUNTIME_SWEEP_URL",
+        ),
+    )
+    runtime_delivery_timeout_seconds: int = 120
+    runtime_sweep_limit: int = 50
     legacy_database_url: SecretStr | None = None
     migration_execution_enabled: bool = False
     integration_encryption_key: SecretStr | None = None
