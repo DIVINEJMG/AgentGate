@@ -996,7 +996,7 @@ class ManagedRuntimeExecutor:
         now = utcnow()
         run.status = "completed"
         run.result_summary = summary
-        item.status = "succeeded"
+        item.status = "completed"
         payload = dict(item.payload or {})
         payload["completedAt"] = now.isoformat()
         item.payload = payload
