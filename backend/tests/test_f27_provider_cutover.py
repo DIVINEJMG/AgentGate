@@ -63,7 +63,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from app.domain.jobs.dispatch import ScheduledDispatch
 from app.infrastructure.database.dispatch import WorkItemDispatchRepository
-from app.infrastructure.qstash.provider import UpstashQStashProvider
+from app.infrastructure.qstash.provider import UpstashQStashProvider, _destination_path
 from app.infrastructure.storage.upstash_blob import UpstashBlobObjectStorage
 
 
@@ -90,6 +90,14 @@ def test_qstash_headers_include_retry_timeout_and_deduplication() -> None:
     assert headers["Upstash-Timeout"] == "20s"
     assert headers["Upstash-Deduplication-Id"] == "idem-123"
     assert headers["Authorization"].startswith("Bearer ")
+
+
+def test_qstash_destination_path_preserves_url_scheme_and_slashes() -> None:
+    destination = "https://audoryn.example/internal/v1/runtime/execute?step=1"
+    encoded = _destination_path(destination)
+    assert encoded.startswith("https://audoryn.example/internal/v1/runtime/execute")
+    assert "%3Fstep%3D1" in encoded
+    assert "https%3A%2F%2F" not in encoded
 
 
 @pytest.mark.asyncio
