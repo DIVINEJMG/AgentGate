@@ -435,14 +435,6 @@ class ManagedRuntimeExecutor:
                     }
                 )
 
-        missing = sorted(scope for scope in selected if scope not in {str(item.get("scope")) for item in tools})
-        if missing:
-            unavailable = ", ".join(missing[:8])
-            suffix = "…" if len(missing) > 8 else ""
-            raise RuntimeError(
-                "Selected Job capabilities are not currently executable under the "
-                f"Agent/resource/policy boundary: {unavailable}{suffix}"
-            )
         return tools
 
     def _planner_observations(self, steps: list[RunStep]) -> list[dict[str, object]]:
