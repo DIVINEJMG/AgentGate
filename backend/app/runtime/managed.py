@@ -231,7 +231,12 @@ class ManagedRuntimeExecutor:
             .limit(1)
         )
         now = utcnow()
-        if run is None:
+        new_run = run is None or (
+            item.status == "queued"
+            and run is not None
+            and run.status in {"completed", "failed", "cancelled"}
+        )
+        if new_run:
             run = Run(
                 organization_id=item.organization_id,
                 work_item_id=item.id,
@@ -252,29 +257,35 @@ class ManagedRuntimeExecutor:
                     "status": "running",
                 },
             )
-        elif run.status not in {"waiting_approval", "completed", "failed", "cancelled"}:
+        elif run is not None and run.status not in {
+            "waiting_approval",
+            "completed",
+            "failed",
+            "cancelled",
+        }:
             run.status = "running"
 
+        assert run is not None
         item.status = "running"
         meta = _runtime_meta(item)
-        if not meta.get("startedAt"):
+        if new_run or not meta.get("startedAt"):
             _write_runtime_meta(
                 item,
                 attempt=int(meta.get("attempt", 1)),
                 currentStep=int(meta.get("currentStep", 0)),
                 startedAt=now.isoformat(),
             )
-        await TransactionalOutbox(self._session).enqueue(
-            topic="run.started",
-            aggregate_type="run",
-            aggregate_id=str(run.id),
-            payload={
-                "organization_id": str(item.organization_id),
-                "run_id": str(run.id),
-                "job_id": str(item.job_id),
-                "correlation_id": item.correlation_id,
-            },
-        )
+            await TransactionalOutbox(self._session).enqueue(
+                topic="run.started",
+                aggregate_type="run",
+                aggregate_id=str(run.id),
+                payload={
+                    "organization_id": str(item.organization_id),
+                    "run_id": str(run.id),
+                    "job_id": str(item.job_id),
+                    "correlation_id": item.correlation_id,
+                },
+            )
         await self._session.flush()
         return run
 
