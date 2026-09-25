@@ -17,16 +17,20 @@ from app.infrastructure.database.models import (
     Action,
     Approval,
     Artifact,
+    CapabilityProfile,
     Job,
     JobRevision,
     Result,
     ResultExport,
     ResultVersion,
     Run,
+    Policy,
+    PolicyRevision,
     RunStep,
     Worker,
     WorkItem,
 )
+from app.execution.bootstrap import execution_provider_registry
 from app.infrastructure.database.session import database_session
 from app.runtime.qstash_trigger import request_runtime_execution
 
@@ -1494,6 +1498,180 @@ async def emit_event_v2(
     return {
         "data": await emit_event(session, organization_id, principal, payload)
     }
+
+
+async def _provision_managed_job_authority(
+    session: AsyncSession,
+    organization_id: UUID,
+    worker: Worker,
+    principal: HumanPrincipal,
+    scopes: list[str],
+) -> None:
+    profile = worker.profile if isinstance(worker.profile, dict) else {}
+    if profile.get("agentIdentityProvisioning") != "automatic":
+        return
+
+    requested = {scope.strip() for scope in scopes if scope.strip()}
+    if not requested:
+        return
+
+    existing_rows = list(
+        (
+            await session.scalars(
+                select(CapabilityProfile).where(
+                    CapabilityProfile.organization_id == organization_id,
+                    CapabilityProfile.agent_id == worker.agent_identity_id,
+                )
+            )
+        ).all()
+    )
+    by_scope = {row.scope: row for row in existing_rows}
+    now = utcnow()
+    for scope in sorted(requested):
+        existing = by_scope.get(scope)
+        if existing is not None:
+            existing.active = True
+            existing.updated_at = now
+            continue
+        session.add(
+            CapabilityProfile(
+                organization_id=organization_id,
+                agent_id=worker.agent_identity_id,
+                scope=scope,
+                active=True,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
+    registry = execution_provider_registry()
+    allow_scopes: set[str] = set()
+    approval_scopes: set[str] = set()
+    for scope in requested:
+        providers = registry.capability_providers(scope)
+        capability = next(
+            (
+                capability
+                for provider in providers
+                for capability in provider.manifest.capabilities
+                if capability.scope == scope
+            ),
+            None,
+        )
+        if capability is None:
+            approval_scopes.add(scope)
+        elif (
+            capability.approval_recommendation != "none"
+            or capability.risk in {"high", "critical"}
+        ):
+            approval_scopes.add(scope)
+        else:
+            allow_scopes.add(scope)
+
+    async def upsert_policy(
+        *,
+        effect: str,
+        selected_scopes: set[str],
+        priority: int,
+    ) -> None:
+        name = f"Managed Runtime {effect} · {worker.id}"
+        policy = await session.scalar(
+            select(Policy).where(
+                Policy.organization_id == organization_id,
+                Policy.name == name,
+            )
+        )
+        if policy is None:
+            policy = Policy(
+                organization_id=organization_id,
+                name=name,
+                status="enabled",
+                current_revision=1,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(policy)
+            await session.flush()
+            revision_number = 1
+            created_at = now.isoformat()
+        else:
+            policy.status = "enabled"
+            policy.current_revision += 1
+            policy.updated_at = now
+            revision_number = policy.current_revision
+            created_at = policy.created_at.isoformat()
+
+        session.add(
+            PolicyRevision(
+                policy_id=policy.id,
+                revision=revision_number,
+                effect=effect,
+                priority=priority,
+                selectors={
+                    "agentIds": [str(worker.agent_identity_id)],
+                    "resourceIds": [],
+                    "actions": [],
+                    "scopes": sorted(selected_scopes),
+                    "risks": [],
+                    "_meta": {
+                        "description": "Automatic least-authority policy for managed Worker Jobs.",
+                        "createdBy": str(principal.user_id),
+                        "updatedBy": str(principal.user_id),
+                        "createdAt": created_at,
+                    },
+                },
+                created_at=now,
+            )
+        )
+
+    all_active_scopes = {row.scope for row in existing_rows if row.active} | requested
+    allow_all: set[str] = set()
+    approval_all: set[str] = set()
+    for scope in all_active_scopes:
+        providers = registry.capability_providers(scope)
+        capability = next(
+            (
+                capability
+                for provider in providers
+                for capability in provider.manifest.capabilities
+                if capability.scope == scope
+            ),
+            None,
+        )
+        if capability is not None and (
+            capability.approval_recommendation == "none"
+            and capability.risk not in {"high", "critical"}
+        ):
+            allow_all.add(scope)
+        else:
+            approval_all.add(scope)
+
+    if allow_all:
+        await upsert_policy(effect="allow", selected_scopes=allow_all, priority=100)
+    if approval_all:
+        await upsert_policy(
+            effect="require_approval",
+            selected_scopes=approval_all,
+            priority=200,
+        )
+
+    await append_audit(
+        session,
+        organization_id=organization_id,
+        principal=principal,
+        event_type="managed_authority.provisioned",
+        category="security",
+        resource_type="worker",
+        resource_id=str(worker.id),
+        resource_name=worker.name,
+        outcome="updated",
+        summary=f"Managed Runtime authority provisioned for {worker.name}.",
+        metadata={
+            "scopes": sorted(all_active_scopes),
+            "automatic": True,
+        },
+    )
+    await session.commit()
 
 
 async def _apply_quick_timing(
