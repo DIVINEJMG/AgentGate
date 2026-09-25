@@ -1381,7 +1381,7 @@ async def trigger_workspace(
             "configsTruncated": False,
             "historyTruncated": False,
         },
-        "scheduler": {"cadenceMinutes": 5, "mode": "queue_only"},
+        "scheduler": {"cadenceMinutes": 1, "mode": "qstash"},
     }
 
 
