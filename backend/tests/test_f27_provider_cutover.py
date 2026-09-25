@@ -92,7 +92,7 @@ def test_qstash_headers_include_retry_timeout_and_deduplication() -> None:
     headers = provider._headers(retries=4, timeout_seconds=20, idempotency_key="idem-123")
     assert headers["Upstash-Retries"] == "4"
     assert headers["Upstash-Timeout"] == "20s"
-    assert headers["Upstash-Deduplication-Id"] == "idem-123"
+    assert headers["Upstash-Deduplication-Id"] == _deduplication_id("idem-123")
     assert headers["Authorization"].startswith("Bearer ")
 
 
