@@ -621,6 +621,8 @@ class ConversationContextAssembler:
                     "mediaType": item.media_type,
                     "sizeBytes": item.size_bytes,
                     "checksumPresent": bool(item.checksum_sha256),
+                    "trust": "untrusted_external_data",
+                    "egress": "analysis_only",
                     "metadata": {
                         key: value
                         for key, value in dict(item.metadata_json or {}).items()
