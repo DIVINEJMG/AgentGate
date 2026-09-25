@@ -160,6 +160,8 @@ for token in (
 for token in (
     'ai_provider: str = "nvidia_nim"',
     'ai_provider_base_url: str = "https://integrate.api.nvidia.com/v1"',
+    "ai_coordinator_api_key: SecretStr | None = None",
+    "ai_vision_api_key: SecretStr | None = None",
     'ai_coordinator_model: str = "nvidia/nemotron-3-ultra-550b-a55b"',
     'ai_vision_model: str = "nvidia/ising-calibration-1.5-31b"',
     "ai_enabled: bool = False",
