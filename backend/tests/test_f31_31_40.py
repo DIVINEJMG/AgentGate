@@ -4,6 +4,7 @@ import inspect
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
+from uuid import uuid4
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -182,13 +183,13 @@ def test_inline_recovery_metadata_is_schema_validated() -> None:
 def test_cross_tenant_conversation_scope_is_rejected() -> None:
     service = ConversationService(cast(AsyncSession, object()))
     principal = HumanPrincipal(
-        user_id=__import__("uuid").uuid4(),
-        organization_id=__import__("uuid").uuid4(),
-        membership_id=__import__("uuid").uuid4(),
+        user_id=uuid4(),
+        organization_id=uuid4(),
+        membership_id=uuid4(),
         role="admin",
         permissions=frozenset({"workforce.read", "workforce.manage"}),
     )
-    other_organization = __import__("uuid").uuid4()
+    other_organization = uuid4()
     with pytest.raises(CrossTenantReferenceError, match="Cross-organization"):
         service._require_org(principal, other_organization)
 
