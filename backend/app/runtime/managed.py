@@ -321,14 +321,8 @@ class ManagedRuntimeExecutor:
         await self._session.flush()
         return run
 
-    async def _ensure_plan(
-        self,
-        item: WorkItem,
-        run: Run,
-        job: Job,
-        revision: JobRevision,
-    ) -> list[RunStep]:
-        existing = list(
+    async def _load_steps(self, run: Run) -> list[RunStep]:
+        return list(
             (
                 await self._session.scalars(
                     select(RunStep)
@@ -337,75 +331,289 @@ class ManagedRuntimeExecutor:
                 )
             ).all()
         )
-        if existing:
-            return existing
 
-        definition = dict(revision.definition or {}) if isinstance(revision.definition, dict) else {}
-        required = [str(scope) for scope in definition.get("requiredCapabilities", []) if str(scope)]
+    async def _planner_tools(
+        self,
+        *,
+        item: WorkItem,
+        revision: JobRevision,
+        agent: AgentIdentity,
+    ) -> list[dict[str, object]]:
+        definition = (
+            dict(revision.definition or {})
+            if isinstance(revision.definition, dict)
+            else {}
+        )
+        selected = {
+            str(scope)
+            for scope in definition.get("requiredCapabilities", [])
+            if str(scope)
+        }
+        active = await self._active_scopes(agent.id)
         catalog = await _catalog(self._session, item.organization_id)
         resources = list(catalog.get("resources", []))
-        steps: list[RunStep] = []
+        tools: list[dict[str, object]] = []
 
-        for index, scope in enumerate(required):
-            resource = next(
-                (
-                    candidate
-                    for candidate in resources
-                    if scope in list(candidate.get("scopes", []))
-                    and candidate.get("status") == "connected"
-                ),
-                None,
-            )
-            if resource is None:
-                raise RuntimeError(f"Required runtime capability is unavailable: {scope}.")
-            action = next(
-                (entry for entry in list(resource.get("actions", [])) if entry.get("scope") == scope),
-                None,
-            )
-            if action is None:
-                raise RuntimeError(f"Runtime capability has no executable operation: {scope}.")
-            steps.append(
-                RunStep(
-                    run_id=run.id,
-                    step_index=index,
-                    kind="action",
-                    status="pending",
-                    input={
-                        "title": f"Use {scope}",
-                        "instruction": str(definition.get("instructions", "")) or str(definition.get("objective", "")),
-                        "resourceId": str(resource["id"]),
-                        "scope": scope,
-                        "provider": str(resource["provider"]),
-                        "operation": str(action["providerOperation"]),
-                    },
-                    output={},
+        for resource in resources:
+            if resource.get("status") != "connected":
+                continue
+            provider_name = str(resource.get("provider", ""))
+            try:
+                provider = self._registry.get(provider_name)
+            except KeyError:
+                continue
+            resource_id = str(resource.get("id", ""))
+            integration: Integration | None = None
+            try:
+                integration = await self._session.get(Integration, UUID(resource_id))
+            except ValueError:
+                integration = None
+            config = _integration_config(integration)
+            actions = list(resource.get("actions", []))
+            for action in actions:
+                scope = str(action.get("scope", ""))
+                if scope not in selected or scope not in active:
+                    continue
+                capability = next(
+                    (
+                        entry
+                        for entry in provider.manifest.capabilities
+                        if entry.scope == scope
+                    ),
+                    None,
                 )
-            )
+                if capability is None:
+                    continue
+                policy = await self._policy_decision(
+                    item=item,
+                    agent=agent,
+                    resource_id=resource_id,
+                    scope=scope,
+                )
+                if policy.get("outcome") == "DENY":
+                    continue
+                tools.append(
+                    {
+                        "resourceId": resource_id,
+                        "resourceName": str(resource.get("displayName", resource_id)),
+                        "provider": provider_name,
+                        "scope": scope,
+                        "operation": capability.operation,
+                        "description": capability.description,
+                        "risk": str(
+                            (policy.get("riskAssessment") or {}).get("effectiveRisk")
+                            or capability.risk
+                        ),
+                        "sideEffect": capability.side_effect,
+                        "approvalRecommendation": capability.approval_recommendation,
+                        "inputSchema": capability.input_schema,
+                        "defaultStartUrl": (
+                            str(config.get("startUrl", ""))
+                            if scope == "browser.navigation.open"
+                            else ""
+                        ),
+                    }
+                )
 
-        steps.append(
-            RunStep(
-                run_id=run.id,
-                step_index=len(steps),
-                kind="finish",
-                status="pending",
-                input={
-                    "title": "Finish",
-                    "instruction": "Verify the durable capability steps completed and publish the Result.",
-                    "resourceId": "",
-                    "scope": "",
-                },
-                output={},
+        missing = sorted(scope for scope in selected if scope not in {str(item.get("scope")) for item in tools})
+        if missing:
+            unavailable = ", ".join(missing[:8])
+            suffix = "…" if len(missing) > 8 else ""
+            raise RuntimeError(
+                "Selected Job capabilities are not currently executable under the "
+                f"Agent/resource/policy boundary: {unavailable}{suffix}"
             )
+        return tools
+
+    def _planner_observations(self, steps: list[RunStep]) -> list[dict[str, object]]:
+        observations: list[dict[str, object]] = []
+        for step in steps:
+            if step.status != "completed":
+                continue
+            spec = dict(step.input or {}) if isinstance(step.input, dict) else {}
+            output = _step_output(step)
+            entry: dict[str, object] = {
+                "step": step.step_index + 1,
+                "title": str(spec.get("title", "")),
+                "scope": str(spec.get("scope", "")),
+                "summary": str(output.get("summary", ""))[:2000],
+            }
+            data = output.get("data")
+            data_map = data if isinstance(data, dict) else {}
+            provider_output = data_map.get("output")
+            provider_map = provider_output if isinstance(provider_output, dict) else {}
+            browser_observation = provider_map.get("observation")
+            if isinstance(browser_observation, dict):
+                raw_elements = browser_observation.get("elements")
+                elements = raw_elements if isinstance(raw_elements, list) else []
+                compact_elements = [
+                    {
+                        key: element.get(key)
+                        for key in (
+                            "ref",
+                            "tag",
+                            "role",
+                            "name",
+                            "text",
+                            "element_type",
+                            "value",
+                            "checked",
+                            "selected",
+                            "disabled",
+                            "href",
+                        )
+                        if key in element
+                    }
+                    for element in elements[:120]
+                    if isinstance(element, dict)
+                ]
+                entry["browserObservation"] = {
+                    "id": browser_observation.get("id"),
+                    "sessionId": browser_observation.get("sessionId"),
+                    "url": browser_observation.get("url"),
+                    "title": browser_observation.get("title"),
+                    "visibleText": str(browser_observation.get("visibleText") or "")[:7000],
+                    "ariaSnapshot": str(browser_observation.get("ariaSnapshot") or "")[:4000],
+                    "elements": compact_elements,
+                    "formDetails": browser_observation.get("formDetails", []),
+                    "pageState": browser_observation.get("pageState", {}),
+                }
+            else:
+                entry["providerOutput"] = str(provider_map)[:4000]
+            verification = data_map.get("verification")
+            if isinstance(verification, dict):
+                entry["verification"] = {
+                    "verified": verification.get("verified"),
+                    "summary": verification.get("summary"),
+                }
+            observations.append(entry)
+        return observations
+
+    async def _plan_next_step(
+        self,
+        *,
+        item: WorkItem,
+        run: Run,
+        job: Job,
+        revision: JobRevision,
+        worker: Worker,
+        agent: AgentIdentity,
+        steps: list[RunStep],
+    ) -> AdaptivePlanDecision:
+        tools = await self._planner_tools(
+            item=item,
+            revision=revision,
+            agent=agent,
         )
-        self._session.add_all(steps)
-        plan_summary = (
-            f"Execute {len(required)} governed capability step(s) for {job.name}."
-            if required
-            else f"Complete {job.name} with no external capability step."
+        definition = (
+            dict(revision.definition or {})
+            if isinstance(revision.definition, dict)
+            else {}
         )
-        _write_runtime_meta(item, planSummary=plan_summary, currentStep=0)
+        payload = dict(item.payload or {})
+        raw_trigger = payload.get("trigger")
+        trigger = (
+            {str(key): value for key, value in raw_trigger.items()}
+            if isinstance(raw_trigger, dict)
+            else {}
+        )
+        profile = dict(worker.profile or {}) if isinstance(worker.profile, dict) else {}
+        decision = await self._planner.choose_next(
+            job={
+                "name": job.name,
+                "objective": str(definition.get("objective", "")),
+                "instructions": str(definition.get("instructions", "")),
+                "completionCriteria": list(definition.get("completionCriteria", [])),
+                "availableCapabilityScopes": [
+                    str(tool.get("scope", "")) for tool in tools
+                ],
+            },
+            worker={
+                "name": worker.name,
+                "role": profile.get("role"),
+                "department": profile.get("department"),
+                "responsibilities": profile.get("responsibilities", []),
+                "instructions": profile.get("instructions", ""),
+            },
+            trigger=trigger,
+            tools=tools,
+            observations=self._planner_observations(steps),
+            action_count=len([step for step in steps if step.kind == "action"]),
+            max_actions=settings.runtime_max_action_steps,
+        )
+        _write_runtime_meta(
+            item,
+            planSummary=decision.summary,
+            plannerMode="adaptive",
+            plannerModel=settings.model_provider_model,
+        )
         await self._session.flush()
-        return steps
+        return decision
+
+    async def _append_action_step(
+        self,
+        *,
+        item: WorkItem,
+        run: Run,
+        decision: AdaptivePlanDecision,
+        step_index: int,
+    ) -> RunStep:
+        catalog = await _catalog(self._session, item.organization_id)
+        resource = next(
+            (
+                candidate
+                for candidate in list(catalog.get("resources", []))
+                if str(candidate.get("id", "")) == decision.resource_id
+                and decision.scope in list(candidate.get("scopes", []))
+            ),
+            None,
+        )
+        if resource is None:
+            raise RuntimeError("Planner-selected execution resource is no longer available.")
+        action = next(
+            (
+                entry
+                for entry in list(resource.get("actions", []))
+                if entry.get("scope") == decision.scope
+            ),
+            None,
+        )
+        if action is None:
+            raise RuntimeError("Planner-selected capability is no longer executable.")
+
+        step = RunStep(
+            run_id=run.id,
+            step_index=step_index,
+            kind="action",
+            status="pending",
+            input={
+                "title": decision.title,
+                "instruction": decision.instruction,
+                "resourceId": decision.resource_id,
+                "scope": decision.scope,
+                "provider": str(resource.get("provider", "")),
+                "operation": str(action.get("providerOperation", "")),
+                "actionInput": decision.action_input,
+            },
+            output={},
+        )
+        self._session.add(step)
+        await self._session.flush()
+        await TransactionalOutbox(self._session).enqueue(
+            topic="run.progress",
+            aggregate_type="run",
+            aggregate_id=str(run.id),
+            payload={
+                "organization_id": str(item.organization_id),
+                "run_id": str(run.id),
+                "job_id": str(item.job_id),
+                "current_step": step_index,
+                "planner_scope": decision.scope,
+                "correlation_id": item.correlation_id,
+            },
+        )
+        await self._session.commit()
+        return step
 
     async def _active_scopes(self, agent_id: UUID) -> frozenset[str]:
         rows = list(
