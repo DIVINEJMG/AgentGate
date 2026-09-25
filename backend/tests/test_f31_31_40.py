@@ -8,6 +8,7 @@ from typing import Any, cast
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.services.conversation_commands import CrossTenantReferenceError
 from app.application.services.conversations import ConversationService
 from app.application.services.intent_interpreter import IntentInterpreter
 from app.bootstrap.settings import Settings
@@ -20,6 +21,7 @@ from app.domain.ai.providers import (
     AIResponse,
 )
 from app.domain.conversation.intent import CommandReceipt
+from app.domain.identity.principals import HumanPrincipal
 from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -175,6 +177,20 @@ def test_inline_recovery_metadata_is_schema_validated() -> None:
     assert receipt.failure_category == "missing_integration"
     assert receipt.action_hints[0]["kind"] == "connect_integration"
 
+
+
+def test_cross_tenant_conversation_scope_is_rejected() -> None:
+    service = ConversationService(cast(AsyncSession, object()))
+    principal = HumanPrincipal(
+        user_id=__import__("uuid").uuid4(),
+        organization_id=__import__("uuid").uuid4(),
+        membership_id=__import__("uuid").uuid4(),
+        role="admin",
+        permissions=frozenset({"workforce.read", "workforce.manage"}),
+    )
+    other_organization = __import__("uuid").uuid4()
+    with pytest.raises(CrossTenantReferenceError, match="Cross-organization"):
+        service._require_org(principal, other_organization)
 
 def test_runtime_provider_outage_waits_instead_of_failing_task() -> None:
     source = (ROOT / "backend/app/api/internal/runtime.py").read_text(encoding="utf-8")
