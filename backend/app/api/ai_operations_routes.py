@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
+from pydantic import SecretStr
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,12 +23,8 @@ _MAX_INVOCATIONS = 100
 _MAX_WAITING = 500
 
 
-def _secret_configured(secret: object | None) -> bool:
-    if secret is None:
-        return False
-    get_secret_value = getattr(secret, "get_secret_value", None)
-    raw = get_secret_value() if callable(get_secret_value) else str(secret)
-    return bool(raw.strip())
+def _secret_configured(secret: SecretStr | None) -> bool:
+    return bool(secret is not None and secret.get_secret_value().strip())
 
 
 def _credential_status() -> tuple[bool, bool]:
