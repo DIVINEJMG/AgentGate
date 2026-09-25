@@ -5,6 +5,17 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+FailureCategory = Literal[
+    "task_failure",
+    "provider_model_outage",
+    "missing_integration",
+    "approval_wait",
+    "policy_denial",
+    "browser_site_failure",
+    "authentication_expiry",
+    "internal_platform_failure",
+]
+
 WorkerCommandFamily = Literal[
     "worker.create",
     "worker.update",
@@ -91,3 +102,5 @@ class CommandReceipt(BaseModel):
     references: list[CommandReference] = Field(default_factory=list)
     result_references: list[CommandReference] = Field(default_factory=list)
     command_id: UUID | None = None
+    failure_category: FailureCategory | None = None
+    action_hints: list[dict[str, str]] = Field(default_factory=list)
