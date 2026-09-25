@@ -10,7 +10,6 @@ from app.application.services.ai_gateway import ProviderAIGateway, UnconfiguredA
 from app.domain.ai.providers import (
     AIInvocationContext,
     AIMediaInput,
-    AIModelRole,
     AIProviderError,
     AIResponse,
     AITextRequest,
@@ -36,12 +35,14 @@ class FakeProvider:
     calls: list[tuple[str, AITextRequest]] = field(default_factory=list)
     media_models: list[str] = field(default_factory=list)
     name: str = "fake"
-    capabilities: ModelProviderCapabilities = ModelProviderCapabilities(
-        text_input=True,
-        image_input=True,
-        structured_json=True,
-        tool_calls=True,
-        streaming=True,
+    capabilities: ModelProviderCapabilities = field(
+        default_factory=lambda: ModelProviderCapabilities(
+            text_input=True,
+            image_input=True,
+            structured_json=True,
+            tool_calls=True,
+            streaming=True,
+        )
     )
 
     async def generate_text(self, *, model: str, request: AITextRequest) -> AIResponse:
