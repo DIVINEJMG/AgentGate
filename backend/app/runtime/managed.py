@@ -127,7 +127,7 @@ class ManagedRuntimeExecutor:
     ) -> RuntimeStepOutcome:
         job, revision, worker, agent = await self._load_context(item)
         run = await self._ensure_run(item)
-        steps = await self._ensure_plan(item, run, job, revision)
+        steps = await self._load_steps(run)
 
         meta = _runtime_meta(item)
         current_step = max(0, int(meta.get("currentStep", 0)))
@@ -150,7 +150,33 @@ class ManagedRuntimeExecutor:
             )
 
         if current_step >= len(steps):
-            return await self._complete(item, run, job, worker, steps)
+            decision = await self._plan_next_step(
+                item=item,
+                run=run,
+                job=job,
+                revision=revision,
+                worker=worker,
+                agent=agent,
+                steps=steps,
+            )
+            if decision.decision == "finish":
+                return await self._complete(
+                    item,
+                    run,
+                    job,
+                    worker,
+                    steps,
+                    completion_summary=decision.summary,
+                    finish_title=decision.title,
+                    finish_instruction=decision.instruction,
+                )
+            step = await self._append_action_step(
+                item=item,
+                run=run,
+                decision=decision,
+                step_index=current_step,
+            )
+            steps.append(step)
 
         step = steps[current_step]
         if step.status == "completed":
