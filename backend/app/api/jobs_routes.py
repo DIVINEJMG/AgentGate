@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, desc, select
@@ -30,6 +32,282 @@ from app.runtime.qstash_trigger import request_runtime_execution
 
 v1_router = APIRouter(tags=["jobs", "scheduler"])
 v2_router = APIRouter(tags=["jobs", "scheduler"])
+
+_WEEKDAY_INDEX = {
+    "monday": 0,
+    "tuesday": 1,
+    "wednesday": 2,
+    "thursday": 3,
+    "friday": 4,
+    "saturday": 5,
+    "sunday": 6,
+}
+
+
+def _parse_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _schedule_zone(schedule: dict[str, Any]) -> ZoneInfo:
+    raw = str(schedule.get("timezone") or "UTC")
+    try:
+        return ZoneInfo(raw)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
+
+
+def _local_clock(schedule: dict[str, Any]) -> tuple[int, int]:
+    raw = str(schedule.get("localTime") or "09:00")
+    try:
+        hour_text, minute_text = raw.split(":", 1)
+        hour = min(23, max(0, int(hour_text)))
+        minute = min(59, max(0, int(minute_text)))
+    except (TypeError, ValueError):
+        return (9, 0)
+    return (hour, minute)
+
+
+def _next_schedule_occurrence(
+    schedule: dict[str, Any],
+    after: datetime,
+) -> datetime:
+    after = after.astimezone(UTC)
+    cadence = str(schedule.get("cadence") or "daily")
+    if cadence == "interval":
+        minutes = min(10080, max(5, int(schedule.get("intervalMinutes") or 60)))
+        return after + timedelta(minutes=minutes)
+
+    zone = _schedule_zone(schedule)
+    local_after = after.astimezone(zone)
+    hour, minute = _local_clock(schedule)
+    allowed_days = {
+        _WEEKDAY_INDEX[value]
+        for value in schedule.get("weekdays", [])
+        if value in _WEEKDAY_INDEX
+    }
+    if cadence != "weekly" or not allowed_days:
+        allowed_days = set(range(7))
+
+    for offset in range(0, 8):
+        day = local_after.date() + timedelta(days=offset)
+        candidate = datetime(
+            day.year,
+            day.month,
+            day.day,
+            hour,
+            minute,
+            tzinfo=zone,
+        )
+        if candidate.weekday() not in allowed_days:
+            continue
+        if candidate <= local_after:
+            continue
+        return candidate.astimezone(UTC)
+    return (local_after + timedelta(days=1)).astimezone(UTC)
+
+
+def _quick_trigger_payload(timing: dict[str, Any]) -> dict[str, Any]:
+    mode = str(timing.get("mode") or "manual")
+    timezone = str(timing.get("timezone") or "UTC")
+    schedule = {
+        "enabled": mode in {"interval", "daily", "weekly", "custom"},
+        "cadence": (
+            "interval"
+            if mode == "interval"
+            else "weekly"
+            if mode in {"weekly", "custom"}
+            else "daily"
+        ),
+        "timezone": timezone,
+        "localTime": str(timing.get("localTime") or "09:00"),
+        "weekdays": list(
+            timing.get(
+                "weekdays",
+                ["monday", "tuesday", "wednesday", "thursday", "friday"],
+            )
+        ),
+        "intervalMinutes": int(timing.get("intervalMinutes") or 60),
+        "missedRunPolicy": "queue_once",
+        "outsideWorkingHoursPolicy": "next_open",
+    }
+    return {
+        "schedule": schedule,
+        "apiEnabled": False,
+        "internalEventKeys": (
+            [str(timing.get("eventKey"))]
+            if mode == "event" and timing.get("eventKey")
+            else []
+        ),
+        "dependencyJobIds": (
+            list(timing.get("dependencyJobIds", []))
+            if mode == "dependency"
+            else []
+        ),
+    }
+
+
+def _system_jobs_principal(organization_id: UUID) -> HumanPrincipal:
+    zero = UUID(int=0)
+    return HumanPrincipal(
+        user_id=zero,
+        organization_id=organization_id,
+        membership_id=zero,
+        role="system",
+        permissions=frozenset({"jobs.run"}),
+    )
+
+
+def _next_worker_open(worker: Worker, when: datetime) -> datetime:
+    profile = worker.profile if isinstance(worker.profile, dict) else {}
+    raw_hours = profile.get("workingHours")
+    hours = raw_hours if isinstance(raw_hours, dict) else {}
+    zone_name = str(hours.get("timezone") or "UTC")
+    try:
+        zone = ZoneInfo(zone_name)
+    except ZoneInfoNotFoundError:
+        zone = ZoneInfo("UTC")
+    days = hours.get("days")
+    days = days if isinstance(days, dict) else {}
+    local = when.astimezone(zone)
+    names = tuple(_WEEKDAY_INDEX)
+
+    for offset in range(0, 8):
+        day_date = local.date() + timedelta(days=offset)
+        name = names[day_date.weekday()]
+        raw = days.get(name)
+        day = raw if isinstance(raw, dict) else {}
+        if not bool(day.get("enabled", offset < 5)):
+            continue
+        start_raw = str(day.get("start") or "09:00")
+        end_raw = str(day.get("end") or "17:00")
+        try:
+            start_h, start_m = (int(part) for part in start_raw.split(":", 1))
+            end_h, end_m = (int(part) for part in end_raw.split(":", 1))
+        except (TypeError, ValueError):
+            start_h, start_m, end_h, end_m = 9, 0, 17, 0
+        opening = datetime(
+            day_date.year,
+            day_date.month,
+            day_date.day,
+            start_h,
+            start_m,
+            tzinfo=zone,
+        )
+        closing = datetime(
+            day_date.year,
+            day_date.month,
+            day_date.day,
+            end_h,
+            end_m,
+            tzinfo=zone,
+        )
+        if offset == 0 and opening <= local <= closing:
+            return when
+        if opening > local:
+            return opening.astimezone(UTC)
+    return when
+
+
+async def queue_due_schedules(
+    session: AsyncSession,
+    *,
+    now: datetime,
+    limit: int = 50,
+) -> int:
+    jobs = list(
+        (
+            await session.scalars(
+                select(Job)
+                .where(Job.status == "active")
+                .order_by(Job.updated_at, Job.id)
+                .limit(max(limit * 4, 50))
+            )
+        ).all()
+    )
+    queued = 0
+    for job in jobs:
+        if queued >= limit:
+            break
+        revision = await current_revision(session, job)
+        definition = (
+            dict(revision.definition)
+            if isinstance(revision.definition, dict)
+            else {}
+        )
+        raw_config = definition.get("triggerConfig")
+        config = dict(raw_config) if isinstance(raw_config, dict) else {}
+        raw_schedule = config.get("schedule")
+        schedule = dict(raw_schedule) if isinstance(raw_schedule, dict) else {}
+        if not bool(schedule.get("enabled")):
+            continue
+
+        due = _parse_timestamp(schedule.get("nextDueAt"))
+        if due is None:
+            anchor_time = (
+                _parse_timestamp(config.get("updatedAt"))
+                or _parse_timestamp(config.get("createdAt"))
+                or job.updated_at
+            )
+            due = _next_schedule_occurrence(schedule, anchor_time)
+        if due > now:
+            continue
+
+        next_due = _next_schedule_occurrence(schedule, due)
+        if str(schedule.get("missedRunPolicy") or "queue_once") == "skip":
+            while next_due <= now:
+                next_due = _next_schedule_occurrence(schedule, next_due)
+            schedule["nextDueAt"] = next_due.isoformat()
+            config["schedule"] = schedule
+            definition["triggerConfig"] = config
+            revision.definition = definition
+            await session.commit()
+            continue
+
+        worker = await session.get(Worker, job.worker_id)
+        scheduled_for = due
+        if (
+            worker is not None
+            and str(schedule.get("outsideWorkingHoursPolicy") or "next_open")
+            == "next_open"
+        ):
+            scheduled_for = _next_worker_open(worker, due)
+
+        schedule["nextDueAt"] = next_due.isoformat()
+        config["schedule"] = schedule
+        definition["triggerConfig"] = config
+        revision.definition = definition
+        trigger = {
+            "type": "schedule",
+            "requestedByType": "system",
+            "requestedBy": "qstash-scheduler",
+            "requestedAt": now.isoformat(),
+            "key": None,
+            "eventId": None,
+            "payload": None,
+            "scheduledFor": due.isoformat(),
+            "dedupeKey": f"schedule:{config.get('id', job.id)}:{due.isoformat()}",
+            "sourceJobId": None,
+            "sourceWorkItemId": None,
+            "configId": config.get("id"),
+        }
+        await queue_job(
+            session,
+            job.organization_id,
+            job,
+            _system_jobs_principal(job.organization_id),
+            trigger=trigger,
+            scheduled_at=scheduled_for,
+        )
+        queued += 1
+    return queued
 
 
 async def current_revision(session: AsyncSession, job: Job) -> JobRevision:
