@@ -26,6 +26,7 @@ from app.infrastructure.database.models import (
     WorkItem,
 )
 from app.infrastructure.database.session import database_session
+from app.runtime.qstash_trigger import request_runtime_execution
 
 v1_router = APIRouter(tags=["jobs", "scheduler"])
 v2_router = APIRouter(tags=["jobs", "scheduler"])
@@ -401,6 +402,12 @@ async def queue_job(
     )
     await session.commit()
     await session.refresh(item)
+    await request_runtime_execution(
+        organization_id=organization_id,
+        work_item_id=item.id,
+        expected_step=0,
+        reason="queue",
+    )
     return item
 
 
