@@ -91,7 +91,7 @@ class DispatchPayload(BaseModel):
 async def heartbeat(
     request: Request,
     upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
-) -> dict[str, str]:
+) -> dict[str, object]:
     if not upstash_signature:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
