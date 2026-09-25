@@ -30,9 +30,12 @@ from app.infrastructure.database.models import (
     Policy,
     PolicyRevision,
     RiskEvent,
+    Run,
+    WorkItem,
 )
 from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.database.session import database_session
+from app.runtime.qstash_trigger import request_runtime_execution
 
 v1_router = APIRouter(tags=["governance"])
 v2_router = APIRouter(tags=["governance"])
@@ -1435,6 +1438,25 @@ async def approval_decision_v1(
             },
         )
     await session.commit()
+
+    if decision == "approve" and action is not None and action.run_id is not None:
+        run = await session.get(Run, action.run_id)
+        item = (
+            await session.get(WorkItem, run.work_item_id)
+            if run is not None
+            else None
+        )
+        if item is not None:
+            payload_data = item.payload if isinstance(item.payload, dict) else {}
+            runtime_data = payload_data.get("runtime")
+            runtime_data = runtime_data if isinstance(runtime_data, dict) else {}
+            await request_runtime_execution(
+                organization_id=organization_id,
+                work_item_id=item.id,
+                expected_step=max(0, int(runtime_data.get("currentStep", 0))),
+                reason="approval",
+            )
+
     await session.refresh(approval)
     return {"approval": await _approval_public(session, approval)}
 
