@@ -798,6 +798,11 @@ async def save_trigger_config(
     schedule: dict[str, Any] = (
         dict(raw_schedule) if isinstance(raw_schedule, dict) else {}
     )
+    next_due = (
+        _next_schedule_occurrence(schedule, now).isoformat()
+        if bool(schedule.get("enabled"))
+        else None
+    )
     config = {
         "id": str(existing.get("id") or uuid4()),
         "organizationId": str(organization_id),
@@ -806,7 +811,7 @@ async def save_trigger_config(
         "revision": int(existing.get("revision", 0)) + 1,
         "schedule": {
             **schedule,
-            "nextDueAt": None,
+            "nextDueAt": next_due,
         },
         "apiEnabled": bool(payload.get("apiEnabled", False)),
         "internalEventKeys": list(payload.get("internalEventKeys", [])),
