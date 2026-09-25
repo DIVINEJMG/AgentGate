@@ -214,6 +214,43 @@ async def test_adaptive_planner_uses_only_observed_browser_refs() -> None:
     assert model.calls == 2
 
 
+
+@pytest.mark.asyncio
+async def test_adaptive_planner_allows_reasoning_only_finish_without_tools() -> None:
+    model = FakeModel(
+        [
+            {
+                "decision": "finish",
+                "summary": "The requested internal analysis is complete.",
+                "title": "Finish",
+                "instruction": "Return the bounded reasoning result.",
+                "resourceId": "",
+                "scope": "",
+                "input": {},
+            }
+        ]
+    )
+    planner = AdaptiveRuntimePlanner(model)
+
+    decision = await planner.choose_next(
+        job={
+            "name": "Internal reasoning",
+            "objective": "Summarize the supplied internal context.",
+            "instructions": "",
+            "completionCriteria": ["Return a concise summary."],
+        },
+        worker=_worker(),
+        trigger={},
+        tools=[],
+        observations=[],
+        action_count=0,
+        max_actions=8,
+    )
+
+    assert decision.decision == "finish"
+    assert decision.scope == ""
+
+
 def test_runtime_injects_observation_id_into_nested_browser_locators() -> None:
     raw = {
         "fields": [
