@@ -31,6 +31,12 @@ services:
         sync: false
       - key: UPSTASH_BLOB_TOKEN
         sync: false
+      - key: MODEL_PROVIDER_API_KEY
+        sync: false
+      - key: MODEL_PROVIDER_BASE_URL
+        value: https://api.openai.com/v1
+      - key: MODEL_PROVIDER_MODEL
+        value: gpt-5.6-luna
       - key: CUTOVER_STAGE
         value: runtime
       - key: RUNTIME_EXECUTION_ENABLED
