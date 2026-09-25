@@ -18,6 +18,7 @@ class DependencyStatus:
     redis: str
     object_storage: str
     queue: str
+    planner: str
 
     @property
     def ready(self) -> bool:
@@ -37,6 +38,7 @@ class DependencyStatus:
             "redis": self.redis,
             "objectStorage": self.object_storage,
             "queue": self.queue,
+            "planner": self.planner,
         }
 
 
@@ -81,4 +83,10 @@ async def check_readiness() -> DependencyStatus:
         redis=redis,
         object_storage=object_storage,
         queue=queue,
+        planner=(
+            "configured"
+            if settings.model_provider_api_key is not None
+            and settings.model_provider_api_key.get_secret_value().strip()
+            else "unconfigured"
+        ),
     )
