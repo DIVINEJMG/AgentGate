@@ -82,7 +82,7 @@ for token in (
     '"waiting_configuration"',
     '"waiting_ai"',
     '"ai_provider"',
-    "No external action was taken",
+    "no external action was taken",
 ):
     if token not in runtime_internal:
         errors.append(f"F31.35 provider recovery semantics are missing: {token}")
