@@ -200,7 +200,7 @@ def test_runtime_provider_outage_waits_instead_of_failing_task() -> None:
     assert 'state = "waiting_ai"' in source
     assert '"aiRetryCount"' in source
     assert '"kind": "ai_provider"' in source
-    assert "No external action was taken" in source
+    assert "no external action was taken" in source
 
 
 def test_external_context_is_explicitly_marked_untrusted() -> None:
