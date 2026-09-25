@@ -75,9 +75,6 @@ class AdaptiveRuntimePlanner:
                 f"Managed Runtime reached its {max_actions}-action safety limit "
                 "before completion criteria were proven."
             )
-        if not tools:
-            raise RuntimeError("Managed Runtime has no authorized execution capability for this Job.")
-
         latest_browser = next(
             (
                 item.get("browserObservation")
@@ -179,7 +176,11 @@ class AdaptiveRuntimePlanner:
             + "\nPLANNING RULES\n"
             + browser_rule
             + "\n- The selected Job capabilities are an allowlist, not actions that must all run."
-            + "\n- Choose one exact resourceId/scope pair from AUTHORIZED TOOLS."
+            + (
+                "\n- No external tools are available; solve as bounded internal reasoning and finish."
+                if not tools
+                else "\n- Choose one exact resourceId/scope pair from AUTHORIZED TOOLS."
+            )
             + "\n- Supply every structured input required by that tool except browser sessionId."
             + "\n- Prefer reading/observing before mutation when current state is uncertain."
             + "\n- Do not finish unless the completion criteria are supported by RECORDED OBSERVATIONS."
@@ -213,9 +214,9 @@ class AdaptiveRuntimePlanner:
         if not summary:
             raise RuntimeError("Planner decision is missing a summary.")
         if decision == "finish":
-            if not observations:
+            if not observations and tools:
                 raise RuntimeError(
-                    "Planner cannot finish before any execution observation exists."
+                    "Planner cannot finish tool-backed work before any execution observation exists."
                 )
             return AdaptivePlanDecision(
                 decision=decision,
