@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+
 import httpx
 
 from app.domain.ai.providers import (
