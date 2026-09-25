@@ -19,6 +19,7 @@ class DependencyStatus:
     object_storage: str
     queue: str
     planner: str
+    ai: dict[str, object]
 
     @property
     def ready(self) -> bool:
@@ -32,13 +33,14 @@ class DependencyStatus:
             )
         )
 
-    def as_dict(self) -> dict[str, str]:
+    def as_dict(self) -> dict[str, object]:
         return {
             "postgres": self.postgres,
             "redis": self.redis,
             "objectStorage": self.object_storage,
             "queue": self.queue,
             "planner": self.planner,
+            "ai": self.ai,
         }
 
 
@@ -78,15 +80,28 @@ async def check_readiness() -> DependencyStatus:
     except (OSError, RuntimeError, ValueError, httpx.HTTPError, SQLAlchemyError, RedisError):
         queue = "unconfigured"
 
+    ai_has_key = (
+        settings.ai_provider_api_key is not None
+        and bool(settings.ai_provider_api_key.get_secret_value().strip())
+    )
+    ai_configured = settings.ai_enabled and ai_has_key
+    ai_state = "ready" if ai_configured else (
+        "disabled" if not settings.ai_enabled else "unconfigured"
+    )
+
     return DependencyStatus(
         postgres=postgres,
         redis=redis,
         object_storage=object_storage,
         queue=queue,
-        planner=(
-            "configured"
-            if settings.model_provider_api_key is not None
-            and settings.model_provider_api_key.get_secret_value().strip()
-            else "unconfigured"
-        ),
+        planner=ai_state,
+        ai={
+            "configured": ai_configured,
+            "enabled": settings.ai_enabled,
+            "provider": settings.ai_provider,
+            "coordinator": ai_state,
+            "vision": ai_state,
+            "coordinatorModel": settings.ai_coordinator_model,
+            "visionModel": settings.ai_vision_model,
+        },
     )
