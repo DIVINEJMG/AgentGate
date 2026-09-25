@@ -272,7 +272,7 @@ def test_runtime_injects_observation_id_into_nested_browser_locators() -> None:
 
 
 def test_openai_response_text_parser_reads_output_message() -> None:
-    payload = {
+    payload: dict[str, object] = {
         "output": [
             {
                 "type": "message",
