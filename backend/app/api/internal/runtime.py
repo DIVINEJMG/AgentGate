@@ -475,6 +475,7 @@ async def execute(
                     "currentStep": _runtime_step(item),
                     "summary": summary,
                     "aiErrorCategory": exc.category,
+                    "failureCategory": runtime_meta["failureCategory"],
                     "retryScheduled": retry_scheduled,
                     "retryAt": retry_at.isoformat() if retry_at is not None else None,
                 }
