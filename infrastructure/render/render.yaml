@@ -11,6 +11,8 @@ services:
         value: production
       - key: DATABASE_URL
         sync: false
+      - key: DATABASE_MIGRATE_ON_STARTUP
+        value: "false"
       - key: REDIS_URL
         sync: false
       - key: QSTASH_URL

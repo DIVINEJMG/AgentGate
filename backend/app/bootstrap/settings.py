@@ -80,6 +80,7 @@ class Settings(BaseSettings):
     runtime_sweep_limit: int = 50
     legacy_database_url: SecretStr | None = None
     migration_execution_enabled: bool = False
+    database_migrate_on_startup: bool = False
     integration_encryption_key: SecretStr | None = None
     oidc_client_secret: SecretStr | None = None
     ai_enabled: bool = False

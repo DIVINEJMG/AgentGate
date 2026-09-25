@@ -313,3 +313,18 @@ def test_destructive_and_cross_tenant_safety_paths_exist() -> None:
     assert "CrossTenantReferenceError" in source
     assert "multiple workers matching" in source
     assert "multiple possible jobs" in source
+
+
+def test_database_schema_migration_switch_defaults_off() -> None:
+    from app.bootstrap.settings import Settings
+
+    config = Settings()
+    assert config.database_migrate_on_startup is False
+
+
+def test_lifespan_runs_schema_migration_only_behind_feature_flag() -> None:
+    from app.bootstrap import lifecycle
+
+    source = inspect.getsource(lifecycle)
+    assert "settings.database_migrate_on_startup" in source
+    assert "await upgrade_database_schema()" in source
