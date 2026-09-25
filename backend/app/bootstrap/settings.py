@@ -93,6 +93,9 @@ class Settings(BaseSettings):
     ai_max_retries: int = 2
     ai_max_output_tokens: int = 1800
     runtime_max_action_steps: int = 8
+    conversation_attachment_max_bytes: int = 10 * 1024 * 1024
+    conversation_attachment_text_max_chars: int = 100_000
+    vision_signed_url_ttl_seconds: int = 300
     object_storage_access_key: SecretStr | None = None
     object_storage_secret_key: SecretStr | None = None
 

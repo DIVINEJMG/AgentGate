@@ -46,7 +46,13 @@ class IntentInterpreter:
                 "arguments.approvalBoundary='submit', effect='require_approval', and preserve "
                 "the human directive in arguments.directive. "
                 "For worker-scoped 'stop' choose the relevant job.stop when a current job is clear; "
-                "for 'continue' use worker.resume and include the relevant job reference when clear."
+                "for 'continue' use worker.resume and include the relevant job reference when clear. "
+                "When the human asks to create or hire a Worker from a natural-language outcome, "
+                "use worker.create. A separate validated WorkerDraft stage will design the role, "
+                "jobs, semantic capability needs, schedule, integrations, and approval boundaries. "
+                "When the human asks to inspect or explain an uploaded file/image, use "
+                "attachment.analyze and reference artifactId only when that artifact appears "
+                "in AUTHORITATIVE_CONTEXT."
             ),
             prompt=(
                 "AUTHORITATIVE_CONTEXT:\n"

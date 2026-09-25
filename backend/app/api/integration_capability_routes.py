@@ -241,6 +241,16 @@ async def _connect(
     )
     await session.commit()
     await session.refresh(integration)
+    from app.application.services.worker_autonomy import AutonomyReadinessService
+    from app.infrastructure.ai.provider import ai_gateway_from_settings
+
+    await AutonomyReadinessService(
+        session,
+        ai_gateway_from_settings(session=session),
+    ).reconcile(
+        organization_id=organization_id,
+        principal=principal,
+    )
     return integration
 
 
@@ -294,6 +304,17 @@ async def _health(
     integration.config = raw_config
     await session.commit()
     await session.refresh(integration)
+    if integration.status == "connected":
+        from app.application.services.worker_autonomy import AutonomyReadinessService
+        from app.infrastructure.ai.provider import ai_gateway_from_settings
+
+        await AutonomyReadinessService(
+            session,
+            ai_gateway_from_settings(session=session),
+        ).reconcile(
+            organization_id=organization_id,
+            principal=principal,
+        )
     return integration
 
 

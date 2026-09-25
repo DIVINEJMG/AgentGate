@@ -7,12 +7,13 @@ from dataclasses import dataclass, replace
 from typing import Any, Literal
 from uuid import UUID
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.governance_routes import _evaluate
 from app.api.integration_capability_routes import _catalog
 from app.api.product_common import utcnow
+from app.application.services.worker_memory import WorkerMemoryService
 from app.bootstrap.settings import settings
 from app.domain.actions.gateway import (
     ActionGateway,
@@ -35,11 +36,13 @@ from app.infrastructure.database.models import (
     Integration,
     Job,
     JobRevision,
+    Memory,
     Result,
     ResultVersion,
     Run,
     RunStep,
     Worker,
+    WorkerDirective,
     WorkItem,
 )
 from app.infrastructure.ai.provider import ai_gateway_from_settings
@@ -504,6 +507,56 @@ class ManagedRuntimeExecutor:
             observations.append(entry)
         return observations
 
+    async def _worker_memory_context(
+        self,
+        worker: Worker,
+    ) -> dict[str, object]:
+        now = utcnow()
+        memories = list(
+            (
+                await self._session.scalars(
+                    select(Memory)
+                    .where(
+                        Memory.organization_id == worker.organization_id,
+                        Memory.owner_id == str(worker.id),
+                        Memory.status == "active",
+                        or_(Memory.expires_at.is_(None), Memory.expires_at > now),
+                    )
+                    .order_by(desc(Memory.created_at))
+                    .limit(20)
+                )
+            ).all()
+        )
+        directives = list(
+            (
+                await self._session.scalars(
+                    select(WorkerDirective)
+                    .where(
+                        WorkerDirective.organization_id == worker.organization_id,
+                        WorkerDirective.worker_id == worker.id,
+                        WorkerDirective.status == "active",
+                    )
+                    .order_by(desc(WorkerDirective.created_at))
+                    .limit(20)
+                )
+            ).all()
+        )
+        return {
+            "standingInstructions": [directive.text[:1200] for directive in directives],
+            "memory": [
+                {
+                    "type": memory.memory_type,
+                    "title": memory.title[:300],
+                    "content": memory.content[:1200],
+                    "source": memory.source,
+                    "provenance": dict(memory.provenance or {}),
+                    "sensitivity": memory.sensitivity,
+                }
+                for memory in memories
+                if memory.sensitivity != "secret"
+            ],
+        }
+
     async def _plan_next_step(
         self,
         *,
@@ -533,6 +586,7 @@ class ManagedRuntimeExecutor:
             else {}
         )
         profile = dict(worker.profile or {}) if isinstance(worker.profile, dict) else {}
+        memory_context = await self._worker_memory_context(worker)
         decision = await self._planner.choose_next(
             job={
                 "name": job.name,
@@ -549,6 +603,8 @@ class ManagedRuntimeExecutor:
                 "department": profile.get("department"),
                 "responsibilities": profile.get("responsibilities", []),
                 "instructions": profile.get("instructions", ""),
+                "standingInstructions": memory_context["standingInstructions"],
+                "memory": memory_context["memory"],
             },
             trigger=trigger,
             tools=tools,
@@ -1269,6 +1325,63 @@ class ManagedRuntimeExecutor:
         )
         await self._session.commit()
 
+    async def _apply_stop_after_next_run(
+        self,
+        *,
+        item: WorkItem,
+        job: Job,
+    ) -> None:
+        revision = await self._session.scalar(
+            select(JobRevision).where(
+                JobRevision.job_id == job.id,
+                JobRevision.revision == job.current_revision,
+            )
+        )
+        if revision is None or not isinstance(revision.definition, dict):
+            return
+        definition = dict(revision.definition)
+        raw_autonomy = definition.get("autonomy")
+        autonomy = dict(raw_autonomy) if isinstance(raw_autonomy, dict) else {}
+        if not bool(autonomy.get("stopAfterNextRun")):
+            return
+        raw_trigger = definition.get("triggerConfig")
+        trigger = dict(raw_trigger) if isinstance(raw_trigger, dict) else {}
+        raw_schedule = trigger.get("schedule")
+        schedule = dict(raw_schedule) if isinstance(raw_schedule, dict) else {}
+        if not schedule.get("enabled") and job.status == "paused":
+            return
+
+        from app.api.jobs_routes import job_status_v1, save_trigger_config
+
+        principal = HumanPrincipal(
+            user_id=revision.created_by,
+            organization_id=item.organization_id,
+            membership_id=UUID(int=0),
+            role="system",
+            permissions=frozenset({"jobs.manage"}),
+        )
+        if trigger and schedule:
+            await save_trigger_config(
+                self._session,
+                item.organization_id,
+                job.id,
+                principal,
+                {
+                    "schedule": {**schedule, "enabled": False},
+                    "apiEnabled": bool(trigger.get("apiEnabled", False)),
+                    "internalEventKeys": list(trigger.get("internalEventKeys", [])),
+                    "dependencyJobIds": list(trigger.get("dependencyJobIds", [])),
+                },
+            )
+        await job_status_v1(
+            item.organization_id,
+            job.id,
+            {"status": "paused"},
+            principal,
+            self._session,
+        )
+        _write_runtime_meta(item, stopAfterNextRunApplied=True)
+
     async def _complete(
         self,
         item: WorkItem,
@@ -1386,6 +1499,25 @@ class ManagedRuntimeExecutor:
                 )
             )
             _write_runtime_meta(item, resultId=str(result.id))
+            memory_service = WorkerMemoryService(self._session)
+            await memory_service.record_operational(
+                worker=worker,
+                title=f"{job.name} latest outcome",
+                content=summary,
+                source_type="runtime_result",
+                source_id=str(result.id),
+                provenance={
+                    "runId": str(run.id),
+                    "resultId": str(result.id),
+                    "jobId": str(job.id),
+                },
+            )
+            await memory_service.record_episode(
+                worker=worker,
+                run_id=run.id,
+                result_id=result.id,
+                summary=summary,
+            )
             await TransactionalOutbox(self._session).enqueue(
                 topic="result.created",
                 aggregate_type="result",
@@ -1400,6 +1532,7 @@ class ManagedRuntimeExecutor:
                 },
             )
 
+        await self._apply_stop_after_next_run(item=item, job=job)
         await TransactionalOutbox(self._session).enqueue(
             topic="run.completed",
             aggregate_type="run",

@@ -18,6 +18,7 @@ from app.api.product_common import (
     require_permission,
     utcnow,
 )
+from app.application.services.worker_memory import contains_secret_material
 from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
 from app.execution.provenance import ExecutionProvenance, provenance_from_action_payload
@@ -567,9 +568,12 @@ async def _memory_public(
         "title": memory.title,
         "content": memory.content,
         "tags": list(metadata.get("tags", [])),
-        "source": str(metadata.get("source", "human")),
+        "memoryType": memory.memory_type,
+        "source": memory.source,
         "sourceMemoryId": metadata.get("sourceMemoryId"),
-        "status": str(metadata.get("status", "active")),
+        "provenance": dict(memory.provenance or {}),
+        "sensitivity": memory.sensitivity,
+        "status": memory.status,
         "createdByType": str(metadata.get("createdByType", "human")),
         "createdBy": str(metadata.get("createdBy", "")),
         "correlationId": metadata.get("correlationId"),
@@ -598,9 +602,12 @@ def _memory_v2(public: dict[str, Any]) -> dict[str, Any]:
             "title": public["title"],
             "text": public["content"],
             "tags": public["tags"],
+            "memoryType": public["memoryType"],
+            "sensitivity": public["sensitivity"],
         },
         "provenance": {
             "source": public["source"],
+            "details": public["provenance"],
             "sourceMemoryId": public["sourceMemoryId"],
             "createdByType": public["createdByType"],
             "createdBy": public["createdBy"],
@@ -704,12 +711,20 @@ async def create_memory_v1(
         if scope == "worker"
         else int(policy["organizationRetentionDays"])
     )
+    content = str(payload.get("content", "")).strip()
+    if contains_secret_material(content):
+        raise HTTPException(400, "Secrets and credentials cannot be stored in memory.")
     memory = Memory(
         organization_id=organization_id,
         scope=scope,
         owner_id=owner_id,
         title=str(payload.get("title", "")).strip() or "Memory",
-        content=str(payload.get("content", "")).strip(),
+        content=content,
+        memory_type=str(payload.get("memoryType") or "operational"),
+        source="human",
+        provenance={"sourceType": "human", "createdBy": str(principal.user_id)},
+        sensitivity=str(payload.get("sensitivity") or "internal"),
+        status="active",
         expires_at=utcnow() + timedelta(days=days),
     )
     session.add(memory)
@@ -771,6 +786,10 @@ async def _memory_transition(
     if event_type == "memory.promoted":
         memory.scope = "organization"
         memory.owner_id = str(organization_id)
+        memory.status = "active"
+        memory.source = "promoted"
+    else:
+        memory.status = "archived"
     await append_audit(
         session,
         organization_id=organization_id,

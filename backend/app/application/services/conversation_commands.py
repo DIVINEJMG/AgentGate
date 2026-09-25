@@ -25,11 +25,15 @@ from app.api.jobs_routes import (
 from app.api.product_common import require_permission
 from app.api.runtime_result_routes import retry_item_v1
 from app.api.workforce_routes import (
-    automatic_agent,
-    create_worker,
     delete_worker_v1,
     set_worker_status,
     update_worker,
+)
+from app.application.services.attachment_ingestion import AttachmentIngestionService
+from app.application.services.worker_autonomy import WorkerAutonomyService
+from app.application.services.worker_memory import (
+    WorkerMemoryService,
+    contains_secret_material,
 )
 from app.domain.ai.providers import AIGateway, AIInvocationContext
 from app.domain.conversation.intent import (
@@ -233,36 +237,39 @@ class ConversationCommandCompiler:
         family = intent.family
 
         if family == "worker.create":
-            require_permission(principal, "workforce.manage")
-            name = str(
-                intent.arguments.get("name")
-                or (intent.worker.name if intent.worker is not None else "")
-            ).strip()
-            if not name:
-                raise CommandResolutionError("What should I call the new worker?")
-            agent, _credential = await automatic_agent(
-                self._session, organization_id, principal, name
-            )
-            worker = await create_worker(
+            result = await WorkerAutonomyService(
                 self._session,
-                organization_id,
-                principal,
-                {
-                    "agentIdentityId": str(agent.id),
-                    "name": name,
-                    "department": str(intent.arguments.get("department") or ""),
-                    "description": str(intent.arguments.get("description") or ""),
-                    "responsibilities": list(intent.arguments.get("responsibilities") or []),
-                    "instructions": str(intent.arguments.get("instructions") or ""),
-                },
-                provisioning="automatic",
+                self._gateway,
+            ).create_from_instruction(
+                organization_id=organization_id,
+                principal=principal,
+                instruction=source_message.content,
+                authoritative_context=context,
+                source_thread_id=thread.id,
+                source_message_id=source_message.id,
             )
             command.target_type = "worker"
-            command.target_id = str(worker.id)
-            return self._receipt(
-                "completed",
-                f"I created {worker.name}.",
-                worker,
+            command.target_id = str(result.worker.id)
+            if result.missing_integrations:
+                providers = ", ".join(result.missing_integrations)
+                return CommandReceipt(
+                    status="waiting_integration",
+                    message=(
+                        f"I created {result.worker.name} and its job setup. "
+                        f"Before all work can start, connect: {providers}."
+                    ),
+                    references=list(result.references),
+                    command_id=command.id,
+                )
+            job_names = ", ".join(job.name for job in result.jobs)
+            return CommandReceipt(
+                status="completed",
+                message=(
+                    f"I created {result.worker.name}"
+                    + (f" with {job_names}." if job_names else ".")
+                ),
+                references=list(result.references),
+                command_id=command.id,
             )
 
         if family in {
@@ -396,6 +403,10 @@ class ConversationCommandCompiler:
                 ).strip()
                 if not text:
                     raise CommandResolutionError("What instruction should I add?")
+                if contains_secret_material(text):
+                    raise CommandResolutionError(
+                        "Secrets and credentials cannot be stored as Worker instructions."
+                    )
                 directive = WorkerDirective(
                     organization_id=organization_id,
                     worker_id=worker.id,
@@ -407,6 +418,12 @@ class ConversationCommandCompiler:
                 )
                 self._session.add(directive)
                 await self._session.flush()
+                await WorkerMemoryService(self._session).add_standing_memory(
+                    worker=worker,
+                    instruction=text,
+                    source_thread_id=thread.id,
+                    source_message_id=source_message.id,
+                )
                 return CommandReceipt(
                     status="completed",
                     message=f"I added that as a standing instruction for {worker.name}.",
@@ -697,12 +714,54 @@ class ConversationCommandCompiler:
             )
 
         if family == "attachment.analyze":
+            artifact_id = self._attachment_id(intent, source_message)
+            if artifact_id is None:
+                raise CommandResolutionError("Which uploaded attachment should I analyze?")
+            analysis = await AttachmentIngestionService(
+                self._session,
+                self._gateway,
+            ).analyze_existing(
+                organization_id=organization_id,
+                artifact_id=artifact_id,
+                thread_id=thread.id,
+                worker_id=thread.worker_id,
+                question=str(intent.arguments.get("question") or source_message.content or ""),
+            )
+            if analysis.status in {"waiting_configuration", "waiting_ai"}:
+                return CommandReceipt(
+                    status="unavailable",
+                    message=(
+                        "The attachment is stored safely, but visual analysis is "
+                        "waiting for the AI vision provider."
+                    ),
+                    references=[
+                        self._ref("artifact", artifact_id, None),
+                        self._ref("artifact_analysis", analysis.id, None),
+                    ],
+                    command_id=command.id,
+                )
+            if analysis.status == "failed":
+                return CommandReceipt(
+                    status="unavailable",
+                    message="The attachment is stored, but its analysis could not be completed.",
+                    references=[
+                        self._ref("artifact", artifact_id, None),
+                        self._ref("artifact_analysis", analysis.id, None),
+                    ],
+                    command_id=command.id,
+                )
+            summary = str(analysis.findings.get("summary") or "")
+            if not summary:
+                summary = str(analysis.findings.get("excerpt") or "")
+            if not summary:
+                summary = "Attachment analysis completed."
             return CommandReceipt(
-                status="unavailable",
-                message=(
-                    "The attachment-analysis pipeline is not active in this phase. "
-                    "The attachment reference is preserved for F31.27."
-                ),
+                status="completed",
+                message=summary[:12000],
+                references=[
+                    self._ref("artifact", artifact_id, None),
+                    self._ref("artifact_analysis", analysis.id, None),
+                ],
                 command_id=command.id,
             )
 
@@ -738,6 +797,27 @@ class ConversationCommandCompiler:
         raise CommandResolutionError(
             f"I understood the request as {family}, but that operation is not available."
         )
+
+    def _attachment_id(
+        self,
+        intent: WorkerCommandIntent,
+        source_message: ConversationMessage,
+    ) -> UUID | None:
+        raw = intent.arguments.get("artifactId")
+        if raw:
+            try:
+                return UUID(str(raw))
+            except ValueError as exc:
+                raise CommandResolutionError("That attachment ID is invalid.") from exc
+        for reference in list(source_message.artifact_references or []):
+            value = reference.get("id") if isinstance(reference, dict) else reference
+            if value is None:
+                continue
+            try:
+                return UUID(str(value))
+            except ValueError:
+                continue
+        return None
 
     async def _resolve_worker(
         self,

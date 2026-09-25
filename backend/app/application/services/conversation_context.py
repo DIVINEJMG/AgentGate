@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database.models import (
     Action,
     Approval,
     Artifact,
+    ArtifactAnalysis,
     CapabilityProfile,
     ConversationMessage,
     ConversationThread,
@@ -295,6 +297,25 @@ class ConversationContextAssembler:
             "requiredCapabilities": [
                 str(item) for item in list(definition.get("requiredCapabilities", []))[:40]
             ],
+            "integrationRequirements": [
+                str(item) for item in list(definition.get("integrationRequirements", []))[:20]
+            ],
+            "autonomy": (
+                {
+                    key: value
+                    for key, value in dict(definition.get("autonomy") or {}).items()
+                    if key
+                    in {
+                        "createdByAI",
+                        "humanSchedule",
+                        "startWhenReady",
+                        "stopAfterNextRun",
+                        "missingIntegrations",
+                    }
+                }
+                if isinstance(definition.get("autonomy"), dict)
+                else {}
+            ),
         }
 
     async def _schedule_context(self, job: Job) -> dict[str, Any] | None:
@@ -514,11 +535,14 @@ class ConversationContextAssembler:
         owner_ids = [str(organization_id)]
         if worker is not None:
             owner_ids.append(str(worker.id))
+        now = datetime.now(UTC)
         rows = await self._session.scalars(
             select(Memory)
             .where(
                 Memory.organization_id == organization_id,
                 Memory.owner_id.in_(owner_ids),
+                Memory.status == "active",
+                or_(Memory.expires_at.is_(None), Memory.expires_at > now),
             )
             .order_by(desc(Memory.created_at))
             .limit(MAX_MEMORIES)
@@ -527,8 +551,13 @@ class ConversationContextAssembler:
             {
                 "id": str(item.id),
                 "scope": item.scope,
+                "type": item.memory_type,
                 "title": _clip(item.title, 300),
                 "content": _clip(item.content, 1200),
+                "source": item.source,
+                "provenance": dict(item.provenance or {}),
+                "sensitivity": item.sensitivity,
+                "expiresAt": item.expires_at.isoformat() if item.expires_at else None,
             }
             for item in rows.all()
         ]
@@ -562,30 +591,62 @@ class ConversationContextAssembler:
     ) -> list[dict[str, Any]]:
         if not artifact_ids:
             return []
-        rows = await self._session.scalars(
-            select(Artifact).where(
-                Artifact.organization_id == organization_id,
-                Artifact.id.in_(artifact_ids),
-            )
+        rows = list(
+            (
+                await self._session.scalars(
+                    select(Artifact).where(
+                        Artifact.organization_id == organization_id,
+                        Artifact.id.in_(artifact_ids),
+                    )
+                )
+            ).all()
         )
-        return [
-            {
-                "id": str(item.id),
-                "mediaType": item.media_type,
-                "sizeBytes": item.size_bytes,
-                "checksumPresent": bool(item.checksum_sha256),
-                "metadata": {
-                    key: value
-                    for key, value in dict(item.metadata_json or {}).items()
-                    if key
-                    in {
-                        "filename",
-                        "title",
-                        "pageCount",
-                        "sheetCount",
-                        "language",
-                    }
-                },
-            }
-            for item in rows.all()
-        ]
+        analyses = list(
+            (
+                await self._session.scalars(
+                    select(ArtifactAnalysis).where(
+                        ArtifactAnalysis.organization_id == organization_id,
+                        ArtifactAnalysis.artifact_id.in_(artifact_ids),
+                    )
+                )
+            ).all()
+        )
+        by_artifact = {item.artifact_id: item for item in analyses}
+        result: list[dict[str, Any]] = []
+        for item in rows:
+            analysis = by_artifact.get(item.id)
+            result.append(
+                {
+                    "id": str(item.id),
+                    "mediaType": item.media_type,
+                    "sizeBytes": item.size_bytes,
+                    "checksumPresent": bool(item.checksum_sha256),
+                    "metadata": {
+                        key: value
+                        for key, value in dict(item.metadata_json or {}).items()
+                        if key
+                        in {
+                            "name",
+                            "filename",
+                            "title",
+                            "category",
+                            "pageCount",
+                            "sheetCount",
+                            "language",
+                        }
+                    },
+                    "analysis": (
+                        {
+                            "status": analysis.status,
+                            "role": analysis.analyzer_role,
+                            "provider": analysis.provider,
+                            "model": analysis.model,
+                            "findings": dict(analysis.findings or {}),
+                            "provenance": dict(analysis.provenance or {}),
+                        }
+                        if analysis is not None
+                        else None
+                    ),
+                }
+            )
+        return result

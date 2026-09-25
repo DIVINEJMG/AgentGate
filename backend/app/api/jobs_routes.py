@@ -332,6 +332,23 @@ def job_definition(
     previous: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     previous = previous or {}
+    raw_integration_requirements = payload.get(
+        "integrationRequirements",
+        previous.get("integrationRequirements", []),
+    )
+    integration_requirements = (
+        list(raw_integration_requirements)
+        if isinstance(raw_integration_requirements, list)
+        else []
+    )
+    raw_autonomy = payload.get("autonomy")
+    if not isinstance(raw_autonomy, dict):
+        raw_autonomy = previous.get("autonomy")
+    autonomy: dict[str, Any] = (
+        {str(key): value for key, value in raw_autonomy.items()}
+        if isinstance(raw_autonomy, dict)
+        else {}
+    )
     return {
         "description": payload.get("description", previous.get("description", "")),
         "objective": payload.get("objective", previous.get("objective", "")),
@@ -355,6 +372,8 @@ def job_definition(
         "createdBy": previous.get("createdBy", str(principal.user_id)),
         "updatedBy": str(principal.user_id),
         "triggerConfig": previous.get("triggerConfig"),
+        "integrationRequirements": integration_requirements,
+        "autonomy": autonomy,
     }
 
 
@@ -458,6 +477,18 @@ async def job_public(session: AsyncSession, job: Job) -> dict[str, Any]:
     trigger: dict[str, Any] = (
         dict(raw_trigger) if isinstance(raw_trigger, dict) else {}
     )
+    raw_integration_requirements = definition.get("integrationRequirements")
+    integration_requirements = (
+        list(raw_integration_requirements)
+        if isinstance(raw_integration_requirements, list)
+        else []
+    )
+    raw_autonomy = definition.get("autonomy")
+    autonomy: dict[str, Any] = (
+        {str(key): value for key, value in raw_autonomy.items()}
+        if isinstance(raw_autonomy, dict)
+        else {}
+    )
     return {
         "id": str(job.id),
         "organizationId": str(job.organization_id),
@@ -468,6 +499,8 @@ async def job_public(session: AsyncSession, job: Job) -> dict[str, Any]:
         "instructions": str(definition.get("instructions", "")),
         "responsibilityLinks": list(definition.get("responsibilityLinks", [])),
         "requiredCapabilities": list(definition.get("requiredCapabilities", [])),
+        "integrationRequirements": integration_requirements,
+        "autonomy": autonomy,
         "priority": str(definition.get("priority", "normal")),
         "completionCriteria": list(definition.get("completionCriteria", [])),
         "status": job.status,
@@ -500,6 +533,8 @@ async def job_v2(session: AsyncSession, job: Job) -> dict[str, Any]:
             "instructions": public["instructions"],
             "responsibilityLinks": public["responsibilityLinks"],
             "requiredCapabilities": public["requiredCapabilities"],
+            "integrationRequirements": public["integrationRequirements"],
+            "autonomy": public["autonomy"],
             "priority": public["priority"],
             "completionCriteria": public["completionCriteria"],
         },
@@ -984,7 +1019,13 @@ async def job_status_v1(
     if job is None:
         raise not_found("Job")
     new_status = str(payload.get("status", ""))
-    if new_status not in {"draft", "active", "paused", "archived"}:
+    if new_status not in {
+        "draft",
+        "active",
+        "paused",
+        "waiting_integration",
+        "archived",
+    }:
         raise HTTPException(400, "Invalid Job status.")
     job.status = new_status
     await session.commit()
