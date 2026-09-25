@@ -13,6 +13,7 @@ from app.api.auth_dependencies import organization_principal
 from app.api.product_common import append_audit, not_found, require_permission, utcnow
 from app.api.workforce_routes import automatic_agent, create_worker
 from app.domain.identity.principals import HumanPrincipal
+from app.execution.bootstrap import execution_provider_registry
 from app.infrastructure.database.models import (
     Action,
     Approval,
@@ -20,17 +21,16 @@ from app.infrastructure.database.models import (
     CapabilityProfile,
     Job,
     JobRevision,
+    Policy,
+    PolicyRevision,
     Result,
     ResultExport,
     ResultVersion,
     Run,
-    Policy,
-    PolicyRevision,
     RunStep,
     Worker,
     WorkItem,
 )
-from app.execution.bootstrap import execution_provider_registry
 from app.infrastructure.database.session import database_session
 from app.runtime.qstash_trigger import request_runtime_execution
 
@@ -1545,29 +1545,6 @@ async def _provision_managed_job_authority(
         )
 
     registry = execution_provider_registry()
-    allow_scopes: set[str] = set()
-    approval_scopes: set[str] = set()
-    for scope in requested:
-        providers = registry.capability_providers(scope)
-        capability = next(
-            (
-                capability
-                for provider in providers
-                for capability in provider.manifest.capabilities
-                if capability.scope == scope
-            ),
-            None,
-        )
-        if capability is None:
-            approval_scopes.add(scope)
-        elif (
-            capability.approval_recommendation != "none"
-            or capability.risk in {"high", "critical"}
-        ):
-            approval_scopes.add(scope)
-        else:
-            allow_scopes.add(scope)
-
     async def upsert_policy(
         *,
         effect: str,
