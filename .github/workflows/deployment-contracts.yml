@@ -27,6 +27,7 @@ jobs:
           grep -q 'QSTASH_RUNTIME_SWEEP_URL' infrastructure/render/render.yaml
           grep -q 'CUTOVER_STAGE' infrastructure/render/render.yaml
           grep -q 'RUNTIME_EXECUTION_ENABLED' infrastructure/render/render.yaml
+          grep -q 'DATABASE_MIGRATE_ON_STARTUP' infrastructure/render/render.yaml
           grep -q 'AI_PROVIDER_API_KEY' infrastructure/render/render.yaml
           grep -q 'AI_PROVIDER_BASE_URL' infrastructure/render/render.yaml
           grep -q 'AI_COORDINATOR_MODEL' infrastructure/render/render.yaml
