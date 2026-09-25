@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# ruff: noqa: I001
+
 import hashlib
 from dataclasses import dataclass, replace
 from typing import Any, Literal
@@ -818,7 +820,7 @@ class ManagedRuntimeExecutor:
                 self._provider_executor,
             )
             result = await gateway.execute_request(principal=principal, request=universal)
-        except Exception as exc:
+        except (LookupError, PermissionError, RuntimeError, TypeError, ValueError) as exc:
             action.status = "failed"
             action.payload = self._action_record_payload(
                 proposal=proposal,
@@ -985,7 +987,7 @@ class ManagedRuntimeExecutor:
                 finish.output = {"output": "Runtime completion checkpoint verified."}
 
         action_summaries = [
-            str((_step_output(step).get("summary") or "")).strip()
+            str(_step_output(step).get("summary") or "").strip()
             for step in steps
             if step.kind == "action" and step.status == "completed"
         ]
