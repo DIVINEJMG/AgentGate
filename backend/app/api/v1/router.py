@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.adapters.system_status import serialize_v1
 from app.api.agent_routes import v1_router as agent_router
+from app.api.conversation_routes import v1_router as conversation_router
 from app.api.governance_routes import v1_router as governance_router
 from app.api.integration_capability_routes import v1_router as integration_router
 from app.api.jobs_routes import v1_router as jobs_router
@@ -13,6 +14,7 @@ from app.api.workforce_routes import v1_router as workforce_router
 from app.application.queries.system_status import get_system_status
 
 router = APIRouter()
+router.include_router(conversation_router)
 router.include_router(workforce_router)
 router.include_router(jobs_router)
 router.include_router(template_router)

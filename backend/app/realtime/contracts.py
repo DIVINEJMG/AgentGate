@@ -34,6 +34,14 @@ RealtimeEventType = Literal[
     "browser.action.completed",
     "browser.verification.failed",
     "browser.session.closed",
+    "conversation.thread.created",
+    "conversation.message.created",
+    "conversation.response.created",
+    "conversation.command.accepted",
+    "conversation.command.completed",
+    "conversation.clarification_required",
+    "conversation.approval_required",
+    "conversation.integration_required",
 ]
 
 REALTIME_EVENT_TYPES: frozenset[str] = frozenset(str(item) for item in get_args(RealtimeEventType))

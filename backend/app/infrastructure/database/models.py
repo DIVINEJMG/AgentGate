@@ -276,6 +276,90 @@ class OutboxEvent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 
 
+class ConversationThread(TenantModel, Base):
+    __tablename__ = "conversation_threads"
+    worker_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("workers.id", ondelete="SET NULL")
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False, default="New conversation")
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
+    created_by: Mapped[UUID] = mapped_column(
+        ForeignKey("human_identities.id"), nullable=False
+    )
+    __table_args__ = (
+        Index("ix_conversation_threads_org_updated", "organization_id", "updated_at"),
+        Index("ix_conversation_threads_worker_updated", "worker_id", "updated_at"),
+    )
+
+
+class ConversationMessage(TenantModel, Base):
+    __tablename__ = "conversation_messages"
+    thread_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversation_threads.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(24), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    artifact_references: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    command_references: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    result_references: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    __table_args__ = (
+        CheckConstraint(
+            "role in ('human','worker','system')",
+            name="ck_conversation_message_role",
+        ),
+        Index("ix_conversation_messages_thread_created", "thread_id", "created_at"),
+        Index("ix_conversation_messages_org_created", "organization_id", "created_at"),
+    )
+
+
+class ConversationCommand(TenantModel, Base):
+    __tablename__ = "conversation_commands"
+    thread_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversation_threads.id", ondelete="CASCADE"), nullable=False
+    )
+    source_message_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversation_messages.id", ondelete="CASCADE"), nullable=False
+    )
+    family: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    target_type: Mapped[str | None] = mapped_column(String(64))
+    target_id: Mapped[str | None] = mapped_column(String(128))
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    receipt: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_by: Mapped[UUID] = mapped_column(
+        ForeignKey("human_identities.id"), nullable=False
+    )
+    requires_confirmation: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    __table_args__ = (
+        Index("ix_conversation_commands_org_created", "organization_id", "created_at"),
+        Index("ix_conversation_commands_thread_created", "thread_id", "created_at"),
+    )
+
+
+class WorkerDirective(TenantModel, Base):
+    __tablename__ = "worker_directives"
+    worker_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workers.id", ondelete="CASCADE"), nullable=False
+    )
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
+    created_by: Mapped[UUID] = mapped_column(
+        ForeignKey("human_identities.id"), nullable=False
+    )
+    source_thread_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("conversation_threads.id", ondelete="SET NULL")
+    )
+    source_message_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("conversation_messages.id", ondelete="SET NULL")
+    )
+    __table_args__ = (
+        Index("ix_worker_directives_org_worker", "organization_id", "worker_id", "status"),
+    )
+
+
+
 class AIInvocation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "ai_invocations"
     organization_id: Mapped[UUID | None] = mapped_column(
@@ -290,7 +374,9 @@ class AIInvocation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     run_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("runs.id", ondelete="SET NULL")
     )
-    thread_id: Mapped[UUID | None] = mapped_column()
+    thread_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("conversation_threads.id", ondelete="SET NULL")
+    )
     role: Mapped[str] = mapped_column(String(32), nullable=False)
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
     model: Mapped[str] = mapped_column(String(255), nullable=False)

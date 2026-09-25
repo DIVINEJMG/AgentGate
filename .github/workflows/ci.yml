@@ -38,6 +38,7 @@ jobs:
       - run: pyright
       - run: pytest
       - run: pytest tests/test_f31_0_10.py
+      - run: pytest tests/test_f31_11_20.py
       - run: pytest tests/test_security_invariants.py
       - run: pytest tests/parity
       - run: pytest tests/contract
@@ -63,5 +64,7 @@ jobs:
       - run: python ../scripts/verify_f30_31_40.py
       - run: python ../scripts/verify_f30_ui_exposure.py
       - run: python ../scripts/verify_f31_0_10.py
+      - run: python ../scripts/verify_f31_11_20.py
+      - run: python ../scripts/verify_conversation_authority.py
       - run: python ../scripts/verify_ai_provider_boundary.py
       - run: python ../scripts/verify_qstash_runtime_cutover.py
