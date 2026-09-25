@@ -1759,6 +1759,9 @@ async def worker_quick_start(
         worker_input,
         provisioning="automatic" if created_auto else "existing",
     )
+    worker.status = "active"
+    worker.updated_at = utcnow()
+    await session.commit()
     job_ids: list[str] = []
     for entry in payload.get("jobs", []):
         if not isinstance(entry, dict):
@@ -1769,6 +1772,13 @@ async def worker_quick_start(
             organization_id,
             principal,
             {**job_entry, "workerId": str(worker.id)},
+        )
+        await _provision_managed_job_authority(
+            session,
+            organization_id,
+            worker,
+            principal,
+            [str(scope) for scope in job_entry.get("requiredCapabilities", [])],
         )
         raw_timing = job_entry.get("timing")
         timing: dict[str, Any] = (
@@ -1840,6 +1850,16 @@ async def job_quick_start(
         dict(raw_job_payload) if isinstance(raw_job_payload, dict) else {}
     )
     job = await create_job(session, organization_id, principal, job_payload)
+    worker = await session.get(Worker, job.worker_id)
+    if worker is None:
+        raise HTTPException(500, "Job Worker is unavailable.")
+    await _provision_managed_job_authority(
+        session,
+        organization_id,
+        worker,
+        principal,
+        [str(scope) for scope in job_payload.get("requiredCapabilities", [])],
+    )
     raw_timing = payload.get("timing")
     timing: dict[str, Any] = (
         dict(raw_timing) if isinstance(raw_timing, dict) else {"mode": "manual"}
