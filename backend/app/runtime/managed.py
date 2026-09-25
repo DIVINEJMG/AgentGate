@@ -451,6 +451,7 @@ class ManagedRuntimeExecutor:
             spec = dict(step.input or {}) if isinstance(step.input, dict) else {}
             output = _step_output(step)
             entry: dict[str, object] = {
+                "trust": "untrusted_tool_output",
                 "step": step.step_index + 1,
                 "title": str(spec.get("title", "")),
                 "scope": str(spec.get("scope", "")),
