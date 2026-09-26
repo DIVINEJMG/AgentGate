@@ -3,9 +3,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from app.execution.browser.policy import normalize_origin
-
 from app.domain.ai.providers import AIGateway, AIInvocationContext
+from app.execution.browser.policy import normalize_origin
 
 
 @dataclass(frozen=True, slots=True)
