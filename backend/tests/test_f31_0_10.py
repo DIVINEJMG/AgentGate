@@ -286,6 +286,68 @@ async def test_nvidia_missing_role_credential_fails_closed() -> None:
     assert caught.value.category == "configuration_missing"
     assert "vision credential" in str(caught.value)
 
+
+@pytest.mark.asyncio
+async def test_nvidia_structured_json_disables_nemotron_thinking() -> None:
+    seen: dict[str, object] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        seen.update(payload)
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"decision":"finish"}'}}]},
+        )
+
+    provider = NvidiaNimProvider(
+        api_key="test-key",
+        extra_body={
+            "chat_template_kwargs": {
+                "enable_thinking": True,
+                "force_nonempty_content": True,
+            }
+        },
+        transport=httpx.MockTransport(handler),
+    )
+    await provider.generate_text(
+        model="nvidia/nemotron-3-ultra-550b-a55b",
+        request=AITextRequest(
+            system="system",
+            prompt="return json",
+            response_format="json_object",
+        ),
+    )
+
+    assert seen["response_format"] == {"type": "json_object"}
+    assert seen["chat_template_kwargs"] == {
+        "enable_thinking": False,
+        "force_nonempty_content": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_nvidia_plain_text_does_not_force_thinking_off() -> None:
+    seen: dict[str, object] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "OK"}}]},
+        )
+
+    provider = NvidiaNimProvider(
+        api_key="test-key",
+        transport=httpx.MockTransport(handler),
+    )
+    await provider.generate_text(
+        model="nvidia/nemotron-3-ultra-550b-a55b",
+        request=AITextRequest(system="system", prompt="hello"),
+    )
+
+    assert "response_format" not in seen
+    assert "chat_template_kwargs" not in seen
+
 @pytest.mark.asyncio
 async def test_nvidia_rate_limit_is_normalized_and_retryable() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
