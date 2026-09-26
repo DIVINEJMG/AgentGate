@@ -606,7 +606,7 @@ def test_f30_32_recovery_policy_is_safe_for_retry_reobserve_and_crash() -> None:
     )
     policy = RecoveryPolicy()
 
-    retry = policy.plan(
+    navigation_timeout = policy.plan(
         request=navigation,
         error=ExecutionError(
             code="navigation_timeout",
@@ -618,7 +618,8 @@ def test_f30_32_recovery_policy_is_safe_for_retry_reobserve_and_crash() -> None:
         ),
         attempt=1,
     )
-    assert retry.action == "retry_same_provider"
+    assert navigation_timeout.action == "escalate"
+    assert "not replayed inside one queue delivery" in navigation_timeout.reason
 
     reobserve = policy.plan(
         request=click,
