@@ -134,6 +134,20 @@ async def ensure_managed_browser_origins(
     for origin in requested:
         current = covered.get(origin)
         if current is not None:
+            current_config = (
+                dict(current.config) if isinstance(current.config, dict) else {}
+            )
+            if (
+                current_config.get("managedBy") == "worker_autonomy"
+                and current_config.get("loadVisualResources") != "false"
+            ):
+                now = utcnow()
+                current.config = {
+                    **current_config,
+                    "loadVisualResources": "false",
+                    "lastCheckedAt": now.isoformat(),
+                }
+                current.updated_at = now
             resolved.append(current)
             continue
 
@@ -144,6 +158,7 @@ async def ensure_managed_browser_origins(
             "displayName": f"Managed web · {host}",
             "enableFileTransfer": "false",
             "allowPrivateNetwork": "false",
+            "loadVisualResources": "false",
         }
         resources = await provider.discover_resources(
             configuration=configuration,
