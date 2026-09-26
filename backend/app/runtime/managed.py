@@ -27,7 +27,7 @@ from app.domain.actions.gateway import (
 from app.domain.ai.providers import AIInvocationContext
 from app.domain.identity.principals import AgentPrincipal, HumanPrincipal
 from app.execution.authorization import UniversalActionRequest, action_fingerprint
-from app.execution.bootstrap import execution_provider_registry
+from app.execution.bootstrap import browser_provider, execution_provider_registry
 from app.execution.provider_executor import (
     DatabaseProviderContextLoader,
     UniversalProviderExecutor,
@@ -865,6 +865,21 @@ class ManagedRuntimeExecutor:
                 )
         return None, None
 
+    async def _close_browser_session(
+        self,
+        run_id: UUID,
+        *,
+        before_index: int,
+    ) -> None:
+        session_id, _ = await self._latest_browser_context(run_id, before_index)
+        if session_id is None:
+            return
+        try:
+            await browser_provider.close_session_id(UUID(session_id))
+        except (LookupError, ValueError):
+            # Recovery/restart may already have dropped the in-memory Browser session.
+            return
+
     async def _policy_decision(
         self,
         *,
@@ -1351,6 +1366,10 @@ class ManagedRuntimeExecutor:
         payload["completedAt"] = utcnow().isoformat()
         item.payload = payload
         _write_runtime_meta(item, failure=message[:4000], completedAt=utcnow().isoformat())
+        await self._close_browser_session(
+            run.id,
+            before_index=step.step_index + 1,
+        )
         await TransactionalOutbox(self._session).enqueue(
             topic="run.failed",
             aggregate_type="run",
@@ -1572,6 +1591,10 @@ class ManagedRuntimeExecutor:
                 },
             )
 
+        await self._close_browser_session(
+            run.id,
+            before_index=len(steps) + 1,
+        )
         await self._apply_stop_after_next_run(item=item, job=job)
         await TransactionalOutbox(self._session).enqueue(
             topic="run.completed",
