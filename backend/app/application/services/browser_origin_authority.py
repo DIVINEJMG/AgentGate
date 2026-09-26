@@ -123,8 +123,12 @@ async def ensure_managed_browser_origins(
 
     resolved: list[Integration] = []
     covered: dict[str, Integration] = {}
+    requested_set = set(requested)
     for integration in existing:
-        for origin in browser_integration_origins(integration):
+        resource_origins = set(browser_integration_origins(integration))
+        if not resource_origins or not resource_origins.issubset(requested_set):
+            continue
+        for origin in resource_origins:
             covered.setdefault(origin, integration)
 
     provider = execution_provider_registry().get("browser")
