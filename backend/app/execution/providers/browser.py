@@ -1352,7 +1352,7 @@ class PlaywrightBrowserProvider:
     ) -> ExecutionResult:
         state = _BrowserExecutionState(started_at=datetime.now(UTC))
         try:
-            async with asyncio.timeout(90):
+            async with asyncio.timeout(70):
                 return await self._execute_authorized(
                     request=request,
                     configuration=configuration,
