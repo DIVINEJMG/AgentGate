@@ -14,6 +14,7 @@ from app.api.governance_routes import (
     policy_status_v1,
 )
 from app.api.jobs_routes import (
+    _provision_managed_job_authority,
     cancel_item,
     create_job,
     current_revision,
@@ -30,6 +31,11 @@ from app.api.workforce_routes import (
     update_worker,
 )
 from app.application.services.attachment_ingestion import AttachmentIngestionService
+from app.application.services.browser_origin_authority import (
+    ensure_managed_browser_origins,
+    explicit_http_origins,
+)
+from app.application.services.capability_autoresolver import SemanticCapabilityResolver
 from app.application.services.worker_autonomy import WorkerAutonomyService
 from app.application.services.worker_memory import (
     WorkerMemoryService,
@@ -43,6 +49,7 @@ from app.domain.conversation.intent import (
     WorkerCommandIntent,
 )
 from app.domain.identity.principals import HumanPrincipal
+from app.domain.workforce.drafts import CapabilityNeed
 from app.infrastructure.database.models import (
     ConversationCommand,
     ConversationMessage,
@@ -486,16 +493,29 @@ class ConversationCommandCompiler:
                 ).strip()
                 if not name:
                     raise CommandResolutionError("What should I call this job?")
+                job_payload, browser_scopes = await self._prepare_existing_worker_job_payload(
+                    organization_id=organization_id,
+                    principal=principal,
+                    worker=worker,
+                    source_message=source_message,
+                    source_thread_id=thread.id,
+                    name=name,
+                    arguments=dict(intent.arguments),
+                )
                 job = await create_job(
                     self._session,
                     organization_id,
                     principal,
-                    {
-                        **dict(intent.arguments),
-                        "workerId": str(worker.id),
-                        "name": name,
-                    },
+                    job_payload,
                 )
+                if browser_scopes:
+                    await _provision_managed_job_authority(
+                        self._session,
+                        organization_id,
+                        worker,
+                        principal,
+                        list(browser_scopes),
+                    )
                 await job_status_v1(
                     organization_id,
                     job.id,
@@ -828,6 +848,89 @@ class ConversationCommandCompiler:
         raise CommandResolutionError(
             f"I understood the request as {family}, but that operation is not available."
         )
+
+    async def _prepare_existing_worker_job_payload(
+        self,
+        *,
+        organization_id: UUID,
+        principal: HumanPrincipal,
+        worker: Worker,
+        source_message: ConversationMessage,
+        source_thread_id: UUID,
+        name: str,
+        arguments: dict[str, Any],
+    ) -> tuple[dict[str, Any], tuple[str, ...]]:
+        """Give AI-created Jobs the same origin-aware Browser authority as new Workers."""
+
+        payload = {
+            **arguments,
+            "workerId": str(worker.id),
+            "name": name,
+        }
+        origins = explicit_http_origins(source_message.content)
+        if not origins:
+            return payload, ()
+
+        require_permission(principal, "integrations.manage")
+        require_permission(principal, "capabilities.manage")
+        require_permission(principal, "policies.manage")
+
+        await ensure_managed_browser_origins(
+            self._session,
+            organization_id=organization_id,
+            origins=origins,
+            principal=principal,
+            source=f"conversation:{source_message.id}",
+        )
+
+        need = CapabilityNeed(
+            provider="browser",
+            need=source_message.content[:500],
+            actions=[],
+        )
+        resolution = await SemanticCapabilityResolver(
+            self._session,
+            self._gateway,
+        ).resolve(
+            organization_id=organization_id,
+            needs=[need],
+            required_browser_origins=origins,
+            invocation_context=AIInvocationContext(
+                organization_id=organization_id,
+                worker_id=worker.id,
+                thread_id=source_thread_id,
+                correlation_id=f"job-capability:{source_message.id}",
+            ),
+        )
+        if not resolution.scopes:
+            raise CommandResolutionError(
+                "I could not resolve a least-authority browser capability set "
+                "for that website job."
+            )
+
+        existing_scopes = {
+            str(scope)
+            for scope in payload.get("requiredCapabilities", [])
+            if str(scope)
+        }
+        autonomy = (
+            dict(payload.get("autonomy"))
+            if isinstance(payload.get("autonomy"), dict)
+            else {}
+        )
+        autonomy.update(
+            {
+                "createdByAI": True,
+                "sourceThreadId": str(source_thread_id),
+                "sourceMessageId": str(source_message.id),
+                "authorizedBrowserOrigins": list(origins),
+                "capabilityMappings": list(resolution.mappings),
+                "capabilityNeeds": [need.model_dump(mode="json")],
+            }
+        )
+        payload["requiredCapabilities"] = sorted(existing_scopes | set(resolution.scopes))
+        payload["autonomy"] = autonomy
+        return payload, resolution.scopes
 
     def _attachment_id(
         self,
