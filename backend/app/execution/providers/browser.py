@@ -1352,12 +1352,13 @@ class PlaywrightBrowserProvider:
     ) -> ExecutionResult:
         state = _BrowserExecutionState(started_at=datetime.now(UTC))
         try:
-            return await self._execute_authorized(
-                request=request,
-                configuration=configuration,
-                credential=credential,
-                state=state,
-            )
+            async with asyncio.timeout(90):
+                return await self._execute_authorized(
+                    request=request,
+                    configuration=configuration,
+                    credential=credential,
+                    state=state,
+                )
         except asyncio.CancelledError:
             if state.session_owned and state.session_id is not None:
                 await self._terminate_quietly(state.session_id)
@@ -1432,11 +1433,7 @@ class PlaywrightBrowserProvider:
                 internal_details=str(error),
             ) from error
         except (PlaywrightTimeoutError, TimeoutError) as error:
-            if (
-                state.session_owned
-                and state.session_id is not None
-                and request.capability.side_effect
-            ):
+            if state.session_owned and state.session_id is not None:
                 await self._terminate_quietly(state.session_id)
             navigation_timeout = request.operation.startswith("navigation.")
             raise self._error(

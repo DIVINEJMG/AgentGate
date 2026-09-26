@@ -42,8 +42,12 @@ def main() -> None:
     require("BrowserNavigationBlocked" in runtime, "navigation policy enforcement missing")
     require("request.is_navigation_request()" in runtime, "redirect/navigation inspection missing")
     require(
-        "route.fetch(max_redirects=0)" in runtime,
+        "route.fetch(" in runtime and "max_redirects=0" in runtime,
         "redirect chains are not inspected before browser follow-up",
+    )
+    require(
+        "timeout=20_000" in runtime,
+        "governed redirect fetch is missing an explicit execution deadline",
     )
 
     require('risk="high"' in provider, "high-risk browser classification missing")

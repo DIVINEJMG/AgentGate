@@ -895,6 +895,25 @@ async def test_browser_runtime_is_warmed_before_managed_runtime_traffic() -> Non
     assert "runtime_execution_enabled" in lifecycle
 
 
+def test_browser_execution_has_bounded_network_and_observation_phases() -> None:
+    root = Path(__file__).resolve().parents[2]
+    runtime = (root / "backend/app/execution/browser/runtime.py").read_text(encoding="utf-8")
+    egress = (root / "backend/app/execution/browser/egress.py").read_text(encoding="utf-8")
+    observation = (
+        root / "backend/app/execution/browser/observation.py"
+    ).read_text(encoding="utf-8")
+    provider = (
+        root / "backend/app/execution/providers/browser.py"
+    ).read_text(encoding="utf-8")
+
+    assert "timeout=20_000" in runtime
+    assert "Browser DNS safety preflight timed out." in egress
+    assert "timeout=5.0" in egress
+    assert "asyncio.wait_for" in observation
+    assert "range(min(len(raw_forms), 100))" in observation
+    assert "asyncio.timeout(90)" in provider
+
+
 def test_f30_40_vercel_auto_deployment_remains_disabled() -> None:
     root = Path(__file__).resolve().parents[2]
     vercel = (root / "vercel.json").read_text(encoding="utf-8")
