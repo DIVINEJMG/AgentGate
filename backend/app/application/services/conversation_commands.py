@@ -914,9 +914,10 @@ class ConversationCommandCompiler:
             for scope in raw_existing_scopes
             if str(scope)
         } if isinstance(raw_existing_scopes, list) else set()
-        autonomy = (
-            dict(payload.get("autonomy"))
-            if isinstance(payload.get("autonomy"), dict)
+        raw_autonomy = payload.get("autonomy")
+        autonomy: dict[str, Any] = (
+            {str(key): value for key, value in raw_autonomy.items()}
+            if isinstance(raw_autonomy, dict)
             else {}
         )
         autonomy.update(
