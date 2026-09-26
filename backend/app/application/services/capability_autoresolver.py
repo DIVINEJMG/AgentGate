@@ -91,11 +91,14 @@ class SemanticCapabilityResolver:
                     connected,
                     required_browser_origins,
                 )
+                required_origin_set = set(required_browser_origins)
                 connected = [
                     integration
                     for integration in connected
-                    if set(browser_integration_origins(integration))
-                    & set(required_browser_origins)
+                    if (
+                        (resource_origins := set(browser_integration_origins(integration)))
+                        and resource_origins.issubset(required_origin_set)
+                    )
                 ]
             if not connected:
                 missing.add(provider_id)
