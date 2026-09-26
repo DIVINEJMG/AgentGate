@@ -593,6 +593,29 @@ def test_managed_runtime_planner_has_memory_and_stop_after_next_run_support() ->
     assert "job_status_v1" in source
 
 
+def test_existing_worker_job_create_uses_generic_browser_origin_provisioning() -> None:
+    from app.application.services import browser_origin_authority, conversation_commands
+
+    compiler = inspect.getsource(conversation_commands.ConversationCommandCompiler)
+    authority = inspect.getsource(browser_origin_authority)
+
+    assert "_prepare_existing_worker_job_payload" in compiler
+    assert "explicit_http_origins(source_message.content)" in compiler
+    assert "ensure_managed_browser_origins" in compiler
+    assert "SemanticCapabilityResolver" in compiler
+    assert "required_browser_origins=origins" in compiler
+    assert "_provision_managed_job_authority" in compiler
+    assert '"authorizedBrowserOrigins": list(origins)' in compiler
+
+    # The mechanism is site-agnostic: origins come from human-authored URLs.
+    assert "nvidia.com" not in authority.lower()
+    assert "bestworth" not in authority.lower()
+    assert "for origin in requested" in authority
+    assert "current = covered.get(origin)" in authority
+    assert "requested_set = set(requested)" in authority
+    assert "resource_origins.issubset(requested_set)" in authority
+
+
 def test_managed_browser_origins_default_to_lean_visual_loading() -> None:
     from app.application.services import browser_origin_authority
 

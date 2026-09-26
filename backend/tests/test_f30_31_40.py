@@ -890,6 +890,31 @@ async def test_f30_39_tenant_file_and_destination_security_fail_closed() -> None
 
 
 @pytest.mark.asyncio
+async def test_browser_provider_can_release_session_by_canonical_id() -> None:
+    runtime = HardeningRuntime()
+    provider = PlaywrightBrowserProvider(runtime)
+    session = await runtime.create_session(
+        organization_id=uuid4(),
+        worker_id=uuid4(),
+        run_id=uuid4(),
+    )
+
+    closed = await provider.close_session_id(session.id)
+
+    assert closed.id == session.id
+    assert session.id not in runtime.sessions
+
+
+def test_managed_runtime_releases_browser_sessions_on_terminal_runs() -> None:
+    root = Path(__file__).resolve().parents[2]
+    managed = (root / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+
+    assert "async def _close_browser_session(" in managed
+    assert "browser_provider.close_session_id" in managed
+    assert managed.count("await self._close_browser_session(") >= 2
+
+
+@pytest.mark.asyncio
 async def test_browser_runtime_is_warmed_before_managed_runtime_traffic() -> None:
     runtime = HardeningRuntime()
     provider = PlaywrightBrowserProvider(runtime)
