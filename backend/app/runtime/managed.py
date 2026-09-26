@@ -13,6 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.governance_routes import _evaluate
 from app.api.integration_capability_routes import _catalog
 from app.api.product_common import utcnow
+from app.application.services.browser_origin_authority import (
+    browser_integration_origins,
+    explicit_http_origins,
+)
 from app.application.services.worker_memory import WorkerMemoryService
 from app.bootstrap.settings import settings
 from app.domain.actions.gateway import (
@@ -375,6 +379,23 @@ class ManagedRuntimeExecutor:
             for scope in definition.get("requiredCapabilities", [])
             if str(scope)
         }
+        raw_autonomy = definition.get("autonomy")
+        autonomy = dict(raw_autonomy) if isinstance(raw_autonomy, dict) else {}
+        raw_authorized_origins = autonomy.get("authorizedBrowserOrigins")
+        authorized_browser_origins = (
+            tuple(str(item) for item in raw_authorized_origins if str(item))
+            if isinstance(raw_authorized_origins, list)
+            else ()
+        )
+        if not authorized_browser_origins:
+            authorized_browser_origins = explicit_http_origins(
+                "\n".join(
+                    (
+                        str(definition.get("objective", "")),
+                        str(definition.get("instructions", "")),
+                    )
+                )
+            )
         active = await self._active_scopes(agent.id)
         catalog = await _catalog(self._session, item.organization_id)
         resources = list(catalog.get("resources", []))
@@ -395,6 +416,20 @@ class ManagedRuntimeExecutor:
             except ValueError:
                 integration = None
             config = _integration_config(integration)
+            resource_browser_origins = (
+                browser_integration_origins(integration)
+                if provider_name == "browser"
+                else ()
+            )
+            if (
+                provider_name == "browser"
+                and authorized_browser_origins
+                and not (
+                    set(resource_browser_origins)
+                    & set(authorized_browser_origins)
+                )
+            ):
+                continue
             actions = list(resource.get("actions", []))
             for action in actions:
                 scope = str(action.get("scope", ""))
@@ -437,6 +472,11 @@ class ManagedRuntimeExecutor:
                             str(config.get("startUrl", ""))
                             if scope == "browser.navigation.open"
                             else ""
+                        ),
+                        "allowedOrigins": (
+                            list(resource_browser_origins)
+                            if provider_name == "browser"
+                            else []
                         ),
                     }
                 )
