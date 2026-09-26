@@ -47,6 +47,7 @@ class BrowserDomainPolicy:
     allowed_path_prefixes: tuple[str, ...] = ()
     denied_path_prefixes: tuple[str, ...] = ()
     allow_private_network: bool = False
+    load_visual_resources: bool = True
 
     @classmethod
     def from_configuration(
@@ -82,6 +83,9 @@ class BrowserDomainPolicy:
             denied_path_prefixes=_split_csv(configuration.get("deniedPaths")),
             allow_private_network=(
                 configuration.get("allowPrivateNetwork", "false").strip().lower() == "true"
+            ),
+            load_visual_resources=(
+                configuration.get("loadVisualResources", "true").strip().lower() == "true"
             ),
         )
 
