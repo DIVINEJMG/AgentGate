@@ -26,6 +26,10 @@ from app.api.workforce_routes import (
     set_worker_status,
     update_worker,
 )
+from app.application.services.browser_origin_authority import (
+    ensure_managed_browser_origins,
+    explicit_http_origins,
+)
 from app.application.services.capability_autoresolver import (
     CapabilityResolution,
     SemanticCapabilityResolver,
@@ -61,6 +65,7 @@ class PreparedJob:
     capabilities: CapabilityResolution
     schedule: CompiledSchedule
     missing_integrations: tuple[str, ...]
+    browser_origins: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +140,25 @@ class WorkerAutonomyService:
         prepared: list[PreparedJob] = []
         has_capability_needs = False
         has_policy_boundaries = False
+        explicit_origins = explicit_http_origins(instruction)
+        draft_uses_browser = any(
+            _provider_id(need.provider) == "browser"
+            for job in draft.initial_jobs
+            for need in job.capability_needs
+        )
+        if (
+            explicit_origins
+            and draft_uses_browser
+            and "integrations.manage" in principal.permissions
+        ):
+            await ensure_managed_browser_origins(
+                self._session,
+                organization_id=organization_id,
+                origins=explicit_origins,
+                principal=principal,
+                source=f"conversation:{source_message_id}",
+            )
+
         connected_providers = set(
             (
                 await self._session.scalars(
@@ -150,9 +174,18 @@ class WorkerAutonomyService:
         for index, job_draft in enumerate(draft.initial_jobs):
             has_capability_needs = has_capability_needs or bool(job_draft.capability_needs)
             has_policy_boundaries = has_policy_boundaries or bool(job_draft.approval_boundaries)
+            browser_origins = (
+                explicit_origins
+                if any(
+                    _provider_id(need.provider) == "browser"
+                    for need in job_draft.capability_needs
+                )
+                else ()
+            )
             resolution = await resolver.resolve(
                 organization_id=organization_id,
                 needs=job_draft.capability_needs,
+                required_browser_origins=browser_origins,
                 invocation_context=AIInvocationContext(
                     organization_id=organization_id,
                     thread_id=source_thread_id,
@@ -187,6 +220,7 @@ class WorkerAutonomyService:
                     capabilities=resolution,
                     schedule=compile_schedule(job_draft.schedule),
                     missing_integrations=missing,
+                    browser_origins=browser_origins,
                 )
             )
 
@@ -425,6 +459,7 @@ class WorkerAutonomyService:
             "missingIntegrations": list(prepared.missing_integrations),
             "capabilityMappings": list(prepared.capabilities.mappings),
             "capabilityNeeds": [need.model_dump(mode="json") for need in draft.capability_needs],
+            "authorizedBrowserOrigins": list(prepared.browser_origins),
         }
         job_payload = {
             "workerId": str(worker.id),
