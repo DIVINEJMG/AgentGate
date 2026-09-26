@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.jobs_routes import update_job
 from app.api.product_common import append_audit, utcnow
 from app.domain.identity.principals import HumanPrincipal
 from app.execution.bootstrap import execution_provider_registry
@@ -284,4 +285,20 @@ async def reconcile_ai_job_browser_origins(
         source=f"conversation:{source_message.id}",
     )
     created = sum(item.id not in before_ids for item in resolved)
+
+    existing_origins = autonomy.get("authorizedBrowserOrigins")
+    normalized_existing = (
+        tuple(str(item) for item in existing_origins if str(item))
+        if isinstance(existing_origins, list)
+        else ()
+    )
+    if normalized_existing != origins:
+        autonomy["authorizedBrowserOrigins"] = list(origins)
+        job = await update_job(
+            session,
+            organization_id,
+            job.id,
+            principal,
+            {"autonomy": autonomy},
+        )
     return job, origins, created
