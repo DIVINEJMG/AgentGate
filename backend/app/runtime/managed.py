@@ -14,6 +14,7 @@ from app.api.governance_routes import _evaluate
 from app.api.integration_capability_routes import _catalog
 from app.api.product_common import utcnow
 from app.application.services.browser_origin_authority import (
+    browser_integration_autonomy_suitable,
     browser_integration_origins,
     explicit_http_origins,
 )
@@ -427,6 +428,14 @@ class ManagedRuntimeExecutor:
                 if (
                     not resource_origin_set
                     or not resource_origin_set.issubset(authorized_origin_set)
+                ):
+                    continue
+                if (
+                    bool(autonomy.get("createdByAI"))
+                    and not browser_integration_autonomy_suitable(
+                        integration,
+                        authorized_origin_set,
+                    )
                 ):
                     continue
             actions = list(resource.get("actions", []))
