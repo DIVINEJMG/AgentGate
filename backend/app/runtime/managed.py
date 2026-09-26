@@ -421,15 +421,14 @@ class ManagedRuntimeExecutor:
                 if provider_name == "browser"
                 else ()
             )
-            if (
-                provider_name == "browser"
-                and authorized_browser_origins
-                and not (
-                    set(resource_browser_origins)
-                    & set(authorized_browser_origins)
-                )
-            ):
-                continue
+            if provider_name == "browser" and authorized_browser_origins:
+                resource_origin_set = set(resource_browser_origins)
+                authorized_origin_set = set(authorized_browser_origins)
+                if (
+                    not resource_origin_set
+                    or not resource_origin_set.issubset(authorized_origin_set)
+                ):
+                    continue
             actions = list(resource.get("actions", []))
             for action in actions:
                 scope = str(action.get("scope", ""))
