@@ -141,9 +141,11 @@ class NvidiaNimProvider:
             body["stream_options"] = {"include_usage": True}
         body.update(self._extra_body)
         if request.response_format == "json_object":
-            # Nemotron reasoning can pollute or truncate constrained JSON output.
-            # NVIDIA recommends disabling thinking for response_format requests.
-            body["response_format"] = {"type": "json_object"}
+            # Hosted NVIDIA NIM has been inconsistent with native response_format
+            # for Nemotron reasoning models. Audoryn already performs strict JSON
+            # parsing, schema validation, and one bounded repair attempt in the
+            # provider-neutral gateway, so use prompt-constrained JSON here while
+            # disabling model thinking for deterministic structured output.
             raw_template_kwargs = body.get("chat_template_kwargs")
             template_kwargs = (
                 dict(raw_template_kwargs)
