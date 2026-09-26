@@ -883,6 +883,18 @@ async def test_f30_39_tenant_file_and_destination_security_fail_closed() -> None
     assert policy.permits("https://evil.example.test/").allowed is False
 
 
+@pytest.mark.asyncio
+async def test_browser_runtime_is_warmed_before_managed_runtime_traffic() -> None:
+    runtime = HardeningRuntime()
+    provider = PlaywrightBrowserProvider(runtime)
+    assert await provider.warmup() is True
+
+    root = Path(__file__).resolve().parents[2]
+    lifecycle = (root / "backend/app/bootstrap/lifecycle.py").read_text(encoding="utf-8")
+    assert "browser_provider.warmup()" in lifecycle
+    assert "runtime_execution_enabled" in lifecycle
+
+
 def test_f30_40_vercel_auto_deployment_remains_disabled() -> None:
     root = Path(__file__).resolve().parents[2]
     vercel = (root / "vercel.json").read_text(encoding="utf-8")
