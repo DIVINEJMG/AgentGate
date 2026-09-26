@@ -14,10 +14,10 @@ from app.domain.ai.providers import (
     AIMediaInput,
     AIProviderError,
 )
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
 from app.infrastructure.ai.provider import ai_gateway_from_settings
 from app.infrastructure.database.session import session_factory
 from app.infrastructure.qstash.verifier import QStashSignatureVerifier
+from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
 
 router = APIRouter(prefix="/internal/v1/ai", tags=["internal-ai"])
 logger = logging.getLogger(__name__)
