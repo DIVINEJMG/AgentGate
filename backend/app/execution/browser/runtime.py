@@ -269,8 +269,16 @@ class BrowserRuntime:
                 return self._browser
             if self._playwright is None:
                 self._playwright = await async_playwright().start()
+            launch_args = [
+                "--renderer-process-limit=1",
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+            ]
             try:
-                self._browser = await self._playwright.chromium.launch(headless=self._headless)
+                self._browser = await self._playwright.chromium.launch(
+                    headless=self._headless,
+                    args=launch_args,
+                )
             except PlaywrightError as error:
                 if "Executable doesn't exist" not in str(error):
                     raise
@@ -300,7 +308,10 @@ class BrowserRuntime:
                         "Failed to provision the Chromium browser runtime: "
                         + stderr.decode("utf-8", errors="replace")[-1000:]
                     ) from error
-                self._browser = await self._playwright.chromium.launch(headless=self._headless)
+                self._browser = await self._playwright.chromium.launch(
+                    headless=self._headless,
+                    args=launch_args,
+                )
             return self._browser
 
     async def health(self) -> bool:
@@ -389,6 +400,14 @@ class BrowserRuntime:
         request: Request,
     ) -> None:
         if not request.is_navigation_request():
+            policy = handle.navigation_policy
+            if (
+                policy is not None
+                and not policy.load_visual_resources
+                and request.resource_type in {"image", "media", "font"}
+            ):
+                await route.abort("blockedbyclient")
+                return
             await route.continue_()
             return
 
@@ -510,7 +529,7 @@ class BrowserRuntime:
         navigation_policy: BrowserDomainPolicy | None = None,
     ) -> BrowserSession:
         browser = await self._ensure_browser()
-        context = await browser.new_context()
+        context = await browser.new_context(service_workers="block")
         try:
             page = await context.new_page()
             now = datetime.now(UTC)
