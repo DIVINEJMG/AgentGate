@@ -908,11 +908,12 @@ class ConversationCommandCompiler:
                 "for that website job."
             )
 
+        raw_existing_scopes = payload.get("requiredCapabilities")
         existing_scopes = {
             str(scope)
-            for scope in payload.get("requiredCapabilities", [])
+            for scope in raw_existing_scopes
             if str(scope)
-        }
+        } if isinstance(raw_existing_scopes, list) else set()
         autonomy = (
             dict(payload.get("autonomy"))
             if isinstance(payload.get("autonomy"), dict)
