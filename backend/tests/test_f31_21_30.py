@@ -18,6 +18,7 @@ from app.application.services.attachment_ingestion import (
     decode_base64_content,
 )
 from app.application.services.browser_origin_authority import (
+    browser_integration_autonomy_suitable,
     browser_integration_origins,
     explicit_http_origins,
 )
@@ -319,6 +320,82 @@ def test_browser_integration_origin_is_read_from_governed_resource_metadata() ->
     )
 
 
+def test_browser_autonomy_suitability_requires_lean_public_exact_origin() -> None:
+    organization_id = uuid4()
+    full_manual = Integration(
+        id=uuid4(),
+        organization_id=organization_id,
+        provider="browser",
+        display_name="Full manual browser",
+        status="connected",
+        config={
+            "allowPrivateNetwork": "false",
+            "metadata": {"allowedOrigins": ["https://example.com"]},
+        },
+    )
+    assert (
+        browser_integration_autonomy_suitable(
+            full_manual,
+            ("https://example.com",),
+        )
+        is False
+    )
+
+    lean_manual = Integration(
+        id=uuid4(),
+        organization_id=organization_id,
+        provider="browser",
+        display_name="Lean manual browser",
+        status="connected",
+        config={
+            "allowPrivateNetwork": "false",
+            "loadVisualResources": "false",
+            "metadata": {"allowedOrigins": ["https://example.com"]},
+        },
+    )
+    assert browser_integration_autonomy_suitable(
+        lean_manual,
+        ("https://example.com",),
+    )
+
+    managed = Integration(
+        id=uuid4(),
+        organization_id=organization_id,
+        provider="browser",
+        display_name="Managed browser",
+        status="connected",
+        config={
+            "managedBy": "worker_autonomy",
+            "allowPrivateNetwork": "false",
+            "metadata": {"allowedOrigins": ["https://example.com"]},
+        },
+    )
+    assert browser_integration_autonomy_suitable(
+        managed,
+        ("https://example.com",),
+    )
+
+    private = Integration(
+        id=uuid4(),
+        organization_id=organization_id,
+        provider="browser",
+        display_name="Private browser",
+        status="connected",
+        config={
+            "managedBy": "worker_autonomy",
+            "allowPrivateNetwork": "true",
+            "metadata": {"allowedOrigins": ["https://example.com"]},
+        },
+    )
+    assert (
+        browser_integration_autonomy_suitable(
+            private,
+            ("https://example.com",),
+        )
+        is False
+    )
+
+
 @pytest.mark.asyncio
 async def test_browser_capability_resolver_rejects_unrelated_connected_origin() -> None:
     integration = Integration(
@@ -614,6 +691,12 @@ def test_existing_worker_job_create_uses_generic_browser_origin_provisioning() -
     assert "current = covered.get(origin)" in authority
     assert "requested_set = set(requested)" in authority
     assert "resource_origins.issubset(requested_set)" in authority
+
+
+def test_ai_runtime_exposes_only_autonomy_suitable_browser_resources() -> None:
+    source = inspect.getsource(ManagedRuntimeExecutor)
+    assert "browser_integration_autonomy_suitable" in source
+    assert 'bool(autonomy.get("createdByAI"))' in source
 
 
 def test_managed_browser_origins_default_to_lean_visual_loading() -> None:
