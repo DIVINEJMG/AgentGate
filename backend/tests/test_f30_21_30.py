@@ -761,10 +761,62 @@ class RecordingRoute:
     def __init__(self) -> None:
         self.aborted = False
         self.abort_code: str | None = None
+        self.continued = False
 
     async def abort(self, error_code: str | None = None) -> None:
         self.aborted = True
         self.abort_code = error_code
+
+    async def continue_(self) -> None:
+        self.continued = True
+
+
+class StaticResourceRequest:
+    def __init__(self, resource_type: str) -> None:
+        self.resource_type = resource_type
+
+    def is_navigation_request(self) -> bool:
+        return False
+
+
+@pytest.mark.asyncio
+async def test_managed_lean_browser_policy_blocks_heavy_visual_resources() -> None:
+    runtime = BrowserRuntime()
+    lean_policy = BrowserDomainPolicy.from_configuration(
+        {
+            "allowedOrigins": "https://portal.example.test",
+            "loadVisualResources": "false",
+        }
+    )
+    lean_handle = runtime_handle(
+        page=FakePage("https://portal.example.test/main"),
+        policy=lean_policy,
+    )
+    image_route = RecordingRoute()
+    await runtime._route_request(
+        lean_handle,
+        cast(Route, image_route),
+        cast(Request, StaticResourceRequest("image")),
+    )
+    assert image_route.aborted is True
+    assert image_route.abort_code == "blockedbyclient"
+    assert image_route.continued is False
+
+    full_policy = BrowserDomainPolicy.from_configuration(
+        {"allowedOrigins": "https://portal.example.test"}
+    )
+    full_handle = runtime_handle(
+        page=FakePage("https://portal.example.test/main"),
+        policy=full_policy,
+    )
+    font_route = RecordingRoute()
+    await runtime._route_request(
+        full_handle,
+        cast(Route, font_route),
+        cast(Request, StaticResourceRequest("font")),
+    )
+    assert font_route.aborted is False
+    assert font_route.continued is True
 
 
 @pytest.mark.asyncio
