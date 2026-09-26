@@ -80,7 +80,9 @@ def browser_origins_covered(
 
     available: set[str] = set()
     for integration in integrations:
-        available.update(browser_integration_origins(integration))
+        resource_origins = set(browser_integration_origins(integration))
+        if resource_origins and resource_origins.issubset(required):
+            available.update(resource_origins)
     return required.issubset(available)
 
 
