@@ -57,6 +57,15 @@ class RecoveryPolicy:
                 ),
             )
 
+        if error.code == "navigation_timeout" and request.resource.provider == "browser":
+            return RecoveryPlan(
+                action="escalate",
+                reason=(
+                    "Browser navigation timeouts are not replayed inside one queue "
+                    "delivery; a later managed-runtime delivery may replan or retry."
+                ),
+            )
+
         retry: RetryDecision = self._retry_policy.decide(error, attempt=attempt)
         if retry.disposition == "retry":
             return RecoveryPlan(

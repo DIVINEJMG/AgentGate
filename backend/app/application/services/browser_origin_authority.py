@@ -66,6 +66,35 @@ def browser_integration_origins(integration: Integration | None) -> tuple[str, .
     return tuple(origins)
 
 
+def browser_integration_autonomy_suitable(
+    integration: Integration | None,
+    required_origins: Iterable[str],
+) -> bool:
+    """Return whether a Browser resource is safe to reuse for AI-managed web work."""
+
+    if integration is None or integration.provider != "browser":
+        return False
+
+    required = {
+        origin
+        for value in required_origins
+        if (origin := normalize_origin(str(value))) is not None
+    }
+    resource_origins = set(browser_integration_origins(integration))
+    if not resource_origins or not resource_origins.issubset(required):
+        return False
+
+    config = integration.config if isinstance(integration.config, dict) else {}
+    if str(config.get("allowPrivateNetwork", "false")).strip().lower() == "true":
+        return False
+
+    # Managed worker resources are lean by contract. A manually configured Browser
+    # resource is reusable only when its owner explicitly made it lean as well.
+    managed = str(config.get("managedBy", "")).strip() == "worker_autonomy"
+    lean = str(config.get("loadVisualResources", "")).strip().lower() == "false"
+    return managed or lean
+
+
 def browser_origins_covered(
     integrations: Iterable[Integration],
     required_origins: Iterable[str],
@@ -125,10 +154,9 @@ async def ensure_managed_browser_origins(
     covered: dict[str, Integration] = {}
     requested_set = set(requested)
     for integration in existing:
-        resource_origins = set(browser_integration_origins(integration))
-        if not resource_origins or not resource_origins.issubset(requested_set):
+        if not browser_integration_autonomy_suitable(integration, requested_set):
             continue
-        for origin in resource_origins:
+        for origin in browser_integration_origins(integration):
             covered.setdefault(origin, integration)
 
     provider = execution_provider_registry().get("browser")
