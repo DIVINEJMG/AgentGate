@@ -137,11 +137,21 @@ class NvidiaNimProvider:
             "max_tokens": max(16, request.max_output_tokens),
             "stream": request.stream,
         }
-        if request.response_format == "json_object":
-            body["response_format"] = {"type": "json_object"}
         if request.stream:
             body["stream_options"] = {"include_usage": True}
         body.update(self._extra_body)
+        if request.response_format == "json_object":
+            # Nemotron reasoning can pollute or truncate constrained JSON output.
+            # NVIDIA recommends disabling thinking for response_format requests.
+            body["response_format"] = {"type": "json_object"}
+            raw_template_kwargs = body.get("chat_template_kwargs")
+            template_kwargs = (
+                dict(raw_template_kwargs)
+                if isinstance(raw_template_kwargs, dict)
+                else {}
+            )
+            template_kwargs["enable_thinking"] = False
+            body["chat_template_kwargs"] = template_kwargs
         return body
 
     async def _raise_for_error(self, response: httpx.Response) -> None:
