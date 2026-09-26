@@ -690,7 +690,8 @@ def test_existing_worker_job_create_uses_generic_browser_origin_provisioning() -
     assert "for origin in requested" in authority
     assert "current = covered.get(origin)" in authority
     assert "requested_set = set(requested)" in authority
-    assert "resource_origins.issubset(requested_set)" in authority
+    assert "browser_integration_autonomy_suitable" in authority
+    assert "resource_origins.issubset(required)" in authority
 
 
 def test_ai_runtime_exposes_only_autonomy_suitable_browser_resources() -> None:
