@@ -288,7 +288,7 @@ async def test_nvidia_missing_role_credential_fails_closed() -> None:
 
 
 @pytest.mark.asyncio
-async def test_nvidia_structured_json_disables_nemotron_thinking() -> None:
+async def test_nvidia_structured_json_uses_hosted_compatible_mode() -> None:
     seen: dict[str, object] = {}
 
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -318,7 +318,7 @@ async def test_nvidia_structured_json_disables_nemotron_thinking() -> None:
         ),
     )
 
-    assert seen["response_format"] == {"type": "json_object"}
+    assert "response_format" not in seen
     assert seen["chat_template_kwargs"] == {
         "enable_thinking": False,
         "force_nonempty_content": True,
