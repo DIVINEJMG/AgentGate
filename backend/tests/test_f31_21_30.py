@@ -593,6 +593,14 @@ def test_managed_runtime_planner_has_memory_and_stop_after_next_run_support() ->
     assert "job_status_v1" in source
 
 
+def test_managed_browser_origins_default_to_lean_visual_loading() -> None:
+    from app.application.services import browser_origin_authority
+
+    source = inspect.getsource(browser_origin_authority)
+    assert '"loadVisualResources": "false"' in source
+    assert 'current_config.get("managedBy") == "worker_autonomy"' in source
+
+
 def test_worker_autonomy_uses_existing_authority_and_governance_services() -> None:
     from app.application.services.worker_autonomy import WorkerAutonomyService
 
