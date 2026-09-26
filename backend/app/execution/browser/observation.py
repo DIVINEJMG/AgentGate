@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
@@ -59,15 +60,29 @@ async def observe_page(
     session_id: UUID,
     sensitive_values: tuple[str, ...] = (),
 ) -> BrowserObservation:
-    title = redact_text(await page.title(), sensitive_values)
+    try:
+        raw_title = await asyncio.wait_for(page.title(), timeout=3.0)
+    except (TimeoutError, PlaywrightError):
+        raw_title = ""
+    title = redact_text(raw_title, sensitive_values)
+
+    try:
+        raw_visible_text = await asyncio.wait_for(
+            page.locator("body").inner_text(timeout=4_000),
+            timeout=5.0,
+        )
+    except (TimeoutError, PlaywrightError):
+        raw_visible_text = ""
     visible_text = redact_text(
-        (await page.locator("body").inner_text(timeout=5_000))[:MAX_VISIBLE_TEXT],
+        raw_visible_text[:MAX_VISIBLE_TEXT],
         sensitive_values,
     )
 
-    raw_elements = await page.locator(
-        "a,button,input,textarea,select,[role],[contenteditable='true']"
-    ).evaluate_all(
+    try:
+        raw_elements = await asyncio.wait_for(
+            page.locator(
+                "a,button,input,textarea,select,[role],[contenteditable='true']"
+            ).evaluate_all(
         """(nodes) => nodes.slice(0, 300).map((el, index) => {
           const style = window.getComputedStyle(el);
           const rect = el.getBoundingClientRect();
@@ -107,7 +122,11 @@ async def observe_page(
             href: el.href || null
           };
         }).filter(Boolean)"""
-    )
+            ),
+            timeout=5.0,
+        )
+    except (TimeoutError, PlaywrightError):
+        raw_elements = []
 
     discovered_sensitive_values: list[str] = []
     elements: list[BrowserElement] = []
@@ -174,8 +193,13 @@ async def observe_page(
 
     body = page.locator("body")
     try:
-        aria_snapshot = (await body.aria_snapshot(timeout=5_000))[:MAX_ARIA_SNAPSHOT]
-    except PlaywrightError:
+        aria_snapshot = (
+            await asyncio.wait_for(
+                body.aria_snapshot(timeout=4_000),
+                timeout=5.0,
+            )
+        )[:MAX_ARIA_SNAPSHOT]
+    except (TimeoutError, PlaywrightError):
         aria_snapshot = ""
     all_sensitive_values = tuple(
         dict.fromkeys((*sensitive_values, *tuple(discovered_sensitive_values)))
@@ -184,7 +208,9 @@ async def observe_page(
     title = redact_text(title, all_sensitive_values)
     visible_text = redact_text(visible_text, all_sensitive_values)
 
-    dom_snapshot = await page.locator("body").evaluate(
+    try:
+        dom_snapshot = await asyncio.wait_for(
+            page.locator("body").evaluate(
         """(body) => {
           const clone = body.cloneNode(true);
           clone.querySelectorAll('script,style,noscript,template').forEach(node => node.remove());
@@ -210,11 +236,17 @@ async def observe_page(
           });
           return clone.innerHTML;
         }"""
-    )
+            ),
+            timeout=5.0,
+        )
+    except (TimeoutError, PlaywrightError):
+        dom_snapshot = ""
 
     dom_snapshot = redact_text(str(dom_snapshot), all_sensitive_values)
 
-    raw_forms = await page.locator("form").evaluate_all(
+    try:
+        raw_forms = await asyncio.wait_for(
+            page.locator("form").evaluate_all(
         """(forms) => {
           const interactive = Array.from(
             document.querySelectorAll("a,button,input,textarea,select,[role],[contenteditable='true']")
@@ -239,7 +271,12 @@ async def observe_page(
             };
           });
         }"""
-    )
+            ),
+            timeout=5.0,
+        )
+    except (TimeoutError, PlaywrightError):
+        raw_forms = []
+
     form_details = tuple(
         BrowserForm(
             ref=str(item.get("ref") or ""),
@@ -266,7 +303,7 @@ async def observe_page(
         for frame in page.frames
     )
     forms = tuple(
-        f"form:{index + 1}" for index in range(min(await page.locator("form").count(), 100))
+        f"form:{index + 1}" for index in range(min(len(raw_forms), 100))
     )
     links = tuple(item.ref for item in elements if item.role == "link")
     buttons = tuple(item.ref for item in elements if item.role == "button")
