@@ -366,6 +366,8 @@ class ConversationService:
             return "authentication_expiry"
         if error.category == "configuration_missing":
             return "internal_platform_failure"
+        if error.category == "invalid_provider_response":
+            return "provider_response_invalid"
         return "provider_model_outage"
 
     def _provider_message(self, error: AIProviderError) -> str:
@@ -382,6 +384,11 @@ class ConversationService:
             return (
                 "Aduoryn's AI command interpreter is temporarily unavailable. "
                 "No worker or external state was changed."
+            )
+        if error.category == "invalid_provider_response":
+            return (
+                "Aduoryn received an AI response that did not satisfy the required "
+                "structured contract. No worker or external state was changed."
             )
         return "I could not safely interpret that request. No worker or external state was changed."
 
