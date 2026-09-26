@@ -83,7 +83,7 @@ async def observe_page(
             page.locator(
                 "a,button,input,textarea,select,[role],[contenteditable='true']"
             ).evaluate_all(
-        """(nodes) => nodes.slice(0, 300).map((el, index) => {
+                """(nodes) => nodes.slice(0, 300).map((el, index) => {
           const style = window.getComputedStyle(el);
           const rect = el.getBoundingClientRect();
           const visible = style.visibility !== 'hidden' && style.display !== 'none'
@@ -211,7 +211,7 @@ async def observe_page(
     try:
         dom_snapshot = await asyncio.wait_for(
             page.locator("body").evaluate(
-        """(body) => {
+                """(body) => {
           const clone = body.cloneNode(true);
           clone.querySelectorAll('script,style,noscript,template').forEach(node => node.remove());
           clone.querySelectorAll('input,textarea').forEach(node => {
@@ -247,7 +247,7 @@ async def observe_page(
     try:
         raw_forms = await asyncio.wait_for(
             page.locator("form").evaluate_all(
-        """(forms) => {
+                """(forms) => {
           const interactive = Array.from(
             document.querySelectorAll("a,button,input,textarea,select,[role],[contenteditable='true']")
           );
@@ -302,9 +302,7 @@ async def observe_page(
         )
         for frame in page.frames
     )
-    forms = tuple(
-        f"form:{index + 1}" for index in range(min(len(raw_forms), 100))
-    )
+    forms = tuple(f"form:{index + 1}" for index in range(min(len(raw_forms), 100)))
     links = tuple(item.ref for item in elements if item.role == "link")
     buttons = tuple(item.ref for item in elements if item.role == "button")
     inputs = tuple(
