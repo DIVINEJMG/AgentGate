@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 FailureCategory = Literal[
     "task_failure",
     "provider_model_outage",
+    "provider_response_invalid",
     "missing_integration",
     "approval_wait",
     "policy_denial",
