@@ -155,10 +155,17 @@ def test_conversation_failure_semantics_distinguish_provider_and_auth() -> None:
         "not configured",
         retryable=False,
     )
+    invalid = AIProviderError(
+        "invalid_provider_response",
+        "schema mismatch",
+        retryable=False,
+    )
 
     assert service._provider_failure_category(provider) == "provider_model_outage"
     assert service._provider_failure_category(auth) == "authentication_expiry"
     assert service._provider_failure_category(config) == "internal_platform_failure"
+    assert service._provider_failure_category(invalid) == "provider_response_invalid"
+    assert "structured contract" in service._provider_message(invalid)
     assert "No worker or external state was changed" in service._provider_message(provider)
 
 
