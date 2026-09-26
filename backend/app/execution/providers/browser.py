@@ -955,6 +955,10 @@ class PlaywrightBrowserProvider:
     async def close_session(self, session: BrowserSession) -> BrowserSession:
         return await self._runtime.close(session.id)
 
+    async def close_session_id(self, session_id: UUID) -> BrowserSession:
+        """Close a canonical governed session when its owning run is finished."""
+        return await self._runtime.close(session_id)
+
     async def warmup(self) -> bool:
         """Provision and launch Chromium before runtime traffic arrives."""
         return await self._runtime.health()
