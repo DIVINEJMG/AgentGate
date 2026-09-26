@@ -57,10 +57,7 @@ class RecoveryPolicy:
                 ),
             )
 
-        if (
-            error.code == "navigation_timeout"
-            and request.resource.provider == "browser"
-        ):
+        if error.code == "navigation_timeout" and request.resource.provider == "browser":
             return RecoveryPlan(
                 action="escalate",
                 reason=(
