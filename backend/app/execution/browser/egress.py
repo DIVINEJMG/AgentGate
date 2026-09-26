@@ -61,11 +61,20 @@ async def evaluate_browser_egress(
         )
 
     try:
-        records = await asyncio.to_thread(
-            socket.getaddrinfo,
+        records = await asyncio.wait_for(
+            asyncio.to_thread(
+                socket.getaddrinfo,
+                host,
+                parts.port or (443 if parts.scheme == "https" else 80),
+                type=socket.SOCK_STREAM,
+            ),
+            timeout=5.0,
+        )
+    except TimeoutError:
+        return BrowserEgressDecision(
+            False,
             host,
-            parts.port or (443 if parts.scheme == "https" else 80),
-            type=socket.SOCK_STREAM,
+            "Browser DNS safety preflight timed out.",
         )
     except socket.gaierror:
         # DNS failure is handled by the browser as a normal navigation/provider error.
