@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Literal
 from uuid import UUID
 
@@ -17,6 +18,7 @@ from app.infrastructure.database.session import session_factory
 from app.infrastructure.qstash.verifier import QStashSignatureVerifier
 
 router = APIRouter(prefix="/internal/v1/ai", tags=["internal-ai"])
+logger = logging.getLogger(__name__)
 
 # 1x1 transparent PNG used only for the protected vision connectivity probe.
 _PROBE_PNG = (
@@ -27,6 +29,7 @@ _PROBE_PNG = (
 
 class AIProbePayload(BaseModel):
     role: Literal["planner", "vision"] = "planner"
+    mode: Literal["text", "structured"] = "text"
     organization_id: UUID | None = None
 
 
@@ -83,6 +86,27 @@ async def provider_probe(
                     context=context,
                     max_output_tokens=24,
                 )
+            elif payload.mode == "structured":
+                structured = await gateway.generate_structured(
+                    role="planner",
+                    system=(
+                        "This is a bounded provider connectivity test. "
+                        "Return only the requested JSON object."
+                    ),
+                    prompt='Return {"status":"ok"} exactly.',
+                    schema_name="provider_structured_probe_v1",
+                    schema={
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "status": {"type": "string", "const": "ok"}
+                        },
+                        "required": ["status"],
+                    },
+                    context=context,
+                    max_output_tokens=64,
+                )
+                response = None
             else:
                 response = await gateway.generate_text(
                     role="planner",
@@ -92,6 +116,14 @@ async def provider_probe(
                     max_output_tokens=16,
                 )
         except AIProviderError as exc:
+            logger.warning(
+                "AI provider probe failed role=%s mode=%s category=%s retryable=%s status_code=%s",
+                payload.role,
+                payload.mode,
+                exc.category,
+                exc.retryable,
+                exc.status_code,
+            )
             await session.commit()
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -103,9 +135,18 @@ async def provider_probe(
             ) from exc
         await session.commit()
 
+    if payload.mode == "structured":
+        return {
+            "status": "ok",
+            "role": payload.role,
+            "mode": payload.mode,
+            "structuredOutputValid": structured.get("status") == "ok",
+        }
+    assert response is not None
     return {
         "status": "ok",
         "role": payload.role,
+        "mode": payload.mode,
         "provider": response.provider,
         "model": response.model,
         "outputReceived": bool(response.text.strip()),
