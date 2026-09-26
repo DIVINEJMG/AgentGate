@@ -450,7 +450,14 @@ class BrowserRuntime:
             await route.abort("blockedbyclient")
             return
 
-        response = await route.fetch(max_redirects=0)
+        try:
+            response = await route.fetch(
+                max_redirects=0,
+                timeout=20_000,
+            )
+        except PlaywrightError:
+            await route.abort("timedout")
+            return
         if 300 <= response.status < 400:
             location = response.headers.get("location")
             if location:
