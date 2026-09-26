@@ -8,11 +8,13 @@ from uuid import UUID
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from pydantic import BaseModel
 
+from app.application.services.worker_draft import WorkerDraftGenerator
 from app.domain.ai.providers import (
     AIInvocationContext,
     AIMediaInput,
     AIProviderError,
 )
+from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
 from app.infrastructure.ai.provider import ai_gateway_from_settings
 from app.infrastructure.database.session import session_factory
 from app.infrastructure.qstash.verifier import QStashSignatureVerifier
@@ -29,7 +31,7 @@ _PROBE_PNG = (
 
 class AIProbePayload(BaseModel):
     role: Literal["planner", "vision"] = "planner"
-    mode: Literal["text", "structured"] = "text"
+    mode: Literal["text", "structured", "worker_draft", "planner_decision"] = "text"
     organization_id: UUID | None = None
 
 
@@ -72,6 +74,7 @@ async def provider_probe(
         correlation_id="internal-ai-provider-probe",
     )
     structured: dict[str, object] | None = None
+    probe_result: dict[str, object] | None = None
     async with session_factory() as session:
         gateway = ai_gateway_from_settings(session=session)
         try:
@@ -108,6 +111,79 @@ async def provider_probe(
                     max_output_tokens=64,
                 )
                 response = None
+            elif payload.mode == "worker_draft":
+                draft = await WorkerDraftGenerator(gateway).generate(
+                    instruction=(
+                        "Create a worker named Scout. Scout's job is to visit "
+                        "https://www.nvidia.com/en-us/ and identify the main headline "
+                        "or featured announcement on the page. Summarize what it finds "
+                        "in 3 short bullet points and save the result for me. Run this "
+                        "job every day at 9:00 AM in Africa/Lagos time. This worker is "
+                        "read-only: it must not log in, submit forms, make purchases, "
+                        "send messages, or change anything without asking me first."
+                    ),
+                    authoritative_context={
+                        "workers": [],
+                        "supportedProviders": ["browser"],
+                        "supportedCapabilityNeeds": [
+                            "open a public webpage",
+                            "read page content",
+                            "scroll a page",
+                        ],
+                    },
+                    invocation_context=context,
+                )
+                probe_result = {
+                    "draftValid": True,
+                    "suggestedName": draft.suggested_name,
+                    "jobCount": len(draft.initial_jobs),
+                    "scheduleKind": draft.initial_jobs[0].schedule.kind,
+                }
+                response = None
+            elif payload.mode == "planner_decision":
+                decision = await AdaptiveRuntimePlanner(gateway).choose_next(
+                    job={
+                        "name": "NVIDIA Daily Headline Monitor",
+                        "objective": (
+                            "Visit NVIDIA homepage, identify the main headline or "
+                            "featured announcement, summarize it in three bullets."
+                        ),
+                        "completionCriteria": [
+                            "Main headline identified",
+                            "Three bullet summary produced",
+                        ],
+                    },
+                    worker={
+                        "name": "Scout",
+                        "charter": "Read-only web research worker.",
+                    },
+                    trigger={"type": "manual"},
+                    tools=[
+                        {
+                            "resourceId": "browser-probe",
+                            "scope": "browser.navigation.open",
+                            "provider": "browser",
+                            "operation": "open",
+                            "defaultStartUrl": "https://www.nvidia.com/en-us/",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {"url": {"type": "string"}},
+                                "required": ["url"],
+                            },
+                        }
+                    ],
+                    observations=[],
+                    action_count=0,
+                    max_actions=4,
+                    invocation_context=context,
+                )
+                probe_result = {
+                    "decisionValid": True,
+                    "decision": decision.decision,
+                    "scope": decision.scope,
+                    "resourceId": decision.resource_id,
+                }
+                response = None
             else:
                 response = await gateway.generate_text(
                     role="planner",
@@ -142,6 +218,13 @@ async def provider_probe(
             "role": payload.role,
             "mode": payload.mode,
             "structuredOutputValid": structured is not None and structured.get("status") == "ok",
+        }
+    if payload.mode in {"worker_draft", "planner_decision"}:
+        return {
+            "status": "ok",
+            "role": payload.role,
+            "mode": payload.mode,
+            **(probe_result or {}),
         }
     assert response is not None
     return {
