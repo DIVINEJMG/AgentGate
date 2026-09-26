@@ -9,14 +9,19 @@ from fastapi import APIRouter, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from app.api.jobs_routes import queue_due_schedules
+from app.api.jobs_routes import current_revision, queue_due_schedules, queue_job
+from app.application.services.browser_origin_authority import (
+    reconcile_ai_job_browser_origins,
+)
 from app.application.services.cutover import CutoverController
 from app.bootstrap.settings import settings
 from app.domain.ai.providers import AIProviderError
+from app.domain.identity.principals import HumanPrincipal
 from app.domain.jobs.dispatch import ScheduledDispatch
 from app.infrastructure.database.dispatch import WorkItemDispatchRepository
 from app.infrastructure.database.models import (
     Approval,
+    Job,
     QueueDeliveryFailure,
     Run,
     RunStep,
@@ -91,6 +96,11 @@ class ExecutePayload(BaseModel):
     expected_step: int = Field(default=0, ge=0)
     reason: str = Field(default="qstash", max_length=80)
 
+
+class BrowserOriginReconcilePayload(BaseModel):
+    organization_id: UUID
+    job_id: UUID
+    run_after_reconcile: bool = False
 
 
 class DispatchPayload(BaseModel):
@@ -270,6 +280,81 @@ async def storage_smoke(
         }
     finally:
         await storage.delete(key=key)
+
+
+@router.post("/reconcile-browser-origin")
+async def reconcile_browser_origin(
+    request: Request,
+    upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
+) -> dict[str, object]:
+    raw = await request.body()
+    _verify_qstash(request, raw, upstash_signature)
+    try:
+        message = BrowserOriginReconcilePayload.model_validate(json.loads(raw))
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid Browser-origin reconciliation payload.",
+        ) from exc
+
+    async with session_factory() as session:
+        job = await session.scalar(
+            select(Job).where(
+                Job.organization_id == message.organization_id,
+                Job.id == message.job_id,
+            )
+        )
+        if job is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Job not found.",
+            )
+        revision = await current_revision(session, job)
+        principal = HumanPrincipal(
+            user_id=revision.created_by,
+            organization_id=message.organization_id,
+            membership_id=UUID(int=0),
+            role="system",
+            permissions=frozenset(
+                {
+                    "integrations.manage",
+                    "jobs.manage",
+                    "jobs.run",
+                }
+            ),
+        )
+        try:
+            job, origins, created = await reconcile_ai_job_browser_origins(
+                session,
+                organization_id=message.organization_id,
+                job_id=message.job_id,
+                principal=principal,
+            )
+        except (LookupError, PermissionError, ValueError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(exc),
+            ) from exc
+
+        work_item_id: str | None = None
+        if message.run_after_reconcile:
+            item = await queue_job(
+                session,
+                message.organization_id,
+                job,
+                principal,
+            )
+            work_item_id = str(item.id)
+
+        current = await current_revision(session, job)
+        return {
+            "status": "ok",
+            "jobId": str(job.id),
+            "jobRevision": current.revision,
+            "authorizedOrigins": list(origins),
+            "managedResourcesCreated": created,
+            "workItemId": work_item_id,
+        }
 
 
 @router.post("/dispatch")

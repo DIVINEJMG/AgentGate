@@ -7,6 +7,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.services.browser_origin_authority import (
+    browser_integration_origins,
+    browser_origins_covered,
+)
 from app.domain.ai.providers import AIGateway, AIInvocationContext
 from app.domain.workforce.drafts import CapabilityNeed
 from app.execution.bootstrap import execution_provider_registry
@@ -51,6 +55,7 @@ class SemanticCapabilityResolver:
         organization_id: UUID,
         needs: list[CapabilityNeed],
         invocation_context: AIInvocationContext,
+        required_browser_origins: tuple[str, ...] = (),
     ) -> CapabilityResolution:
         integrations = list(
             (
@@ -80,6 +85,21 @@ class SemanticCapabilityResolver:
                 ) from exc
 
             connected = by_provider.get(provider_id, [])
+            browser_origin_gap = False
+            if provider_id == "browser" and required_browser_origins:
+                browser_origin_gap = not browser_origins_covered(
+                    connected,
+                    required_browser_origins,
+                )
+                required_origin_set = set(required_browser_origins)
+                connected = [
+                    integration
+                    for integration in connected
+                    if (
+                        (resource_origins := set(browser_integration_origins(integration)))
+                        and resource_origins.issubset(required_origin_set)
+                    )
+                ]
             if not connected:
                 missing.add(provider_id)
                 semantic.append(
@@ -122,7 +142,7 @@ class SemanticCapabilityResolver:
                         "description": capability.description,
                         "target": capability.target,
                     }
-            if not available:
+            if not available or browser_origin_gap:
                 missing.add(provider_id)
             semantic.append(
                 {
@@ -130,7 +150,30 @@ class SemanticCapabilityResolver:
                     "need": need.need,
                     "actions": need.actions,
                     "candidateScopes": sorted(available),
-                    "state": "connected" if available else "missing_usable_capability",
+                    "requiredOrigins": (
+                        list(required_browser_origins)
+                        if provider_id == "browser"
+                        else []
+                    ),
+                    "matchedOrigins": (
+                        sorted(
+                            {
+                                origin
+                                for integration in connected
+                                for origin in browser_integration_origins(integration)
+                                if origin in set(required_browser_origins)
+                            }
+                        )
+                        if provider_id == "browser"
+                        else []
+                    ),
+                    "state": (
+                        "missing_authorized_origin"
+                        if browser_origin_gap
+                        else "connected"
+                        if available
+                        else "missing_usable_capability"
+                    ),
                 }
             )
 

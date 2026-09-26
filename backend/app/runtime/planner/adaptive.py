@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 
 from app.domain.ai.providers import AIGateway, AIInvocationContext
+from app.execution.browser.policy import normalize_origin
 
 
 @dataclass(frozen=True, slots=True)
@@ -248,6 +249,21 @@ class AdaptiveRuntimePlanner:
             raise RuntimeError(
                 "Browser session is not open yet; choose browser.navigation.open first."
             )
+
+        if scope == "browser.navigation.open":
+            raw_allowed = tool.get("allowedOrigins")
+            allowed_origins = {
+                origin
+                for value in raw_allowed
+                if (origin := normalize_origin(str(value))) is not None
+            } if isinstance(raw_allowed, list) else set()
+            raw_url = action_input.get("url") or tool.get("defaultStartUrl")
+            target_origin = normalize_origin(str(raw_url or ""))
+            if allowed_origins and target_origin not in allowed_origins:
+                raise RuntimeError(
+                    "Planner selected a Browser resource that is not authorized "
+                    "for the requested destination origin."
+                )
 
         input_schema = tool.get("inputSchema")
         schema = input_schema if isinstance(input_schema, dict) else {}

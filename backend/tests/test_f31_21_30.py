@@ -17,6 +17,10 @@ from app.application.services.attachment_ingestion import (
     AttachmentIngestionService,
     decode_base64_content,
 )
+from app.application.services.browser_origin_authority import (
+    browser_integration_origins,
+    explicit_http_origins,
+)
 from app.application.services.capability_autoresolver import SemanticCapabilityResolver
 from app.application.services.schedule_inference import compile_schedule
 from app.application.services.worker_draft import WorkerDraftGenerator
@@ -38,6 +42,7 @@ from app.infrastructure.database.models import (
     Memory,
 )
 from app.runtime.managed import ManagedRuntimeExecutor
+from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
 
 
 @dataclass
@@ -283,6 +288,153 @@ async def test_capability_resolver_turns_missing_provider_into_connection_requir
     assert gateway.schemas == []
 
 
+
+
+def test_explicit_browser_origins_are_exact_and_normalized() -> None:
+    assert explicit_http_origins(
+        "Visit https://www.nvidia.com/en-us/ and then report back."
+    ) == ("https://www.nvidia.com",)
+    assert explicit_http_origins(
+        "Use https://Example.COM/path, not a guessed destination."
+    ) == ("https://example.com",)
+
+
+def test_browser_integration_origin_is_read_from_governed_resource_metadata() -> None:
+    integration = Integration(
+        id=uuid4(),
+        organization_id=uuid4(),
+        provider="browser",
+        display_name="Bestworth",
+        status="connected",
+        config={
+            "startUrl": "https://bestworthproductsltd.ng/",
+            "allowedOrigins": "https://bestworthproductsltd.ng/login",
+            "metadata": {
+                "allowedOrigins": ["https://bestworthproductsltd.ng"],
+            },
+        },
+    )
+    assert browser_integration_origins(integration) == (
+        "https://bestworthproductsltd.ng",
+    )
+
+
+@pytest.mark.asyncio
+async def test_browser_capability_resolver_rejects_unrelated_connected_origin() -> None:
+    integration = Integration(
+        id=uuid4(),
+        organization_id=uuid4(),
+        provider="browser",
+        display_name="Bestworth",
+        status="connected",
+        config={
+            "availableCapabilities": [
+                "browser.navigation.open",
+                "browser.page.read",
+            ],
+            "metadata": {
+                "allowedOrigins": ["https://bestworthproductsltd.ng"],
+            },
+        },
+    )
+    gateway = StructuredGateway([])
+    resolver = SemanticCapabilityResolver(
+        cast(AsyncSession, CapabilitySession(integration, None)),
+        gateway,
+    )
+
+    result = await resolver.resolve(
+        organization_id=integration.organization_id,
+        needs=[
+            CapabilityNeed(
+                provider="browser",
+                need="Read NVIDIA homepage",
+                actions=["open", "read"],
+            )
+        ],
+        required_browser_origins=("https://www.nvidia.com",),
+        invocation_context=AIInvocationContext(),
+    )
+
+    assert result.scopes == ()
+    assert result.missing_integrations == ("browser",)
+    assert gateway.schemas == []
+
+
+@pytest.mark.asyncio
+async def test_browser_capability_resolver_accepts_matching_origin() -> None:
+    integration = Integration(
+        id=uuid4(),
+        organization_id=uuid4(),
+        provider="browser",
+        display_name="NVIDIA",
+        status="connected",
+        config={
+            "availableCapabilities": [
+                "browser.navigation.open",
+                "browser.page.read",
+            ],
+            "metadata": {
+                "allowedOrigins": ["https://www.nvidia.com"],
+            },
+        },
+    )
+    gateway = StructuredGateway(
+        [{"selectedScopes": ["browser.navigation.open", "browser.page.read"]}]
+    )
+    resolver = SemanticCapabilityResolver(
+        cast(AsyncSession, CapabilitySession(integration, None)),
+        gateway,
+    )
+
+    result = await resolver.resolve(
+        organization_id=integration.organization_id,
+        needs=[
+            CapabilityNeed(
+                provider="browser",
+                need="Read NVIDIA homepage",
+                actions=["open", "read"],
+            )
+        ],
+        required_browser_origins=("https://www.nvidia.com",),
+        invocation_context=AIInvocationContext(),
+    )
+
+    assert result.scopes == (
+        "browser.navigation.open",
+        "browser.page.read",
+    )
+    assert result.missing_integrations == ()
+
+
+def test_planner_rejects_browser_resource_destination_mismatch_before_execution() -> None:
+    planner = AdaptiveRuntimePlanner(cast(Any, object()))
+    with pytest.raises(RuntimeError, match="not authorized"):
+        planner._validate(
+            {
+                "decision": "act",
+                "summary": "Open NVIDIA",
+                "title": "Open NVIDIA",
+                "instruction": "Navigate to NVIDIA.",
+                "resourceId": "bestworth-browser",
+                "scope": "browser.navigation.open",
+                "input": {"url": "https://www.nvidia.com/en-us/"},
+            },
+            tools=[
+                {
+                    "resourceId": "bestworth-browser",
+                    "scope": "browser.navigation.open",
+                    "allowedOrigins": ["https://bestworthproductsltd.ng"],
+                    "inputSchema": {
+                        "type": "object",
+                        "required": ["url"],
+                    },
+                }
+            ],
+            observations=[],
+            latest_browser=None,
+        )
+
 def test_schedule_inference_normalizes_daily_weekly_once_and_stop_after() -> None:
     daily = compile_schedule(
         ScheduleDraft(
@@ -454,6 +606,8 @@ def test_worker_autonomy_uses_existing_authority_and_governance_services() -> No
     assert "update_worker" in source
     assert "update_job" in source
     assert "automatic_agent" in source
+    assert "ensure_managed_browser_origins" in source
+    assert "authorizedBrowserOrigins" in source
 
 
 def test_golden_qq_scenario_contract_is_represented_without_scope_invention() -> None:
