@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.jobs_routes import _trigger_failure_reason
 from app.application.services.conversation_commands import CrossTenantReferenceError
 from app.application.services.conversations import ConversationService
 from app.application.services.intent_interpreter import IntentInterpreter
@@ -155,10 +156,17 @@ def test_conversation_failure_semantics_distinguish_provider_and_auth() -> None:
         "not configured",
         retryable=False,
     )
+    invalid = AIProviderError(
+        "invalid_provider_response",
+        "schema mismatch",
+        retryable=False,
+    )
 
     assert service._provider_failure_category(provider) == "provider_model_outage"
     assert service._provider_failure_category(auth) == "authentication_expiry"
     assert service._provider_failure_category(config) == "internal_platform_failure"
+    assert service._provider_failure_category(invalid) == "provider_response_invalid"
+    assert "structured contract" in service._provider_message(invalid)
     assert "No worker or external state was changed" in service._provider_message(provider)
 
 
@@ -201,6 +209,20 @@ def test_runtime_provider_outage_waits_instead_of_failing_task() -> None:
     assert '"aiRetryCount"' in source
     assert '"kind": "ai_provider"' in source
     assert "no external action was taken" in source
+
+
+
+def test_trigger_failure_objects_are_normalized_for_frontend_rendering() -> None:
+    assert _trigger_failure_reason(
+        {
+            "kind": "ai_provider",
+            "category": "invalid_provider_response",
+            "retryable": False,
+        }
+    ) == "ai provider · invalid provider response · not retryable"
+    scheduler = (ROOT / "frontend/src/lib/schedulerApi.ts").read_text(encoding="utf-8")
+    assert "displayReason" in scheduler
+    assert "reason:displayReason(raw.reason)" in scheduler
 
 
 def test_external_context_is_explicitly_marked_untrusted() -> None:

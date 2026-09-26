@@ -1340,6 +1340,23 @@ async def save_trigger_v2(
     return {"data": {"config": trigger_config_v2(config)}}
 
 
+def _trigger_failure_reason(value: object) -> str | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        kind = str(value.get("kind") or "").replace("_", " ").strip()
+        category = str(value.get("category") or "").replace("_", " ").strip()
+        retryable = value.get("retryable")
+        parts = [part for part in (kind, category) if part]
+        if isinstance(retryable, bool):
+            parts.append("retryable" if retryable else "not retryable")
+        if parts:
+            return " · ".join(parts)
+    return str(value)
+
+
 async def trigger_workspace(
     session: AsyncSession, organization_id: UUID
 ) -> dict[str, Any]:
@@ -1394,7 +1411,7 @@ async def trigger_workspace(
                 "scheduledFor": trigger.get("scheduledFor"),
                 "workItemId": str(item.id),
                 "correlationId": item.correlation_id,
-                "reason": payload.get("lastError"),
+                "reason": _trigger_failure_reason(payload.get("lastError")),
                 "actorType": trigger.get("requestedByType", "human"),
                 "actorId": trigger.get("requestedBy", "system"),
                 "occurredAt": item.created_at.isoformat(),

@@ -113,6 +113,8 @@ async def test_structured_gateway_repairs_invalid_schema_once() -> None:
 
     assert result == {"decision": "act", "scope": "browser.navigation.open"}
     assert len(provider.calls) == 2
+    assert "AUTHORITATIVE_JSON_SCHEMA" in provider.calls[0][1].prompt
+    assert '"required":["decision","scope"]' in provider.calls[0][1].prompt
     assert "PREVIOUS RESPONSE WAS INVALID" in provider.calls[1][1].prompt
 
 

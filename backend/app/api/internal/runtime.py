@@ -429,6 +429,13 @@ async def execute(
                     state = "waiting_ai"
                     retry_scheduled = True
                     summary = "AI planner is temporarily unavailable; retry is scheduled."
+                elif exc.category == "invalid_provider_response":
+                    state = "waiting_ai"
+                    item.status = state
+                    summary = (
+                        "AI planner returned a response that did not satisfy the "
+                        "required structured contract; no external action was taken."
+                    )
                 else:
                     state = "waiting_ai"
                     item.status = state
@@ -441,6 +448,8 @@ async def execute(
                     if exc.category == "authentication_failed"
                     else "internal_platform_failure"
                     if exc.category in {"configuration_missing", "model_not_found"}
+                    else "provider_response_invalid"
+                    if exc.category == "invalid_provider_response"
                     else "provider_model_outage"
                 )
                 runtime_meta["lastAIErrorAt"] = now.isoformat()

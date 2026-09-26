@@ -259,13 +259,27 @@ class ProviderAIGateway(AIGateway):
                 retryable=False,
             )
 
+        schema_json = json.dumps(
+            schema,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        base_prompt = (
+            prompt
+            + "\n\nAUTHORITATIVE_JSON_SCHEMA\n"
+            + schema_json
+            + "\n\nReturn exactly one JSON object that validates against "
+            + schema_name
+            + ". Include every required property. Do not add properties that "
+            + "the schema forbids. Do not wrap the JSON in markdown."
+        )
         feedback = ""
         for repair_attempt in range(2):
-            current_prompt = prompt
+            current_prompt = base_prompt
             if feedback:
                 current_prompt += (
                     "\n\nYOUR PREVIOUS RESPONSE WAS INVALID. "
-                    "Return one JSON object matching the schema exactly.\n"
+                    "Return one corrected JSON object matching the schema exactly.\n"
                     + feedback
                 )
             invocation_context = context or AIInvocationContext()
