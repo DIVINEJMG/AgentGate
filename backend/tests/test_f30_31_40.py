@@ -90,10 +90,12 @@ class IsolationContext:
 class IsolationBrowser:
     def __init__(self) -> None:
         self.contexts: list[IsolationContext] = []
+        self.context_options: list[dict[str, object]] = []
 
-    async def new_context(self):
+    async def new_context(self, **kwargs):
         context = IsolationContext()
         self.contexts.append(context)
+        self.context_options.append(dict(kwargs))
         return cast(BrowserContext, context)
 
 
@@ -840,6 +842,10 @@ async def test_f30_39_cookie_and_localstorage_are_isolated_per_browser_context()
 
     assert second_context.cookie_jar.get("session") is None
     assert second_context.local_storage.get("token") is None
+    assert browser.context_options == [
+        {"service_workers": "block"},
+        {"service_workers": "block"},
+    ]
 
 
 @pytest.mark.asyncio
@@ -911,7 +917,11 @@ def test_browser_execution_has_bounded_network_and_observation_phases() -> None:
     assert "timeout=5.0" in egress
     assert "asyncio.wait_for" in observation
     assert "range(min(len(raw_forms), 100))" in observation
-    assert "asyncio.timeout(90)" in provider
+    assert "asyncio.timeout(70)" in provider
+    assert "--renderer-process-limit=1" in runtime
+    assert "--disable-gpu" in runtime
+    assert 'service_workers="block"' in runtime
+    assert 'request.resource_type in {"image", "media", "font"}' in runtime
 
 
 def test_f30_40_vercel_auto_deployment_remains_disabled() -> None:
