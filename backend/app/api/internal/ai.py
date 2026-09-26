@@ -71,6 +71,7 @@ async def provider_probe(
         organization_id=payload.organization_id,
         correlation_id="internal-ai-provider-probe",
     )
+    structured: dict[str, object] | None = None
     async with session_factory() as session:
         gateway = ai_gateway_from_settings(session=session)
         try:
@@ -140,7 +141,7 @@ async def provider_probe(
             "status": "ok",
             "role": payload.role,
             "mode": payload.mode,
-            "structuredOutputValid": structured.get("status") == "ok",
+            "structuredOutputValid": structured is not None and structured.get("status") == "ok",
         }
     assert response is not None
     return {
