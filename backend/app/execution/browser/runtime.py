@@ -284,7 +284,17 @@ class BrowserRuntime:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                _, stderr = await process.communicate()
+                try:
+                    _, stderr = await asyncio.wait_for(
+                        process.communicate(),
+                        timeout=240,
+                    )
+                except TimeoutError as timeout_error:
+                    process.kill()
+                    await process.communicate()
+                    raise RuntimeError(
+                        "Timed out while provisioning the Chromium browser runtime."
+                    ) from timeout_error
                 if process.returncode != 0:
                     raise RuntimeError(
                         "Failed to provision the Chromium browser runtime: "
