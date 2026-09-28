@@ -856,12 +856,8 @@ class BrowserRuntime:
         )
         snapshot = self._memory_snapshot()
         pressure = snapshot.cgroup_percent
-        under_soft_pressure = (
-            pressure is not None and pressure >= self._memory_soft_limit_percent
-        )
-        under_hard_pressure = (
-            pressure is not None and pressure >= self._memory_hard_limit_percent
-        )
+        under_soft_pressure = pressure is not None and pressure >= self._memory_soft_limit_percent
+        under_hard_pressure = pressure is not None and pressure >= self._memory_hard_limit_percent
         if under_hard_pressure:
             logger.warning(
                 "Browser memory hard threshold reached percent=%.2f session=%s; "
