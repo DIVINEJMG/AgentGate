@@ -102,6 +102,10 @@ class Settings(BaseSettings):
     browser_memory_hard_limit_percent: int = 90
     browser_http_read_max_bytes: int = 1_000_000
     browser_http_read_timeout_seconds: int = 12
+    browser_cold_start_timeout_seconds: int = 50
+    browser_action_timeout_seconds: int = 60
+    runtime_provider_retry_limit: int = 2
+    runtime_provider_retry_backoff_seconds: int = 5
     conversation_attachment_max_bytes: int = 10 * 1024 * 1024
     conversation_attachment_text_max_chars: int = 100_000
     vision_signed_url_ttl_seconds: int = 300
