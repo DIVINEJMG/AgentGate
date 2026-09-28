@@ -32,7 +32,10 @@ from app.infrastructure.database.models import (
     WorkItem,
 )
 from app.infrastructure.database.session import database_session
-from app.runtime.qstash_trigger import request_runtime_execution
+from app.runtime.qstash_trigger import (
+    get_runtime_dispatch_health,
+    request_runtime_execution,
+)
 
 v1_router = APIRouter(tags=["jobs", "scheduler"])
 v2_router = APIRouter(tags=["jobs", "scheduler"])
@@ -950,6 +953,7 @@ async def jobs_v2(
             "items": [await job_v2(session, job) for job in jobs],
             "summary": v1["summary"],
             "window": v1["window"],
+            "dispatch": v1["dispatch"],
         }
     }
 
@@ -1149,6 +1153,7 @@ async def work_items_v1(
             "failed": sum(x.status == "failed" for x in items),
         },
         "window": {"limit": 500, "truncated": False},
+        "dispatch": await get_runtime_dispatch_health(),
     }
 
 

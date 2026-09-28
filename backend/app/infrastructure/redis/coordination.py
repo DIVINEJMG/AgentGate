@@ -63,6 +63,9 @@ class RedisCoordinator:
         value = await self._client.get(f"cache:{key}")
         return value if isinstance(value, str) else None
 
+    async def cache_delete(self, key: str) -> None:
+        await self._client.delete(f"cache:{key}")
+
     async def publish(self, channel: str, payload: str) -> int:
         return int(await self._client.publish(f"audoryn:{channel}", payload))
 
