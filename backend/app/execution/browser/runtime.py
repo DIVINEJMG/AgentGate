@@ -833,6 +833,7 @@ class BrowserRuntime:
                 await self.terminate(session_id)
             except (LookupError, PlaywrightError) as error:
                 logger.warning("Failed to terminate browser session %s: %s", session_id, error)
+        self._cancel_idle_shutdown()
         await self._shutdown_browser_engine()
         if self._coordinator is not None:
             await self._coordinator.close()
@@ -854,6 +855,20 @@ class BrowserRuntime:
         under_soft_pressure = (
             pressure is not None and pressure >= self._memory_soft_limit_percent
         )
+        under_hard_pressure = (
+            pressure is not None and pressure >= self._memory_hard_limit_percent
+        )
+        if under_hard_pressure:
+            logger.warning(
+                "Browser memory hard threshold reached percent=%.2f session=%s; "
+                "closing inactive pages and suppressing optional snapshots.",
+                pressure,
+                session_id,
+            )
+            for page in tuple(handle.pages.values()):
+                if page is handle.page or page.is_closed():
+                    continue
+                await page.close()
         observation = await observe_page(
             handle.page,
             session_id=session_id,
