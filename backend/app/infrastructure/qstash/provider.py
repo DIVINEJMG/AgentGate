@@ -24,7 +24,7 @@ class QStashRateLimitedError(RuntimeError):
         self.daily_quota_exhausted = daily_quota_exhausted
 
 
-def _raise_for_qstash_status(response: httpx.Response) -> None:
+def raise_for_qstash_status(response: httpx.Response) -> None:
     if response.status_code == 429:
         detail = response.text.strip()
         lowered = detail.lower()
@@ -102,7 +102,7 @@ class UpstashQStashProvider(QueueProvider):
                 ),
                 content=body,
             )
-            _raise_for_qstash_status(response)
+            raise_for_qstash_status(response)
             payload = response.json()
         return QueueMessage(
             id=str(payload["messageId"]),
@@ -132,7 +132,7 @@ class UpstashQStashProvider(QueueProvider):
                 headers=headers,
                 content=body,
             )
-            _raise_for_qstash_status(response)
+            raise_for_qstash_status(response)
             payload = response.json()
         return str(payload["scheduleId"])
 
