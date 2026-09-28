@@ -18,6 +18,7 @@ from app.bootstrap.settings import settings
 from app.domain.ai.providers import AIProviderError
 from app.domain.identity.principals import HumanPrincipal
 from app.domain.jobs.dispatch import ScheduledDispatch
+from app.execution.bootstrap import browser_provider
 from app.infrastructure.database.dispatch import WorkItemDispatchRepository
 from app.infrastructure.database.models import (
     Approval,
@@ -645,6 +646,7 @@ async def sweep(
             detail=str(exc),
         ) from exc
 
+    expired_browser_sessions = await browser_provider.reap_expired_sessions()
     now = datetime.now(UTC)
     async with session_factory() as session:
         scheduled_queued = await queue_due_schedules(
@@ -717,4 +719,5 @@ async def sweep(
         "eligible": len(candidates),
         "queued": queued,
         "scheduledQueued": scheduled_queued,
+        "expiredBrowserSessions": expired_browser_sessions,
     }

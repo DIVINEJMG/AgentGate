@@ -12,6 +12,7 @@ from uuid import UUID
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+from app.bootstrap.settings import settings
 from app.execution.authorization import CredentialReference, ProviderPermissionSnapshot
 from app.execution.browser.artifacts import (
     BrowserArtifactReference,
@@ -28,6 +29,7 @@ from app.execution.browser.credentials import (
     BrowserCredentialBundle,
 )
 from app.execution.browser.errors import (
+    BrowserCapacityUnavailable,
     BrowserDetachedFrame,
     BrowserDownloadFailure,
     BrowserElementNotFound,
@@ -53,6 +55,7 @@ from app.execution.contracts import (
 )
 from app.execution.providers.base import ExecutionProvider
 from app.execution.redaction import redact_sensitive_structure, redact_text
+from app.infrastructure.redis.coordination import RedisCoordinator
 
 FILE_TRANSFER_SCOPES = frozenset({"browser.file.upload", "browser.file.download"})
 
@@ -764,6 +767,9 @@ class PlaywrightBrowserProvider:
     ) -> BrowserArtifactReference | None:
         if self._artifact_store is None:
             return None
+        evidence_check = getattr(self._runtime, "optional_evidence_allowed", None)
+        if evidence_check is not None and not await evidence_check():
+            return None
         content = await self._runtime.screenshot(
             session_id,
             organization_id=request.organization_id,
@@ -940,9 +946,9 @@ class PlaywrightBrowserProvider:
         ttl_seconds = _bounded_int(
             request.resource.configuration,
             "sessionTtlSeconds",
-            1800,
+            settings.browser_session_ttl_seconds,
             minimum=60,
-            maximum=MAX_SESSION_TTL_SECONDS,
+            maximum=min(MAX_SESSION_TTL_SECONDS, 600),
         )
         return await self._runtime.create_session(
             organization_id=request.organization_id,
@@ -960,8 +966,12 @@ class PlaywrightBrowserProvider:
         return await self._runtime.close(session_id)
 
     async def warmup(self) -> bool:
-        """Provision and launch Chromium before runtime traffic arrives."""
+        """Compatibility health probe; Chromium remains lazy and is not launched here."""
         return await self._runtime.health()
+
+    async def reap_expired_sessions(self) -> int:
+        reaper = getattr(self._runtime, "reap_expired", None)
+        return int(await reaper()) if reaper is not None else 0
 
     async def shutdown(self) -> None:
         await self._runtime.shutdown()
@@ -1278,7 +1288,12 @@ class PlaywrightBrowserProvider:
             }
         )
 
-        if request.operation != "page.observe":
+        capture_after = (
+            request.capability.side_effect
+            or request.operation in {"form.submit", "auth.login", "file.upload", "file.download"}
+            or request.input.get("verify") is not None
+        )
+        if request.operation != "page.observe" and capture_after:
             after_screenshot = await self._store_screenshot(
                 request=request,
                 session_id=session_id,
@@ -1384,6 +1399,14 @@ class PlaywrightBrowserProvider:
             ) from error
         except ExecutionProviderError:
             raise
+        except BrowserCapacityUnavailable as error:
+            raise self._error(
+                request=request,
+                code="temporary_provider_error",
+                retryable=True,
+                safe_message="Governed browser capacity is temporarily unavailable.",
+                internal_details=str(error),
+            ) from error
         except PermissionError as error:
             if state.session_owned and state.session_id is not None:
                 await self._terminate_quietly(state.session_id)
@@ -1706,4 +1729,13 @@ class PlaywrightBrowserProvider:
         )
 
 
-browser_provider = PlaywrightBrowserProvider(artifact_store=DatabaseBrowserArtifactStore())
+browser_provider = PlaywrightBrowserProvider(
+    runtime=BrowserRuntime(
+        coordinator=RedisCoordinator.from_settings(),
+        idle_shutdown_seconds=settings.browser_idle_shutdown_seconds,
+        memory_soft_limit_percent=settings.browser_memory_soft_limit_percent,
+        memory_hard_limit_percent=settings.browser_memory_hard_limit_percent,
+        max_pages_per_session=settings.browser_max_pages_per_session,
+    ),
+    artifact_store=DatabaseBrowserArtifactStore(),
+)

@@ -38,6 +38,21 @@ class RedisCoordinator:
         )
         return bool(await self._client.eval(script, 1, f"lock:{lease.key}", lease.token))
 
+    async def renew_lock(self, lease: Lease, *, ttl_seconds: int) -> bool:
+        script = (
+            "if redis.call('get', KEYS[1]) == ARGV[1] then "
+            "return redis.call('expire', KEYS[1], ARGV[2]) end return 0"
+        )
+        return bool(
+            await self._client.eval(
+                script,
+                1,
+                f"lock:{lease.key}",
+                lease.token,
+                max(1, ttl_seconds),
+            )
+        )
+
     async def heartbeat(self, key: str, value: str, *, ttl_seconds: int = 60) -> None:
         await self._client.set(f"heartbeat:{key}", value, ex=ttl_seconds)
 

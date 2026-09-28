@@ -17,10 +17,11 @@ from app.execution.browser.contracts import (
 from app.execution.browser.sensitive import is_sensitive_field_metadata
 from app.execution.redaction import redact_text, redact_url
 
-MAX_VISIBLE_TEXT = 24_000
-MAX_DOM_SNAPSHOT = 32_000
-MAX_ARIA_SNAPSHOT = 24_000
-MAX_ELEMENTS = 300
+MAX_VISIBLE_TEXT = 12_000
+MAX_DOM_SNAPSHOT = 16_000
+MAX_ARIA_SNAPSHOT = 6_000
+MAX_ELEMENTS = 120
+MAX_FORMS = 20
 
 
 def _origin(url: str) -> str | None:
@@ -59,6 +60,8 @@ async def observe_page(
     *,
     session_id: UUID,
     sensitive_values: tuple[str, ...] = (),
+    include_aria_snapshot: bool = True,
+    include_dom_snapshot: bool = False,
 ) -> BrowserObservation:
     try:
         raw_title = await asyncio.wait_for(page.title(), timeout=3.0)
@@ -68,7 +71,10 @@ async def observe_page(
 
     try:
         raw_visible_text = await asyncio.wait_for(
-            page.locator("body").inner_text(timeout=4_000),
+            page.locator("body").evaluate(
+                "(body, limit) => (body.innerText || '').slice(0, limit)",
+                MAX_VISIBLE_TEXT,
+            ),
             timeout=5.0,
         )
     except (TimeoutError, PlaywrightError):
@@ -83,7 +89,7 @@ async def observe_page(
             page.locator(
                 "a,button,input,textarea,select,[role],[contenteditable='true']"
             ).evaluate_all(
-                """(nodes) => nodes.slice(0, 300).map((el, index) => {
+                """(nodes) => nodes.slice(0, 120).map((el, index) => {
           const style = window.getComputedStyle(el);
           const rect = el.getBoundingClientRect();
           const visible = style.visibility !== 'hidden' && style.display !== 'none'
@@ -192,15 +198,17 @@ async def observe_page(
         )
 
     body = page.locator("body")
-    try:
-        aria_snapshot = (
-            await asyncio.wait_for(
-                body.aria_snapshot(timeout=4_000),
-                timeout=5.0,
-            )
-        )[:MAX_ARIA_SNAPSHOT]
-    except (TimeoutError, PlaywrightError):
-        aria_snapshot = ""
+    aria_snapshot = ""
+    if include_aria_snapshot:
+        try:
+            aria_snapshot = (
+                await asyncio.wait_for(
+                    body.aria_snapshot(timeout=4_000),
+                    timeout=5.0,
+                )
+            )[:MAX_ARIA_SNAPSHOT]
+        except (TimeoutError, PlaywrightError):
+            aria_snapshot = ""
     all_sensitive_values = tuple(
         dict.fromkeys((*sensitive_values, *tuple(discovered_sensitive_values)))
     )
@@ -208,41 +216,43 @@ async def observe_page(
     title = redact_text(title, all_sensitive_values)
     visible_text = redact_text(visible_text, all_sensitive_values)
 
-    try:
-        dom_snapshot = await asyncio.wait_for(
-            page.locator("body").evaluate(
-                """(body) => {
-          const clone = body.cloneNode(true);
-          clone.querySelectorAll('script,style,noscript,template').forEach(node => node.remove());
-          clone.querySelectorAll('input,textarea').forEach(node => {
-            const type = (node.getAttribute('type') || '').toLowerCase();
-            const name = [
-              node.getAttribute('name'),
-              node.getAttribute('aria-label'),
-              node.getAttribute('id'),
-              node.getAttribute('placeholder'),
-              node.getAttribute('autocomplete')
-            ].filter(Boolean).join(' ');
-            if (
-              type === 'password'
-              || type === 'hidden'
-              || /password|passwd|passcode|token|secret|api.?key|authorization|access.?code|one.?time|otp|pin/i.test(name)
-            ) {
-              node.setAttribute('value', '[REDACTED]');
-              node.textContent = '';
-            } else if (node.hasAttribute('value')) {
-              node.setAttribute('value', String(node.value || '').slice(0, 500));
-            }
-          });
-          return clone.innerHTML;
-        }"""
-            ),
-            timeout=5.0,
-        )
-    except (TimeoutError, PlaywrightError):
-        dom_snapshot = ""
+    dom_snapshot = ""
+    if include_dom_snapshot:
+        try:
+            dom_snapshot = await asyncio.wait_for(
+                page.locator("body").evaluate(
+                    """(body) => {
+              const clone = body.cloneNode(true);
+              clone.querySelectorAll('script,style,noscript,template').forEach(node => node.remove());
+              clone.querySelectorAll('input,textarea').forEach(node => {
+                const type = (node.getAttribute('type') || '').toLowerCase();
+                const name = [
+                  node.getAttribute('name'),
+                  node.getAttribute('aria-label'),
+                  node.getAttribute('id'),
+                  node.getAttribute('placeholder'),
+                  node.getAttribute('autocomplete')
+                ].filter(Boolean).join(' ');
+                if (
+                  type === 'password'
+                  || type === 'hidden'
+                  || /password|passwd|passcode|token|secret|api.?key|authorization|access.?code|one.?time|otp|pin/i.test(name)
+                ) {
+                  node.setAttribute('value', '[REDACTED]');
+                  node.textContent = '';
+                } else if (node.hasAttribute('value')) {
+                  node.setAttribute('value', String(node.value || '').slice(0, 500));
+                }
+              });
+              return clone.innerHTML;
+            }"""
+                ),
+                timeout=5.0,
+            )
+        except (TimeoutError, PlaywrightError):
+            dom_snapshot = ""
 
-    dom_snapshot = redact_text(str(dom_snapshot), all_sensitive_values)
+        dom_snapshot = redact_text(str(dom_snapshot), all_sensitive_values)
 
     try:
         raw_forms = await asyncio.wait_for(
@@ -251,7 +261,7 @@ async def observe_page(
           const interactive = Array.from(
             document.querySelectorAll("a,button,input,textarea,select,[role],[contenteditable='true']")
           );
-          return forms.slice(0, 100).map((form, index) => {
+          return forms.slice(0, 20).map((form, index) => {
             const fields = Array.from(
               form.querySelectorAll("input,textarea,select,[contenteditable='true']")
             );
@@ -302,7 +312,7 @@ async def observe_page(
         )
         for frame in page.frames
     )
-    forms = tuple(f"form:{index + 1}" for index in range(min(len(raw_forms), 100)))
+    forms = tuple(f"form:{index + 1}" for index in range(min(len(raw_forms), MAX_FORMS)))
     links = tuple(item.ref for item in elements if item.role == "link")
     buttons = tuple(item.ref for item in elements if item.role == "button")
     inputs = tuple(

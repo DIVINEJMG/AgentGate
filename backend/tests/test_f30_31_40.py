@@ -844,8 +844,16 @@ async def test_f30_39_cookie_and_localstorage_are_isolated_per_browser_context()
     assert second_context.cookie_jar.get("session") is None
     assert second_context.local_storage.get("token") is None
     assert browser.context_options == [
-        {"service_workers": "block"},
-        {"service_workers": "block"},
+        {
+            "service_workers": "block",
+            "viewport": {"width": 1280, "height": 720},
+            "device_scale_factor": 1,
+        },
+        {
+            "service_workers": "block",
+            "viewport": {"width": 1280, "height": 720},
+            "device_scale_factor": 1,
+        },
     ]
 
 
@@ -916,14 +924,15 @@ def test_managed_runtime_releases_browser_sessions_on_terminal_runs() -> None:
 
 
 @pytest.mark.asyncio
-async def test_browser_runtime_is_warmed_before_managed_runtime_traffic() -> None:
+async def test_browser_runtime_stays_lazy_before_managed_runtime_traffic() -> None:
     runtime = HardeningRuntime()
     provider = PlaywrightBrowserProvider(runtime)
     assert await provider.warmup() is True
 
     root = Path(__file__).resolve().parents[2]
     lifecycle = (root / "backend/app/bootstrap/lifecycle.py").read_text(encoding="utf-8")
-    assert "browser_provider.warmup()" in lifecycle
+    assert "browser_provider.warmup()" not in lifecycle
+    assert "browser process will start on first browser action" in lifecycle
     assert "runtime_execution_enabled" in lifecycle
 
 
@@ -942,7 +951,7 @@ def test_browser_execution_has_bounded_network_and_observation_phases() -> None:
     assert "Browser DNS safety preflight timed out." in egress
     assert "timeout=5.0" in egress
     assert "asyncio.wait_for" in observation
-    assert "range(min(len(raw_forms), 100))" in observation
+    assert "range(min(len(raw_forms), MAX_FORMS))" in observation
     assert "asyncio.timeout(70)" in provider
     assert "--renderer-process-limit=1" in runtime
     assert "--disable-gpu" in runtime
@@ -952,6 +961,10 @@ def test_browser_execution_has_bounded_network_and_observation_phases() -> None:
     assert "not handle.navigation_policy.load_visual_resources" in runtime
     assert "Browser navigation observation completed" in runtime
     assert "Browser screenshot completed" in runtime
+    assert "MAX_VISIBLE_TEXT = 12_000" in observation
+    assert "MAX_ARIA_SNAPSHOT = 6_000" in observation
+    assert "MAX_ELEMENTS = 120" in observation
+    assert "MAX_FORMS = 20" in observation
 
 
 def test_f30_40_vercel_auto_deployment_remains_disabled() -> None:

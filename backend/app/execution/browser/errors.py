@@ -23,3 +23,7 @@ class BrowserCrash(RuntimeError):
 
 class BrowserRuntimeLimitExceeded(RuntimeError):
     pass
+
+
+class BrowserCapacityUnavailable(RuntimeError):
+    """Chromium capacity is temporarily unavailable and the action should be retried."""

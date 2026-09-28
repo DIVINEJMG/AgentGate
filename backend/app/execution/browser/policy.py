@@ -47,7 +47,8 @@ class BrowserDomainPolicy:
     allowed_path_prefixes: tuple[str, ...] = ()
     denied_path_prefixes: tuple[str, ...] = ()
     allow_private_network: bool = False
-    load_visual_resources: bool = True
+    load_visual_resources: bool = False
+    capture_dom_snapshot: bool = False
 
     @classmethod
     def from_configuration(
@@ -85,7 +86,10 @@ class BrowserDomainPolicy:
                 configuration.get("allowPrivateNetwork", "false").strip().lower() == "true"
             ),
             load_visual_resources=(
-                configuration.get("loadVisualResources", "true").strip().lower() == "true"
+                configuration.get("loadVisualResources", "false").strip().lower() == "true"
+            ),
+            capture_dom_snapshot=(
+                configuration.get("captureDomSnapshot", "false").strip().lower() == "true"
             ),
         )
 

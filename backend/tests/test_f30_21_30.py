@@ -808,7 +808,10 @@ async def test_managed_lean_browser_policy_blocks_heavy_visual_resources() -> No
     assert image_route.continued is False
 
     full_policy = BrowserDomainPolicy.from_configuration(
-        {"allowedOrigins": "https://portal.example.test"}
+        {
+            "allowedOrigins": "https://portal.example.test",
+            "loadVisualResources": "true",
+        }
     )
     full_handle = runtime_handle(
         page=FakePage("https://portal.example.test/main"),
@@ -853,7 +856,10 @@ async def test_lean_browser_policy_uses_bounded_viewport_evidence_screenshot() -
     full_handle = runtime_handle(
         page=full_page,
         policy=BrowserDomainPolicy.from_configuration(
-            {"allowedOrigins": "https://portal.example.test"}
+            {
+                "allowedOrigins": "https://portal.example.test",
+                "loadVisualResources": "true",
+            }
         ),
     )
     runtime._sessions[full_handle.session.id] = full_handle
