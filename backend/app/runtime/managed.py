@@ -740,7 +740,7 @@ class ManagedRuntimeExecutor:
                     max_bytes=settings.browser_http_read_max_bytes,
                     timeout_seconds=settings.browser_http_read_timeout_seconds,
                 )
-            except Exception as error:
+            except (PermissionError, RuntimeError, ValueError) as error:
                 logger.info(
                     "HTTP-first bootstrap skipped resource=%s url=%s error=%s",
                     resource_id,
