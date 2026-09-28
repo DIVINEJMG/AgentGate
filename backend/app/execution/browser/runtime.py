@@ -38,12 +38,14 @@ from app.execution.browser.credentials import (
 )
 from app.execution.browser.egress import evaluate_browser_egress
 from app.execution.browser.errors import (
+    BrowserCapacityUnavailable,
     BrowserDetachedFrame,
     BrowserDownloadFailure,
     BrowserElementNotFound,
     BrowserRuntimeLimitExceeded,
     BrowserStaleObservation,
 )
+from app.execution.browser.memory import browser_memory_snapshot
 from app.execution.browser.observation import observe_page, origin_for_url
 from app.execution.browser.policy import (
     BrowserDomainPolicy,
@@ -53,6 +55,7 @@ from app.execution.browser.policy import (
 from app.execution.browser.sensitive import is_sensitive_field_metadata
 from app.execution.browser.verification import BrowserVerificationExpectation
 from app.execution.redaction import redact_sensitive_structure, redact_url
+from app.infrastructure.redis.coordination import Lease, RedisCoordinator
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +67,9 @@ class BrowserRuntimeContract(Protocol):
         organization_id: UUID,
         worker_id: UUID | None,
         run_id: UUID | None,
-        ttl_seconds: int = 1800,
+        ttl_seconds: int = 600,
         navigation_policy: BrowserDomainPolicy | None = None,
+        max_pages: int = 3,
     ) -> BrowserSession: ...
 
     async def resume(
@@ -202,6 +206,10 @@ class BrowserRuntimeContract(Protocol):
 
     async def health(self) -> bool: ...
 
+    async def optional_evidence_allowed(self) -> bool: ...
+
+    async def reap_expired(self) -> int: ...
+
     async def shutdown(self) -> None: ...
 
 
@@ -214,12 +222,14 @@ class _SessionHandle:
         page: Page,
         navigation_policy: BrowserDomainPolicy | None,
         max_pages: int,
+        capacity_lease: Lease | None = None,
     ) -> None:
         self.session = session
         self.context = context
         self.page = page
         self.navigation_policy = navigation_policy
         self.max_pages = max_pages
+        self.capacity_lease = capacity_lease
         self.limit_error: str | None = None
         self.last_observation: BrowserObservation | None = None
         self.transition_trail: list[BrowserNavigationDecision] = []
@@ -235,12 +245,101 @@ class _SessionHandle:
 class BrowserRuntime:
     """Owns Chromium and one isolated BrowserContext per governed session."""
 
-    def __init__(self, *, headless: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        headless: bool = True,
+        coordinator: RedisCoordinator | None = None,
+        idle_shutdown_seconds: int = 20,
+        memory_soft_limit_percent: int = 85,
+        memory_hard_limit_percent: int = 90,
+    ) -> None:
         self._headless = headless
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._sessions: dict[UUID, _SessionHandle] = {}
         self._launch_lock = asyncio.Lock()
+        self._coordinator = coordinator
+        self._idle_shutdown_seconds = max(1, idle_shutdown_seconds)
+        self._memory_soft_limit_percent = max(1, min(memory_soft_limit_percent, 99))
+        self._memory_hard_limit_percent = max(
+            self._memory_soft_limit_percent,
+            min(memory_hard_limit_percent, 100),
+        )
+        self._idle_shutdown_task: asyncio.Task[None] | None = None
+
+    def _memory_snapshot(self):
+        return browser_memory_snapshot(
+            active_sessions=len(self._sessions),
+            open_pages=sum(
+                len([page for page in handle.pages.values() if not page.is_closed()])
+                for handle in self._sessions.values()
+            ),
+        )
+
+    def _log_memory(self, phase: str, *, screenshot_bytes: int | None = None) -> None:
+        snapshot = self._memory_snapshot()
+        logger.info(
+            "Browser memory phase=%s python=%s chromium=%s renderer=%s cgroup=%s limit=%s "
+            "percent=%s sessions=%s pages=%s screenshot_bytes=%s",
+            phase,
+            snapshot.python_rss_bytes,
+            snapshot.chromium_rss_bytes,
+            snapshot.renderer_rss_bytes,
+            snapshot.cgroup_current_bytes,
+            snapshot.cgroup_limit_bytes,
+            round(snapshot.cgroup_percent, 2) if snapshot.cgroup_percent is not None else None,
+            snapshot.active_sessions,
+            snapshot.open_pages,
+            screenshot_bytes,
+        )
+
+    def _cancel_idle_shutdown(self) -> None:
+        task = self._idle_shutdown_task
+        if task is not None and not task.done():
+            task.cancel()
+        self._idle_shutdown_task = None
+
+    def _schedule_idle_shutdown(self) -> None:
+        if self._sessions or self._browser is None:
+            return
+        self._cancel_idle_shutdown()
+        self._idle_shutdown_task = asyncio.create_task(self._idle_shutdown())
+
+    async def _idle_shutdown(self) -> None:
+        try:
+            await asyncio.sleep(self._idle_shutdown_seconds)
+            if self._sessions:
+                return
+            await self._shutdown_browser_engine()
+        except asyncio.CancelledError:
+            return
+        finally:
+            current = asyncio.current_task()
+            if self._idle_shutdown_task is current:
+                self._idle_shutdown_task = None
+
+    async def _shutdown_browser_engine(self) -> None:
+        async with self._launch_lock:
+            if self._sessions:
+                return
+            if self._browser is not None:
+                await self._browser.close()
+                self._browser = None
+            if self._playwright is not None:
+                await self._playwright.stop()
+                self._playwright = None
+        self._log_memory("after_chromium_shutdown")
+
+    async def _release_capacity(self, handle: _SessionHandle) -> None:
+        if self._coordinator is None or handle.capacity_lease is None:
+            return
+        try:
+            await self._coordinator.release_lock(handle.capacity_lease)
+        except Exception as error:
+            logger.warning("Failed to release browser capacity lease: %s", error)
+        finally:
+            handle.capacity_lease = None
 
     @staticmethod
     def _redact_metadata(value: object, sensitive_values: set[str]) -> object:
@@ -263,6 +362,7 @@ class BrowserRuntime:
         return value
 
     async def _ensure_browser(self) -> Browser:
+        self._cancel_idle_shutdown()
         if self._browser is not None and self._browser.is_connected():
             return self._browser
         async with self._launch_lock:
@@ -270,6 +370,7 @@ class BrowserRuntime:
                 return self._browser
             if self._playwright is None:
                 self._playwright = await async_playwright().start()
+            self._log_memory("before_browser_launch")
             launch_args = [
                 "--renderer-process-limit=1",
                 "--disable-gpu",
@@ -313,14 +414,34 @@ class BrowserRuntime:
                     headless=self._headless,
                     args=launch_args,
                 )
+            self._log_memory("after_browser_launch")
             return self._browser
 
     async def health(self) -> bool:
-        try:
-            browser = await self._ensure_browser()
-        except (PlaywrightError, RuntimeError):
-            return False
-        return browser.is_connected()
+        # Health checks must not wake Chromium. The runtime is considered lazily
+        # available while stopped; the first governed action performs the real launch.
+        return self._browser is None or self._browser.is_connected()
+
+    async def optional_evidence_allowed(self) -> bool:
+        snapshot = self._memory_snapshot()
+        percent = snapshot.cgroup_percent
+        return percent is None or percent < self._memory_soft_limit_percent
+
+    async def reap_expired(self) -> int:
+        now = datetime.now(UTC)
+        expired = [
+            session_id
+            for session_id, handle in self._sessions.items()
+            if handle.session.expires_at <= now
+        ]
+        for session_id in expired:
+            try:
+                await self.expire(session_id)
+            except (LookupError, PlaywrightError):
+                continue
+        if expired:
+            self._log_memory("after_expired_session_reap")
+        return len(expired)
 
     def _register_page(self, handle: _SessionHandle, page: Page) -> None:
         if page in handle.pages.values():
@@ -547,12 +668,40 @@ class BrowserRuntime:
         organization_id: UUID,
         worker_id: UUID | None,
         run_id: UUID | None,
-        ttl_seconds: int = 1800,
+        ttl_seconds: int = 600,
         navigation_policy: BrowserDomainPolicy | None = None,
+        max_pages: int = 3,
     ) -> BrowserSession:
-        browser = await self._ensure_browser()
-        context = await browser.new_context(service_workers="block")
+        snapshot = self._memory_snapshot()
+        if (
+            snapshot.cgroup_percent is not None
+            and snapshot.cgroup_percent >= self._memory_soft_limit_percent
+        ):
+            raise BrowserCapacityUnavailable(
+                "Browser capacity is temporarily paused because service memory is above "
+                f"{self._memory_soft_limit_percent}%."
+            )
+
+        capacity_lease: Lease | None = None
+        if self._coordinator is not None:
+            capacity_lease = await self._coordinator.acquire_lock(
+                "browser-capacity",
+                ttl_seconds=max(120, min(ttl_seconds, 600) + 120),
+            )
+            if capacity_lease is None:
+                raise BrowserCapacityUnavailable(
+                    "Another governed browser session currently owns the browser capacity lease."
+                )
+
+        self._cancel_idle_shutdown()
+        context: BrowserContext | None = None
         try:
+            browser = await self._ensure_browser()
+            context = await browser.new_context(
+                service_workers="block",
+                viewport={"width": 1280, "height": 720},
+                device_scale_factor=1,
+            )
             page = await context.new_page()
             now = datetime.now(UTC)
             session_id = uuid4()
@@ -563,7 +712,7 @@ class BrowserRuntime:
                 run_id=run_id,
                 browser_context_id=f"ctx_{uuid4().hex}",
                 created_at=now,
-                expires_at=now + timedelta(seconds=max(60, min(ttl_seconds, 3600))),
+                expires_at=now + timedelta(seconds=max(60, min(ttl_seconds, 600))),
                 status="active",
             )
             handle = _SessionHandle(
@@ -571,7 +720,8 @@ class BrowserRuntime:
                 context=context,
                 page=page,
                 navigation_policy=navigation_policy,
-                max_pages=8,
+                max_pages=max(1, min(max_pages, 3)),
+                capacity_lease=capacity_lease,
             )
             self._register_page(handle, page)
             context.on("page", lambda popup: self._register_page(handle, popup))
@@ -580,9 +730,18 @@ class BrowserRuntime:
                 "**/*",
                 lambda route, request: self._route_request(handle, route, request),
             )
+            self._log_memory("after_browser_context")
             return session
         except BaseException:
-            await context.close()
+            if context is not None:
+                await context.close()
+            if self._coordinator is not None and capacity_lease is not None:
+                try:
+                    await self._coordinator.release_lock(capacity_lease)
+                except Exception:
+                    pass
+            if not self._sessions:
+                self._schedule_idle_shutdown()
             raise
 
     def _handle(
@@ -614,26 +773,45 @@ class BrowserRuntime:
         organization_id: UUID,
         worker_id: UUID | None,
     ) -> BrowserSession:
-        return self._handle(
+        handle = self._handle(
             session_id,
             organization_id=organization_id,
             worker_id=worker_id,
-        ).session
+        )
+        if self._coordinator is not None and handle.capacity_lease is not None:
+            remaining = max(
+                120,
+                int((handle.session.expires_at - datetime.now(UTC)).total_seconds()) + 120,
+            )
+            renewed = await self._coordinator.renew_lock(
+                handle.capacity_lease,
+                ttl_seconds=remaining,
+            )
+            if not renewed:
+                raise BrowserCapacityUnavailable(
+                    "Governed browser capacity lease expired before the session completed."
+                )
+        return handle.session
 
     async def _finish(self, session_id: UUID, status: str) -> BrowserSession:
         handle = self._sessions.pop(session_id, None)
         if handle is None:
             raise LookupError("Browser session does not exist.")
+        current_url = handle.page.url
         try:
             await handle.context.close()
         finally:
             handle.session = replace(
                 handle.session,
                 status=status,  # type: ignore[arg-type]
-                current_url=handle.page.url,
-                current_origin=origin_for_url(handle.page.url),
+                current_url=current_url,
+                current_origin=origin_for_url(current_url),
             )
             handle.sensitive_values.clear()
+            await self._release_capacity(handle)
+            self._log_memory("after_browser_context_close")
+            if not self._sessions:
+                self._schedule_idle_shutdown()
         return handle.session
 
     async def close(self, session_id: UUID) -> BrowserSession:
@@ -646,33 +824,18 @@ class BrowserRuntime:
         return await self._finish(session_id, "terminated")
 
     async def fail(self, session_id: UUID) -> BrowserSession:
-        handle = self._sessions.get(session_id)
-        if handle is None:
-            raise LookupError("Browser session does not exist.")
-        try:
-            await handle.context.close()
-        finally:
-            handle.session = replace(
-                handle.session,
-                status="failed",
-                current_url=handle.page.url,
-                current_origin=origin_for_url(handle.page.url),
-            )
-            handle.sensitive_values.clear()
-        return handle.session
+        return await self._finish(session_id, "failed")
 
     async def shutdown(self) -> None:
+        self._cancel_idle_shutdown()
         for session_id in tuple(self._sessions):
             try:
                 await self.terminate(session_id)
             except (LookupError, PlaywrightError) as error:
                 logger.warning("Failed to terminate browser session %s: %s", session_id, error)
-        if self._browser is not None:
-            await self._browser.close()
-            self._browser = None
-        if self._playwright is not None:
-            await self._playwright.stop()
-            self._playwright = None
+        await self._shutdown_browser_engine()
+        if self._coordinator is not None:
+            await self._coordinator.close()
 
     async def observe(
         self,
@@ -720,6 +883,7 @@ class BrowserRuntime:
         }
         observation = replace(observation, page_state=page_state)
         handle.last_observation = observation
+        self._log_memory("after_observation")
         handle.session = replace(
             handle.session,
             current_url=observation.url,
@@ -1052,6 +1216,7 @@ class BrowserRuntime:
             time.monotonic() - observation_started,
             redact_url(observation.url),
         )
+        self._log_memory("after_navigation")
         return observation
 
     async def interact(
@@ -1317,6 +1482,7 @@ class BrowserRuntime:
             len(content),
             time.monotonic() - screenshot_started,
         )
+        self._log_memory("after_screenshot", screenshot_bytes=len(content))
         return content
 
     async def upload_file(
