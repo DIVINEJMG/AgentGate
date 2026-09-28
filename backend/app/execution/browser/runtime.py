@@ -849,10 +849,21 @@ class BrowserRuntime:
             organization_id=organization_id,
             worker_id=worker_id,
         )
+        snapshot = self._memory_snapshot()
+        pressure = snapshot.cgroup_percent
+        under_soft_pressure = (
+            pressure is not None and pressure >= self._memory_soft_limit_percent
+        )
         observation = await observe_page(
             handle.page,
             session_id=session_id,
             sensitive_values=tuple(handle.sensitive_values),
+            include_aria_snapshot=not under_soft_pressure,
+            include_dom_snapshot=(
+                handle.navigation_policy is not None
+                and handle.navigation_policy.capture_dom_snapshot
+                and not under_soft_pressure
+            ),
         )
         page_state = {
             **observation.page_state,
