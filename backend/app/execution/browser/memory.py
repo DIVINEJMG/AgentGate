@@ -17,10 +17,7 @@ class BrowserMemorySnapshot:
 
     @property
     def cgroup_percent(self) -> float | None:
-        if (
-            self.cgroup_current_bytes is None
-            or self.cgroup_limit_bytes in (None, 0)
-        ):
+        if self.cgroup_current_bytes is None or self.cgroup_limit_bytes in (None, 0):
             return None
         return (self.cgroup_current_bytes / self.cgroup_limit_bytes) * 100.0
 
@@ -71,9 +68,13 @@ def _chromium_memory() -> tuple[int, int]:
         if not child.name.isdigit():
             continue
         try:
-            cmdline = (child / "cmdline").read_bytes().replace(b"\x00", b" ").decode(
-                "utf-8", errors="ignore"
-            ).lower()
+            cmdline = (
+                (child / "cmdline")
+                .read_bytes()
+                .replace(b"\x00", b" ")
+                .decode("utf-8", errors="ignore")
+                .lower()
+            )
         except OSError:
             continue
         if not any(marker in cmdline for marker in ("chromium", "chrome-headless", "/chrome ")):
