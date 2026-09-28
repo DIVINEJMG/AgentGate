@@ -5,7 +5,7 @@ import pytest
 
 from app.infrastructure.qstash.provider import (
     QStashRateLimitedError,
-    _raise_for_qstash_status,
+    raise_for_qstash_status,
 )
 
 
@@ -22,14 +22,14 @@ def _response(status: int, text: str) -> httpx.Response:
 
 def test_qstash_daily_quota_is_classified_separately() -> None:
     with pytest.raises(QStashRateLimitedError) as caught:
-        _raise_for_qstash_status(_response(429, "daily ratelimit 1000 exceeded"))
+        raise_for_qstash_status(_response(429, "daily ratelimit 1000 exceeded"))
 
     assert caught.value.daily_quota_exhausted is True
 
 
 def test_qstash_transient_rate_limit_is_not_called_daily_quota() -> None:
     with pytest.raises(QStashRateLimitedError) as caught:
-        _raise_for_qstash_status(_response(429, "too many concurrent requests"))
+        raise_for_qstash_status(_response(429, "too many concurrent requests"))
 
     assert caught.value.daily_quota_exhausted is False
 
