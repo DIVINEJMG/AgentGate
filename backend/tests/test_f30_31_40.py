@@ -948,6 +948,10 @@ def test_browser_execution_has_bounded_network_and_observation_phases() -> None:
     assert "--disable-gpu" in runtime
     assert 'service_workers="block"' in runtime
     assert 'request.resource_type in {"image", "media", "font"}' in runtime
+    assert "full_page=full_page_evidence" in runtime
+    assert "not handle.navigation_policy.load_visual_resources" in runtime
+    assert "Browser navigation observation completed" in runtime
+    assert "Browser screenshot completed" in runtime
 
 
 def test_f30_40_vercel_auto_deployment_remains_disabled() -> None:

@@ -680,6 +680,7 @@ class FakePage:
         self.frames = frames or []
         self.handlers: dict[str, object] = {}
         self.closed = False
+        self.screenshot_options: dict[str, object] | None = None
 
     def on(self, event: str, callback) -> None:
         self.handlers[event] = callback
@@ -695,6 +696,10 @@ class FakePage:
 
     async def wait_for_timeout(self, timeout: float) -> None:
         del timeout
+
+    async def screenshot(self, **kwargs) -> bytes:
+        self.screenshot_options = dict(kwargs)
+        return b"PNG-bounded-evidence"
 
 
 class FakeFrame:
@@ -817,6 +822,50 @@ async def test_managed_lean_browser_policy_blocks_heavy_visual_resources() -> No
     )
     assert font_route.aborted is False
     assert font_route.continued is True
+
+
+@pytest.mark.asyncio
+async def test_lean_browser_policy_uses_bounded_viewport_evidence_screenshot() -> None:
+    runtime = BrowserRuntime()
+    lean_page = FakePage("https://portal.example.test/main")
+    lean_handle = runtime_handle(
+        page=lean_page,
+        policy=BrowserDomainPolicy.from_configuration(
+            {
+                "allowedOrigins": "https://portal.example.test",
+                "loadVisualResources": "false",
+            }
+        ),
+    )
+    runtime._sessions[lean_handle.session.id] = lean_handle
+
+    content = await runtime.screenshot(
+        lean_handle.session.id,
+        organization_id=lean_handle.session.organization_id,
+        worker_id=lean_handle.session.worker_id,
+    )
+
+    assert content == b"PNG-bounded-evidence"
+    assert lean_page.screenshot_options is not None
+    assert lean_page.screenshot_options["full_page"] is False
+
+    full_page = FakePage("https://portal.example.test/main")
+    full_handle = runtime_handle(
+        page=full_page,
+        policy=BrowserDomainPolicy.from_configuration(
+            {"allowedOrigins": "https://portal.example.test"}
+        ),
+    )
+    runtime._sessions[full_handle.session.id] = full_handle
+
+    await runtime.screenshot(
+        full_handle.session.id,
+        organization_id=full_handle.session.organization_id,
+        worker_id=full_handle.session.worker_id,
+    )
+
+    assert full_page.screenshot_options is not None
+    assert full_page.screenshot_options["full_page"] is True
 
 
 @pytest.mark.asyncio

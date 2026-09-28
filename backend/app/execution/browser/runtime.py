@@ -4,6 +4,7 @@ import asyncio
 import logging
 import mimetypes
 import sys
+import time
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -469,14 +470,35 @@ class BrowserRuntime:
             await route.abort("blockedbyclient")
             return
 
+        fetch_started = time.monotonic()
+        logger.info(
+            "Browser navigation fetch started run=%s session=%s url=%s",
+            handle.session.run_id,
+            handle.session.id,
+            redact_url(request.url),
+        )
         try:
             response = await route.fetch(
                 max_redirects=0,
                 timeout=20_000,
             )
-        except PlaywrightError:
+        except PlaywrightError as error:
+            logger.warning(
+                "Browser navigation fetch failed run=%s session=%s elapsed=%.3fs error=%s",
+                handle.session.run_id,
+                handle.session.id,
+                time.monotonic() - fetch_started,
+                type(error).__name__,
+            )
             await route.abort("timedout")
             return
+        logger.info(
+            "Browser navigation fetch completed run=%s session=%s status=%s elapsed=%.3fs",
+            handle.session.run_id,
+            handle.session.id,
+            response.status,
+            time.monotonic() - fetch_started,
+        )
         if 300 <= response.status < 400:
             location = response.headers.get("location")
             if location:
@@ -981,7 +1003,21 @@ class BrowserRuntime:
                 if not url:
                     raise ValueError("URL is required for browser navigation.")
                 self._preflight(handle, url)
+                navigation_started = time.monotonic()
+                logger.info(
+                    "Browser navigation started run=%s session=%s url=%s",
+                    handle.session.run_id,
+                    handle.session.id,
+                    redact_url(url),
+                )
                 await handle.page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+                logger.info(
+                    "Browser navigation DOM ready run=%s session=%s elapsed=%.3fs url=%s",
+                    handle.session.run_id,
+                    handle.session.id,
+                    time.monotonic() - navigation_started,
+                    redact_url(handle.page.url),
+                )
             elif operation == "navigation.back":
                 await handle.page.go_back(wait_until="domcontentloaded", timeout=timeout_ms)
             elif operation == "navigation.forward":
@@ -1003,11 +1039,20 @@ class BrowserRuntime:
             await self._raise_blocked(handle, error)
         await self._raise_if_blocked(handle)
         self._raise_if_limit(handle)
-        return await self.observe(
+        observation_started = time.monotonic()
+        observation = await self.observe(
             session_id,
             organization_id=organization_id,
             worker_id=worker_id,
         )
+        logger.info(
+            "Browser navigation observation completed run=%s session=%s elapsed=%.3fs url=%s",
+            handle.session.run_id,
+            handle.session.id,
+            time.monotonic() - observation_started,
+            redact_url(observation.url),
+        )
+        return observation
 
     async def interact(
         self,
@@ -1247,11 +1292,32 @@ class BrowserRuntime:
                     frame.locator("[contenteditable='true']"),
                 ]
             )
-        return await handle.page.screenshot(
-            full_page=True,
+        full_page_evidence = not (
+            handle.navigation_policy is not None
+            and not handle.navigation_policy.load_visual_resources
+        )
+        screenshot_started = time.monotonic()
+        logger.info(
+            "Browser screenshot started run=%s session=%s full_page=%s url=%s",
+            handle.session.run_id,
+            handle.session.id,
+            full_page_evidence,
+            redact_url(handle.page.url),
+        )
+        content = await handle.page.screenshot(
+            full_page=full_page_evidence,
             animations="disabled",
             mask=masks,
         )
+        logger.info(
+            "Browser screenshot completed run=%s session=%s full_page=%s bytes=%s elapsed=%.3fs",
+            handle.session.run_id,
+            handle.session.id,
+            full_page_evidence,
+            len(content),
+            time.monotonic() - screenshot_started,
+        )
+        return content
 
     async def upload_file(
         self,
