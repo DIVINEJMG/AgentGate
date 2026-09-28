@@ -325,11 +325,15 @@ class BrowserRuntime:
             if self._browser is not None:
                 try:
                     await self._browser.close()
+                except PlaywrightError as error:
+                    logger.warning("Failed to close idle Chromium browser cleanly: %s", error)
                 finally:
                     self._browser = None
             if self._playwright is not None:
                 try:
                     await self._playwright.stop()
+                except PlaywrightError as error:
+                    logger.warning("Failed to stop idle Playwright runtime cleanly: %s", error)
                 finally:
                     self._playwright = None
         self._log_memory("after_chromium_shutdown")
