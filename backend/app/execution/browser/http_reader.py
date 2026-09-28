@@ -125,7 +125,7 @@ class _BoundedHTMLParser(HTMLParser):
         self._append_text(data)
 
 
-async def fetch_http_page(
+async def _fetch_http_page_impl(
     url: str,
     *,
     policy: BrowserDomainPolicy,
@@ -228,3 +228,21 @@ async def fetch_http_page(
                 )
 
     raise RuntimeError("HTTP-first reader exceeded the governed redirect limit.")
+
+
+async def fetch_http_page(
+    url: str,
+    *,
+    policy: BrowserDomainPolicy,
+    max_bytes: int,
+    timeout_seconds: int,
+) -> HttpPageObservation:
+    try:
+        return await _fetch_http_page_impl(
+            url,
+            policy=policy,
+            max_bytes=max_bytes,
+            timeout_seconds=timeout_seconds,
+        )
+    except httpx.HTTPError as error:
+        raise RuntimeError("HTTP-first reader request failed.") from error
