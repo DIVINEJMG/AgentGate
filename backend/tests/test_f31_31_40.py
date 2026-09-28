@@ -201,6 +201,16 @@ def test_cross_tenant_conversation_scope_is_rejected() -> None:
     with pytest.raises(CrossTenantReferenceError, match="Cross-organization"):
         service._require_org(principal, other_organization)
 
+def test_runtime_checkpoints_planning_before_governed_action_delivery() -> None:
+    source = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    assert "settings.runtime_delivery_timeout_seconds - 20" in source
+    assert "AI planner exceeded the runtime delivery budget." in source
+    assert "Next governed action planned and queued for execution." in source
+    assert "Runtime action checkpointed" in source
+    assert "Runtime action started" in source
+    assert "Runtime action finished" in source
+
+
 def test_runtime_provider_outage_waits_instead_of_failing_task() -> None:
     source = (ROOT / "backend/app/api/internal/runtime.py").read_text(encoding="utf-8")
     assert "except AIProviderError as exc:" in source

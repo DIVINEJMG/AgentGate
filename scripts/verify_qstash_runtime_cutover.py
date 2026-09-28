@@ -42,6 +42,12 @@ if "AI_PROVIDER_API_KEY" not in render:
     errors.append("Render blueprint is missing the AI provider credential boundary")
 if "ai_gateway_from_settings" not in managed:
     errors.append("Managed Runtime planner is not wired through AIGateway")
+if "settings.runtime_delivery_timeout_seconds - 20" not in managed:
+    errors.append("Managed Runtime planner is not bounded below the QStash delivery timeout")
+if "Next governed action planned and queued for execution." not in managed:
+    errors.append("Managed Runtime does not checkpoint planning before governed action delivery")
+if "continuation_id = await request_runtime_execution" not in internal:
+    errors.append("Managed Runtime continuation is not queued after a planned/action step")
 if "request_runtime_execution" not in jobs:
     errors.append("new WorkItems are not signaled to QStash")
 if "reason=\"approval\"" not in governance:

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 # ruff: noqa: I001
 
+import asyncio
 import hashlib
+import logging
+import time
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 from uuid import UUID
@@ -25,7 +28,7 @@ from app.domain.actions.gateway import (
     ActionProposal,
     AuthorizationDecision,
 )
-from app.domain.ai.providers import AIInvocationContext
+from app.domain.ai.providers import AIInvocationContext, AIProviderError
 from app.domain.identity.principals import AgentPrincipal, HumanPrincipal
 from app.execution.authorization import UniversalActionRequest, action_fingerprint
 from app.execution.bootstrap import browser_provider, execution_provider_registry
@@ -56,6 +59,8 @@ from app.runtime.planner.adaptive import AdaptivePlanDecision, AdaptiveRuntimePl
 
 
 RuntimeState = Literal["completed", "continue", "waiting_approval", "failed", "noop"]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,14 +186,51 @@ class ManagedRuntimeExecutor:
             )
 
         if current_step >= len(steps):
-            decision = await self._plan_next_step(
-                item=item,
-                run=run,
-                job=job,
-                revision=revision,
-                worker=worker,
-                agent=agent,
-                steps=steps,
+            planner_started = time.monotonic()
+            planner_timeout_seconds = max(
+                15,
+                settings.runtime_delivery_timeout_seconds - 20,
+            )
+            logger.info(
+                "Runtime planner started work_item=%s run=%s step=%s timeout=%ss",
+                item.id,
+                run.id,
+                current_step,
+                planner_timeout_seconds,
+            )
+            try:
+                async with asyncio.timeout(planner_timeout_seconds):
+                    decision = await self._plan_next_step(
+                        item=item,
+                        run=run,
+                        job=job,
+                        revision=revision,
+                        worker=worker,
+                        agent=agent,
+                        steps=steps,
+                    )
+            except TimeoutError as exc:
+                logger.warning(
+                    "Runtime planner timed out work_item=%s run=%s step=%s elapsed=%.3fs",
+                    item.id,
+                    run.id,
+                    current_step,
+                    time.monotonic() - planner_started,
+                )
+                raise AIProviderError(
+                    "provider_unavailable",
+                    "AI planner exceeded the runtime delivery budget.",
+                    retryable=True,
+                ) from exc
+            logger.info(
+                "Runtime planner completed work_item=%s run=%s step=%s elapsed=%.3fs "
+                "decision=%s scope=%s",
+                item.id,
+                run.id,
+                current_step,
+                time.monotonic() - planner_started,
+                decision.decision,
+                decision.scope,
             )
             if decision.decision == "finish":
                 return await self._complete(
@@ -201,13 +243,26 @@ class ManagedRuntimeExecutor:
                     finish_title=decision.title,
                     finish_instruction=decision.instruction,
                 )
-            step = await self._append_action_step(
+            await self._append_action_step(
                 item=item,
                 run=run,
                 decision=decision,
                 step_index=current_step,
             )
-            steps.append(step)
+            logger.info(
+                "Runtime action checkpointed work_item=%s run=%s step=%s scope=%s",
+                item.id,
+                run.id,
+                current_step,
+                decision.scope,
+            )
+            return RuntimeStepOutcome(
+                state="continue",
+                work_item_id=item.id,
+                run_id=run.id,
+                current_step=current_step,
+                summary="Next governed action planned and queued for execution.",
+            )
 
         step = steps[current_step]
         if step.status == "completed":
@@ -235,7 +290,18 @@ class ManagedRuntimeExecutor:
         if step.kind == "finish":
             return await self._complete(item, run, job, worker, steps)
 
-        return await self._execute_action_step(
+        spec = dict(step.input or {})
+        logger.info(
+            "Runtime action started work_item=%s run=%s step=%s provider=%s scope=%s operation=%s",
+            item.id,
+            run.id,
+            current_step,
+            str(spec.get("provider", "")),
+            str(spec.get("scope", "")),
+            str(spec.get("operation", "")),
+        )
+        action_started = time.monotonic()
+        outcome = await self._execute_action_step(
             item=item,
             run=run,
             step=step,
@@ -244,6 +310,15 @@ class ManagedRuntimeExecutor:
             agent=agent,
             current_step=current_step,
         )
+        logger.info(
+            "Runtime action finished work_item=%s run=%s step=%s state=%s elapsed=%.3fs",
+            item.id,
+            run.id,
+            current_step,
+            outcome.state,
+            time.monotonic() - action_started,
+        )
+        return outcome
 
     async def _load_context(
         self, item: WorkItem
