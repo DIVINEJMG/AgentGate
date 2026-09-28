@@ -93,10 +93,7 @@ class _BoundedHTMLParser(HTMLParser):
                 "fields": [],
             }
             self.forms.append(self._current_form)
-        if (
-            self._current_form is not None
-            and lowered in {"input", "textarea", "select", "button"}
-        ):
+        if self._current_form is not None and lowered in {"input", "textarea", "select", "button"}:
             fields = self._current_form.get("fields")
             if isinstance(fields, list) and len(fields) < MAX_HTTP_FIELDS_PER_FORM:
                 fields.append(
@@ -170,8 +167,7 @@ async def fetch_http_page(
 
                 content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
                 if content_type and not (
-                    content_type.startswith("text/")
-                    or content_type in {"application/xhtml+xml"}
+                    content_type.startswith("text/") or content_type in {"application/xhtml+xml"}
                 ):
                     raise ValueError(
                         f"HTTP-first reader only accepts text content, got {content_type}."
