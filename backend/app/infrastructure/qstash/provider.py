@@ -18,6 +18,32 @@ def _deduplication_id(idempotency_key: str) -> str:
     return f"audoryn-{digest}"
 
 
+class QStashRateLimitedError(RuntimeError):
+    def __init__(self, message: str, *, daily_quota_exhausted: bool) -> None:
+        super().__init__(message)
+        self.daily_quota_exhausted = daily_quota_exhausted
+
+
+def _raise_for_qstash_status(response: httpx.Response) -> None:
+    if response.status_code == 429:
+        detail = response.text.strip()
+        lowered = detail.lower()
+        daily_quota_exhausted = any(
+            marker in lowered
+            for marker in (
+                "daily ratelimit",
+                "daily rate limit",
+                "daily quota",
+                "limit 1000 exceeded",
+            )
+        )
+        raise QStashRateLimitedError(
+            detail or "QStash rate limit reached.",
+            daily_quota_exhausted=daily_quota_exhausted,
+        )
+    response.raise_for_status()
+
+
 class UpstashQStashProvider(QueueProvider):
     def __init__(self, *, base_url: str, token: str) -> None:
         self._base_url = base_url.rstrip("/")
@@ -76,7 +102,7 @@ class UpstashQStashProvider(QueueProvider):
                 ),
                 content=body,
             )
-            response.raise_for_status()
+            _raise_for_qstash_status(response)
             payload = response.json()
         return QueueMessage(
             id=str(payload["messageId"]),
@@ -106,7 +132,7 @@ class UpstashQStashProvider(QueueProvider):
                 headers=headers,
                 content=body,
             )
-            response.raise_for_status()
+            _raise_for_qstash_status(response)
             payload = response.json()
         return str(payload["scheduleId"])
 
