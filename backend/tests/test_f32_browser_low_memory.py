@@ -102,9 +102,50 @@ def test_f32_http_first_and_provider_neutral_capacity_backoff_are_durable() -> N
     assert '"browser.http.bootstrap"' in managed
     assert "httpFirstObservations" in managed
     assert "providerRetryAt" in managed
-    assert "timedelta(seconds=5)" in managed
+    assert "runtime_provider_retry_limit" in managed
+    assert "runtime_provider_retry_backoff_seconds" in managed
+    assert "providerRetryCount" in managed
     assert '"loadVisualResources": "false"' in authority
     assert '"captureDomSnapshot": "false"' in authority
     assert '"sessionTtlSeconds": str(settings.browser_session_ttl_seconds)' in authority
     assert '"maxPages": str(settings.browser_max_pages_per_session)' in authority
     assert "async def renew_lock" in coordinator
+
+
+
+def test_f32_cold_browser_start_has_separate_budget_and_reclaim_path() -> None:
+    provider = (
+        ROOT / "backend/app/execution/providers/browser.py"
+    ).read_text(encoding="utf-8")
+    runtime = (
+        ROOT / "backend/app/execution/browser/runtime.py"
+    ).read_text(encoding="utf-8")
+    settings_source = (
+        ROOT / "backend/app/bootstrap/settings.py"
+    ).read_text(encoding="utf-8")
+
+    assert "browser_cold_start_timeout_seconds" in settings_source
+    assert "browser_action_timeout_seconds" in settings_source
+    assert 'request.operation == "navigation.open"' in provider
+    assert 'getattr(self._runtime, "prepare", None)' in provider
+    assert 'getattr(self._runtime, "shutdown_if_idle", None)' in provider
+    assert 'code="browser_cold_start_timeout"' in provider
+    assert "async def prepare(self) -> None:" in runtime
+    assert "async def shutdown_if_idle(self) -> None:" in runtime
+    assert "self._browser is None and self._playwright is None" in runtime
+    assert 'telemetry_logger = logging.getLogger("uvicorn.error")' in runtime
+
+
+def test_f32_retryable_provider_errors_are_bounded_and_requeued() -> None:
+    managed = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    settings_source = (
+        ROOT / "backend/app/bootstrap/settings.py"
+    ).read_text(encoding="utf-8")
+
+    assert "runtime_provider_retry_limit: int = 2" in settings_source
+    assert "runtime_provider_retry_backoff_seconds: int = 5" in settings_source
+    assert "exc.error.retryable" in managed
+    assert "provider_retry_count < settings.runtime_provider_retry_limit" in managed
+    assert "2**provider_retry_count" in managed
+    assert 'item.status = "queued"' in managed
+    assert "providerRetryCode=exc.error.code" in managed

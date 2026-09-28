@@ -59,6 +59,7 @@ from app.execution.redaction import redact_sensitive_structure, redact_url
 from app.infrastructure.redis.coordination import Lease, RedisCoordinator
 
 logger = logging.getLogger(__name__)
+telemetry_logger = logging.getLogger("uvicorn.error")
 
 
 class BrowserRuntimeContract(Protocol):
@@ -277,7 +278,7 @@ class BrowserRuntime:
 
     def _log_memory(self, phase: str, *, screenshot_bytes: int | None = None) -> None:
         snapshot = self._memory_snapshot()
-        logger.info(
+        telemetry_logger.info(
             "Browser memory phase=%s python=%s chromium=%s renderer=%s cgroup=%s limit=%s "
             "percent=%s sessions=%s pages=%s screenshot_bytes=%s",
             phase,
@@ -299,7 +300,7 @@ class BrowserRuntime:
         self._idle_shutdown_task = None
 
     def _schedule_idle_shutdown(self) -> None:
-        if self._sessions or self._browser is None:
+        if self._sessions or (self._browser is None and self._playwright is None):
             return
         self._cancel_idle_shutdown()
         self._idle_shutdown_task = asyncio.create_task(self._idle_shutdown())
@@ -322,12 +323,26 @@ class BrowserRuntime:
             if self._sessions:
                 return
             if self._browser is not None:
-                await self._browser.close()
-                self._browser = None
+                try:
+                    await self._browser.close()
+                except PlaywrightError as error:
+                    logger.warning("Failed to close idle Chromium browser cleanly: %s", error)
+                finally:
+                    self._browser = None
             if self._playwright is not None:
-                await self._playwright.stop()
-                self._playwright = None
+                try:
+                    await self._playwright.stop()
+                except PlaywrightError as error:
+                    logger.warning("Failed to stop idle Playwright runtime cleanly: %s", error)
+                finally:
+                    self._playwright = None
         self._log_memory("after_chromium_shutdown")
+
+    async def shutdown_if_idle(self) -> None:
+        self._cancel_idle_shutdown()
+        if self._sessions:
+            return
+        await self._shutdown_browser_engine()
 
     async def _release_capacity(self, handle: _SessionHandle) -> None:
         if self._coordinator is None or handle.capacity_lease is None:
@@ -419,6 +434,16 @@ class BrowserRuntime:
         # Health checks must not wake Chromium. The runtime is considered lazily
         # available while stopped; the first governed action performs the real launch.
         return self._browser is None or self._browser.is_connected()
+
+    async def prepare(self) -> None:
+        try:
+            await self._ensure_browser()
+        except BaseException:
+            try:
+                await asyncio.shield(self.shutdown_if_idle())
+            except (PlaywrightError, RuntimeError):
+                logger.warning("Failed to reclaim browser runtime after cold-start failure.")
+            raise
 
     async def optional_evidence_allowed(self) -> bool:
         snapshot = self._memory_snapshot()
@@ -590,7 +615,7 @@ class BrowserRuntime:
             return
 
         fetch_started = time.monotonic()
-        logger.info(
+        telemetry_logger.info(
             "Browser navigation fetch started run=%s session=%s url=%s",
             handle.session.run_id,
             handle.session.id,
@@ -611,7 +636,7 @@ class BrowserRuntime:
             )
             await route.abort("timedout")
             return
-        logger.info(
+        telemetry_logger.info(
             "Browser navigation fetch completed run=%s session=%s status=%s elapsed=%.3fs",
             handle.session.run_id,
             handle.session.id,
@@ -1190,14 +1215,14 @@ class BrowserRuntime:
                     raise ValueError("URL is required for browser navigation.")
                 self._preflight(handle, url)
                 navigation_started = time.monotonic()
-                logger.info(
+                telemetry_logger.info(
                     "Browser navigation started run=%s session=%s url=%s",
                     handle.session.run_id,
                     handle.session.id,
                     redact_url(url),
                 )
                 await handle.page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-                logger.info(
+                telemetry_logger.info(
                     "Browser navigation DOM ready run=%s session=%s elapsed=%.3fs url=%s",
                     handle.session.run_id,
                     handle.session.id,
@@ -1231,7 +1256,7 @@ class BrowserRuntime:
             organization_id=organization_id,
             worker_id=worker_id,
         )
-        logger.info(
+        telemetry_logger.info(
             "Browser navigation observation completed run=%s session=%s elapsed=%.3fs url=%s",
             handle.session.run_id,
             handle.session.id,
@@ -1484,7 +1509,7 @@ class BrowserRuntime:
             and not handle.navigation_policy.load_visual_resources
         )
         screenshot_started = time.monotonic()
-        logger.info(
+        telemetry_logger.info(
             "Browser screenshot started run=%s session=%s full_page=%s url=%s",
             handle.session.run_id,
             handle.session.id,
@@ -1496,7 +1521,7 @@ class BrowserRuntime:
             animations="disabled",
             mask=masks,
         )
-        logger.info(
+        telemetry_logger.info(
             "Browser screenshot completed run=%s session=%s full_page=%s bytes=%s elapsed=%.3fs",
             handle.session.run_id,
             handle.session.id,

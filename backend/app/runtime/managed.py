@@ -1412,8 +1412,19 @@ class ManagedRuntimeExecutor:
             )
             result = await gateway.execute_request(principal=principal, request=universal)
         except ExecutionProviderError as exc:
-            if exc.error.retryable and exc.error.code == "temporary_provider_error":
-                retry_at = utcnow() + timedelta(seconds=5)
+            runtime_meta = _runtime_meta(item)
+            try:
+                provider_retry_count = int(runtime_meta.get("providerRetryCount", 0))
+            except (TypeError, ValueError):
+                provider_retry_count = 0
+            if (
+                exc.error.retryable
+                and provider_retry_count < settings.runtime_provider_retry_limit
+            ):
+                backoff_seconds = settings.runtime_provider_retry_backoff_seconds * (
+                    2**provider_retry_count
+                )
+                retry_at = utcnow() + timedelta(seconds=backoff_seconds)
                 action.status = "processing"
                 action.payload = self._action_record_payload(
                     proposal=proposal,
@@ -1429,6 +1440,8 @@ class ManagedRuntimeExecutor:
                     item,
                     providerRetryAt=retry_at.isoformat(),
                     providerRetryReason=exc.error.safe_message,
+                    providerRetryCount=provider_retry_count + 1,
+                    providerRetryCode=exc.error.code,
                 )
                 await self._session.commit()
                 return RuntimeStepOutcome(
@@ -1436,7 +1449,7 @@ class ManagedRuntimeExecutor:
                     item.id,
                     run.id,
                     current_step,
-                    "Execution provider is temporarily busy; action will retry shortly.",
+                    "Execution provider returned a retryable error; action will retry shortly.",
                 )
             action.status = "failed"
             action.payload = self._action_record_payload(
@@ -1489,7 +1502,14 @@ class ManagedRuntimeExecutor:
         }
         run.status = "running"
         item.status = "running"
-        _write_runtime_meta(item, currentStep=current_step + 1)
+        _write_runtime_meta(
+            item,
+            currentStep=current_step + 1,
+            providerRetryCount=0,
+            providerRetryAt=None,
+            providerRetryReason=None,
+            providerRetryCode=None,
+        )
         await TransactionalOutbox(self._session).enqueue(
             topic="run.progress",
             aggregate_type="run",
