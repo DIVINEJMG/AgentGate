@@ -824,7 +824,7 @@ class BrowserRuntime:
         return await self._finish(session_id, "terminated")
 
     async def fail(self, session_id: UUID) -> BrowserSession:
-        return await self._finish(session_id, "failed")
+        return await self._finish(session_id, status="failed")
 
     async def shutdown(self) -> None:
         self._cancel_idle_shutdown()
