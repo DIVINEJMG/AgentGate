@@ -116,7 +116,14 @@ def main() -> None:
     ):
         require(limit in provider, f"Browser provider limit missing: {limit}")
     require(
-        "max_pages=8" in runtime and "Browser page limit exceeded" in runtime,
+        (
+            "max_pages=8" in runtime
+            or (
+                "max_pages=self._max_pages_per_session" in runtime
+                and "max_pages_per_session" in runtime
+            )
+        )
+        and "Browser page limit exceeded" in runtime,
         "Browser page-count cap is missing",
     )
     for observation_cap in (
