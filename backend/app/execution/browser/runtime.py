@@ -68,9 +68,8 @@ class BrowserRuntimeContract(Protocol):
         organization_id: UUID,
         worker_id: UUID | None,
         run_id: UUID | None,
-        ttl_seconds: int = 600,
+        ttl_seconds: int = 1800,
         navigation_policy: BrowserDomainPolicy | None = None,
-        max_pages: int = 3,
     ) -> BrowserSession: ...
 
     async def resume(
@@ -207,10 +206,6 @@ class BrowserRuntimeContract(Protocol):
 
     async def health(self) -> bool: ...
 
-    async def optional_evidence_allowed(self) -> bool: ...
-
-    async def reap_expired(self) -> int: ...
-
     async def shutdown(self) -> None: ...
 
 
@@ -254,6 +249,7 @@ class BrowserRuntime:
         idle_shutdown_seconds: int = 20,
         memory_soft_limit_percent: int = 99,
         memory_hard_limit_percent: int = 100,
+        max_pages_per_session: int = 3,
     ) -> None:
         self._headless = headless
         self._playwright: Playwright | None = None
@@ -267,6 +263,7 @@ class BrowserRuntime:
             self._memory_soft_limit_percent,
             min(memory_hard_limit_percent, 100),
         )
+        self._max_pages_per_session = max(1, min(max_pages_per_session, 3))
         self._idle_shutdown_task: asyncio.Task[None] | None = None
 
     def _memory_snapshot(self):
@@ -669,9 +666,8 @@ class BrowserRuntime:
         organization_id: UUID,
         worker_id: UUID | None,
         run_id: UUID | None,
-        ttl_seconds: int = 600,
+        ttl_seconds: int = 1800,
         navigation_policy: BrowserDomainPolicy | None = None,
-        max_pages: int = 3,
     ) -> BrowserSession:
         snapshot = self._memory_snapshot()
         if (
@@ -721,7 +717,7 @@ class BrowserRuntime:
                 context=context,
                 page=page,
                 navigation_policy=navigation_policy,
-                max_pages=max(1, min(max_pages, 3)),
+                max_pages=self._max_pages_per_session,
                 capacity_lease=capacity_lease,
             )
             self._register_page(handle, page)
