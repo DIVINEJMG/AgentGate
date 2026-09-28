@@ -952,7 +952,8 @@ def test_browser_execution_has_bounded_network_and_observation_phases() -> None:
     assert "timeout=5.0" in egress
     assert "asyncio.wait_for" in observation
     assert "range(min(len(raw_forms), MAX_FORMS))" in observation
-    assert "asyncio.timeout(70)" in provider
+    assert "settings.browser_cold_start_timeout_seconds" in provider
+    assert "settings.browser_action_timeout_seconds" in provider
     assert "--renderer-process-limit=1" in runtime
     assert "--disable-gpu" in runtime
     assert 'service_workers="block"' in runtime
