@@ -39,6 +39,9 @@ def test_work_queue_exposes_dispatch_health_without_mutating_work_items() -> Non
         encoding="utf-8"
     )
     routes = (ROOT / "backend/app/api/jobs_routes.py").read_text(encoding="utf-8")
+    runtime_routes = (
+        ROOT / "backend/app/api/runtime_result_routes.py"
+    ).read_text(encoding="utf-8")
     jobs_api = (ROOT / "frontend/src/lib/jobsApi.ts").read_text(encoding="utf-8")
     jobs_panel = (ROOT / "frontend/src/components/JobsPanel.tsx").read_text(
         encoding="utf-8"
@@ -49,6 +52,8 @@ def test_work_queue_exposes_dispatch_health_without_mutating_work_items() -> Non
     assert "Work remains safely queued" in trigger
     assert "get_runtime_dispatch_health" in routes
     assert '"dispatch": await get_runtime_dispatch_health()' in routes
+    assert "request_runtime_execution_detailed" in runtime_routes
+    assert '"dispatch": execution_signal.as_dict()' in runtime_routes
     assert "RuntimeDispatchHealth" in jobs_api
     assert "Runtime dispatch delayed." in jobs_panel
     assert "dispatchBlocked" in jobs_panel
