@@ -1412,7 +1412,11 @@ class ManagedRuntimeExecutor:
             )
             result = await gateway.execute_request(principal=principal, request=universal)
         except ExecutionProviderError as exc:
-            if exc.error.retryable and exc.error.code == "temporary_provider_error":
+            if (
+                proposal.provider == "browser"
+                and exc.error.retryable
+                and exc.error.code == "temporary_provider_error"
+            ):
                 retry_at = utcnow() + timedelta(seconds=5)
                 action.status = "processing"
                 action.payload = self._action_record_payload(
