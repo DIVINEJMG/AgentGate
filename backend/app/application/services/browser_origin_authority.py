@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.jobs_routes import update_job
 from app.api.product_common import append_audit, utcnow
+from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
 from app.execution.bootstrap import execution_provider_registry
 from app.execution.browser.policy import normalize_origin
@@ -169,17 +170,21 @@ async def ensure_managed_browser_origins(
             current_config = (
                 dict(current.config) if isinstance(current.config, dict) else {}
             )
-            if (
-                current_config.get("managedBy") == "worker_autonomy"
-                and current_config.get("loadVisualResources") != "false"
-            ):
-                now = utcnow()
-                current.config = {
-                    **current_config,
+            if current_config.get("managedBy") == "worker_autonomy":
+                desired = {
                     "loadVisualResources": "false",
-                    "lastCheckedAt": now.isoformat(),
+                    "captureDomSnapshot": "false",
+                    "sessionTtlSeconds": str(settings.browser_session_ttl_seconds),
+                    "maxPages": str(settings.browser_max_pages_per_session),
                 }
-                current.updated_at = now
+                if any(current_config.get(key) != value for key, value in desired.items()):
+                    now = utcnow()
+                    current.config = {
+                        **current_config,
+                        **desired,
+                        "lastCheckedAt": now.isoformat(),
+                    }
+                    current.updated_at = now
             resolved.append(current)
             continue
 
@@ -191,6 +196,9 @@ async def ensure_managed_browser_origins(
             "enableFileTransfer": "false",
             "allowPrivateNetwork": "false",
             "loadVisualResources": "false",
+            "captureDomSnapshot": "false",
+            "sessionTtlSeconds": str(settings.browser_session_ttl_seconds),
+            "maxPages": str(settings.browser_max_pages_per_session),
         }
         resources = await provider.discover_resources(
             configuration=configuration,
