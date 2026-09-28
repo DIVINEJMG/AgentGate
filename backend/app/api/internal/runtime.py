@@ -29,6 +29,7 @@ from app.infrastructure.database.models import (
 )
 from app.infrastructure.database.session import session_factory
 from app.infrastructure.qstash.verifier import QStashSignatureVerifier
+from app.execution.bootstrap import browser_provider
 from app.infrastructure.redis.coordination import RedisCoordinator
 from app.infrastructure.storage.provider import object_storage_from_settings
 from app.runtime.managed import ManagedRuntimeExecutor
@@ -645,6 +646,7 @@ async def sweep(
             detail=str(exc),
         ) from exc
 
+    expired_browser_sessions = await browser_provider.reap_expired_sessions()
     now = datetime.now(UTC)
     async with session_factory() as session:
         scheduled_queued = await queue_due_schedules(
@@ -717,4 +719,5 @@ async def sweep(
         "eligible": len(candidates),
         "queued": queued,
         "scheduledQueued": scheduled_queued,
+        "expiredBrowserSessions": expired_browser_sessions,
     }
