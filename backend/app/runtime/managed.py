@@ -7,6 +7,7 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, replace
+from datetime import timedelta
 from typing import Any, Literal
 from uuid import UUID
 
@@ -34,6 +35,7 @@ from app.execution.authorization import UniversalActionRequest, action_fingerpri
 from app.execution.bootstrap import browser_provider, execution_provider_registry
 from app.execution.browser.http_reader import fetch_http_page
 from app.execution.browser.policy import BrowserDomainPolicy
+from app.execution.contracts import ExecutionProviderError
 from app.execution.provider_executor import (
     DatabaseProviderContextLoader,
     UniversalProviderExecutor,
@@ -1409,6 +1411,54 @@ class ManagedRuntimeExecutor:
                 self._provider_executor,
             )
             result = await gateway.execute_request(principal=principal, request=universal)
+        except ExecutionProviderError as exc:
+            if exc.error.retryable and exc.error.code == "temporary_provider_error":
+                retry_at = utcnow() + timedelta(seconds=5)
+                action.status = "processing"
+                action.payload = self._action_record_payload(
+                    proposal=proposal,
+                    decision=decision,
+                    fingerprint=action_fingerprint(universal),
+                    result=None,
+                    error=exc.error.safe_message,
+                )
+                item.status = "queued"
+                item.scheduled_at = retry_at
+                run.status = "running"
+                _write_runtime_meta(
+                    item,
+                    browserCapacityRetryAt=retry_at.isoformat(),
+                    browserCapacityReason=exc.error.safe_message,
+                )
+                await self._session.commit()
+                return RuntimeStepOutcome(
+                    "continue",
+                    item.id,
+                    run.id,
+                    current_step,
+                    "Governed browser capacity is busy; action will retry shortly.",
+                )
+            action.status = "failed"
+            action.payload = self._action_record_payload(
+                proposal=proposal,
+                decision=decision,
+                fingerprint=action_fingerprint(universal),
+                result=None,
+                error=exc.error.safe_message,
+            )
+            await self._fail(
+                item=item,
+                run=run,
+                step=step,
+                message=exc.error.safe_message,
+            )
+            return RuntimeStepOutcome(
+                "failed",
+                item.id,
+                run.id,
+                current_step,
+                exc.error.safe_message,
+            )
         except (LookupError, PermissionError, RuntimeError, TypeError, ValueError) as exc:
             action.status = "failed"
             action.payload = self._action_record_payload(
