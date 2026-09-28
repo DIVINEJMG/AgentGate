@@ -1370,8 +1370,35 @@ class PlaywrightBrowserProvider:
         credential: str | None,
     ) -> ExecutionResult:
         state = _BrowserExecutionState(started_at=datetime.now(UTC))
+        cold_navigation = (
+            request.operation == "navigation.open"
+            and self._session_id(request.input) is None
+        )
         try:
-            async with asyncio.timeout(70):
+            if cold_navigation:
+                prepare = getattr(self._runtime, "prepare", None)
+                if prepare is not None:
+                    try:
+                        async with asyncio.timeout(
+                            settings.browser_cold_start_timeout_seconds
+                        ):
+                            await prepare()
+                    except TimeoutError as error:
+                        reclaim = getattr(self._runtime, "shutdown_if_idle", None)
+                        if reclaim is not None:
+                            try:
+                                await asyncio.shield(reclaim())
+                            except (PlaywrightError, RuntimeError):
+                                pass
+                        raise self._error(
+                            request=request,
+                            code="browser_cold_start_timeout",
+                            retryable=True,
+                            safe_message="Governed browser startup timed out.",
+                            internal_details=str(error),
+                        ) from error
+
+            async with asyncio.timeout(settings.browser_action_timeout_seconds):
                 return await self._execute_authorized(
                     request=request,
                     configuration=configuration,
