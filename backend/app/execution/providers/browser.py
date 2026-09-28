@@ -950,20 +950,12 @@ class PlaywrightBrowserProvider:
             minimum=60,
             maximum=min(MAX_SESSION_TTL_SECONDS, 600),
         )
-        max_pages = _bounded_int(
-            request.resource.configuration,
-            "maxPages",
-            settings.browser_max_pages_per_session,
-            minimum=1,
-            maximum=3,
-        )
         return await self._runtime.create_session(
             organization_id=request.organization_id,
             worker_id=request.worker_id,
             run_id=request.run_id,
             ttl_seconds=ttl_seconds,
             navigation_policy=policy,
-            max_pages=max_pages,
         )
 
     async def close_session(self, session: BrowserSession) -> BrowserSession:
@@ -1743,6 +1735,7 @@ browser_provider = PlaywrightBrowserProvider(
         idle_shutdown_seconds=settings.browser_idle_shutdown_seconds,
         memory_soft_limit_percent=settings.browser_memory_soft_limit_percent,
         memory_hard_limit_percent=settings.browser_memory_hard_limit_percent,
+        max_pages_per_session=settings.browser_max_pages_per_session,
     ),
     artifact_store=DatabaseBrowserArtifactStore(),
 )
