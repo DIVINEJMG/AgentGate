@@ -18,6 +18,7 @@ from app.bootstrap.settings import settings
 from app.domain.ai.providers import AIProviderError
 from app.domain.identity.principals import HumanPrincipal
 from app.domain.jobs.dispatch import ScheduledDispatch
+from app.execution.bootstrap import browser_provider
 from app.infrastructure.database.dispatch import WorkItemDispatchRepository
 from app.infrastructure.database.models import (
     Approval,
@@ -29,7 +30,6 @@ from app.infrastructure.database.models import (
 )
 from app.infrastructure.database.session import session_factory
 from app.infrastructure.qstash.verifier import QStashSignatureVerifier
-from app.execution.bootstrap import browser_provider
 from app.infrastructure.redis.coordination import RedisCoordinator
 from app.infrastructure.storage.provider import object_storage_from_settings
 from app.runtime.managed import ManagedRuntimeExecutor
