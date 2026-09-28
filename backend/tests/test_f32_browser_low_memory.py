@@ -1,3 +1,5 @@
+# ruff: noqa: I001
+
 from pathlib import Path
 
 from app.bootstrap.settings import settings
