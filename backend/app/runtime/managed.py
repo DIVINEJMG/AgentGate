@@ -1412,11 +1412,7 @@ class ManagedRuntimeExecutor:
             )
             result = await gateway.execute_request(principal=principal, request=universal)
         except ExecutionProviderError as exc:
-            if (
-                proposal.provider == "browser"
-                and exc.error.retryable
-                and exc.error.code == "temporary_provider_error"
-            ):
+            if exc.error.retryable and exc.error.code == "temporary_provider_error":
                 retry_at = utcnow() + timedelta(seconds=5)
                 action.status = "processing"
                 action.payload = self._action_record_payload(
@@ -1431,8 +1427,8 @@ class ManagedRuntimeExecutor:
                 run.status = "running"
                 _write_runtime_meta(
                     item,
-                    browserCapacityRetryAt=retry_at.isoformat(),
-                    browserCapacityReason=exc.error.safe_message,
+                    providerRetryAt=retry_at.isoformat(),
+                    providerRetryReason=exc.error.safe_message,
                 )
                 await self._session.commit()
                 return RuntimeStepOutcome(
@@ -1440,7 +1436,7 @@ class ManagedRuntimeExecutor:
                     item.id,
                     run.id,
                     current_step,
-                    "Governed browser capacity is busy; action will retry shortly.",
+                    "Execution provider is temporarily busy; action will retry shortly.",
                 )
             action.status = "failed"
             action.payload = self._action_record_payload(
