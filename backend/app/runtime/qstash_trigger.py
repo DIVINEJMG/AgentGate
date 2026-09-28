@@ -200,7 +200,7 @@ async def request_runtime_execution_detailed(
             detail=detail,
             updated_at=now,
         )
-    except Exception as error:
+    except Exception:
         detail = (
             "Runtime queue provider is temporarily unavailable. "
             "Work remains safely queued for recovery."
@@ -211,9 +211,8 @@ async def request_runtime_execution_detailed(
             ttl_seconds=300,
         )
         logger.exception(
-            "QStash runtime execution signal failed for %s: %s",
+            "QStash runtime execution signal failed for %s",
             work_item_id,
-            error,
         )
         return RuntimeSignalResult(
             message_id=None,
