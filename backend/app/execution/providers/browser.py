@@ -1371,17 +1371,14 @@ class PlaywrightBrowserProvider:
     ) -> ExecutionResult:
         state = _BrowserExecutionState(started_at=datetime.now(UTC))
         cold_navigation = (
-            request.operation == "navigation.open"
-            and self._session_id(request.input) is None
+            request.operation == "navigation.open" and self._session_id(request.input) is None
         )
         try:
             if cold_navigation:
                 prepare = getattr(self._runtime, "prepare", None)
                 if prepare is not None:
                     try:
-                        async with asyncio.timeout(
-                            settings.browser_cold_start_timeout_seconds
-                        ):
+                        async with asyncio.timeout(settings.browser_cold_start_timeout_seconds):
                             await prepare()
                     except TimeoutError as error:
                         reclaim = getattr(self._runtime, "shutdown_if_idle", None)
