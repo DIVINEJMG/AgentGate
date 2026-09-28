@@ -24,6 +24,7 @@ from playwright.async_api import (
     async_playwright,
 )
 from playwright.async_api import Error as PlaywrightError
+from redis.exceptions import RedisError
 
 from app.execution.browser.contracts import (
     BrowserDownload,
@@ -336,7 +337,7 @@ class BrowserRuntime:
             return
         try:
             await self._coordinator.release_lock(handle.capacity_lease)
-        except Exception as error:
+        except RedisError as error:
             logger.warning("Failed to release browser capacity lease: %s", error)
         finally:
             handle.capacity_lease = None
@@ -738,8 +739,11 @@ class BrowserRuntime:
             if self._coordinator is not None and capacity_lease is not None:
                 try:
                     await self._coordinator.release_lock(capacity_lease)
-                except Exception:
-                    pass
+                except RedisError as error:
+                    logger.warning(
+                        "Failed to release browser capacity lease after session setup error: %s",
+                        error,
+                    )
             if not self._sessions:
                 self._schedule_idle_shutdown()
             raise
