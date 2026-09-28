@@ -844,8 +844,16 @@ async def test_f30_39_cookie_and_localstorage_are_isolated_per_browser_context()
     assert second_context.cookie_jar.get("session") is None
     assert second_context.local_storage.get("token") is None
     assert browser.context_options == [
-        {"service_workers": "block"},
-        {"service_workers": "block"},
+        {
+            "service_workers": "block",
+            "viewport": {"width": 1280, "height": 720},
+            "device_scale_factor": 1,
+        },
+        {
+            "service_workers": "block",
+            "viewport": {"width": 1280, "height": 720},
+            "device_scale_factor": 1,
+        },
     ]
 
 
