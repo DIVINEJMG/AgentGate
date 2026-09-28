@@ -40,7 +40,6 @@ from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.database.session import database_session
 from app.infrastructure.storage.provider import object_storage_from_settings
 from app.runtime.qstash_trigger import (
-    get_runtime_dispatch_health,
     request_runtime_execution,
     request_runtime_execution_detailed,
 )
