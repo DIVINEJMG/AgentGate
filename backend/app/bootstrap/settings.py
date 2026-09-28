@@ -95,6 +95,13 @@ class Settings(BaseSettings):
     ai_max_retries: int = 2
     ai_max_output_tokens: int = 1800
     runtime_max_action_steps: int = 8
+    browser_idle_shutdown_seconds: int = 20
+    browser_session_ttl_seconds: int = 600
+    browser_max_pages_per_session: int = 3
+    browser_memory_soft_limit_percent: int = 85
+    browser_memory_hard_limit_percent: int = 90
+    browser_http_read_max_bytes: int = 1_000_000
+    browser_http_read_timeout_seconds: int = 12
     conversation_attachment_max_bytes: int = 10 * 1024 * 1024
     conversation_attachment_text_max_chars: int = 100_000
     vision_signed_url_ttl_seconds: int = 300
