@@ -32,6 +32,8 @@ from app.domain.ai.providers import AIInvocationContext, AIProviderError
 from app.domain.identity.principals import AgentPrincipal, HumanPrincipal
 from app.execution.authorization import UniversalActionRequest, action_fingerprint
 from app.execution.bootstrap import browser_provider, execution_provider_registry
+from app.execution.browser.http_reader import fetch_http_page
+from app.execution.browser.policy import BrowserDomainPolicy
 from app.execution.provider_executor import (
     DatabaseProviderContextLoader,
     UniversalProviderExecutor,
@@ -681,6 +683,94 @@ class ManagedRuntimeExecutor:
             ],
         }
 
+    async def _http_first_observations(
+        self,
+        *,
+        item: WorkItem,
+        tools: list[dict[str, object]],
+        steps: list[RunStep],
+    ) -> list[dict[str, object]]:
+        completed_browser = any(
+            step.status == "completed"
+            and isinstance(step.input, dict)
+            and str(step.input.get("scope", "")).startswith("browser.")
+            for step in steps
+        )
+        if completed_browser:
+            return []
+
+        runtime_meta = _runtime_meta(item)
+        cached = runtime_meta.get("httpFirstObservations")
+        if isinstance(cached, list) and cached:
+            return [dict(entry) for entry in cached if isinstance(entry, dict)]
+
+        observations: list[dict[str, object]] = []
+        seen_resources: set[str] = set()
+        for tool in tools:
+            if (
+                str(tool.get("provider", "")) != "browser"
+                or str(tool.get("scope", "")) != "browser.navigation.open"
+            ):
+                continue
+            resource_id = str(tool.get("resourceId", ""))
+            start_url = str(tool.get("defaultStartUrl", "")).strip()
+            if not resource_id or not start_url or resource_id in seen_resources:
+                continue
+            seen_resources.add(resource_id)
+            if len(seen_resources) > 2:
+                break
+
+            try:
+                integration = await self._session.get(Integration, UUID(resource_id))
+            except ValueError:
+                integration = None
+            if integration is None:
+                continue
+            config = _integration_config(integration)
+            try:
+                policy = BrowserDomainPolicy.from_configuration(
+                    {str(key): str(value) for key, value in config.items() if value is not None},
+                    fallback_url=start_url,
+                )
+                observation = await fetch_http_page(
+                    start_url,
+                    policy=policy,
+                    max_bytes=settings.browser_http_read_max_bytes,
+                    timeout_seconds=settings.browser_http_read_timeout_seconds,
+                )
+            except Exception as error:
+                logger.info(
+                    "HTTP-first bootstrap skipped resource=%s url=%s error=%s",
+                    resource_id,
+                    start_url,
+                    type(error).__name__,
+                )
+                continue
+
+            observations.append(
+                {
+                    "trust": "untrusted_tool_output",
+                    "step": 0,
+                    "title": "Authorized HTTP-first page read",
+                    "scope": "browser.http.bootstrap",
+                    "summary": (
+                        "Lightweight authorized page content fetched without starting Chromium. "
+                        "Use governed browser actions only when interaction or JavaScript state is needed."
+                    ),
+                    "resourceId": resource_id,
+                    "httpObservation": observation.as_dict(),
+                }
+            )
+
+        if observations:
+            _write_runtime_meta(
+                item,
+                httpFirstObservations=observations,
+                httpFirstObservedAt=utcnow().isoformat(),
+            )
+            await self._session.flush()
+        return observations
+
     async def _plan_next_step(
         self,
         *,
@@ -711,6 +801,12 @@ class ManagedRuntimeExecutor:
         )
         profile = dict(worker.profile or {}) if isinstance(worker.profile, dict) else {}
         memory_context = await self._worker_memory_context(worker)
+        durable_observations = self._planner_observations(steps)
+        http_first = await self._http_first_observations(
+            item=item,
+            tools=tools,
+            steps=steps,
+        )
         decision = await self._planner.choose_next(
             job={
                 "name": job.name,
@@ -732,7 +828,7 @@ class ManagedRuntimeExecutor:
             },
             trigger=trigger,
             tools=tools,
-            observations=self._planner_observations(steps),
+            observations=[*http_first, *durable_observations],
             action_count=len([step for step in steps if step.kind == "action"]),
             max_actions=settings.runtime_max_action_steps,
             invocation_context=AIInvocationContext(
