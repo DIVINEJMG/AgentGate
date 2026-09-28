@@ -39,7 +39,11 @@ from app.infrastructure.database.models import (
 from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.database.session import database_session
 from app.infrastructure.storage.provider import object_storage_from_settings
-from app.runtime.qstash_trigger import request_runtime_execution
+from app.runtime.qstash_trigger import (
+    get_runtime_dispatch_health,
+    request_runtime_execution,
+    request_runtime_execution_detailed,
+)
 
 v1_router = APIRouter(tags=["runtime", "memory", "results"])
 v2_router = APIRouter(tags=["runtime", "memory", "results"])
@@ -362,7 +366,7 @@ async def process_item_v1(
         if isinstance((item.payload or {}).get("runtime"), dict)
         else 0
     )
-    execution_message_id = await request_runtime_execution(
+    execution_signal = await request_runtime_execution_detailed(
         organization_id=organization_id,
         work_item_id=item.id,
         expected_step=expected_step,
@@ -373,7 +377,8 @@ async def process_item_v1(
         "workItem": await work_item_public(session, item),
         "waitingForApproval": False,
         "retryScheduled": False,
-        "executionQueued": execution_message_id is not None,
+        "executionQueued": execution_signal.message_id is not None,
+        "dispatch": execution_signal.as_dict(),
     }
 
 
@@ -396,6 +401,8 @@ async def process_item_v2(
             "workItem": await work_item_v2(session, item),
             "waitingForApproval": False,
             "retryScheduled": False,
+            "executionQueued": result["executionQueued"],
+            "dispatch": result["dispatch"],
         }
     }
 
@@ -424,7 +431,7 @@ async def continue_run_v1(
         if isinstance((item.payload or {}).get("runtime"), dict)
         else 0
     )
-    execution_message_id = await request_runtime_execution(
+    execution_signal = await request_runtime_execution_detailed(
         organization_id=organization_id,
         work_item_id=item.id,
         expected_step=expected_step,
@@ -435,7 +442,8 @@ async def continue_run_v1(
         "workItem": await work_item_public(session, item),
         "waitingForApproval": run.status == "waiting_approval",
         "retryScheduled": False,
-        "executionQueued": execution_message_id is not None,
+        "executionQueued": execution_signal.message_id is not None,
+        "dispatch": execution_signal.as_dict(),
     }
 
 
@@ -458,6 +466,8 @@ async def continue_run_v2(
             "workItem": await work_item_v2(session, item),
             "waitingForApproval": result["waitingForApproval"],
             "retryScheduled": False,
+            "executionQueued": result["executionQueued"],
+            "dispatch": result["dispatch"],
         }
     }
 
