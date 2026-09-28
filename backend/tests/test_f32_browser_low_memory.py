@@ -89,7 +89,7 @@ def test_f32_observation_and_evidence_paths_are_memory_bounded() -> None:
     assert "optional_evidence_allowed" in provider
 
 
-def test_f32_http_first_and_capacity_backoff_are_durable() -> None:
+def test_f32_http_first_and_provider_neutral_capacity_backoff_are_durable() -> None:
     managed = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
     authority = (
         ROOT / "backend/app/application/services/browser_origin_authority.py"
@@ -101,7 +101,7 @@ def test_f32_http_first_and_capacity_backoff_are_durable() -> None:
     assert "fetch_http_page(" in managed
     assert '"browser.http.bootstrap"' in managed
     assert "httpFirstObservations" in managed
-    assert "browserCapacityRetryAt" in managed
+    assert "providerRetryAt" in managed
     assert "timedelta(seconds=5)" in managed
     assert '"loadVisualResources": "false"' in authority
     assert '"captureDomSnapshot": "false"' in authority
