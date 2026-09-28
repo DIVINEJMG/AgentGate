@@ -251,8 +251,8 @@ class BrowserRuntime:
         headless: bool = True,
         coordinator: RedisCoordinator | None = None,
         idle_shutdown_seconds: int = 20,
-        memory_soft_limit_percent: int = 85,
-        memory_hard_limit_percent: int = 90,
+        memory_soft_limit_percent: int = 99,
+        memory_hard_limit_percent: int = 100,
     ) -> None:
         self._headless = headless
         self._playwright: Playwright | None = None
