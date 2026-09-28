@@ -4,8 +4,8 @@ import httpx
 import pytest
 
 from app.infrastructure.qstash.provider import (
-    _raise_for_qstash_status,
     QStashRateLimitedError,
+    _raise_for_qstash_status,
 )
 
 
