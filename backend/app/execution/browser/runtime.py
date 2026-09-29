@@ -468,9 +468,7 @@ class BrowserRuntime:
                 )
             except PlaywrightError as error:
                 if "Executable doesn't exist" not in str(error):
-                    await self._reap_orphaned_chromium(
-                        baseline_pids=baseline_chromium_pids
-                    )
+                    await self._reap_orphaned_chromium(baseline_pids=baseline_chromium_pids)
                     raise
                 logger.info("Chromium is not installed; provisioning the Playwright runtime.")
                 process = await asyncio.create_subprocess_exec(
@@ -504,14 +502,10 @@ class BrowserRuntime:
                         args=launch_args,
                     )
                 except BaseException:
-                    await self._reap_orphaned_chromium(
-                        baseline_pids=baseline_chromium_pids
-                    )
+                    await self._reap_orphaned_chromium(baseline_pids=baseline_chromium_pids)
                     raise
             except BaseException:
-                await self._reap_orphaned_chromium(
-                    baseline_pids=baseline_chromium_pids
-                )
+                await self._reap_orphaned_chromium(baseline_pids=baseline_chromium_pids)
                 raise
             telemetry_logger.info(
                 "Browser launch completed elapsed=%.3fs",
