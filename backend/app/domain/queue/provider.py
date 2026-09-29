@@ -18,6 +18,7 @@ class QueueProvider(Protocol):
         retries: int = 3,
         timeout_seconds: int = 15,
         failure_callback: str | None = None,
+        delay_seconds: int | None = None,
     ) -> QueueMessage: ...
 
     async def schedule(
