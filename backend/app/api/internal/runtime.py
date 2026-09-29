@@ -2,6 +2,7 @@ import base64
 import binascii
 import json
 import logging
+from math import ceil
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -452,6 +453,8 @@ async def execute(
         }
 
     outcome = None
+    continuation_delay_seconds = 0
+    continuation_reason = "continuation"
     try:
         async with session_factory() as session:
             item = await session.scalar(
@@ -484,6 +487,18 @@ async def execute(
                     item=item,
                     expected_step=message.expected_step,
                 )
+                if outcome.state == "continue" and item.scheduled_at > datetime.now(UTC):
+                    continuation_delay_seconds = max(
+                        1,
+                        ceil(
+                            (
+                                item.scheduled_at - datetime.now(UTC)
+                            ).total_seconds()
+                        ),
+                    )
+                    continuation_reason = (
+                        f"provider-retry:{int(item.scheduled_at.timestamp())}"
+                    )
             except AIProviderError as exc:
                 now = datetime.now(UTC)
                 payload = dict(item.payload or {})
@@ -614,7 +629,10 @@ async def execute(
             organization_id=message.organization_id,
             work_item_id=message.work_item_id,
             expected_step=outcome.current_step,
-            reason="continuation",
+            reason=continuation_reason,
+            delay_seconds=(
+                continuation_delay_seconds if continuation_delay_seconds > 0 else None
+            ),
         )
 
     return {
