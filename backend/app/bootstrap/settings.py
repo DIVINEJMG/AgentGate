@@ -104,6 +104,9 @@ class Settings(BaseSettings):
     browser_http_read_timeout_seconds: int = 12
     browser_cold_start_timeout_seconds: int = 50
     browser_action_timeout_seconds: int = 60
+    browser_launch_min_headroom_bytes: int = 256 * 1024 * 1024
+    browser_runtime_retry_limit: int = 4
+    browser_runtime_retry_backoff_seconds: int = 20
     runtime_provider_retry_limit: int = 2
     runtime_provider_retry_backoff_seconds: int = 5
     conversation_attachment_max_bytes: int = 10 * 1024 * 1024
