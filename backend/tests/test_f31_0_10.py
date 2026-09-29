@@ -67,6 +67,66 @@ class FakeProvider:
         return AIResponse(text="image received", provider=self.name, model=model)
 
 
+class RetryableFakeProvider:
+    name = "fake"
+    capabilities = ModelProviderCapabilities(
+        text_input=True,
+        image_input=True,
+        structured_json=True,
+        tool_calls=True,
+        streaming=True,
+    )
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def generate_text(self, *, model: str, request: AITextRequest) -> AIResponse:
+        del model, request
+        self.calls += 1
+        raise AIProviderError(
+            "timeout",
+            "simulated slow planner provider",
+            retryable=True,
+        )
+
+    async def analyze_media(
+        self,
+        *,
+        model: str,
+        request: AITextRequest,
+        media: AIMediaInput,
+    ) -> AIResponse:
+        del model, request, media
+        raise AssertionError("planner retry budget test must not analyze media")
+
+
+@pytest.mark.asyncio
+async def test_planner_structured_call_does_not_stack_provider_retries() -> None:
+    provider = RetryableFakeProvider()
+    gateway = ProviderAIGateway(
+        providers={"fake": provider},
+        registry=_registry(),
+        max_retries=2,
+    )
+    schema: dict[str, object] = {
+        "type": "object",
+        "properties": {"decision": {"type": "string"}},
+        "required": ["decision"],
+    }
+
+    with pytest.raises(AIProviderError) as caught:
+        await gateway.generate_structured(
+            role="planner",
+            system="system",
+            prompt="plan",
+            schema_name="test_plan",
+            schema=schema,
+        )
+
+    assert caught.value.category == "timeout"
+    assert provider.calls == 1
+
+
 @pytest.mark.asyncio
 async def test_unconfigured_ai_gateway_fails_closed() -> None:
     gateway = UnconfiguredAIGateway()

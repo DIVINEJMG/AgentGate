@@ -135,6 +135,7 @@ class ProviderAIGateway(AIGateway):
         context: AIInvocationContext,
         schema_name: str | None,
         operation: Callable[[AIModelProvider, str, AITextRequest], Awaitable[AIResponse]],
+        max_retries: int | None = None,
     ) -> AIResponse:
         provider, model = self._provider_for(role)
         invocation_id = None
@@ -149,7 +150,8 @@ class ProviderAIGateway(AIGateway):
 
         started = time.monotonic()
         last_error: AIProviderError | None = None
-        for attempt in range(self._max_retries + 1):
+        retry_limit = self._max_retries if max_retries is None else max(0, max_retries)
+        for attempt in range(retry_limit + 1):
             try:
                 response = await operation(provider, model, request)
                 if invocation_id is not None and self._recorder is not None:
@@ -164,7 +166,7 @@ class ProviderAIGateway(AIGateway):
                 return response
             except AIProviderError as exc:
                 last_error = exc
-                if not exc.retryable or attempt >= self._max_retries:
+                if not exc.retryable or attempt >= retry_limit:
                     if invocation_id is not None and self._recorder is not None:
                         await self._recorder.finish(
                             invocation_id,
@@ -305,6 +307,7 @@ class ProviderAIGateway(AIGateway):
                 context=invocation_context,
                 schema_name=schema_name,
                 operation=operation,
+                max_retries=0 if role == "planner" else None,
             )
             try:
                 parsed = _parse_json_object(response.text)
