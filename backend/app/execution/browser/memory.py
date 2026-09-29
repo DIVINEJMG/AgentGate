@@ -58,12 +58,11 @@ def _rss_bytes(pid: int) -> int:
     return 0
 
 
-def _chromium_memory() -> tuple[int, int]:
-    chromium = 0
-    renderers = 0
+def chromium_process_ids() -> set[int]:
+    pids: set[int] = set()
     proc = Path("/proc")
     if not proc.exists():
-        return (0, 0)
+        return pids
     for child in proc.iterdir():
         if not child.name.isdigit():
             continue
@@ -79,8 +78,26 @@ def _chromium_memory() -> tuple[int, int]:
             continue
         if not any(marker in cmdline for marker in ("chromium", "chrome-headless", "/chrome ")):
             continue
-        rss = _rss_bytes(int(child.name))
+        pids.add(int(child.name))
+    return pids
+
+
+def _chromium_memory() -> tuple[int, int]:
+    chromium = 0
+    renderers = 0
+    for pid in chromium_process_ids():
+        rss = _rss_bytes(pid)
         chromium += rss
+        try:
+            cmdline = (
+                Path(f"/proc/{pid}/cmdline")
+                .read_bytes()
+                .replace(b"\x00", b" ")
+                .decode("utf-8", errors="ignore")
+                .lower()
+            )
+        except OSError:
+            cmdline = ""
         if "--type=renderer" in cmdline:
             renderers += rss
     return chromium, renderers
