@@ -56,6 +56,8 @@ def test_f32_browser_memory_budget_defaults_target_512mb_service() -> None:
     assert settings.browser_runtime_retry_limit == 4
     assert settings.browser_runtime_retry_backoff_seconds == 20
     assert settings.browser_http_read_max_bytes <= 1_000_000
+    assert settings.browser_cold_start_timeout_seconds == 65
+    assert settings.browser_action_timeout_seconds == 45
 
 
 def test_f32_chromium_is_lazy_and_runtime_sweep_reaps_sessions() -> None:
@@ -142,6 +144,11 @@ def test_f32_cold_browser_start_has_separate_budget_and_reclaim_path() -> None:
     assert "_launch_min_headroom_bytes" in runtime
     assert "Browser launch deferred" in runtime
     assert "BrowserCapacityUnavailable" in runtime
+    assert "chromium_process_ids" in runtime
+    assert "async def _reap_orphaned_chromium" in runtime
+    assert "signal.SIGTERM" in runtime
+    assert "signal.SIGKILL" in runtime
+    assert "baseline_chromium_pids" in runtime
     assert 'telemetry_logger = logging.getLogger("uvicorn.error")' in runtime
 
 
@@ -160,3 +167,12 @@ def test_f32_retryable_provider_errors_are_bounded_and_requeued() -> None:
     assert "2**provider_retry_count" in managed
     assert 'item.status = "queued"' in managed
     assert "providerRetryCode=exc.error.code" in managed
+
+
+def test_f32_http_first_bootstrap_is_visible_in_runtime_telemetry() -> None:
+    managed = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+
+    assert "HTTP-first bootstrap completed" in managed
+    assert "HTTP-first bootstrap skipped" in managed
+    assert "HTTP-first bootstrap cache reused" in managed
+    assert 'telemetry_logger = logging.getLogger("uvicorn.error")' in managed
