@@ -1417,13 +1417,22 @@ class ManagedRuntimeExecutor:
                 provider_retry_count = int(runtime_meta.get("providerRetryCount", 0))
             except (TypeError, ValueError):
                 provider_retry_count = 0
-            if (
-                exc.error.retryable
-                and provider_retry_count < settings.runtime_provider_retry_limit
-            ):
-                backoff_seconds = settings.runtime_provider_retry_backoff_seconds * (
-                    2**provider_retry_count
-                )
+            browser_runtime_error = exc.error.code in {
+                "browser_capacity_unavailable",
+                "browser_cold_start_timeout",
+            }
+            retry_limit = (
+                settings.browser_runtime_retry_limit
+                if browser_runtime_error
+                else settings.runtime_provider_retry_limit
+            )
+            retry_backoff = (
+                settings.browser_runtime_retry_backoff_seconds
+                if browser_runtime_error
+                else settings.runtime_provider_retry_backoff_seconds
+            )
+            if exc.error.retryable and provider_retry_count < retry_limit:
+                backoff_seconds = retry_backoff * (2**provider_retry_count)
                 retry_at = utcnow() + timedelta(seconds=backoff_seconds)
                 action.status = "processing"
                 action.payload = self._action_record_payload(
