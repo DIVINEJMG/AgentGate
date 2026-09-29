@@ -65,6 +65,7 @@ class UpstashQStashProvider(QueueProvider):
         timeout_seconds: int,
         idempotency_key: str | None = None,
         failure_callback: str | None = None,
+        delay_seconds: int | None = None,
     ) -> dict[str, str]:
         headers = {
             "Authorization": f"Bearer {self._token}",
@@ -75,6 +76,8 @@ class UpstashQStashProvider(QueueProvider):
         }
         if idempotency_key:
             headers["Upstash-Deduplication-Id"] = _deduplication_id(idempotency_key)
+        if delay_seconds is not None and delay_seconds > 0:
+            headers["Upstash-Delay"] = f"{int(delay_seconds)}s"
         callback = failure_callback or settings.qstash_failure_callback_url
         if callback:
             headers["Upstash-Failure-Callback"] = callback
@@ -89,6 +92,7 @@ class UpstashQStashProvider(QueueProvider):
         retries: int = 3,
         timeout_seconds: int = 15,
         failure_callback: str | None = None,
+        delay_seconds: int | None = None,
     ) -> QueueMessage:
         encoded = _destination_path(destination)
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -99,6 +103,7 @@ class UpstashQStashProvider(QueueProvider):
                     timeout_seconds=timeout_seconds,
                     idempotency_key=idempotency_key,
                     failure_callback=failure_callback,
+                    delay_seconds=delay_seconds,
                 ),
                 content=body,
             )
