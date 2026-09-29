@@ -65,6 +65,7 @@ from app.runtime.planner.adaptive import AdaptivePlanDecision, AdaptiveRuntimePl
 RuntimeState = Literal["completed", "continue", "waiting_approval", "failed", "noop"]
 
 logger = logging.getLogger(__name__)
+telemetry_logger = logging.getLogger("uvicorn.error")
 
 
 @dataclass(frozen=True, slots=True)
@@ -704,6 +705,11 @@ class ManagedRuntimeExecutor:
         runtime_meta = _runtime_meta(item)
         cached = runtime_meta.get("httpFirstObservations")
         if isinstance(cached, list) and cached:
+            telemetry_logger.info(
+                "HTTP-first bootstrap cache reused work_item=%s observations=%s",
+                item.id,
+                len(cached),
+            )
             return [dict(entry) for entry in cached if isinstance(entry, dict)]
 
         observations: list[dict[str, object]] = []
@@ -741,14 +747,25 @@ class ManagedRuntimeExecutor:
                     timeout_seconds=settings.browser_http_read_timeout_seconds,
                 )
             except (PermissionError, RuntimeError, ValueError) as error:
-                logger.info(
-                    "HTTP-first bootstrap skipped resource=%s url=%s error=%s",
+                telemetry_logger.info(
+                    "HTTP-first bootstrap skipped work_item=%s resource=%s error=%s",
+                    item.id,
                     resource_id,
-                    start_url,
                     type(error).__name__,
                 )
                 continue
 
+            telemetry_logger.info(
+                "HTTP-first bootstrap completed work_item=%s resource=%s status=%s "
+                "text_chars=%s links=%s forms=%s truncated=%s",
+                item.id,
+                resource_id,
+                observation.status_code,
+                len(observation.visible_text),
+                len(observation.links),
+                len(observation.forms),
+                observation.truncated,
+            )
             observations.append(
                 {
                     "trust": "untrusted_tool_output",
