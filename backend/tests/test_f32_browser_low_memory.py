@@ -156,7 +156,7 @@ def test_f32_retryable_provider_errors_are_bounded_and_requeued() -> None:
     assert "browser_runtime_retry_limit: int = 4" in settings_source
     assert "browser_runtime_retry_backoff_seconds: int = 20" in settings_source
     assert "exc.error.retryable" in managed
-    assert "provider_retry_count < settings.runtime_provider_retry_limit" in managed
+    assert "provider_retry_count < retry_limit" in managed
     assert "2**provider_retry_count" in managed
     assert 'item.status = "queued"' in managed
     assert "providerRetryCode=exc.error.code" in managed
