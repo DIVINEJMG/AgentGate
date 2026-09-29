@@ -1426,7 +1426,7 @@ class PlaywrightBrowserProvider:
         except BrowserCapacityUnavailable as error:
             raise self._error(
                 request=request,
-                code="temporary_provider_error",
+                code="browser_capacity_unavailable",
                 retryable=True,
                 safe_message="Governed browser capacity is temporarily unavailable.",
                 internal_details=str(error),
@@ -1760,6 +1760,7 @@ browser_provider = PlaywrightBrowserProvider(
         memory_soft_limit_percent=settings.browser_memory_soft_limit_percent,
         memory_hard_limit_percent=settings.browser_memory_hard_limit_percent,
         max_pages_per_session=settings.browser_max_pages_per_session,
+        launch_min_headroom_bytes=settings.browser_launch_min_headroom_bytes,
     ),
     artifact_store=DatabaseBrowserArtifactStore(),
 )

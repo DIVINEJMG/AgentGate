@@ -120,6 +120,7 @@ async def request_runtime_execution_detailed(
     work_item_id: UUID,
     expected_step: int | None = None,
     reason: str = "queued",
+    delay_seconds: int | None = None,
 ) -> RuntimeSignalResult:
     now = datetime.now(UTC).isoformat()
     if not settings.runtime_execution_enabled:
@@ -167,6 +168,7 @@ async def request_runtime_execution_detailed(
             idempotency_key=f"runtime:{work_item_id}:{step}:{dedupe_suffix}",
             retries=3,
             timeout_seconds=settings.runtime_delivery_timeout_seconds,
+            delay_seconds=delay_seconds,
         )
     except QStashRateLimitedError as error:
         if error.daily_quota_exhausted:
@@ -236,12 +238,14 @@ async def request_runtime_execution(
     work_item_id: UUID,
     expected_step: int | None = None,
     reason: str = "queued",
+    delay_seconds: int | None = None,
 ) -> str | None:
     result = await request_runtime_execution_detailed(
         organization_id=organization_id,
         work_item_id=work_item_id,
         expected_step=expected_step,
         reason=reason,
+        delay_seconds=delay_seconds,
     )
     return result.message_id
 

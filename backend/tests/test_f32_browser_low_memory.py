@@ -52,6 +52,9 @@ def test_f32_browser_memory_budget_defaults_target_512mb_service() -> None:
     assert settings.browser_max_pages_per_session == 3
     assert settings.browser_memory_soft_limit_percent == 85
     assert settings.browser_memory_hard_limit_percent == 90
+    assert settings.browser_launch_min_headroom_bytes == 256 * 1024 * 1024
+    assert settings.browser_runtime_retry_limit == 4
+    assert settings.browser_runtime_retry_backoff_seconds == 20
     assert settings.browser_http_read_max_bytes <= 1_000_000
 
 
@@ -104,6 +107,9 @@ def test_f32_http_first_and_provider_neutral_capacity_backoff_are_durable() -> N
     assert "providerRetryAt" in managed
     assert "runtime_provider_retry_limit" in managed
     assert "runtime_provider_retry_backoff_seconds" in managed
+    assert "browser_runtime_retry_limit" in managed
+    assert "browser_runtime_retry_backoff_seconds" in managed
+    assert '"browser_capacity_unavailable"' in managed
     assert "providerRetryCount" in managed
     assert '"loadVisualResources": "false"' in authority
     assert '"captureDomSnapshot": "false"' in authority
@@ -133,6 +139,9 @@ def test_f32_cold_browser_start_has_separate_budget_and_reclaim_path() -> None:
     assert "async def prepare(self) -> None:" in runtime
     assert "async def shutdown_if_idle(self) -> None:" in runtime
     assert "self._browser is None and self._playwright is None" in runtime
+    assert "_launch_min_headroom_bytes" in runtime
+    assert "Browser launch deferred" in runtime
+    assert "BrowserCapacityUnavailable" in runtime
     assert 'telemetry_logger = logging.getLogger("uvicorn.error")' in runtime
 
 
@@ -144,8 +153,10 @@ def test_f32_retryable_provider_errors_are_bounded_and_requeued() -> None:
 
     assert "runtime_provider_retry_limit: int = 2" in settings_source
     assert "runtime_provider_retry_backoff_seconds: int = 5" in settings_source
+    assert "browser_runtime_retry_limit: int = 4" in settings_source
+    assert "browser_runtime_retry_backoff_seconds: int = 20" in settings_source
     assert "exc.error.retryable" in managed
-    assert "provider_retry_count < settings.runtime_provider_retry_limit" in managed
+    assert "provider_retry_count < retry_limit" in managed
     assert "2**provider_retry_count" in managed
     assert 'item.status = "queued"' in managed
     assert "providerRetryCode=exc.error.code" in managed

@@ -251,6 +251,7 @@ class BrowserRuntime:
         memory_soft_limit_percent: int = 99,
         memory_hard_limit_percent: int = 100,
         max_pages_per_session: int = 3,
+        launch_min_headroom_bytes: int = 0,
     ) -> None:
         self._headless = headless
         self._playwright: Playwright | None = None
@@ -265,6 +266,7 @@ class BrowserRuntime:
             min(memory_hard_limit_percent, 100),
         )
         self._max_pages_per_session = max(1, min(max_pages_per_session, 3))
+        self._launch_min_headroom_bytes = max(0, launch_min_headroom_bytes)
         self._idle_shutdown_task: asyncio.Task[None] | None = None
 
     def _memory_snapshot(self):
@@ -381,9 +383,36 @@ class BrowserRuntime:
         async with self._launch_lock:
             if self._browser is not None and self._browser.is_connected():
                 return self._browser
+            snapshot = self._memory_snapshot()
+            if (
+                self._launch_min_headroom_bytes > 0
+                and snapshot.cgroup_current_bytes is not None
+                and snapshot.cgroup_limit_bytes is not None
+            ):
+                headroom = max(
+                    0,
+                    snapshot.cgroup_limit_bytes - snapshot.cgroup_current_bytes,
+                )
+                if headroom < self._launch_min_headroom_bytes:
+                    telemetry_logger.info(
+                        "Browser launch deferred cgroup=%s limit=%s headroom=%s required=%s "
+                        "percent=%s",
+                        snapshot.cgroup_current_bytes,
+                        snapshot.cgroup_limit_bytes,
+                        headroom,
+                        self._launch_min_headroom_bytes,
+                        round(snapshot.cgroup_percent, 2)
+                        if snapshot.cgroup_percent is not None
+                        else None,
+                    )
+                    raise BrowserCapacityUnavailable(
+                        "Governed browser launch is deferred until the service has "
+                        "enough memory headroom."
+                    )
             if self._playwright is None:
                 self._playwright = await async_playwright().start()
             self._log_memory("before_browser_launch")
+            launch_started = time.monotonic()
             launch_args = [
                 "--renderer-process-limit=1",
                 "--disable-gpu",
@@ -427,6 +456,10 @@ class BrowserRuntime:
                     headless=self._headless,
                     args=launch_args,
                 )
+            telemetry_logger.info(
+                "Browser launch completed elapsed=%.3fs",
+                time.monotonic() - launch_started,
+            )
             self._log_memory("after_browser_launch")
             return self._browser
 

@@ -65,3 +65,36 @@ def test_qstash_recovery_cadence_preserves_free_plan_headroom() -> None:
     assert "*/15 * * * *" in docs
     assert "264 scheduled QStash messages per day" in docs
     assert "Do not restore the old every-minute runtime sweep" in docs
+
+
+def test_qstash_publish_headers_support_delayed_delivery() -> None:
+    provider = qstash_provider.UpstashQStashProvider(
+        base_url="https://qstash.example",
+        token="test-token",
+    )
+
+    headers = provider._headers(
+        retries=3,
+        timeout_seconds=120,
+        idempotency_key="runtime:test",
+        delay_seconds=40,
+    )
+
+    assert headers["Upstash-Delay"] == "40s"
+
+
+def test_runtime_provider_retry_uses_qstash_delay_instead_of_waiting_for_sweep() -> None:
+    runtime_api = (
+        ROOT / "backend/app/api/internal/runtime.py"
+    ).read_text(encoding="utf-8")
+    trigger = (ROOT / "backend/app/runtime/qstash_trigger.py").read_text(
+        encoding="utf-8"
+    )
+    queue_provider = (
+        ROOT / "backend/app/infrastructure/qstash/provider.py"
+    ).read_text(encoding="utf-8")
+
+    assert "continuation_delay_seconds" in runtime_api
+    assert 'f"provider-retry:{int(item.scheduled_at.timestamp())}"' in runtime_api
+    assert "delay_seconds=delay_seconds" in trigger
+    assert 'headers["Upstash-Delay"]' in queue_provider
