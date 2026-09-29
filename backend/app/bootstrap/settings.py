@@ -102,8 +102,8 @@ class Settings(BaseSettings):
     browser_memory_hard_limit_percent: int = 90
     browser_http_read_max_bytes: int = 1_000_000
     browser_http_read_timeout_seconds: int = 12
-    browser_cold_start_timeout_seconds: int = 50
-    browser_action_timeout_seconds: int = 60
+    browser_cold_start_timeout_seconds: int = 65
+    browser_action_timeout_seconds: int = 45
     browser_launch_min_headroom_bytes: int = 256 * 1024 * 1024
     browser_runtime_retry_limit: int = 4
     browser_runtime_retry_backoff_seconds: int = 20
