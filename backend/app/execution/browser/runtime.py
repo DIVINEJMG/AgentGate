@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import mimetypes
+import os
+import signal
 import sys
 import time
 from dataclasses import replace
@@ -46,7 +48,7 @@ from app.execution.browser.errors import (
     BrowserRuntimeLimitExceeded,
     BrowserStaleObservation,
 )
-from app.execution.browser.memory import browser_memory_snapshot
+from app.execution.browser.memory import browser_memory_snapshot, chromium_process_ids
 from app.execution.browser.observation import observe_page, origin_for_url
 from app.execution.browser.policy import (
     BrowserDomainPolicy,
@@ -320,6 +322,45 @@ class BrowserRuntime:
             if self._idle_shutdown_task is current:
                 self._idle_shutdown_task = None
 
+    async def _reap_orphaned_chromium(
+        self,
+        *,
+        baseline_pids: set[int] | None = None,
+    ) -> None:
+        if self._sessions:
+            return
+        current = chromium_process_ids()
+        targets = current if baseline_pids is None else current - baseline_pids
+        if not targets:
+            return
+
+        telemetry_logger.warning(
+            "Reaping orphaned Chromium processes pids=%s",
+            ",".join(str(pid) for pid in sorted(targets)),
+        )
+        for pid in targets:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                continue
+
+        await asyncio.sleep(0.75)
+        survivors = chromium_process_ids() & targets
+        for pid in survivors:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                continue
+
+        if survivors:
+            await asyncio.sleep(0.25)
+        remaining = chromium_process_ids() & targets
+        telemetry_logger.info(
+            "Chromium orphan reap completed requested=%s survivors=%s",
+            len(targets),
+            len(remaining),
+        )
+
     async def _shutdown_browser_engine(self) -> None:
         async with self._launch_lock:
             if self._sessions:
@@ -338,6 +379,7 @@ class BrowserRuntime:
                     logger.warning("Failed to stop idle Playwright runtime cleanly: %s", error)
                 finally:
                     self._playwright = None
+            await self._reap_orphaned_chromium()
         self._log_memory("after_chromium_shutdown")
 
     async def shutdown_if_idle(self) -> None:
@@ -413,6 +455,7 @@ class BrowserRuntime:
                 self._playwright = await async_playwright().start()
             self._log_memory("before_browser_launch")
             launch_started = time.monotonic()
+            baseline_chromium_pids = chromium_process_ids()
             launch_args = [
                 "--renderer-process-limit=1",
                 "--disable-gpu",
@@ -425,6 +468,7 @@ class BrowserRuntime:
                 )
             except PlaywrightError as error:
                 if "Executable doesn't exist" not in str(error):
+                    await self._reap_orphaned_chromium(baseline_pids=baseline_chromium_pids)
                     raise
                 logger.info("Chromium is not installed; provisioning the Playwright runtime.")
                 process = await asyncio.create_subprocess_exec(
@@ -452,10 +496,17 @@ class BrowserRuntime:
                         "Failed to provision the Chromium browser runtime: "
                         + stderr.decode("utf-8", errors="replace")[-1000:]
                     ) from error
-                self._browser = await self._playwright.chromium.launch(
-                    headless=self._headless,
-                    args=launch_args,
-                )
+                try:
+                    self._browser = await self._playwright.chromium.launch(
+                        headless=self._headless,
+                        args=launch_args,
+                    )
+                except BaseException:
+                    await self._reap_orphaned_chromium(baseline_pids=baseline_chromium_pids)
+                    raise
+            except BaseException:
+                await self._reap_orphaned_chromium(baseline_pids=baseline_chromium_pids)
+                raise
             telemetry_logger.info(
                 "Browser launch completed elapsed=%.3fs",
                 time.monotonic() - launch_started,
