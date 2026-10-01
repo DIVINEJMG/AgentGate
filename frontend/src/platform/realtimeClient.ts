@@ -1,4 +1,5 @@
 import { apiUrl, realtimeUrl } from './config';
+import { isWorkspacePreview } from '../preview/previewMode';
 
 export interface RealtimeEvent {
   stream_id?: string;
@@ -92,6 +93,7 @@ export function subscribeOrganizationRealtime({
   poll,
   pollingIntervalMs = 15000,
 }: SubscriptionOptions) {
+  if (isWorkspacePreview()) return () => {};
   let closed = false;
   let socket: WebSocket | null = null;
   let source: EventSource | null = null;

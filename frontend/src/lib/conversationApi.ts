@@ -54,6 +54,18 @@ export interface ConversationTurn {
   receipt: ConversationReceipt;
 }
 
+export interface ConversationMessage {
+  id: string;
+  organizationId: string;
+  threadId: string;
+  role: string;
+  content: string;
+  artifactReferences: Array<Record<string, unknown>>;
+  commandReferences: Array<Record<string, unknown>>;
+  resultReferences: Array<Record<string, unknown>>;
+  createdAt: string;
+}
+
 function unwrap<T>(version: ApiVersion, response: { data: any }): T {
   return (version === 'v1' ? response.data : response.data.data) as T;
 }
@@ -90,6 +102,16 @@ export async function createConversation(
     { workerId: workerId || undefined, title: title || undefined },
   );
   return unwrap<{ thread: ConversationThread }>(version, response).thread;
+}
+
+export async function listConversations(version: ApiVersion, organizationId: string): Promise<ConversationThread[]> {
+  const response = await api.get(`/api/${version}/organizations/${organizationId}/conversations?limit=200`);
+  return unwrap<{ threads: ConversationThread[] }>(version, response).threads;
+}
+
+export async function getConversation(version: ApiVersion, organizationId: string, threadId: string): Promise<{ thread: ConversationThread; messages: ConversationMessage[] }> {
+  const response = await api.get(`/api/${version}/organizations/${organizationId}/conversations/${threadId}`);
+  return unwrap<{ thread: ConversationThread; messages: ConversationMessage[] }>(version, response);
 }
 
 export async function sendConversationMessage(

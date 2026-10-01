@@ -1,5 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import HomeHero from './HomeHero';
+import HomeJourney from './HomeJourney';
+import HomeOperatingView from './HomeOperatingView';
+import ProductShowcase from './ProductShowcase';
+import SolutionsShowcase from './SolutionsShowcase';
+import SecurityShowcase from './SecurityShowcase';
+import PricingShowcase from './PricingShowcase';
+import ResourcesShowcase from './ResourcesShowcase';
+import LegalShowcase from './LegalShowcase';
+import CompanyShowcase from './CompanyShowcase';
+import humanOversightImage from './assets/human-oversight.webp';
+import operationsImage from './assets/operations-work.webp';
+import researchImage from './assets/research-work.webp';
 import './public.css';
+import './public-brand.css';
+import './home-page.css';
+import './home-composition.css';
+import './public-navigation.css';
 
 export type PublicRoute = 'home' | 'product' | 'solutions' | 'security' | 'pricing' | 'resources' | 'company' | 'privacy' | 'terms';
 type TargetRoute = PublicRoute | 'login' | 'signup' | 'app';
@@ -10,7 +27,34 @@ const NAV: { route: PublicRoute; label: string }[] = [
   { route: 'security', label: 'Security' },
   { route: 'resources', label: 'Resources' },
   { route: 'pricing', label: 'Pricing' },
+  { route: 'company', label: 'Company' },
 ];
+
+type NavDestination = { label: string; route: PublicRoute; detail: string; sectionId?: string; solutionIndex?: number };
+const NAV_MENUS: Partial<Record<PublicRoute, { intro: string; links: NavDestination[] }>> = {
+  product: { intro: 'A clear place for workers, work and authority.', links: [
+    { label: 'Overview', route: 'product', detail: 'See the complete operating layer.' },
+    { label: 'Workforce', route: 'product', sectionId: 'product-workforce', detail: 'Define roles, jobs and supervision.' },
+    { label: 'Governance', route: 'security', sectionId: 'security-boundary', detail: 'Understand the control path.' },
+    { label: 'Integrations', route: 'product', sectionId: 'product-integrations', detail: 'Connect work to your tools.' },
+  ] },
+  solutions: { intro: 'Start with a responsibility that already matters.', links: [
+    { label: 'Support', route: 'solutions', sectionId: 'solution-index', solutionIndex: 2, detail: 'Prioritize the inbox.' },
+    { label: 'Research', route: 'solutions', sectionId: 'solution-index', solutionIndex: 1, detail: 'Turn sources into a brief.' },
+    { label: 'Operations', route: 'solutions', sectionId: 'solution-index', solutionIndex: 0, detail: 'Keep the daily picture current.' },
+    { label: 'Development', route: 'solutions', sectionId: 'solution-index', solutionIndex: 5, detail: 'Review repository work.' },
+  ] },
+  resources: { intro: 'Find the detail you need to evaluate Audoryn.', links: [
+    { label: 'Product', route: 'product', detail: 'How the system works.' },
+    { label: 'Security', route: 'security', detail: 'What controls every action.' },
+    { label: 'Pricing', route: 'pricing', detail: 'Capacity and plan availability.' },
+  ] },
+  company: { intro: 'Learn about the product and its public notices.', links: [
+    { label: 'About', route: 'company', detail: 'Why SOT is building Audoryn.' },
+    { label: 'Privacy', route: 'privacy', detail: 'How product data is handled.' },
+    { label: 'Terms', route: 'terms', detail: 'How Audoryn may be used.' },
+  ] },
+};
 
 const TITLES: Record<PublicRoute, string> = {
   home: 'Audoryn · AI workforce, under control',
@@ -26,27 +70,77 @@ const TITLES: Record<PublicRoute, string> = {
 
 export default function PublicSite({ route, onNavigate }: { route: PublicRoute; onNavigate: (route: TargetRoute) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [activeMenu, setActiveMenu] = useState<PublicRoute | null>(null);
+  const [destination, setDestination] = useState<NavDestination | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navButtons = useRef<Partial<Record<PublicRoute, HTMLButtonElement | null>>>({});
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  function clearHoverTimer() { if (hoverTimer.current) clearTimeout(hoverTimer.current); hoverTimer.current = null; }
+  function clearCloseTimer() { if (closeTimer.current) clearTimeout(closeTimer.current); closeTimer.current = null; }
+  function scheduleMenu(route: PublicRoute) {
+    clearHoverTimer(); clearCloseTimer();
+    if (!NAV_MENUS[route]) { setActiveMenu(null); return; }
+    hoverTimer.current = setTimeout(() => setActiveMenu(route), activeMenu ? 140 : 350);
+  }
+  function scheduleClose() { clearHoverTimer(); clearCloseTimer(); closeTimer.current = setTimeout(() => setActiveMenu(null), 260); }
+  function navigateMain(nextRoute: PublicRoute) {
+    clearHoverTimer(); clearCloseTimer(); setActiveMenu(null); setDestination(null);
+    if (nextRoute === route) window.scrollTo({ top: 0, behavior: 'auto' });
+    onNavigate(nextRoute);
+  }
+  function navigateSub(next: NavDestination) {
+    clearHoverTimer(); clearCloseTimer(); setActiveMenu(null); setDestination({ ...next });
+    onNavigate(next.route);
+  }
 
   useEffect(() => {
     document.title = TITLES[route];
     window.scrollTo({ top: 0, behavior: 'auto' });
     setMenuOpen(false);
+    setActiveMenu(null);
+  }, [route]);
+
+  useEffect(() => {
+    if (!destination || destination.route !== route) return;
+    const frame = requestAnimationFrame(() => {
+      if (destination.sectionId) (document.getElementById(destination.sectionId) ?? document.querySelector(`.${destination.sectionId}`))?.scrollIntoView({ block: 'start', behavior: 'auto' });
+      else window.scrollTo({ top: 0, behavior: 'auto' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [destination, route]);
+
+  useEffect(() => () => { clearHoverTimer(); clearCloseTimer(); }, []);
+
+  useEffect(() => {
+    if (route !== 'home') return;
+    const update = () => setScrolled(window.scrollY > 8);
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
   }, [route]);
 
   return <div className='public-site'>
-    <header className='public-header'>
-      <button className='public-wordmark' onClick={() => onNavigate('home')} aria-label='Audoryn home'>Audoryn</button>
+    <header className={`public-header${route === 'home' ? ` public-header-home${scrolled ? ' is-scrolled' : ''}` : ''}${activeMenu ? ' has-dropdown' : ''}`} onPointerLeave={scheduleClose} onKeyDown={(event) => { if (event.key === 'Escape' && activeMenu) { clearHoverTimer(); clearCloseTimer(); navButtons.current[activeMenu]?.focus(); setActiveMenu(null); } }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) scheduleClose(); }}>
+      <button className='public-wordmark' onPointerEnter={() => { clearHoverTimer(); setActiveMenu(null); }} onClick={() => onNavigate('home')} aria-label='Audoryn home'><img src='/audoryn-mark.png' alt='' aria-hidden='true' />Audoryn</button>
       <nav className='public-nav' aria-label='Public navigation'>
-        {NAV.map((item) => <button key={item.route} className={route === item.route ? 'active' : ''} onClick={() => onNavigate(item.route)}>{item.label}</button>)}
+        {NAV.map((item) => <button key={item.route} ref={(element) => { navButtons.current[item.route] = element; }} className={route === item.route || activeMenu === item.route ? 'active' : ''} aria-expanded={NAV_MENUS[item.route] ? activeMenu === item.route : undefined} aria-controls={NAV_MENUS[item.route] ? 'public-nav-panel' : undefined} onPointerEnter={(event) => { if (event.pointerType === 'mouse') scheduleMenu(item.route); }} onFocus={clearCloseTimer} onKeyDown={(event) => { if (event.key === 'ArrowDown' && NAV_MENUS[item.route]) { event.preventDefault(); clearHoverTimer(); clearCloseTimer(); setActiveMenu(item.route); requestAnimationFrame(() => panelRef.current?.querySelector<HTMLButtonElement>('button')?.focus()); } }} onClick={() => navigateMain(item.route)}>{item.label}</button>)}
       </nav>
-      <div className='public-header-actions'>
+      <div className='public-header-actions' onPointerEnter={() => { clearHoverTimer(); setActiveMenu(null); }}>
         <button className='public-signin' onClick={() => onNavigate('login')}>Sign in</button>
         <button className='public-cta small' onClick={() => onNavigate('signup')}>Get started</button>
       </div>
       <button className='public-menu-button' onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen} aria-label='Open navigation'>{menuOpen ? 'Close' : 'Menu'}</button>
+      {activeMenu && NAV_MENUS[activeMenu] && <div id='public-nav-panel' className='public-nav-panel' ref={panelRef} onPointerEnter={clearCloseTimer}>
+        <div className='public-nav-panel-inner'>
+          <div className='public-nav-panel-intro'><span>AUDORYN / {activeMenu.toUpperCase()}</span><strong>{activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1)}</strong><p>{NAV_MENUS[activeMenu].intro}</p><button type='button' onClick={() => navigateMain(activeMenu)}>Explore {activeMenu} <span aria-hidden='true'>↗</span></button></div>
+          <div className='public-nav-panel-links'>{NAV_MENUS[activeMenu].links.map((link, index) => <button key={link.label} type='button' onClick={() => navigateSub(link)}><span className='public-nav-panel-number'>0{index + 1}</span><span><strong>{link.label}</strong><small>{link.detail}</small></span><span className='public-nav-panel-arrow' aria-hidden='true'>↗</span></button>)}</div>
+        </div>
+      </div>}
       {menuOpen && <div className='public-mobile-menu'>
         {NAV.map((item) => <button key={item.route} onClick={() => onNavigate(item.route)}>{item.label}</button>)}
-        <button onClick={() => onNavigate('company')}>Company</button>
         <span />
         <button onClick={() => onNavigate('login')}>Sign in</button>
         <button className='strong' onClick={() => onNavigate('signup')}>Get started</button>
@@ -56,13 +150,13 @@ export default function PublicSite({ route, onNavigate }: { route: PublicRoute; 
     <main>
       {route === 'home' && <HomePage onNavigate={onNavigate} />}
       {route === 'product' && <ProductPage onNavigate={onNavigate} />}
-      {route === 'solutions' && <SolutionsPage onNavigate={onNavigate} />}
+      {route === 'solutions' && <SolutionsPage onNavigate={onNavigate} selectedIndex={destination?.route === 'solutions' ? destination.solutionIndex : undefined} />}
       {route === 'security' && <SecurityPage onNavigate={onNavigate} />}
       {route === 'pricing' && <PricingPage onNavigate={onNavigate} />}
       {route === 'resources' && <ResourcesPage onNavigate={onNavigate} />}
-      {route === 'company' && <CompanyPage onNavigate={onNavigate} />}
-      {route === 'privacy' && <PrivacyPage />}
-      {route === 'terms' && <TermsPage />}
+      {route === 'company' && <CompanyShowcase onNavigate={onNavigate} />}
+      {route === 'privacy' && <LegalShowcase kind='privacy' onNavigate={onNavigate} />}
+      {route === 'terms' && <LegalShowcase kind='terms' onNavigate={onNavigate} />}
     </main>
 
     <Footer onNavigate={onNavigate} />
@@ -70,54 +164,67 @@ export default function PublicSite({ route, onNavigate }: { route: PublicRoute; 
 }
 
 function HomePage({ onNavigate }: { onNavigate: (route: TargetRoute) => void }) {
-  return <>
-    <section className='public-hero public-container'>
-      <div className='public-hero-copy'>
-        <p className='public-kicker'>AUDORYN · AN SOT PRODUCT</p>
-        <h1>Put AI to work.<br />Keep people in control.</h1>
-        <p className='public-lead'>Create AI workers, assign real work, connect company tools, and keep every sensitive action governed by policy and human oversight.</p>
-        <div className='public-actions'><button className='public-cta' onClick={() => onNavigate('signup')}>Get started</button><button className='public-text-action' onClick={() => onNavigate('product')}>Explore product <span>→</span></button></div>
-      </div>
-      <p className='public-hero-note'>Autonomous work should be useful without becoming unaccountable.</p>
-    </section>
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const root = document.querySelector<HTMLElement>('.home-page');
+    if (!root || !('IntersectionObserver' in window)) return;
+    const elements = root.querySelectorAll<HTMLElement>('[data-home-reveal]');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-visible');
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+    elements.forEach((element) => observer.observe(element));
+    root.classList.add('home-motion-ready');
+    return () => { observer.disconnect(); root.classList.remove('home-motion-ready'); };
+  }, []);
 
-    <section className='public-section public-container'>
-      <SectionIntro kicker='THE PRODUCT' title='An operating system for your AI workforce.' body='Audoryn gives businesses one place to create workers, define work, connect tools and supervise the moments where human judgment matters.' />
-      <div className='public-three'>
-        <TextColumn number='01' title='Create workers' body='Give AI clear roles, responsibilities, schedules and a named human supervisor.' />
-        <TextColumn number='02' title='Assign work' body='Turn business objectives into durable jobs that can be scheduled, queued and inspected.' />
-        <TextColumn number='03' title='Stay in control' body='Capabilities, policy, approvals and incident controls remain separate from AI reasoning.' />
-      </div>
-    </section>
+  return <div className='home-page'>
+    <HomeHero onNavigate={onNavigate} />
 
-    <section className='public-section public-container public-how'>
-      <SectionIntro kicker='HOW IT WORKS' title='From a role to real work, without losing the boundary.' />
-      <div className='public-steps'>
-        {[
-          ['01','Create a worker','Define the role, responsibilities, instructions and working hours.'],
-          ['02','Connect the tools it needs','Attach workplace systems through explicit provider connections.'],
-          ['03','Define what it may do','Capabilities and policy make authority visible and deterministic.'],
-          ['04','Assign work','Create jobs, schedules and triggers without granting new permission.'],
-          ['05','Supervise exceptions','Route approvals, failures and elevated-risk work back to people.'],
-        ].map(([number,title,body]) => <div className='public-step' key={number}><span>{number}</span><strong>{title}</strong><p>{body}</p></div>)}
-      </div>
-    </section>
-
-    <section className='public-section public-container'>
-      <SectionIntro kicker='OPERATING VIEW' title='One place to understand what your AI workforce is doing.' body='The authenticated workspace is compact and operational. The public site stays editorial; the product stays focused on work.' />
-      <div className='public-operating-view' aria-label='Audoryn operating model'>
-        <div className='operating-head'><span>Workforce state</span><strong>Human attention stays visible.</strong></div>
-        <div className='operating-grid'>
-          <div><span>Workers</span><strong>Roles, identity, schedules</strong></div>
-          <div><span>Jobs</span><strong>Objectives, queue, runtime</strong></div>
-          <div><span>Governance</span><strong>Policy, risk, approvals</strong></div>
-          <div><span>Supervision</span><strong>Escalations, incidents, audit</strong></div>
+    <section className='home-product public-section' data-home-reveal>
+      <div className='public-container'>
+        <SectionIntro kicker='THE PRODUCT' title='An operating system for your AI workforce.' body='Audoryn gives businesses one place to create workers, define work, connect tools and supervise the moments where human judgment matters.' />
+        <div className='public-three'>
+          <TextColumn number='01' title='Create workers' body='Give AI clear roles, responsibilities, schedules and a named human supervisor.' />
+          <TextColumn number='02' title='Assign work' body='Turn business objectives into durable jobs that can be scheduled, queued and inspected.' />
+          <TextColumn number='03' title='Stay in control' body='Capabilities, policy, approvals and incident controls remain separate from AI reasoning.' />
         </div>
       </div>
     </section>
 
-    <section className='public-section public-container'>
-      <SectionIntro kicker='CONTROL' title='Autonomous where appropriate. Human where it matters.' />
+    <HomeJourney />
+
+    <section className='public-section public-container' data-home-reveal>
+      <SectionIntro kicker='OPERATING VIEW' title='One place to understand what your AI workforce is doing.' body='See workers, queued jobs, governance decisions and the moments that need human attention.' />
+      <HomeOperatingView />
+    </section>
+
+    <section className='home-interlude' data-home-reveal>
+      <div className='public-container home-interlude-inner'>
+        <div className='home-interlude-copy'>
+          <p className='public-kicker'>THE AUDORYN PRINCIPLE</p>
+          <h2><span>AI can propose.</span><span>People stay in control.</span></h2>
+          <p>Every external action meets a boundary the model cannot rewrite. The result is useful autonomy with a clear line of responsibility.</p>
+          <div className='home-interlude-decisions'><span>ALLOW</span><span>HOLD FOR REVIEW</span><span>DENY</span></div>
+        </div>
+        <div className='home-interlude-aperture' aria-hidden='true'><span /><span /><span /><i /></div>
+      </div>
+    </section>
+
+    <section className='public-section public-container home-control' data-home-reveal>
+      <div className='home-human'>
+        <div className='home-human-copy'>
+          <p className='public-kicker'>HUMAN OVERSIGHT</p>
+          <h2>Autonomous where appropriate.<br />Human where it matters.</h2>
+          <p>Workers can keep moving through routine work. The decisions that need judgment return to a person with the context to act.</p>
+          <span>APPROVAL <i /> EXCEPTION <i /> REVIEW</span>
+        </div>
+        <div className='home-human-image'><img src={humanOversightImage} alt='Two colleagues reviewing a decision together at a table' loading='lazy' /></div>
+      </div>
+      <p className='public-kicker home-control-list-label'>CONTROL / THE BOUNDARIES IN PRACTICE</p>
       <div className='public-control-list'>
         <ControlRow title='Capability controls' body='Define the actions an AI worker may attempt.' />
         <ControlRow title='Policy' body='Make authorization deterministic instead of leaving it to model judgment.' />
@@ -127,158 +234,83 @@ function HomePage({ onNavigate }: { onNavigate: (route: TargetRoute) => void }) 
       </div>
     </section>
 
-    <section className='public-section public-container'>
+    <section className='public-section public-container' data-home-reveal>
       <SectionIntro kicker='CONNECTIONS' title='Works where your company already works.' body='Provider connections expose bounded technical operations. They do not become AI permissions by themselves.' />
-      <div className='public-integrations' aria-label='Supported workplace systems'>
-        {['GitHub','Slack','Gmail','Google Drive','Google Calendar','REST / MCP'].map((name) => <span key={name}>{name}</span>)}
+      <div className='home-connections'>
+        <div className='home-connections-heading'><span>CONNECTED SYSTEMS</span><span>CONTROLLED ACTION PATH</span></div>
+        <div className='home-connections-flow'>
+          <div className='public-integrations' aria-label='Supported workplace systems'>
+            {['GitHub','Slack','Gmail','Google Drive','Google Calendar','REST / MCP'].map((name) => <span key={name}>{name}</span>)}
+          </div>
+          <div className='home-connections-boundary' aria-hidden='true'><span>POLICY<br />BOUNDARY</span><i /></div>
+          <div className='home-connections-result'>
+            <span>AVAILABLE ACTION</span>
+            <strong>Authority is checked before execution.</strong>
+            <small>CAPABILITY <b>→</b> POLICY <b>→</b> APPROVAL</small>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section className='public-section public-container'>
-      <SectionIntro kicker='SOLUTIONS' title='Built for different kinds of work.' />
-      <div className='public-solution-links'>
-        {['Customer support','Research','Sales','Marketing','Operations','Software development'].map((name, index) => <button key={name} onClick={() => onNavigate('solutions')}><span>0{index + 1}</span><strong>{name}</strong><em>→</em></button>)}
+    <section className='home-solutions public-section' data-home-reveal>
+      <div className='public-container'>
+        <div className='home-solutions-heading'>
+          <SectionIntro kicker='SOLUTIONS' title='Built for different kinds of work.' body='Start with a defined responsibility. Give the worker room to move, with a person and a policy around the actions that matter.' />
+          <span>SELECTED APPLICATIONS / 01 — 06</span>
+        </div>
+        <div className='home-solution-feature-grid'>
+          <button className='home-solution-feature home-solution-feature-main' onClick={() => onNavigate('solutions')}>
+            <span className='home-solution-image'><img src={operationsImage} alt='A logistics operations floor with a supervisor overseeing the work' loading='lazy' /></span>
+            <span className='home-solution-copy'><small>01 / OPERATIONS</small><strong>Keep recurring work moving. Keep exceptions visible.</strong><span>Scheduled work, connected tools and a clear handoff when conditions change.</span><em>Explore operations <b>↗</b></em></span>
+          </button>
+          <button className='home-solution-feature home-solution-feature-secondary' onClick={() => onNavigate('solutions')}>
+            <span className='home-solution-image'><img src={researchImage} alt='Research materials being reviewed at a worktable' loading='lazy' /></span>
+            <span className='home-solution-copy'><small>02 / RESEARCH</small><strong>Turn open questions into inspectable work.</strong><span>Collect and structure findings while people remain responsible for the result.</span><em>Explore research <b>↗</b></em></span>
+          </button>
+        </div>
+        <div className='home-solution-more' aria-label='More solution areas'>
+          {['Customer support','Sales','Marketing','Software development'].map((name, index) => <button key={name} onClick={() => onNavigate('solutions')}><span>0{index + 3}</span><strong>{name}</strong><em>↗</em></button>)}
+        </div>
       </div>
     </section>
 
-    <section className='public-section public-container'>
-      <SectionIntro kicker='TRUST' title='Control is part of the architecture, not an add-on.' />
-      <div className='public-trust-lines'>
-        <span>Human identity ≠ AI identity</span>
-        <span>Every side effect passes through authorization</span>
-        <span>Sensitive actions can require approval</span>
-        <span>Credentials stay outside the frontend</span>
-        <span>Every decision carries an audit trail</span>
+    <section className='home-trust public-section public-container' data-home-reveal>
+      <div className='home-trust-intro'>
+        <p className='public-kicker'>TRUST / BY DESIGN</p>
+        <h2>Control is part of the architecture.</h2>
+        <p>The boundary around an action stays visible from identity through the final record.</p>
+        <button className='public-text-action' onClick={() => onNavigate('security')}>Read about security <span>→</span></button>
       </div>
-      <button className='public-text-action after-list' onClick={() => onNavigate('security')}>Read about security <span>→</span></button>
+      <ol className='home-trust-track'>
+        <li><span>01</span><strong>Identity</strong><p>Human and AI identities remain distinct.</p></li>
+        <li><span>02</span><strong>Authorization</strong><p>Every external action is checked against capability and policy.</p></li>
+        <li><span>03</span><strong>Approval</strong><p>Sensitive work can pause for a person.</p></li>
+        <li><span>04</span><strong>Audit</strong><p>The decision and outcome stay connected in a record.</p></li>
+      </ol>
     </section>
 
     <ClosingCta onNavigate={onNavigate} />
-  </>;
+  </div>;
 }
 
 function ProductPage({ onNavigate }: { onNavigate: (route: TargetRoute) => void }) {
-  const areas = [
-    ['Workers','Business-facing AI workers with roles, responsibilities, schedules, supervisors and a separate security identity.'],
-    ['Jobs','Durable work definitions with objectives, requirements, priorities, triggers and completion criteria.'],
-    ['Runtime','Queue-based execution with checkpoints, retries, approvals and fail-closed recovery.'],
-    ['Supervision','Human handoff for failures, elevated risk and exceptional autonomous work.'],
-    ['Governance','Capabilities, policy, risk, approvals, incidents and audit around every controlled side effect.'],
-    ['Connections','Replaceable provider adapters for the workplace systems your company already uses.'],
-  ];
-  return <><PageIntro kicker='PRODUCT' title='A calm operating layer for autonomous work.' body='Audoryn separates what AI decides from what the organization allows. Workers can plan and act, but authority remains explicit.' />
-    <section className='public-section public-container'>
-      <div className='public-feature-rows'>{areas.map(([title,body], index) => <div key={title}><span>0{index + 1}</span><h2>{title}</h2><p>{body}</p></div>)}</div>
-    </section>
-    <section className='public-section public-container public-split'>
-      <SectionIntro kicker='THE BOUNDARY' title='AI chooses what comes next. Audoryn decides what is allowed.' body='Natural-language instructions, memory and model reasoning never become authorization. External actions still pass through identity, capability, risk, policy and approval controls.' />
-      <div className='public-simple-list'><span>AI reasoning</span><span>Durable workflow</span><span>Deterministic authorization</span><span>Human exception handling</span></div>
-    </section>
-    <ClosingCta onNavigate={onNavigate} />
-  </>;
+  return <ProductShowcase onNavigate={onNavigate} />;
 }
 
-function SolutionsPage({ onNavigate }: { onNavigate: (route: TargetRoute) => void }) {
-  const solutions = [
-    ['Customer support','Triage requests, prepare responses and escalate sensitive customer situations to people.'],
-    ['Research','Collect, structure and summarize information while keeping external actions governed.'],
-    ['Sales','Coordinate follow-up work, research accounts and prepare drafts without silently changing CRM state.'],
-    ['Marketing','Run repeatable research, content and coordination jobs with explicit publishing boundaries.'],
-    ['Operations','Schedule recurring work, monitor exceptions and keep a durable record of execution.'],
-    ['Software development','Coordinate repository work and issue creation while write actions remain controlled.'],
-  ];
-  return <><PageIntro kicker='SOLUTIONS' title='AI workers for work that already exists.' body='Audoryn starts from business responsibilities, not novelty. Each worker has a clear charter, connected tools and explicit authority.' />
-    <section className='public-section public-container'><div className='public-solution-detail'>{solutions.map(([title,body], index) => <div key={title}><span>0{index + 1}</span><h2>{title}</h2><p>{body}</p><small>Start from a supervised worker blueprint</small></div>)}</div></section>
-    <section className='public-section public-container public-split'><SectionIntro kicker='TEMPLATES' title='Start faster without granting permission faster.' body='Templates can suggest roles, responsibilities, jobs, integrations and policy defaults. They create draft setup only; authority stays separate.' /><button className='public-text-action' onClick={() => onNavigate('security')}>See the control model <span>→</span></button></section>
-    <ClosingCta onNavigate={onNavigate} />
-  </>;
+function SolutionsPage({ onNavigate, selectedIndex }: { onNavigate: (route: TargetRoute) => void; selectedIndex?: number }) {
+  return <SolutionsShowcase onNavigate={onNavigate} selectedIndex={selectedIndex} />;
 }
 
 function SecurityPage({ onNavigate }: { onNavigate: (route: TargetRoute) => void }) {
-  const controls = [
-    ['Identity separation','Human sessions and AI identities are different security principals. A user session cannot stand in for an agent credential.'],
-    ['Capability-based authority','Workers receive only explicitly declared capabilities. Missing authority fails closed.'],
-    ['Policy enforcement','Deterministic policy resolves whether a controlled action is allowed, denied or requires approval.'],
-    ['Human approvals','Sensitive actions can pause for human review. An AI worker cannot approve its own action.'],
-    ['Credential handling','Provider credentials remain outside the frontend and are referenced through protected integration boundaries.'],
-    ['Incident controls','Organization, worker and integration execution can be stopped independently without destroying operational state.'],
-    ['Auditability','Actions, decisions, approvals, incidents and correlation IDs preserve a trace of what happened.'],
-    ['Tenant isolation','Organizations remain the boundary for membership, workers, policies, credentials and data access.'],
-  ];
-  return <><PageIntro kicker='SECURITY' title='Control is designed into the execution path.' body='Audoryn does not treat an AI model as the final authorization authority. Security remains deterministic, inspectable and independent of the worker’s reasoning.' />
-    <section className='public-section public-container'><div className='public-security-rows'>{controls.map(([title,body]) => <div key={title}><h2>{title}</h2><p>{body}</p></div>)}</div></section>
-    <section className='public-section public-container public-split'><SectionIntro kicker='FAIL CLOSED' title='When authority cannot be verified, work does not continue.' body='Kill switches, credential checks, capability requirements, policy evaluation and approval state are revalidated rather than bypassed for convenience.' /><div className='public-code-line'>Identity → Capability → Risk → Policy → Approval → Provider</div></section>
-    <ClosingCta onNavigate={onNavigate} />
-  </>;
+  return <SecurityShowcase onNavigate={onNavigate} />;
 }
 
 function PricingPage({ onNavigate }: { onNavigate: (route: TargetRoute) => void }) {
-  return <><PageIntro kicker='PRICING' title='Start small. Add capacity when the work proves itself.' body='Audoryn’s commercial layer limits product capacity; it does not change what an AI worker is authorized to do.' />
-    <section className='public-section public-container'>
-      <div className='public-pricing'>
-        <Plan name='Free' audience='For trying Audoryn with a small managed workforce.' action='Get started' onClick={() => onNavigate('signup')} features={['Core workforce workspace','Governance and approval controls','Limited managed-worker capacity']} />
-        <Plan name='Business' audience='For teams operating AI workers across recurring company work.' action='Talk to us' onClick={() => onNavigate('company')} features={['Higher workforce capacity','Organization collaboration','Production operations visibility']} />
-        <Plan name='Enterprise' audience='For larger deployments with security, governance and rollout requirements.' action='Contact us' onClick={() => onNavigate('company')} features={['Enterprise rollout planning','Security and governance review','Deployment and support alignment']} />
-      </div>
-      <p className='public-pricing-note'>Audoryn does not advertise a checkout flow until a verified billing provider is connected. Plan state never bypasses execution authorization.</p>
-    </section>
-    <ClosingCta onNavigate={onNavigate} />
-  </>;
+  return <PricingShowcase onNavigate={onNavigate} />;
 }
 
 function ResourcesPage({ onNavigate }: { onNavigate: (route: TargetRoute) => void }) {
-  return <><PageIntro kicker='RESOURCES' title='Understand the product before you operate it.' body='The useful material is the architecture, control model and operating principles—not marketing filler.' />
-    <section className='public-section public-container'><div className='public-resource-rows'>
-      <Resource title='Product overview' body='How workers, jobs, runtime, supervision and connections fit together.' action='Read product' onClick={() => onNavigate('product')} />
-      <Resource title='Security model' body='Identity separation, capability authority, policy, approvals, incidents and audit.' action='Read security' onClick={() => onNavigate('security')} />
-      <Resource title='Solutions' body='How Audoryn applies the same operating model across different kinds of company work.' action='Explore solutions' onClick={() => onNavigate('solutions')} />
-      <Resource title='Pricing approach' body='Capacity and commercial readiness without pretending an unverified checkout integration exists.' action='View pricing' onClick={() => onNavigate('pricing')} />
-    </div></section>
-    <section className='public-section public-container public-split'><SectionIntro kicker='DOCUMENTATION' title='Operator documentation stays close to the product.' body='The authenticated workspace already exposes operational guidance around runtime, authorization, incident recovery and API lifecycle. A dedicated public docs surface can grow when there is enough material to justify it.' /><span className='public-muted-note'>No empty documentation shell.</span></section>
-    <ClosingCta onNavigate={onNavigate} />
-  </>;
-}
-
-function CompanyPage({ onNavigate }: { onNavigate: (route: TargetRoute) => void }) {
-  return <><PageIntro kicker='COMPANY' title='Audoryn is built by SOT.' body='Audoryn is an SOT product focused on making autonomous software useful inside real organizations without making human authority ambiguous.' />
-    <section className='public-section public-container'>
-      <div className='public-company-grid'>
-        <div><span>01</span><h2>Useful autonomy</h2><p>AI workers should perform real work, not stop at demos and chat interfaces.</p></div>
-        <div><span>02</span><h2>Explicit control</h2><p>Authority, approvals and incident controls should remain understandable to people.</p></div>
-        <div><span>03</span><h2>Evolution without rewrites</h2><p>Stable domain boundaries, versioned APIs and replaceable adapters let the product evolve without discarding its core.</p></div>
-      </div>
-    </section>
-    <section className='public-section public-container public-contact'>
-      <p className='public-kicker'>START WITH AUDORYN</p>
-      <h2>See what a controlled AI workforce looks like in practice.</h2>
-      <p>Start with the Free workspace, or use your existing SOT business contact for a pilot, partnership or enterprise discussion.</p>
-      <div className='public-actions'><button className='public-cta' onClick={() => onNavigate('signup')}>Get started</button><button className='public-text-action' onClick={() => onNavigate('product')}>Explore product <span>→</span></button></div>
-    </section>
-  </>;
-}
-
-function PrivacyPage() {
-  return <><PageIntro kicker='LEGAL' title='Privacy' body='This public notice summarizes how the Audoryn product is designed to handle identity and operational data. Contractual or jurisdiction-specific terms may add to this notice.' />
-    <LegalBody sections={[
-      ['Product data','Audoryn processes organization, workforce, job, governance, audit and integration metadata needed to provide the service.'],
-      ['Credentials','Provider credentials are not intended for public pages or frontend storage. Connected-tool credentials are handled through protected product boundaries.'],
-      ['Organization isolation','Operational records are scoped to the organization and authenticated membership context that created or is authorized to access them.'],
-      ['Audit and security records','Security and execution history may be retained to support auditability, incident investigation and operational reliability.'],
-      ['Public website','The public website is primarily informational. It does not expose private workforce data before authentication.'],
-    ]} />
-  </>;
-}
-
-function TermsPage() {
-  return <><PageIntro kicker='LEGAL' title='Terms' body='This page gives a plain-language product-use overview. Signed commercial agreements or other applicable terms may supersede this summary.' />
-    <LegalBody sections={[
-      ['Authorized use','Use Audoryn only for organizations, systems and provider accounts you are authorized to operate.'],
-      ['Human responsibility','Audoryn can supervise and constrain AI workers, but organizations remain responsible for how they configure workers, policies, connected tools and approvals.'],
-      ['Security boundaries','Do not attempt to bypass identity, capability, policy, approval, incident or tenant-isolation controls.'],
-      ['Service evolution','Audoryn may evolve APIs, product surfaces and integrations while preserving compatibility and migration boundaries where appropriate.'],
-      ['Third-party systems','Connected providers remain subject to their own availability, permissions and terms.'],
-    ]} />
-  </>;
+  return <ResourcesShowcase onNavigate={onNavigate} />;
 }
 
 function Footer({ onNavigate }: { onNavigate: (route: TargetRoute) => void }) {
@@ -298,10 +330,6 @@ function ClosingCta({ onNavigate }: { onNavigate: (route: TargetRoute) => void }
   return <section className='public-closing'><div className='public-container'><p className='public-kicker'>AUDORYN</p><h2>Give AI real work.<br />Keep authority explicit.</h2><p>Start with a small workforce and build from there.</p><button onClick={() => onNavigate('signup')}>Get started <span>→</span></button></div></section>;
 }
 
-function PageIntro({ kicker, title, body }: { kicker: string; title: string; body: string }) {
-  return <section className='public-page-intro public-container'><p className='public-kicker'>{kicker}</p><h1>{title}</h1><p>{body}</p></section>;
-}
-
 function SectionIntro({ kicker, title, body }: { kicker: string; title: string; body?: string }) {
   return <div className='public-section-intro'><p className='public-kicker'>{kicker}</p><h2>{title}</h2>{body && <p>{body}</p>}</div>;
 }
@@ -312,18 +340,6 @@ function TextColumn({ number, title, body }: { number: string; title: string; bo
 
 function ControlRow({ title, body }: { title: string; body: string }) {
   return <div><h3>{title}</h3><p>{body}</p><span>→</span></div>;
-}
-
-function Plan({ name, audience, features, action, onClick }: { name: string; audience: string; features: string[]; action: string; onClick: () => void }) {
-  return <article><p className='public-kicker'>{name}</p><h2>{name}</h2><p>{audience}</p><ul>{features.map((item) => <li key={item}>{item}</li>)}</ul><button onClick={onClick}>{action} <span>→</span></button></article>;
-}
-
-function Resource({ title, body, action, onClick }: { title: string; body: string; action: string; onClick: () => void }) {
-  return <div><h2>{title}</h2><p>{body}</p><button className='public-text-action' onClick={onClick}>{action} <span>→</span></button></div>;
-}
-
-function LegalBody({ sections }: { sections: [string,string][] }) {
-  return <section className='public-section public-container public-legal'><p className='public-legal-note'>This page is a product-level notice and not legal advice.</p>{sections.map(([title,body]) => <div key={title}><h2>{title}</h2><p>{body}</p></div>)}</section>;
 }
 
 function FooterGroup({ title, items, onNavigate }: { title: string; items: [string,TargetRoute][]; onNavigate: (route: TargetRoute) => void }) {

@@ -1,4 +1,5 @@
 import { apiUrl } from './config';
+import { isWorkspacePreview } from '../preview/previewMode';
 
 export class ApiClientError extends Error {
   status: number;
@@ -19,6 +20,10 @@ function readAccessToken() {
 }
 
 async function request<T = any>(method: string, path: string, body?: unknown): Promise<ApiResponse<T>> {
+  if (import.meta.env.DEV && isWorkspacePreview()) {
+    const { previewResponse } = await import('../preview/previewResponses');
+    return previewResponse(method, path, body) as Promise<ApiResponse<T>>;
+  }
   const headers = new Headers({ Accept: 'application/json' });
   const token = readAccessToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
