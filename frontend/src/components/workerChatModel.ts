@@ -1,5 +1,9 @@
 import type { ConversationMessage, ConversationThread } from '../lib/conversationApi';
 
+export function isHumanMessage(role: string) {
+  return role === 'human' || role === 'user';
+}
+
 export function discoveryWorkers<T extends { name: string; department: string }>(workers: T[], query: string, offset: number) {
   const term = query.trim().toLowerCase();
   const filtered = workers.filter((worker) => `${worker.name} ${worker.department}`.toLowerCase().includes(term));
@@ -10,7 +14,7 @@ export function discoveryWorkers<T extends { name: string; department: string }>
 export function conversationFrames(messages: ConversationMessage[]) {
   const frames: Array<{ id: string; direction: ConversationMessage | null; responses: ConversationMessage[] }> = [];
   for (const message of messages) {
-    if (message.role === 'user') {
+    if (isHumanMessage(message.role)) {
       frames.push({ id: message.id, direction: message, responses: [] });
     } else {
       if (!frames.length) frames.push({ id: message.id, direction: null, responses: [] });

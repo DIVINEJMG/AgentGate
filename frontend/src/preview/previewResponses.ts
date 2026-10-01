@@ -65,11 +65,11 @@ const conversationThreads = [
 ];
 const conversationMessages = {
   'preview-thread-1': [
-    { id: 'preview-message-1', organizationId: org, threadId: 'preview-thread-1', role: 'user', content: 'What is the state of the weekly brief?', artifactReferences: [], commandReferences: [], resultReferences: [], createdAt: recent(1) },
-    { id: 'preview-message-2', organizationId: org, threadId: 'preview-thread-1', role: 'assistant', content: 'The brief is ready for your review. One source still needs a human decision before any external update.', artifactReferences: [], commandReferences: [], resultReferences: [], createdAt: recent(0) },
+    { id: 'preview-message-1', organizationId: org, threadId: 'preview-thread-1', role: 'human', content: 'What is the state of the weekly brief?', artifactReferences: [], commandReferences: [], resultReferences: [], createdAt: recent(1) },
+    { id: 'preview-message-2', organizationId: org, threadId: 'preview-thread-1', role: 'worker', content: 'The brief is ready for your review. One source still needs a human decision before any external update.', artifactReferences: [], commandReferences: [], resultReferences: [], createdAt: recent(0) },
   ],
-  'preview-thread-2': [{ id: 'preview-message-3', organizationId: org, threadId: 'preview-thread-2', role: 'assistant', content: 'I gathered the source material and marked the items that need confirmation.', artifactReferences: [], commandReferences: [], resultReferences: [], createdAt: recent(2) }],
-  'preview-thread-3': [{ id: 'preview-message-4', organizationId: org, threadId: 'preview-thread-3', role: 'assistant', content: 'The daily work queue is current. A policy block was recorded for review.', artifactReferences: [], commandReferences: [], resultReferences: [], createdAt: recent(1) }],
+  'preview-thread-2': [{ id: 'preview-message-3', organizationId: org, threadId: 'preview-thread-2', role: 'worker', content: 'I gathered the source material and marked the items that need confirmation.', artifactReferences: [], commandReferences: [], resultReferences: [], createdAt: recent(2) }],
+  'preview-thread-3': [{ id: 'preview-message-4', organizationId: org, threadId: 'preview-thread-3', role: 'worker', content: 'The daily work queue is current. A policy block was recorded for review.', artifactReferences: [], commandReferences: [], resultReferences: [], createdAt: recent(1) }],
 };
 
 const job: JobsWorkspace['jobs'][number] = {
