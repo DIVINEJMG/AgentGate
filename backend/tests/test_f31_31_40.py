@@ -273,12 +273,22 @@ def test_normal_worker_ux_is_conversational_and_manual_setup_remains() -> None:
     profile = (
         ROOT / "frontend/src/components/WorkerExperienceProfile.tsx"
     ).read_text(encoding="utf-8")
+    product_app = (ROOT / "frontend/src/ProductApp.tsx").read_text(
+        encoding="utf-8"
+    )
+    chat_page = (
+        ROOT / "frontend/src/components/WorkerChatPage.tsx"
+    ).read_text(encoding="utf-8")
 
     assert "NaturalWorkerCreate" in workforce
     assert "WorkerQuickStart" in workforce
     assert "What should this worker do?" in natural
     assert "Advanced setup" in natural
-    assert "WorkerConversation" in profile
+    assert "onClick={onChat}" in profile
+    assert "Open conversation" in profile
+    assert "WorkerChatPage" in product_app
+    assert "view === 'conversations'" in product_app
+    assert "ConversationField" in chat_page
     assert "Current work" in profile
     assert "Next scheduled work" in profile
     assert "Recent result" in profile

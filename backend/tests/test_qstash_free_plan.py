@@ -45,6 +45,9 @@ def test_work_queue_exposes_dispatch_health_without_mutating_work_items() -> Non
     jobs_panel = (ROOT / "frontend/src/components/JobsPanel.tsx").read_text(
         encoding="utf-8"
     )
+    jobs_workspace = (
+        ROOT / "frontend/src/components/JobsWorkspacePage.tsx"
+    ).read_text(encoding="utf-8")
 
     assert '"runtime-dispatch-health"' in trigger
     assert '"quota_exhausted"' in trigger
@@ -54,8 +57,10 @@ def test_work_queue_exposes_dispatch_health_without_mutating_work_items() -> Non
     assert "request_runtime_execution_detailed" in runtime_routes
     assert '"dispatch": execution_signal.as_dict()' in runtime_routes
     assert "RuntimeDispatchHealth" in jobs_api
-    assert "Runtime dispatch delayed." in jobs_panel
-    assert "dispatchBlocked" in jobs_panel
+    assert "JobsWorkspacePage" in jobs_panel
+    assert "data={data}" in jobs_panel
+    assert "Runtime dispatch delayed." in jobs_workspace
+    assert "dispatchBlocked" in jobs_workspace
 
 
 def test_qstash_recovery_cadence_preserves_free_plan_headroom() -> None:
