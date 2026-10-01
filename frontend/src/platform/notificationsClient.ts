@@ -1,3 +1,5 @@
+import { isWorkspacePreview } from '../preview/previewMode';
+
 export interface NotificationEnvironment {
   supported: boolean;
   isSupported: boolean;
@@ -8,7 +10,7 @@ export interface NotificationEnvironment {
 type NotificationPayload = { data: Record<string, unknown> };
 
 function environment(): NotificationEnvironment {
-  const supported = typeof window !== 'undefined' && 'Notification' in window;
+  const supported = typeof window !== 'undefined' && !isWorkspacePreview() && 'Notification' in window;
   return {
     supported,
     isSupported: supported,
@@ -23,6 +25,7 @@ export const notifications = Object.freeze({
   },
 
   async subscribe() {
+    if (isWorkspacePreview()) return environment();
     if ('Notification' in window && Notification.permission === 'default') {
       await Notification.requestPermission();
     }

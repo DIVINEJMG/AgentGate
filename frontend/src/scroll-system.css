@@ -1,0 +1,117 @@
+/* Audoryn's document rail follows native scrolling; only its visual control is custom. */
+html.audoryn-rail-active { scrollbar-width: none; }
+html.audoryn-rail-active::-webkit-scrollbar,
+html.audoryn-rail-active body::-webkit-scrollbar { display: none; }
+
+.audoryn-scroll-control {
+  --scroll-thumb-size: 52px;
+  --scroll-thumb-offset: 0px;
+  --scroll-progress: 0%;
+  position: fixed;
+  z-index: 110;
+  top: 50%;
+  right: 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 42px;
+  height: min(67dvh, 610px);
+  min-height: 250px;
+  padding: 8px 0;
+  border: 0;
+  border-radius: 22px;
+  background: rgba(246, 249, 245, .8);
+  box-shadow: 0 0 0 1px rgba(82, 111, 89, .08), 0 8px 28px rgba(27, 52, 33, .06);
+  color: #78937d;
+  opacity: 0;
+  pointer-events: none;
+  touch-action: none;
+  transform: translateY(-50%) translateX(8px);
+  transition: opacity .25s ease, transform .25s ease, background .2s ease;
+  user-select: none;
+}
+.audoryn-scroll-control.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) translateX(0);
+}
+.audoryn-scroll-control:hover,
+.audoryn-scroll-control:focus-visible { background: #f3f7f1; }
+.audoryn-scroll-control:focus-visible { outline: 2px solid #486e51; outline-offset: 3px; }
+.audoryn-scroll-control.is-workspace { background: rgba(250, 252, 249, .92); }
+.audoryn-scroll-label {
+  height: 53px;
+  color: #8ea392;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .17em;
+  line-height: 1;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+.audoryn-scroll-track {
+  position: relative;
+  flex: 1;
+  width: 28px;
+  min-height: 0;
+  margin: 11px 0 10px;
+}
+.audoryn-scroll-track::before,
+.audoryn-scroll-progress {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  content: '';
+}
+.audoryn-scroll-track::before { bottom: 0; background: #d4e1d5; }
+.audoryn-scroll-progress {
+  height: var(--scroll-progress);
+  background: #4a7754;
+}
+.audoryn-scroll-tick {
+  position: absolute;
+  left: 50%;
+  width: 8px;
+  height: 1px;
+  background: #a9bcac;
+  transform: translateX(-50%);
+}
+.audoryn-scroll-tick.is-first { top: 0; }
+.audoryn-scroll-tick.is-quarter { top: 25%; }
+.audoryn-scroll-tick.is-middle { top: 50%; }
+.audoryn-scroll-tick.is-three-quarter { top: 75%; }
+.audoryn-scroll-tick.is-last { bottom: 0; }
+.audoryn-scroll-thumb {
+  position: absolute;
+  z-index: 1;
+  top: var(--scroll-thumb-offset);
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: var(--scroll-thumb-size);
+  border: 1px solid #496f53;
+  border-radius: 13px;
+  background: linear-gradient(145deg, #355c40, #1f3b29);
+  box-shadow: 0 5px 12px rgba(32, 63, 39, .19), inset 0 1px 0 rgba(255, 255, 255, .17);
+  cursor: grab;
+  transform: translateX(-50%);
+}
+.audoryn-scroll-control:active .audoryn-scroll-thumb { cursor: grabbing; }
+.audoryn-scroll-thumb img { display: block; width: 16px; height: 16px; object-fit: contain; filter: brightness(0) invert(1); opacity: .9; pointer-events: none; }
+.audoryn-scroll-percent {
+  min-height: 18px;
+  color: #4c7055;
+  font-size: 9px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+}
+@media (max-width: 899px), (pointer: coarse), (forced-colors: active) {
+  .audoryn-scroll-control { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .audoryn-scroll-control { transition: none; }
+}

@@ -14,7 +14,9 @@ def read(path: str) -> str:
 workforce = read("frontend/src/components/WorkforcePanel.tsx")
 natural = read("frontend/src/components/NaturalWorkerCreate.tsx")
 profile = read("frontend/src/components/WorkerExperienceProfile.tsx")
-conversation_ui = read("frontend/src/components/WorkerConversation.tsx")
+product_app = read("frontend/src/ProductApp.tsx")
+chat_page = read("frontend/src/components/WorkerChatPage.tsx")
+conversation_ui = read("frontend/src/components/ConversationField.tsx")
 settings_ui = read("frontend/src/components/SettingsPanel.tsx")
 ai_ops_ui = read("frontend/src/components/AIOperationsPanel.tsx")
 commands = read("backend/app/application/services/conversation_commands.py")
@@ -48,11 +50,16 @@ for token in (
     "Current work",
     "Next scheduled work",
     "Recent result",
-    "WorkerConversation",
     "Advanced diagnostics & configuration",
 ):
     if token not in profile:
         errors.append(f"F31.32 employee worker profile is missing: {token}")
+if "onClick={onChat}" not in profile or "Open conversation" not in profile:
+    errors.append("F31.32 employee worker profile cannot open a conversation")
+if "WorkerChatPage" not in product_app or "view === 'conversations'" not in product_app:
+    errors.append("F31.32 conversation page is not routed from the workspace")
+if "ConversationField" not in chat_page:
+    errors.append("F31.32 conversation page is missing its chat interface")
 
 for token in (
     "Jobs & schedules",

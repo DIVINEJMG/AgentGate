@@ -1,0 +1,30 @@
+.home-gate { min-width: 0; margin: 0; }
+.home-gate-art { position: relative; height: clamp(480px, 45vw, 660px); overflow: hidden; isolation: isolate; background: radial-gradient(ellipse at 55% 46%, #fcfcf9, #f7f7f3 72%); }
+.home-gate-art::before { position: absolute; inset: 0; z-index: -1; background: linear-gradient(rgba(38,56,47,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(38,56,47,.045) 1px, transparent 1px); background-size: 52px 52px; mask-image: radial-gradient(ellipse at center, #000 8%, transparent 75%); content: ''; }
+.home-gate-art canvas { display: block; width: 100%; height: 100%; opacity: 0; transition: opacity .8s ease; }
+.home-gate-art[data-ready='true'] canvas { opacity: 1; }
+.home-gate-coordinate { position: absolute; inset: 28px 30px auto; display: flex; justify-content: space-between; gap: 15px; color: #777f75; font-size: 10px; font-weight: 600; letter-spacing: .13em; pointer-events: none; }
+.home-gate figcaption { display: flex; justify-content: space-between; gap: 15px; padding: 19px 0; border-top: 1px solid var(--public-line); color: var(--public-muted); font-size: 11px; }
+.home-gate figcaption span:first-child { color: var(--public-text); font-size: 10px; font-weight: 600; letter-spacing: .1em; }
+.home-gate-phase { position: absolute; right: 32px; bottom: 30px; display: flex; align-items: baseline; gap: 16px; color: #4e6655; pointer-events: none; }
+.home-gate-phase span { color: #7c8d7d; font-size: 10px; letter-spacing: .13em; }
+.home-gate-phase strong { min-width: 150px; font-size: 12px; font-weight: 500; text-align: right; }
+
+/* A deliberate static illustration keeps the same visual language without WebGL. */
+.home-gate-static { position: absolute; inset: 0; display: grid; place-items: center; perspective: 900px; transition: opacity .5s ease; }
+.home-gate-static span { position: absolute; width: 41%; height: 55%; border: 10px solid #c9d2c6; box-shadow: 12px 18px 25px rgba(38,56,47,.08); transform: rotateY(-22deg) rotateX(8deg); }
+.home-gate-static span:nth-child(1) { translate: -28px 15px; opacity: .45; }
+.home-gate-static span:nth-child(2) { translate: 0 0; border-color: #526d58; opacity: .7; }
+.home-gate-static span:nth-child(3) { translate: 30px -15px; border-color: #26382f; }
+.home-gate-static i { width: 80px; height: 65px; background: #26382f; box-shadow: 14px 18px 22px rgba(38,56,47,.24); transform: translateZ(70px) rotateY(-22deg); }
+.home-gate-art[data-ready='true'] .home-gate-static { opacity: 0; }
+
+@media (max-width: 1000px) { .home-gate-art { height: 500px; } }
+@media (max-width: 700px) {
+  .home-gate-art { height: 390px; }
+  .home-gate-coordinate { inset: 22px 18px auto; font-size: 9px; }
+  .home-gate figcaption { flex-direction: column; gap: 5px; }
+  .home-gate-phase { right: 18px; bottom: 17px; }
+  .home-gate-static span { width: 57%; height: 61%; border-width: 7px; }
+}
+@media (prefers-reduced-motion: reduce) { .home-gate-art canvas, .home-gate-static { transition: none; } }

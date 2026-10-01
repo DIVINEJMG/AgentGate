@@ -4,6 +4,7 @@ import {
   Clock3,
   PauseCircle,
   PlayCircle,
+  MessageCircle,
   ShieldCheck,
   Trash2,
   Wrench,
@@ -20,7 +21,6 @@ import type {
   WorkerStatus,
 } from '../lib/workforceApi';
 import type { AppView } from '../navigation';
-import WorkerConversation from './WorkerConversation';
 
 function dateTime(value: string | null | undefined) {
   if (!value) return 'Not scheduled';
@@ -59,6 +59,7 @@ export default function WorkerExperienceProfile({
   onEdit,
   onStatus,
   onDelete,
+  onChat,
   onNavigate,
 }: {
   worker: ManagedWorker;
@@ -72,6 +73,7 @@ export default function WorkerExperienceProfile({
   onEdit: () => void;
   onStatus: (status: WorkerStatus) => void;
   onDelete: () => void;
+  onChat: () => void;
   onNavigate: (view: AppView) => void;
 }) {
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
@@ -79,7 +81,6 @@ export default function WorkerExperienceProfile({
   const [results, setResults] = useState<ResultSummary[]>([]);
   const [approvals, setApprovals] = useState<ApprovalRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -99,7 +100,7 @@ export default function WorkerExperienceProfile({
       if (active) setLoading(false);
     });
     return () => { active = false; };
-  }, [apiVersion, organizationId, worker.id, reloadToken]);
+  }, [apiVersion, organizationId, worker.id]);
 
   const currentWork = useMemo(() => {
     const rank: Record<string, number> = {
@@ -166,16 +167,13 @@ export default function WorkerExperienceProfile({
           <small>{recentResult?.summary ?? 'Completed work will appear here.'}</small>
         </article>
       </div>
-
-      <WorkerConversation
-        organizationId={organizationId}
-        workerId={worker.id}
-        workerName={worker.name}
-        apiVersion={apiVersion}
-        pendingApprovals={pendingApprovals}
-        onApprovalsChanged={() => setReloadToken((value) => value + 1)}
-        onNavigate={onNavigate}
-      />
+      <div className="worker-profile-primary-actions">
+        <button type="button" className="primary-button" onClick={onChat}><MessageCircle size={15} /> Open conversation</button>
+        {canManage && worker.status !== 'archived' && <button type="button" className="secondary-button" onClick={onEdit}>Edit worker</button>}
+        {canManage && worker.status !== 'active' && worker.status !== 'archived' && <button type="button" className="secondary-button" disabled={saving} onClick={() => onStatus('active')}><PlayCircle size={15} /> Activate</button>}
+        {canManage && worker.status === 'active' && <button type="button" className="secondary-button" disabled={saving} onClick={() => onStatus('paused')}><PauseCircle size={15} /> Pause</button>}
+      </div>
+      {pendingApprovals.length > 0 && <button type="button" className="worker-pending-approval" onClick={() => onNavigate('approvals')}><ShieldCheck size={15} /> {pendingApprovals.length} pending approval{pendingApprovals.length === 1 ? '' : 's'} <span>Review approvals →</span></button>}
 
       <details className="worker-advanced">
         <summary><Wrench size={14} /> Advanced diagnostics & configuration</summary>
@@ -189,17 +187,6 @@ export default function WorkerExperienceProfile({
         </div>
 
         <div className="worker-profile-actions">
-          {canManage && worker.status !== 'archived' && <button className="secondary-button" onClick={onEdit}>Edit profile</button>}
-          {canManage && worker.status !== 'active' && worker.status !== 'archived' && (
-            <button className="secondary-button" disabled={saving} onClick={() => onStatus('active')}>
-              <PlayCircle size={14} /> Activate
-            </button>
-          )}
-          {canManage && worker.status === 'active' && (
-            <button className="secondary-button" disabled={saving} onClick={() => onStatus('paused')}>
-              <PauseCircle size={14} /> Pause
-            </button>
-          )}
           {canManage && worker.status !== 'suspended' && worker.status !== 'archived' && (
             <button className="ghost-button" disabled={saving} onClick={() => onStatus('suspended')}>Suspend worker</button>
           )}

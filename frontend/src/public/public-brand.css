@@ -1,0 +1,6 @@
+.public-site .public-wordmark { display: inline-flex; align-items: center; gap: 9px; }
+.public-wordmark img { display: block; width: 26px; height: 26px; flex: none; }
+
+@media (max-width: 700px) {
+  .public-wordmark img { width: 24px; height: 24px; }
+}

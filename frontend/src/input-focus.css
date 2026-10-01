@@ -1,0 +1,13 @@
+#root input:focus-visible,
+#root textarea:focus-visible,
+#root select:focus-visible {
+  outline: 2px solid #83ad8c !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px #b9d7bf55 !important;
+}
+
+#root .cf-scene input:focus-visible,
+#root .cf-scene textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
