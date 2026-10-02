@@ -167,23 +167,17 @@ def _safe_get_form_navigation(
 ) -> tuple[str, str] | None:
     raw_forms = latest_browser.get("formDetails")
     forms = raw_forms if isinstance(raw_forms, list) else []
-    form = next(
-        (
-            item
-            for item in forms
-            if isinstance(item, dict)
-            and str(item.get("method") or "").lower() == "get"
-            and target_ref in {
-                str(ref)
-                for ref in (
-                    item.get("fieldRefs")
-                    if isinstance(item.get("fieldRefs"), list)
-                    else []
-                )
-            }
-        ),
-        None,
-    )
+    form: dict[str, object] | None = None
+    for raw_form in forms:
+        if not isinstance(raw_form, dict):
+            continue
+        if str(raw_form.get("method") or "").lower() != "get":
+            continue
+        raw_refs = raw_form.get("fieldRefs")
+        refs = raw_refs if isinstance(raw_refs, list) else []
+        if target_ref in {str(ref) for ref in refs}:
+            form = {str(key): value for key, value in raw_form.items()}
+            break
     if form is None:
         return None
 
@@ -570,6 +564,7 @@ class AdaptiveRuntimePlanner:
                         "Enter on this observed field would submit a form. "
                         f"Use browser.form.submit with formRef {form_ref} instead."
                     )
+                assert target_ref is not None
                 safe_navigation = _safe_get_form_navigation(
                     latest_browser=latest_browser,
                     target_ref=target_ref,
