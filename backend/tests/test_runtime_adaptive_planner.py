@@ -306,3 +306,15 @@ def test_runtime_injects_observation_id_into_nested_browser_locators() -> None:
     assert isinstance(fields, list)
     assert fields[0]["locator"]["observationId"] == "obs-123"
     assert result["submitLocator"]["observationId"] == "obs-123"
+
+
+def test_browser_scroll_contract_accepts_semantic_boundaries() -> None:
+    browser_provider = (
+        ROOT / "backend/app/execution/providers/browser.py"
+    ).read_text(encoding="utf-8")
+    browser_runtime = (
+        ROOT / "backend/app/execution/browser/runtime.py"
+    ).read_text(encoding="utf-8")
+
+    assert '"enum": ["top", "bottom"]' in browser_provider
+    assert "Browser page.scroll value must be an integer, top, or bottom." in browser_runtime
