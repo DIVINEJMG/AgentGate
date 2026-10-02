@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
@@ -12,6 +13,8 @@ from app.domain.ai.providers import (
 )
 from app.runtime.managed import _attach_observation_id
 from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass
