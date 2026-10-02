@@ -119,6 +119,7 @@ async def observe_page(
             text: (el.innerText || el.textContent || '').trim().slice(0, 500),
             elementType: el.getAttribute('type'),
             elementId: el.getAttribute('id'),
+            fieldName: el.getAttribute('name'),
             placeholder: el.getAttribute('placeholder'),
             autocomplete: el.getAttribute('autocomplete'),
             value: 'value' in el ? el.value : null,
@@ -192,6 +193,11 @@ async def observe_page(
                 href=(
                     redact_url(redact_text(str(item["href"]), sensitive_values))
                     if item.get("href") is not None
+                    else None
+                ),
+                field_name=(
+                    redact_text(str(item["fieldName"]), sensitive_values)[:240]
+                    if item.get("fieldName") is not None
                     else None
                 ),
             )
