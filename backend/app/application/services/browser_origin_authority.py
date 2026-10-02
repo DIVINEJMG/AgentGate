@@ -23,10 +23,10 @@ from app.infrastructure.database.models import (
 
 _URL_PATTERN = re.compile(r"https?://[^\s<>\"'\x60]+", re.IGNORECASE)
 _BARE_DOMAIN_PATTERN = re.compile(
-    r"(?<![@\\w-])"
-    r"(?P<host>(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63})"
-    r"(?::(?P<port>\\d{1,5}))?"
-    r"(?:/[^\\s<>\"'\\x60]*)?",
+    r"(?<![@\w-])"
+    r"(?P<host>(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})"
+    r"(?::(?P<port>\d{1,5}))?"
+    r"(?:/[^\s<>\"'\x60]*)?",
     re.IGNORECASE,
 )
 _TRAILING_URL_PUNCTUATION = ".,;:!?)]}"
