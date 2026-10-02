@@ -123,3 +123,12 @@ def test_manual_process_uses_runtime_delivery_lock() -> None:
 
     assert 'f"runtime:{item.id}:{expected_step}"' in runtime_routes
     assert '"Work item is already being processed."' in runtime_routes
+
+
+def test_retry_cancels_stale_nonterminal_runs() -> None:
+    runtime_routes = (
+        ROOT / "backend/app/api/runtime_result_routes.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'stale_run.status = "cancelled"' in runtime_routes
+    assert '"Superseded by a bounded Work Item retry."' in runtime_routes
