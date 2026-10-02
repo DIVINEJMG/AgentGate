@@ -484,6 +484,24 @@ async def test_browser_capability_resolver_accepts_matching_origin() -> None:
     assert result.missing_integrations == ()
 
 
+def test_bare_domain_is_explicit_browser_authority() -> None:
+    assert explicit_http_origins(
+        "Create Div, open google.com and search for the latest Real Madrid result."
+    ) == ("https://google.com",)
+
+
+def test_explicit_http_origin_stays_exact_and_bare_domain_scan_does_not_duplicate() -> None:
+    assert explicit_http_origins(
+        "Open https://www.google.com/search?q=real+madrid then read the page."
+    ) == ("https://www.google.com",)
+
+
+def test_bare_domain_parser_ignores_email_addresses_and_common_file_names() -> None:
+    assert explicit_http_origins(
+        "Email user@example.com and inspect report.pdf before opening example.org."
+    ) == ("https://example.org",)
+
+
 def test_planner_rejects_browser_resource_destination_mismatch_before_execution() -> None:
     planner = AdaptiveRuntimePlanner(cast(Any, object()))
     with pytest.raises(RuntimeError, match="not authorized"):
@@ -813,5 +831,7 @@ def test_retry_refreshes_managed_standing_authority() -> None:
 
     source = inspect.getsource(runtime_result_routes.retry_item_v1)
 
+    assert "reconcile_ai_job_browser_origins(" in source
+    assert 'any(str(scope).startswith("browser.")' in source
     assert "_provision_managed_job_authority(" in source
     assert "standing_approval=True" in source
