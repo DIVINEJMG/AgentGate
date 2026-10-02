@@ -1,5 +1,38 @@
 import type { ConversationMessage, ConversationThread } from '../lib/conversationApi';
 
+export type LiveResultReference = {
+  type: 'result';
+  id: string;
+  name: string;
+  presentation: 'live_result';
+  status: 'completed';
+  summary?: string;
+  workerId?: string;
+  jobId?: string;
+  workItemId?: string;
+  runId?: string;
+};
+
+export function liveResultReference(message: { resultReferences?: Array<Record<string, unknown>> | null }): LiveResultReference | null {
+  for (const raw of message.resultReferences ?? []) {
+    if (!raw || typeof raw !== 'object') continue;
+    if (raw.type !== 'result' || raw.presentation !== 'live_result' || typeof raw.id !== 'string' || !raw.id) continue;
+    return {
+      type: 'result',
+      id: raw.id,
+      name: typeof raw.name === 'string' && raw.name ? raw.name : 'Completed result',
+      presentation: 'live_result',
+      status: 'completed',
+      summary: typeof raw.summary === 'string' ? raw.summary : undefined,
+      workerId: typeof raw.workerId === 'string' ? raw.workerId : undefined,
+      jobId: typeof raw.jobId === 'string' ? raw.jobId : undefined,
+      workItemId: typeof raw.workItemId === 'string' ? raw.workItemId : undefined,
+      runId: typeof raw.runId === 'string' ? raw.runId : undefined,
+    };
+  }
+  return null;
+}
+
 export function isHumanMessage(role: string) {
   return role === 'human' || role === 'user';
 }
