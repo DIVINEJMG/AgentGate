@@ -460,6 +460,7 @@ class WorkerAutonomyService:
             "capabilityMappings": list(prepared.capabilities.mappings),
             "capabilityNeeds": [need.model_dump(mode="json") for need in draft.capability_needs],
             "authorizedBrowserOrigins": list(prepared.browser_origins),
+            "standingApproval": True,
         }
         job_payload = {
             "workerId": str(worker.id),
@@ -509,6 +510,7 @@ class WorkerAutonomyService:
                 worker,
                 principal,
                 list(prepared.capabilities.scopes),
+                standing_approval=True,
             )
 
         await self._apply_approval_boundaries(
