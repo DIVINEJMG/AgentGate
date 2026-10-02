@@ -506,6 +506,19 @@ async def retry_item_v1(
     payload = dict(item.payload or {})
     if int(payload.get("retryCount", 0)) >= 2:
         raise HTTPException(409, "This Work Item reached the bounded retry limit.")
+    stale_runs = list(
+        (
+            await session.scalars(
+                select(Run).where(
+                    Run.work_item_id == item.id,
+                    Run.status.notin_({"completed", "failed", "cancelled"}),
+                )
+            )
+        ).all()
+    )
+    for stale_run in stale_runs:
+        stale_run.status = "cancelled"
+        stale_run.result_summary = "Superseded by a bounded Work Item retry."
     payload["retryCount"] = int(payload.get("retryCount", 0)) + 1
     for key in ("lastError", "cancelledBy", "cancelledAt", "completedAt"):
         payload.pop(key, None)
