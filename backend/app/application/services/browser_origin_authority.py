@@ -22,18 +22,70 @@ from app.infrastructure.database.models import (
 )
 
 _URL_PATTERN = re.compile(r"https?://[^\s<>\"'\x60]+", re.IGNORECASE)
+_BARE_DOMAIN_PATTERN = re.compile(
+    r"(?<![@\w-])"
+    r"(?P<host>(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})"
+    r"(?::(?P<port>\d{1,5}))?"
+    r"(?:/[^\s<>\"'\x60]*)?",
+    re.IGNORECASE,
+)
 _TRAILING_URL_PUNCTUATION = ".,;:!?)]}"
+_FILELIKE_TLDS = {
+    "csv",
+    "doc",
+    "docx",
+    "gif",
+    "jpeg",
+    "jpg",
+    "json",
+    "md",
+    "pdf",
+    "png",
+    "py",
+    "ts",
+    "tsx",
+    "txt",
+    "webp",
+    "xls",
+    "xlsx",
+}
 
 
 def explicit_http_origins(text: str) -> tuple[str, ...]:
-    """Return exact HTTP(S) origins explicitly present in human-authored text."""
+    """Return web origins explicitly named in human-authored text.
+
+    Full HTTP(S) URLs remain exact. Bare DNS names such as google.com are
+    treated as an explicit HTTPS destination, which lets managed Browser
+    authority be provisioned without requiring the human to type a scheme.
+    """
 
     origins: list[str] = []
-    for match in _URL_PATTERN.findall(text):
-        candidate = match.rstrip(_TRAILING_URL_PUNCTUATION)
+    masked = list(text)
+
+    for match in _URL_PATTERN.finditer(text):
+        candidate = match.group(0).rstrip(_TRAILING_URL_PUNCTUATION)
         origin = normalize_origin(candidate)
         if origin is not None and origin not in origins:
             origins.append(origin)
+        for index in range(match.start(), match.end()):
+            masked[index] = " "
+
+    remaining = "".join(masked)
+    for match in _BARE_DOMAIN_PATTERN.finditer(remaining):
+        host = match.group("host").lower()
+        top_level = host.rsplit(".", 1)[-1]
+        if top_level in _FILELIKE_TLDS:
+            continue
+        port = match.group("port")
+        suffix = f":{port}" if port else ""
+        candidates = [f"https://{host}{suffix}"]
+        if not host.startswith("www.") and host.count(".") == 1:
+            candidates.append(f"https://www.{host}{suffix}")
+        for candidate in candidates:
+            origin = normalize_origin(candidate)
+            if origin is not None and origin not in origins:
+                origins.append(origin)
+
     return tuple(origins)
 
 
@@ -124,7 +176,7 @@ async def ensure_managed_browser_origins(
     principal: HumanPrincipal | None,
     source: str,
 ) -> tuple[Integration, ...]:
-    """Create one least-authority Browser resource per explicit human URL origin.
+    """Create one least-authority Browser resource per explicit human web origin.
 
     This never broadens an existing Browser resource. Existing resources that
     already authorize an origin are reused; otherwise a new credential-free,
@@ -320,7 +372,7 @@ async def reconcile_ai_job_browser_origins(
 
     origins = explicit_http_origins(source_message.content)
     if not origins:
-        raise ValueError("The source message contains no explicit HTTP(S) origin to authorize.")
+        raise ValueError("The source message contains no explicit web origin to authorize.")
 
     before = list(
         (

@@ -439,6 +439,50 @@ async def test_browser_capability_resolver_rejects_unrelated_connected_origin() 
 
 
 @pytest.mark.asyncio
+async def test_ai_browser_capability_resolver_fails_closed_without_authorized_origin() -> None:
+    integration = Integration(
+        id=uuid4(),
+        organization_id=uuid4(),
+        provider="browser",
+        display_name="Unrelated managed site",
+        status="connected",
+        config={
+            "availableCapabilities": [
+                "browser.navigation.open",
+                "browser.page.read",
+            ],
+            "metadata": {
+                "allowedOrigins": ["https://unrelated.example"],
+            },
+        },
+    )
+    gateway = StructuredGateway([])
+    resolver = SemanticCapabilityResolver(
+        cast(AsyncSession, CapabilitySession(integration, None)),
+        gateway,
+    )
+
+    result = await resolver.resolve(
+        organization_id=integration.organization_id,
+        needs=[
+            CapabilityNeed(
+                provider="browser",
+                need="Open the requested website",
+                actions=["open", "read"],
+            )
+        ],
+        required_browser_origins=(),
+        require_browser_origin_authority=True,
+        invocation_context=AIInvocationContext(),
+    )
+
+    assert result.scopes == ()
+    assert result.missing_integrations == ("browser",)
+    assert result.mappings[0]["state"] == "missing_authorized_origin"
+    assert gateway.schemas == []
+
+
+@pytest.mark.asyncio
 async def test_browser_capability_resolver_accepts_matching_origin() -> None:
     integration = Integration(
         id=uuid4(),
@@ -484,6 +528,24 @@ async def test_browser_capability_resolver_accepts_matching_origin() -> None:
     assert result.missing_integrations == ()
 
 
+def test_bare_domain_is_explicit_browser_authority() -> None:
+    assert explicit_http_origins(
+        "Create Div, open google.com and search for the latest Real Madrid result."
+    ) == ("https://google.com", "https://www.google.com")
+
+
+def test_explicit_http_origin_stays_exact_and_bare_domain_scan_does_not_duplicate() -> None:
+    assert explicit_http_origins(
+        "Open https://www.google.com/search?q=real+madrid then read the page."
+    ) == ("https://www.google.com",)
+
+
+def test_bare_domain_parser_ignores_email_addresses_and_common_file_names() -> None:
+    assert explicit_http_origins(
+        "Email user@example.com and inspect report.pdf before opening example.org."
+    ) == ("https://example.org", "https://www.example.org")
+
+
 def test_planner_rejects_browser_resource_destination_mismatch_before_execution() -> None:
     planner = AdaptiveRuntimePlanner(cast(Any, object()))
     with pytest.raises(RuntimeError, match="not authorized"):
@@ -511,6 +573,7 @@ def test_planner_rejects_browser_resource_destination_mismatch_before_execution(
             observations=[],
             latest_browser=None,
         )
+
 
 def test_schedule_inference_normalizes_daily_weekly_once_and_stop_after() -> None:
     daily = compile_schedule(
@@ -813,5 +876,7 @@ def test_retry_refreshes_managed_standing_authority() -> None:
 
     source = inspect.getsource(runtime_result_routes.retry_item_v1)
 
+    assert "reconcile_ai_job_browser_origins(" in source
+    assert 'any(str(scope).startswith("browser.")' in source
     assert "_provision_managed_job_authority(" in source
     assert "standing_approval=True" in source

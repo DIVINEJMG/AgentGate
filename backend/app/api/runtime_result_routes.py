@@ -23,6 +23,9 @@ from app.api.product_common import (
     require_permission,
     utcnow,
 )
+from app.application.services.browser_origin_authority import (
+    reconcile_ai_job_browser_origins,
+)
 from app.application.services.worker_memory import contains_secret_material
 from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
@@ -521,6 +524,35 @@ async def retry_item_v1(
         revision = await current_revision(session, job)
         definition = revision.definition if isinstance(revision.definition, dict) else {}
         required_scopes = definition.get("requiredCapabilities", [])
+        raw_autonomy = definition.get("autonomy")
+        autonomy = dict(raw_autonomy) if isinstance(raw_autonomy, dict) else {}
+        browser_required = (
+            isinstance(required_scopes, list)
+            and any(str(scope).startswith("browser.") for scope in required_scopes)
+        )
+        if browser_required and bool(autonomy.get("createdByAI")):
+            required_permissions = {"integrations.manage", "jobs.manage"}
+            if not required_permissions.issubset(principal.permissions):
+                raise HTTPException(
+                    409,
+                    "This managed Browser job needs origin reconciliation before retry. "
+                    "Ask a workspace administrator to retry it.",
+                )
+            try:
+                job, _, _ = await reconcile_ai_job_browser_origins(
+                    session,
+                    organization_id=organization_id,
+                    job_id=job.id,
+                    principal=principal,
+                )
+            except (LookupError, PermissionError, ValueError) as exc:
+                raise HTTPException(
+                    409,
+                    f"Managed Browser authority could not be reconciled: {exc}",
+                ) from exc
+            revision = await current_revision(session, job)
+            definition = revision.definition if isinstance(revision.definition, dict) else {}
+            required_scopes = definition.get("requiredCapabilities", [])
         if isinstance(required_scopes, list):
             await _provision_managed_job_authority(
                 session,
