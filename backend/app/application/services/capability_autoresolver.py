@@ -56,6 +56,7 @@ class SemanticCapabilityResolver:
         needs: list[CapabilityNeed],
         invocation_context: AIInvocationContext,
         required_browser_origins: tuple[str, ...] = (),
+        require_browser_origin_authority: bool = False,
     ) -> CapabilityResolution:
         integrations = list(
             (
@@ -86,6 +87,24 @@ class SemanticCapabilityResolver:
 
             connected = by_provider.get(provider_id, [])
             browser_origin_gap = False
+            if (
+                provider_id == "browser"
+                and require_browser_origin_authority
+                and not required_browser_origins
+            ):
+                missing.add(provider_id)
+                semantic.append(
+                    {
+                        "provider": provider_id,
+                        "need": need.need,
+                        "actions": need.actions,
+                        "candidateScopes": [],
+                        "requiredOrigins": [],
+                        "matchedOrigins": [],
+                        "state": "missing_authorized_origin",
+                    }
+                )
+                continue
             if provider_id == "browser" and required_browser_origins:
                 browser_origin_gap = not browser_origins_covered(
                     connected,
