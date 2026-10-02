@@ -1236,7 +1236,7 @@ class PlaywrightBrowserProvider:
             )
             state.session_owned = True
 
-        before_observation = await self._runtime.observe(
+        before_observation = await self._runtime.current_observation(
             session_id,
             organization_id=request.organization_id,
             worker_id=request.worker_id,
