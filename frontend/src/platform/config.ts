@@ -4,7 +4,7 @@ function trimTrailingSlashes(value: string) {
 
 const configuredApiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ?? '';
 const developmentApiBase = import.meta.env.DEV ? 'http://localhost:8000' : '';
-const productionApiBase = 'https://audoryn-api-staging.onrender.com';
+const productionApiBase = 'https://130.61.104.247';
 
 export const platformConfig = Object.freeze({
   apiBaseUrl: trimTrailingSlashes(
