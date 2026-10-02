@@ -304,3 +304,16 @@ def test_nvidia_defaults_remain_preconfigured_without_a_secret() -> None:
     assert fields["ai_provider_api_key"].default is None
     assert fields["ai_coordinator_api_key"].default is None
     assert fields["ai_vision_api_key"].default is None
+
+
+
+def test_completed_runtime_publishes_live_result_into_conversation() -> None:
+    runtime = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    delivery = (
+        ROOT / "backend/app/application/services/live_results.py"
+    ).read_text(encoding="utf-8")
+    assert "append_live_result_message(" in runtime
+    assert '"presentation": "live_result"' in delivery
+    assert 'topic="conversation.response.created"' in delivery
+    assert 'autonomy.get("sourceThreadId")' in delivery
+    assert 'ConversationMessage(' in delivery
