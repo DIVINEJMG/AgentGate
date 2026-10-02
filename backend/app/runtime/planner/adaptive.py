@@ -170,7 +170,7 @@ class AdaptiveRuntimePlanner:
             + "\n\nRECORDED OBSERVATIONS\n"
             + _json_for_prompt(observations[-6:], 16000)
             + "\n\nLATEST BROWSER OBSERVATION\n"
-            + _json_for_prompt(latest_browser or {}, 12000)
+            + _json_for_prompt(latest_browser or {}, 18000)
             + f"\n\nACTION BUDGET\n{action_count} used of {max_actions}.\n"
             + "\nPLANNING RULES\n"
             + browser_rule
@@ -182,6 +182,8 @@ class AdaptiveRuntimePlanner:
             )
             + "\n- Supply every structured input required by that tool except browser sessionId."
             + "\n- Prefer reading/observing before mutation when current state is uncertain."
+            + "\n- If latestBrowser.formDetails and latestBrowser.elements already identify the needed controls, use those refs instead of scrolling to rediscover them."
+            + "\n- Do not repeat page scrolling when the latest scroll revealed no new actionable elements or forms."
             + "\n- Do not finish unless the completion criteria are supported by RECORDED OBSERVATIONS."
             + "\n- Return only the structured decision object."
             + feedback
