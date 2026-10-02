@@ -111,6 +111,52 @@ def _previous_scroll_made_no_progress(observations: list[dict[str, object]]) -> 
     )
 
 
+def _observation_element(
+    browser: dict[str, object] | None,
+    ref: str,
+) -> dict[str, object] | None:
+    if browser is None:
+        return None
+    raw_elements = browser.get("elements")
+    elements = raw_elements if isinstance(raw_elements, list) else []
+    return next(
+        (
+            element
+            for element in elements
+            if isinstance(element, dict) and str(element.get("ref") or "") == ref
+        ),
+        None,
+    )
+
+
+def _form_ref_for_element(
+    browser: dict[str, object] | None,
+    ref: str,
+) -> str | None:
+    if browser is None:
+        return None
+    raw_forms = browser.get("formDetails")
+    forms = raw_forms if isinstance(raw_forms, list) else []
+    for form in forms:
+        if not isinstance(form, dict):
+            continue
+        raw_fields = form.get("fieldRefs")
+        field_refs = (
+            {str(item) for item in raw_fields}
+            if isinstance(raw_fields, list)
+            else set()
+        )
+        if ref in field_refs:
+            value = str(form.get("ref") or "").strip()
+            return value or None
+    return None
+
+
+def _single_observation_ref(action_input: dict[str, object]) -> str | None:
+    refs = _locator_refs(action_input)
+    return refs[0] if len(refs) == 1 else None
+
+
 class AdaptiveRuntimePlanner:
     def __init__(self, gateway: AIGateway) -> None:
         self._gateway = gateway
@@ -236,6 +282,10 @@ class AdaptiveRuntimePlanner:
                 else "\n- Choose one exact resourceId/scope pair from AUTHORIZED TOOLS."
             )
             + "\n- Supply every structured input required by that tool except browser sessionId."
+            + "\n- Each decision is exactly one capability action. Do not describe a second action in the instruction that the selected scope will not perform."
+            + "\n- browser.element.type only edits the field. It does not press Enter or submit a form."
+            + "\n- Never type the same value into the same observed field when latestBrowser already shows that value."
+            + "\n- Do not use browser.element.press_key Enter/NumpadEnter to submit a form. Use browser.form.submit when authorized. If the form is GET-based and form.submit is unavailable, browser.navigation.open may navigate to the same authorized form action with the intended query parameters."
             + "\n- Prefer reading/observing before mutation when current state is uncertain."
             + "\n- If latestBrowser.formDetails and latestBrowser.elements already identify the needed controls, use those refs instead of scrolling to rediscover them."
             + "\n- Do not repeat page scrolling when the latest scroll revealed no new actionable elements or forms."
@@ -351,6 +401,49 @@ class AdaptiveRuntimePlanner:
                 "Previous browser.page.scroll revealed no new actionable elements or forms. "
                 "Do not scroll again; use the latest observed refs/forms or choose another action."
             )
+
+        if scope == "browser.element.type" and latest_browser is not None:
+            target_ref = _single_observation_ref(action_input)
+            target = (
+                _observation_element(latest_browser, target_ref)
+                if target_ref is not None
+                else None
+            )
+            if (
+                target is not None
+                and "value" in action_input
+                and target.get("value") is not None
+                and str(target.get("value")) == str(action_input.get("value"))
+            ):
+                raise RuntimeError(
+                    "The target browser field already contains the requested value. "
+                    "Do not repeat browser.element.type; choose the next distinct action."
+                )
+
+        if scope == "browser.element.press_key" and latest_browser is not None:
+            key = str(action_input.get("value") or "").strip().lower()
+            target_ref = _single_observation_ref(action_input)
+            form_ref = (
+                _form_ref_for_element(latest_browser, target_ref)
+                if target_ref is not None
+                else None
+            )
+            if key in {"enter", "numpadenter"} and form_ref is not None:
+                submit_available = any(
+                    str(candidate.get("scope") or "") == "browser.form.submit"
+                    for candidate in tools
+                )
+                if submit_available:
+                    raise RuntimeError(
+                        "Enter on this observed field would submit a form. "
+                        f"Use browser.form.submit with formRef {form_ref} instead."
+                    )
+                raise RuntimeError(
+                    "Enter on this observed field would submit a form, but "
+                    "browser.form.submit is not authorized. Do not use press_key as a "
+                    "submission shortcut; use another authorized route such as same-origin "
+                    "browser.navigation.open for an equivalent GET form when appropriate."
+                )
 
         if latest_browser is not None:
             raw_elements = latest_browser.get("elements")
