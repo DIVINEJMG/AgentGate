@@ -613,24 +613,27 @@ class ManagedRuntimeExecutor:
                         if isinstance(refs, list):
                             form_refs.update(str(ref) for ref in refs)
 
-                def element_priority(element: dict[str, object]) -> tuple[int, str]:
+                ranked_elements: list[tuple[int, str, dict[str, object]]] = []
+                for element in elements:
                     ref = str(element.get("ref") or "")
                     tag = str(element.get("tag") or "").lower()
                     role = str(element.get("role") or "").lower()
                     element_type = str(element.get("element_type") or "").lower()
                     if ref in form_refs:
-                        return (0, ref)
-                    if (
+                        priority = 0
+                    elif (
                         tag in {"input", "textarea", "select", "button"}
                         or role in {"textbox", "checkbox", "combobox", "button"}
                         or element_type in {"text", "email", "checkbox", "submit"}
                     ):
-                        return (1, ref)
-                    return (2, ref)
+                        priority = 1
+                    else:
+                        priority = 2
+                    ranked_elements.append((priority, ref, element))
+                ranked_elements.sort(key=lambda item: (item[0], item[1]))
 
-                prioritized_elements = sorted(elements, key=element_priority)
                 compact_elements: list[dict[str, object]] = []
-                for element in prioritized_elements[:100]:
+                for _, _, element in ranked_elements[:100]:
                     compact: dict[str, object] = {}
                     for key in (
                         "ref",
