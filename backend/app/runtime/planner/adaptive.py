@@ -157,6 +157,30 @@ def _single_observation_ref(action_input: dict[str, object]) -> str | None:
     return refs[0] if len(refs) == 1 else None
 
 
+def _previous_successful_type_target(
+    observations: list[dict[str, object]],
+) -> str | None:
+    browser_entries = [
+        item
+        for item in observations
+        if isinstance(item.get("browserObservation"), dict)
+    ]
+    if not browser_entries:
+        return None
+    latest = browser_entries[-1]
+    if str(latest.get("scope") or "") != "browser.element.type":
+        return None
+    browser = latest.get("browserObservation")
+    if not isinstance(browser, dict):
+        return None
+    raw_evidence = browser.get("actionEvidence")
+    evidence = raw_evidence if isinstance(raw_evidence, dict) else {}
+    if evidence.get("stateChanged") is not True:
+        return None
+    target = str(evidence.get("elementReference") or "").strip()
+    return target or None
+
+
 class AdaptiveRuntimePlanner:
     def __init__(self, gateway: AIGateway) -> None:
         self._gateway = gateway
@@ -284,7 +308,7 @@ class AdaptiveRuntimePlanner:
             + "\n- Supply every structured input required by that tool except browser sessionId."
             + "\n- Each decision is exactly one capability action. Do not describe a second action in the instruction that the selected scope will not perform."
             + "\n- browser.element.type only edits the field. It does not press Enter or submit a form."
-            + "\n- Never type the same value into the same observed field when latestBrowser already shows that value."
+            + "\n- After a successful browser.element.type, do not immediately type into that same populated field again with the same or revised text. Advance to the next distinct action. If a correction is genuinely required, it must be justified by later observable evidence that the prior input was rejected, cleared, or invalid."
             + "\n- Do not use browser.element.press_key Enter/NumpadEnter to submit a form. Use browser.form.submit when authorized. If the form is GET-based and form.submit is unavailable, browser.navigation.open may navigate to the same authorized form action with the intended query parameters."
             + "\n- Prefer reading/observing before mutation when current state is uncertain."
             + "\n- If latestBrowser.formDetails and latestBrowser.elements already identify the needed controls, use those refs instead of scrolling to rediscover them."
@@ -409,15 +433,27 @@ class AdaptiveRuntimePlanner:
                 if target_ref is not None
                 else None
             )
-            if (
-                target is not None
-                and "value" in action_input
-                and target.get("value") is not None
-                and str(target.get("value")) == str(action_input.get("value"))
-            ):
+            current_value = (
+                str(target.get("value"))
+                if target is not None and target.get("value") is not None
+                else ""
+            )
+            requested_value = str(action_input.get("value") or "")
+            if target is not None and current_value and current_value == requested_value:
                 raise RuntimeError(
                     "The target browser field already contains the requested value. "
                     "Do not repeat browser.element.type; choose the next distinct action."
+                )
+            previous_type_target = _previous_successful_type_target(observations)
+            if (
+                target_ref is not None
+                and previous_type_target == target_ref
+                and current_value
+            ):
+                raise RuntimeError(
+                    "The previous successful browser.element.type already populated this "
+                    "same field. Do not refine or retype the field immediately; advance "
+                    "to submission, navigation, reading, or another distinct action."
                 )
 
         if scope == "browser.element.press_key" and latest_browser is not None:
