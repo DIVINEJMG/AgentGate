@@ -99,6 +99,14 @@ class BrowserRuntimeContract(Protocol):
         worker_id: UUID | None,
     ) -> BrowserObservation: ...
 
+    async def current_observation(
+        self,
+        session_id: UUID,
+        *,
+        organization_id: UUID,
+        worker_id: UUID | None,
+    ) -> BrowserObservation: ...
+
     async def navigate(
         self,
         session_id: UUID,
@@ -947,6 +955,26 @@ class BrowserRuntime:
         if self._coordinator is not None:
             await self._coordinator.close()
 
+    async def current_observation(
+        self,
+        session_id: UUID,
+        *,
+        organization_id: UUID,
+        worker_id: UUID | None,
+    ) -> BrowserObservation:
+        handle = self._handle(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        if handle.last_observation is not None:
+            return handle.last_observation
+        return await self.observe(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+
     async def observe(
         self,
         session_id: UUID,
@@ -1400,8 +1428,21 @@ class BrowserRuntime:
         elif operation == "element.hover" and target is not None:
             await target.hover(timeout=timeout_ms)
         elif operation == "page.scroll":
-            amount = int(value) if isinstance(value, (int, float, str)) else 0
-            await handle.page.mouse.wheel(0, amount)
+            if isinstance(value, str) and value.strip().lower() in {"top", "bottom"}:
+                target = value.strip().lower()
+                await handle.page.evaluate(
+                    "position => window.scrollTo(0, position === 'bottom' "
+                    "? document.documentElement.scrollHeight : 0)",
+                    target,
+                )
+            else:
+                try:
+                    amount = int(value) if isinstance(value, (int, float, str)) else 0
+                except (TypeError, ValueError) as error:
+                    raise ValueError(
+                        "Browser page.scroll value must be an integer, top, or bottom."
+                    ) from error
+                await handle.page.mouse.wheel(0, amount)
         else:
             raise ValueError("Unsupported browser interaction operation.")
 

@@ -56,6 +56,61 @@ def _locator_refs(value: object) -> list[str]:
     return refs
 
 
+def _browser_actionable_signature(browser: dict[str, object]) -> str:
+    raw_elements = browser.get("elements")
+    elements = raw_elements if isinstance(raw_elements, list) else []
+    raw_forms = browser.get("formDetails")
+    forms = raw_forms if isinstance(raw_forms, list) else []
+    raw_page_state = browser.get("pageState")
+    page_state = raw_page_state if isinstance(raw_page_state, dict) else {}
+    return json.dumps(
+        {
+            "url": browser.get("url"),
+            "elements": [
+                {
+                    key: element.get(key)
+                    for key in (
+                        "ref",
+                        "tag",
+                        "role",
+                        "name",
+                        "text",
+                        "element_type",
+                        "checked",
+                        "disabled",
+                    )
+                    if key in element
+                }
+                for element in elements
+                if isinstance(element, dict)
+            ],
+            "formDetails": forms,
+            "formCount": page_state.get("formCount"),
+            "interactiveElementCount": page_state.get("interactiveElementCount"),
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+    )
+
+
+def _previous_scroll_made_no_progress(observations: list[dict[str, object]]) -> bool:
+    browser_entries = [
+        (item, browser)
+        for item in observations
+        if isinstance((browser := item.get("browserObservation")), dict)
+    ]
+    if len(browser_entries) < 2:
+        return False
+    latest_entry, latest_browser = browser_entries[-1]
+    _, previous_browser = browser_entries[-2]
+    if str(latest_entry.get("scope") or "") != "browser.page.scroll":
+        return False
+    return _browser_actionable_signature(latest_browser) == _browser_actionable_signature(
+        previous_browser
+    )
+
+
 class AdaptiveRuntimePlanner:
     def __init__(self, gateway: AIGateway) -> None:
         self._gateway = gateway
@@ -170,7 +225,7 @@ class AdaptiveRuntimePlanner:
             + "\n\nRECORDED OBSERVATIONS\n"
             + _json_for_prompt(observations[-6:], 16000)
             + "\n\nLATEST BROWSER OBSERVATION\n"
-            + _json_for_prompt(latest_browser or {}, 12000)
+            + _json_for_prompt(latest_browser or {}, 18000)
             + f"\n\nACTION BUDGET\n{action_count} used of {max_actions}.\n"
             + "\nPLANNING RULES\n"
             + browser_rule
@@ -182,6 +237,8 @@ class AdaptiveRuntimePlanner:
             )
             + "\n- Supply every structured input required by that tool except browser sessionId."
             + "\n- Prefer reading/observing before mutation when current state is uncertain."
+            + "\n- If latestBrowser.formDetails and latestBrowser.elements already identify the needed controls, use those refs instead of scrolling to rediscover them."
+            + "\n- Do not repeat page scrolling when the latest scroll revealed no new actionable elements or forms."
             + "\n- Do not finish unless the completion criteria are supported by RECORDED OBSERVATIONS."
             + "\n- Return only the structured decision object."
             + feedback
@@ -285,6 +342,14 @@ class AdaptiveRuntimePlanner:
                 f"Planner action {scope} is missing required structured input: "
                 + ", ".join(missing)
                 + "."
+            )
+
+        if scope == "browser.page.scroll" and _previous_scroll_made_no_progress(
+            observations
+        ):
+            raise RuntimeError(
+                "Previous browser.page.scroll revealed no new actionable elements or forms. "
+                "Do not scroll again; use the latest observed refs/forms or choose another action."
             )
 
         if latest_browser is not None:

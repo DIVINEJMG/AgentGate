@@ -231,6 +231,19 @@ class EvidenceRuntime:
         )
         return self.observation(session_id)
 
+    async def current_observation(
+        self,
+        session_id,
+        *,
+        organization_id,
+        worker_id,
+    ):
+        return await self.observe(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+
     async def navigate(
         self,
         session_id,

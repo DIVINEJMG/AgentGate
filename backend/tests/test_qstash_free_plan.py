@@ -103,3 +103,32 @@ def test_runtime_provider_retry_uses_qstash_delay_instead_of_waiting_for_sweep()
     assert 'f"provider-retry:{int(item.scheduled_at.timestamp())}"' in runtime_api
     assert "delay_seconds=delay_seconds" in trigger
     assert 'headers["Upstash-Delay"]' in queue_provider
+
+
+def test_runtime_continuations_use_distinct_plan_and_execute_dedupe_keys() -> None:
+    managed = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    runtime_api = (
+        ROOT / "backend/app/api/internal/runtime.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'continuation_phase="execute"' in managed
+    assert 'continuation_phase="plan"' in managed
+    assert 'continuation_reason = f"continuation-{outcome.continuation_phase}"' in runtime_api
+
+
+def test_manual_process_uses_runtime_delivery_lock() -> None:
+    runtime_routes = (
+        ROOT / "backend/app/api/runtime_result_routes.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'f"runtime:{item.id}:{expected_step}"' in runtime_routes
+    assert '"Work item is already being processed."' in runtime_routes
+
+
+def test_retry_cancels_stale_nonterminal_runs() -> None:
+    runtime_routes = (
+        ROOT / "backend/app/api/runtime_result_routes.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'stale_run.status = "cancelled"' in runtime_routes
+    assert '"Superseded by a bounded Work Item retry."' in runtime_routes

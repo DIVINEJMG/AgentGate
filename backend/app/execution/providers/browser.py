@@ -315,6 +315,14 @@ CAPABILITIES = (
         approval="none",
         description="Scroll the governed page vertically.",
         requires_value=True,
+        properties={
+            "value": {
+                "oneOf": [
+                    {"type": "integer", "minimum": -100000, "maximum": 100000},
+                    {"type": "string", "enum": ["top", "bottom"]},
+                ]
+            }
+        },
     ),
     _capability(
         scope="browser.element.hover",
@@ -1228,7 +1236,7 @@ class PlaywrightBrowserProvider:
             )
             state.session_owned = True
 
-        before_observation = await self._runtime.observe(
+        before_observation = await self._runtime.current_observation(
             session_id,
             organization_id=request.organization_id,
             worker_id=request.worker_id,

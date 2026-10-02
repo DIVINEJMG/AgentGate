@@ -211,6 +211,19 @@ class HardeningRuntime:
         )
         return self.observation(session_id)
 
+    async def current_observation(
+        self,
+        session_id: UUID,
+        *,
+        organization_id: UUID,
+        worker_id: UUID | None,
+    ) -> BrowserObservation:
+        return await self.observe(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+
     async def navigate(
         self,
         session_id: UUID,

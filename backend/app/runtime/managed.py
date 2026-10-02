@@ -75,6 +75,7 @@ class RuntimeStepOutcome:
     run_id: UUID
     current_step: int
     summary: str
+    continuation_phase: Literal["plan", "execute"] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,6 +268,7 @@ class ManagedRuntimeExecutor:
                 run_id=run.id,
                 current_step=current_step,
                 summary="Next governed action planned and queued for execution.",
+                continuation_phase="execute",
             )
 
         step = steps[current_step]
@@ -279,6 +281,7 @@ class ManagedRuntimeExecutor:
                 run_id=run.id,
                 current_step=current_step + 1,
                 summary="Completed step checkpoint advanced.",
+                continuation_phase="plan",
             )
 
         if step.status == "waiting_approval":
@@ -592,38 +595,83 @@ class ManagedRuntimeExecutor:
             browser_observation = provider_map.get("observation")
             if isinstance(browser_observation, dict):
                 raw_elements = browser_observation.get("elements")
-                elements = raw_elements if isinstance(raw_elements, list) else []
-                compact_elements = [
-                    {
-                        key: element.get(key)
-                        for key in (
-                            "ref",
-                            "tag",
-                            "role",
-                            "name",
-                            "text",
-                            "element_type",
-                            "value",
-                            "checked",
-                            "selected",
-                            "disabled",
-                            "href",
-                        )
-                        if key in element
-                    }
-                    for element in elements[:120]
+                elements = [
+                    element
+                    for element in (raw_elements if isinstance(raw_elements, list) else [])
                     if isinstance(element, dict)
                 ]
+                raw_form_details = browser_observation.get("formDetails")
+                form_details = (
+                    raw_form_details if isinstance(raw_form_details, list) else []
+                )
+                form_refs: set[str] = set()
+                for form in form_details:
+                    if not isinstance(form, dict):
+                        continue
+                    for key in ("fieldRefs", "submitRefs"):
+                        refs = form.get(key)
+                        if isinstance(refs, list):
+                            form_refs.update(str(ref) for ref in refs)
+
+                ranked_elements: list[tuple[int, str, dict[str, object]]] = []
+                for element in elements:
+                    ref = str(element.get("ref") or "")
+                    tag = str(element.get("tag") or "").lower()
+                    role = str(element.get("role") or "").lower()
+                    element_type = str(element.get("element_type") or "").lower()
+                    if ref in form_refs:
+                        priority = 0
+                    elif (
+                        tag in {"input", "textarea", "select", "button"}
+                        or role in {"textbox", "checkbox", "combobox", "button"}
+                        or element_type in {"text", "email", "checkbox", "submit"}
+                    ):
+                        priority = 1
+                    else:
+                        priority = 2
+                    ranked_elements.append((priority, ref, element))
+                ranked_elements.sort(key=lambda item: (item[0], item[1]))
+
+                compact_elements: list[dict[str, object]] = []
+                for _, _, element in ranked_elements[:100]:
+                    compact: dict[str, object] = {}
+                    for key in (
+                        "ref",
+                        "tag",
+                        "role",
+                        "element_type",
+                        "checked",
+                        "disabled",
+                    ):
+                        if key in element:
+                            compact[key] = element.get(key)
+                    for key, limit in (("name", 240), ("text", 240), ("href", 320)):
+                        if key in element and element.get(key) is not None:
+                            compact[key] = str(element.get(key))[:limit]
+                    compact_elements.append(compact)
+
+                action_evidence = provider_map.get("actionEvidence")
+                compact_action_evidence = (
+                    {
+                        "operation": action_evidence.get("operation"),
+                        "stateChanged": action_evidence.get("stateChanged"),
+                        "beforeObservationId": action_evidence.get("beforeObservationId"),
+                        "afterObservationId": action_evidence.get("afterObservationId"),
+                    }
+                    if isinstance(action_evidence, dict)
+                    else {}
+                )
                 entry["browserObservation"] = {
                     "id": browser_observation.get("id"),
                     "sessionId": browser_observation.get("sessionId"),
                     "url": browser_observation.get("url"),
                     "title": browser_observation.get("title"),
-                    "visibleText": str(browser_observation.get("visibleText") or "")[:7000],
-                    "ariaSnapshot": str(browser_observation.get("ariaSnapshot") or "")[:4000],
+                    "formDetails": form_details,
                     "elements": compact_elements,
-                    "formDetails": browser_observation.get("formDetails", []),
                     "pageState": browser_observation.get("pageState", {}),
+                    "actionEvidence": compact_action_evidence,
+                    "visibleText": str(browser_observation.get("visibleText") or "")[:3500],
+                    "ariaSnapshot": str(browser_observation.get("ariaSnapshot") or "")[:2500],
                 }
             else:
                 entry["providerOutput"] = str(provider_map)[:4000]
@@ -1175,6 +1223,7 @@ class ManagedRuntimeExecutor:
                 run_id=run.id,
                 current_step=current_step + 1,
                 summary="Previously executed action checkpoint reused.",
+                continuation_phase="plan",
             )
 
         if decision["outcome"] == "DENY":
@@ -1555,6 +1604,7 @@ class ManagedRuntimeExecutor:
             run.id,
             current_step + 1,
             result.summary,
+            "plan",
         )
 
     def _action_record_payload(

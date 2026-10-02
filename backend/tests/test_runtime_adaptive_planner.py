@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
@@ -12,6 +13,8 @@ from app.domain.ai.providers import (
 )
 from app.runtime.managed import _attach_observation_id
 from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass
@@ -306,3 +309,118 @@ def test_runtime_injects_observation_id_into_nested_browser_locators() -> None:
     assert isinstance(fields, list)
     assert fields[0]["locator"]["observationId"] == "obs-123"
     assert result["submitLocator"]["observationId"] == "obs-123"
+
+
+def test_browser_scroll_contract_accepts_semantic_boundaries() -> None:
+    browser_provider = (
+        ROOT / "backend/app/execution/providers/browser.py"
+    ).read_text(encoding="utf-8")
+    browser_runtime = (
+        ROOT / "backend/app/execution/browser/runtime.py"
+    ).read_text(encoding="utf-8")
+
+    assert '"enum": ["top", "bottom"]' in browser_provider
+    assert "Browser page.scroll value must be an integer, top, or bottom." in browser_runtime
+
+
+def test_browser_execution_preserves_current_observation_for_locator_actions() -> None:
+    runtime = (
+        ROOT / "backend/app/execution/browser/runtime.py"
+    ).read_text(encoding="utf-8")
+    provider = (
+        ROOT / "backend/app/execution/providers/browser.py"
+    ).read_text(encoding="utf-8")
+
+    assert "async def current_observation(" in runtime
+    assert "if handle.last_observation is not None:" in runtime
+    assert "before_observation = await self._runtime.current_observation(" in provider
+
+
+@pytest.mark.asyncio
+async def test_adaptive_planner_rejects_repeat_scroll_without_new_actionable_state() -> None:
+    scroll_tool = {
+        "resourceId": "browser-1",
+        "resourceName": "QQ browser",
+        "provider": "browser",
+        "scope": "browser.page.scroll",
+        "operation": "page.scroll",
+        "description": "Scroll the page.",
+        "risk": "low",
+        "inputSchema": {
+            "type": "object",
+            "required": ["sessionId", "value"],
+            "properties": {
+                "sessionId": {"type": "string"},
+                "value": {"type": "integer"},
+            },
+        },
+        "defaultStartUrl": "",
+    }
+    gateway = FakeGateway(
+        [
+            {
+                "decision": "act",
+                "summary": "Scroll again.",
+                "title": "Scroll again",
+                "instruction": "Keep scrolling.",
+                "resourceId": "browser-1",
+                "scope": "browser.page.scroll",
+                "input": {"value": 900},
+            },
+            {
+                "decision": "act",
+                "summary": "Use the already observed checkbox.",
+                "title": "Check newsletter",
+                "instruction": "Check the observed checkbox.",
+                "resourceId": "browser-1",
+                "scope": "browser.element.check",
+                "input": {
+                    "locator": {"strategy": "observation_ref", "value": "e2"}
+                },
+            },
+        ]
+    )
+    planner = AdaptiveRuntimePlanner(gateway)
+    browser_observation = {
+        "url": "https://example.com",
+        "formDetails": [{"ref": "f1", "fieldRefs": ["e2"], "submitRefs": []}],
+        "elements": [
+            {"ref": "e2", "role": "checkbox", "name": "Newsletter"}
+        ],
+        "pageState": {"formCount": 1, "interactiveElementCount": 1},
+    }
+    observations = [
+        {
+            "step": 1,
+            "scope": "browser.navigation.open",
+            "browserObservation": dict(browser_observation),
+        },
+        {
+            "step": 2,
+            "scope": "browser.page.scroll",
+            "browserObservation": dict(browser_observation),
+        },
+    ]
+
+    decision = await planner.choose_next(
+        job=_job(),
+        worker=_worker(),
+        trigger={},
+        tools=[*_browser_tools(), scroll_tool],
+        observations=observations,
+        action_count=2,
+        max_actions=8,
+    )
+
+    assert decision.scope == "browser.element.check"
+    assert gateway.calls == 2
+
+
+def test_planner_observation_prioritizes_form_refs_before_page_prose() -> None:
+    source = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    browser_block_start = source.index('entry["browserObservation"] = {')
+    browser_block = source[browser_block_start : browser_block_start + 1800]
+
+    assert browser_block.index('"formDetails"') < browser_block.index('"visibleText"')
+    assert browser_block.index('"elements"') < browser_block.index('"visibleText"')
+    assert "form_refs" in source

@@ -487,6 +487,8 @@ async def execute(
                     item=item,
                     expected_step=message.expected_step,
                 )
+                if outcome.state == "continue" and outcome.continuation_phase is not None:
+                    continuation_reason = f"continuation-{outcome.continuation_phase}"
                 if outcome.state == "continue" and item.scheduled_at > datetime.now(UTC):
                     continuation_delay_seconds = max(
                         1,
