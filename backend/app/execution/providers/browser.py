@@ -315,6 +315,14 @@ CAPABILITIES = (
         approval="none",
         description="Scroll the governed page vertically.",
         requires_value=True,
+        properties={
+            "value": {
+                "oneOf": [
+                    {"type": "integer", "minimum": -100000, "maximum": 100000},
+                    {"type": "string", "enum": ["top", "bottom"]},
+                ]
+            }
+        },
     ),
     _capability(
         scope="browser.element.hover",
