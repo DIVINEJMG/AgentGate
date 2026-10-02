@@ -1695,11 +1695,12 @@ async def _provision_managed_job_authority(
             None,
         )
         explicitly_granted_now = standing_approval and scope in requested
-        if capability is not None and explicitly_granted_now and capability.risk != "critical":
-            allow_all.add(scope)
-        elif capability is not None and (
-            capability.approval_recommendation == "none"
-            and capability.risk not in {"high", "critical"}
+        if capability is not None and (
+            (explicitly_granted_now and capability.risk != "critical")
+            or (
+                capability.approval_recommendation == "none"
+                and capability.risk not in {"high", "critical"}
+            )
         ):
             allow_all.add(scope)
         else:
