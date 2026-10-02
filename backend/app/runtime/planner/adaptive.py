@@ -344,6 +344,14 @@ class AdaptiveRuntimePlanner:
                 + "."
             )
 
+        if scope == "browser.page.scroll" and _previous_scroll_made_no_progress(
+            observations
+        ):
+            raise RuntimeError(
+                "Previous browser.page.scroll revealed no new actionable elements or forms. "
+                "Do not scroll again; use the latest observed refs/forms or choose another action."
+            )
+
         if latest_browser is not None:
             raw_elements = latest_browser.get("elements")
             elements = raw_elements if isinstance(raw_elements, list) else []
