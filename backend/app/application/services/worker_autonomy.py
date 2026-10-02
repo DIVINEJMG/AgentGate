@@ -186,6 +186,10 @@ class WorkerAutonomyService:
                 organization_id=organization_id,
                 needs=job_draft.capability_needs,
                 required_browser_origins=browser_origins,
+                require_browser_origin_authority=any(
+                    _provider_id(need.provider) == "browser"
+                    for need in job_draft.capability_needs
+                ),
                 invocation_context=AIInvocationContext(
                     organization_id=organization_id,
                     thread_id=source_thread_id,
@@ -196,7 +200,11 @@ class WorkerAutonomyService:
                 unresolved_connected = {
                     _provider_id(need.provider)
                     for need in job_draft.capability_needs
-                    if _provider_id(need.provider) in connected_providers
+                    if (
+                        _provider_id(need.provider) in connected_providers
+                        and _provider_id(need.provider)
+                        not in set(resolution.missing_integrations)
+                    )
                 }
                 if unresolved_connected:
                     raise ValueError(
