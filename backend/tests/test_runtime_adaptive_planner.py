@@ -424,6 +424,7 @@ def test_planner_observation_prioritizes_form_refs_before_page_prose() -> None:
     assert browser_block.index('"formDetails"') < browser_block.index('"visibleText"')
     assert browser_block.index('"elements"') < browser_block.index('"visibleText"')
     assert '"value", 240' in source
+    assert '"field_name"' in source
     assert '"elementReference": action_evidence.get("elementReference")' in source
     assert "form_refs" in source
 
@@ -713,6 +714,97 @@ async def test_adaptive_planner_redirects_enter_form_shortcut_to_form_submit() -
     assert decision.scope == "browser.form.submit"
     assert decision.action_input == {"formRef": "f1"}
     assert gateway.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_adaptive_planner_converts_get_form_enter_to_governed_navigation() -> None:
+    press_tool = {
+        "resourceId": "browser-1",
+        "resourceName": "Search browser",
+        "provider": "browser",
+        "scope": "browser.element.press_key",
+        "operation": "element.press_key",
+        "description": "Press a key outside form submission.",
+        "risk": "medium",
+        "inputSchema": {
+            "type": "object",
+            "required": ["sessionId", "locator", "value"],
+            "properties": {
+                "sessionId": {"type": "string"},
+                "locator": {"type": "object"},
+                "value": {"type": "string"},
+            },
+        },
+        "defaultStartUrl": "",
+    }
+    open_tool = _browser_tools()[0]
+    gateway = FakeGateway(
+        [
+            {
+                "decision": "act",
+                "summary": "Submit the search.",
+                "title": "Submit search",
+                "instruction": "Press Enter in the populated search field.",
+                "resourceId": "browser-1",
+                "scope": "browser.element.press_key",
+                "input": {
+                    "locator": {"strategy": "observation_ref", "value": "e12"},
+                    "value": "Enter",
+                },
+            }
+        ]
+    )
+    planner = AdaptiveRuntimePlanner(gateway)
+    observations = [
+        {
+            "step": 2,
+            "scope": "browser.element.type",
+            "browserObservation": {
+                "url": "https://example.com/",
+                "elements": [
+                    {
+                        "ref": "e12",
+                        "tag": "textarea",
+                        "role": "combobox",
+                        "name": "Search",
+                        "field_name": "q",
+                        "value": "latest Real Madrid result",
+                    }
+                ],
+                "formDetails": [
+                    {
+                        "ref": "f1",
+                        "action": "https://example.com/search",
+                        "method": "get",
+                        "fieldRefs": ["e12"],
+                        "submitRefs": ["e16"],
+                    }
+                ],
+            },
+        }
+    ]
+
+    decision = await planner.choose_next(
+        job={
+            "name": "Search",
+            "objective": "Search for the latest result.",
+            "instructions": "",
+            "completionCriteria": ["Search results are visible."],
+        },
+        worker=_worker(),
+        trigger={},
+        tools=[open_tool, press_tool],
+        observations=observations,
+        action_count=2,
+        max_actions=8,
+    )
+
+    assert decision.scope == "browser.navigation.open"
+    assert decision.resource_id == "browser-1"
+    assert decision.action_input == {
+        "url": "https://example.com/search?q=latest+Real+Madrid+result"
+    }
+    assert gateway.calls == 1
 
 
 @pytest.mark.asyncio
