@@ -737,3 +737,81 @@ def test_golden_qq_scenario_contract_is_represented_without_scope_invention() ->
     assert "missingIntegrations" in autonomy_source
     assert "approval_boundaries" in autonomy_source
     assert "humanSchedule" in autonomy_source
+
+
+def test_worker_draft_requires_explicit_human_intent_for_per_action_approval() -> None:
+    from app.application.services.worker_draft import (
+        _enforce_human_approval_intent,
+        _explicit_approval_requested,
+    )
+
+    draft = WorkerDraft.model_validate(
+        {
+            "suggested_name": "Scout",
+            "role": "Web researcher",
+            "department": "Operations",
+            "supervisor_name": None,
+            "charter": "Research products and submit inquiries.",
+            "responsibilities": ["Research products"],
+            "standing_instructions": [],
+            "initial_jobs": [
+                {
+                    "name": "Product inquiry",
+                    "objective": "Inspect a website and submit an inquiry.",
+                    "instructions": "Use the governed browser.",
+                    "completion_criteria": ["Inquiry submitted."],
+                    "capability_needs": [],
+                    "schedule": {"kind": "manual"},
+                    "approval_boundaries": [
+                        {
+                            "kind": "write_requires_approval",
+                            "provider": "browser",
+                            "reason": "External write should require approval.",
+                            "allowed_origins": [],
+                        }
+                    ],
+                    "integration_requirements": [],
+                    "start_when_ready": True,
+                }
+            ],
+        }
+    )
+
+    assert _explicit_approval_requested(
+        "Submit the inquiry and accept the privacy checkbox if required."
+    ) is False
+    sanitized = _enforce_human_approval_intent(
+        draft,
+        instruction="Submit the inquiry and accept the privacy checkbox if required.",
+    )
+    assert sanitized.initial_jobs[0].approval_boundaries == []
+
+    assert _explicit_approval_requested(
+        "Fill the form, but never submit without asking me."
+    ) is True
+    preserved = _enforce_human_approval_intent(
+        draft,
+        instruction="Fill the form, but never submit without asking me.",
+    )
+    assert preserved.initial_jobs[0].approval_boundaries[0].kind == "write_requires_approval"
+
+
+def test_managed_worker_creation_uses_standing_authority_for_granted_scopes() -> None:
+    from app.api import jobs_routes
+
+    source = inspect.getsource(jobs_routes._provision_managed_job_authority)
+
+    assert "standing_approval: bool = False" in source
+    assert "explicitly_granted_now = standing_approval and scope in requested" in source
+    assert 'capability.risk != "critical"' in source
+    assert '"standingApproval": standing_approval' in source
+    assert 'policy.status = "disabled"' in source
+
+
+def test_retry_refreshes_managed_standing_authority() -> None:
+    from app.api import runtime_result_routes
+
+    source = inspect.getsource(runtime_result_routes.retry_item_v1)
+
+    assert "_provision_managed_job_authority(" in source
+    assert "standing_approval=True" in source
