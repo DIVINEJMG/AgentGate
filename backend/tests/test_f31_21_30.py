@@ -487,7 +487,7 @@ async def test_browser_capability_resolver_accepts_matching_origin() -> None:
 def test_bare_domain_is_explicit_browser_authority() -> None:
     assert explicit_http_origins(
         "Create Div, open google.com and search for the latest Real Madrid result."
-    ) == ("https://google.com",)
+    ) == ("https://google.com", "https://www.google.com")
 
 
 def test_explicit_http_origin_stays_exact_and_bare_domain_scan_does_not_duplicate() -> None:
@@ -499,7 +499,7 @@ def test_explicit_http_origin_stays_exact_and_bare_domain_scan_does_not_duplicat
 def test_bare_domain_parser_ignores_email_addresses_and_common_file_names() -> None:
     assert explicit_http_origins(
         "Email user@example.com and inspect report.pdf before opening example.org."
-    ) == ("https://example.org",)
+    ) == ("https://example.org", "https://www.example.org")
 
 
 def test_planner_rejects_browser_resource_destination_mismatch_before_execution() -> None:
