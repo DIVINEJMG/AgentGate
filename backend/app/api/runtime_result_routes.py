@@ -38,6 +38,7 @@ from app.infrastructure.database.models import (
 )
 from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.database.session import database_session
+from app.infrastructure.redis.coordination import RedisCoordinator
 from app.infrastructure.storage.provider import object_storage_from_settings
 from app.runtime.qstash_trigger import (
     request_runtime_execution,
@@ -329,42 +330,55 @@ async def process_item_v1(
             else "Only queued work can be manually processed."
         )
         raise HTTPException(409, guidance)
-    run = await session.scalar(
-        select(Run)
-        .where(Run.work_item_id == item.id)
-        .order_by(desc(Run.created_at))
-        .limit(1)
-    )
-    created_run = run is None
-    if run is None:
-        run = Run(
-            organization_id=organization_id,
-            work_item_id=item.id,
-            status="queued",
-            correlation_id=item.correlation_id,
-        )
-        session.add(run)
-        await session.flush()
-    item.status = "queued"
-    if created_run:
-        await TransactionalOutbox(session).enqueue(
-            topic="run.created",
-            aggregate_type="run",
-            aggregate_id=str(run.id),
-            payload={
-                "organization_id": str(organization_id),
-                "run_id": str(run.id),
-                "job_id": str(item.job_id),
-                "correlation_id": item.correlation_id,
-                "status": run.status,
-            },
-        )
-    await session.commit()
     expected_step = int(
         ((item.payload or {}).get("runtime") or {}).get("currentStep", 0)
         if isinstance((item.payload or {}).get("runtime"), dict)
         else 0
     )
+    coordinator = RedisCoordinator.from_settings()
+    lease = await coordinator.acquire_lock(
+        f"runtime:{item.id}:{expected_step}",
+        ttl_seconds=30,
+    )
+    if lease is None:
+        await coordinator.close()
+        raise HTTPException(409, "Work item is already being processed.")
+
+    try:
+        run = await session.scalar(
+            select(Run)
+            .where(Run.work_item_id == item.id)
+            .order_by(desc(Run.created_at))
+            .limit(1)
+        )
+        created_run = run is None
+        if run is None:
+            run = Run(
+                organization_id=organization_id,
+                work_item_id=item.id,
+                status="queued",
+                correlation_id=item.correlation_id,
+            )
+            session.add(run)
+            await session.flush()
+        item.status = "queued"
+        if created_run:
+            await TransactionalOutbox(session).enqueue(
+                topic="run.created",
+                aggregate_type="run",
+                aggregate_id=str(run.id),
+                payload={
+                    "organization_id": str(organization_id),
+                    "run_id": str(run.id),
+                    "job_id": str(item.job_id),
+                    "correlation_id": item.correlation_id,
+                    "status": run.status,
+                },
+            )
+        await session.commit()
+    finally:
+        await coordinator.release_lock(lease)
+        await coordinator.close()
     execution_signal = await request_runtime_execution_detailed(
         organization_id=organization_id,
         work_item_id=item.id,
