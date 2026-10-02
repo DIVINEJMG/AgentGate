@@ -77,10 +77,14 @@ def explicit_http_origins(text: str) -> tuple[str, ...]:
         if top_level in _FILELIKE_TLDS:
             continue
         port = match.group("port")
-        candidate = f"https://{host}" + (f":{port}" if port else "")
-        origin = normalize_origin(candidate)
-        if origin is not None and origin not in origins:
-            origins.append(origin)
+        suffix = f":{port}" if port else ""
+        candidates = [f"https://{host}{suffix}"]
+        if not host.startswith("www.") and host.count(".") == 1:
+            candidates.append(f"https://www.{host}{suffix}")
+        for candidate in candidates:
+            origin = normalize_origin(candidate)
+            if origin is not None and origin not in origins:
+                origins.append(origin)
 
     return tuple(origins)
 
