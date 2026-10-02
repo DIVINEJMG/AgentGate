@@ -423,6 +423,8 @@ def test_planner_observation_prioritizes_form_refs_before_page_prose() -> None:
 
     assert browser_block.index('"formDetails"') < browser_block.index('"visibleText"')
     assert browser_block.index('"elements"') < browser_block.index('"visibleText"')
+    assert '"value", 240' in source
+    assert '"elementReference": action_evidence.get("elementReference")' in source
     assert "form_refs" in source
 
 
@@ -494,6 +496,101 @@ async def test_adaptive_planner_rejects_typing_value_already_present() -> None:
                 "formDetails": [
                     {"ref": "f1", "fieldRefs": ["e11"], "submitRefs": ["e16"]}
                 ],
+            },
+        }
+    ]
+
+    decision = await planner.choose_next(
+        job={
+            "name": "Search",
+            "objective": "Search for the latest result.",
+            "instructions": "",
+            "completionCriteria": ["Search results are visible."],
+        },
+        worker=_worker(),
+        trigger={},
+        tools=[*_browser_tools(), type_tool],
+        observations=observations,
+        action_count=2,
+        max_actions=8,
+    )
+
+    assert decision.scope == "browser.navigation.open"
+    assert gateway.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_adaptive_planner_rejects_consecutive_retype_of_populated_field() -> None:
+    type_tool = {
+        "resourceId": "browser-1",
+        "resourceName": "Search browser",
+        "provider": "browser",
+        "scope": "browser.element.type",
+        "operation": "element.type",
+        "description": "Type into a field.",
+        "risk": "medium",
+        "inputSchema": {
+            "type": "object",
+            "required": ["sessionId", "locator", "value"],
+            "properties": {
+                "sessionId": {"type": "string"},
+                "locator": {"type": "object"},
+                "value": {},
+            },
+        },
+        "defaultStartUrl": "",
+    }
+    gateway = FakeGateway(
+        [
+            {
+                "decision": "act",
+                "summary": "Refine the query.",
+                "title": "Enter search query",
+                "instruction": "Replace the query with a slightly different phrase.",
+                "resourceId": "browser-1",
+                "scope": "browser.element.type",
+                "input": {
+                    "locator": {"strategy": "observation_ref", "value": "e12"},
+                    "value": "latest Real Madrid match result",
+                },
+            },
+            {
+                "decision": "act",
+                "summary": "Advance to the search results.",
+                "title": "Submit search",
+                "instruction": "Open the authorized GET search URL.",
+                "resourceId": "browser-1",
+                "scope": "browser.navigation.open",
+                "input": {
+                    "url": "https://example.com/search?q=latest+Real+Madrid+result"
+                },
+            },
+        ]
+    )
+    planner = AdaptiveRuntimePlanner(gateway)
+    observations = [
+        {
+            "step": 2,
+            "scope": "browser.element.type",
+            "browserObservation": {
+                "url": "https://example.com/",
+                "elements": [
+                    {
+                        "ref": "e12",
+                        "tag": "textarea",
+                        "role": "combobox",
+                        "name": "Search",
+                        "value": "latest Real Madrid result",
+                    }
+                ],
+                "formDetails": [
+                    {"ref": "f1", "fieldRefs": ["e12"], "submitRefs": ["e16"]}
+                ],
+                "actionEvidence": {
+                    "operation": "element.type",
+                    "stateChanged": True,
+                    "elementReference": "e12",
+                },
             },
         }
     ]
