@@ -56,6 +56,61 @@ def _locator_refs(value: object) -> list[str]:
     return refs
 
 
+def _browser_actionable_signature(browser: dict[str, object]) -> str:
+    raw_elements = browser.get("elements")
+    elements = raw_elements if isinstance(raw_elements, list) else []
+    raw_forms = browser.get("formDetails")
+    forms = raw_forms if isinstance(raw_forms, list) else []
+    raw_page_state = browser.get("pageState")
+    page_state = raw_page_state if isinstance(raw_page_state, dict) else {}
+    return json.dumps(
+        {
+            "url": browser.get("url"),
+            "elements": [
+                {
+                    key: element.get(key)
+                    for key in (
+                        "ref",
+                        "tag",
+                        "role",
+                        "name",
+                        "text",
+                        "element_type",
+                        "checked",
+                        "disabled",
+                    )
+                    if key in element
+                }
+                for element in elements
+                if isinstance(element, dict)
+            ],
+            "formDetails": forms,
+            "formCount": page_state.get("formCount"),
+            "interactiveElementCount": page_state.get("interactiveElementCount"),
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+    )
+
+
+def _previous_scroll_made_no_progress(observations: list[dict[str, object]]) -> bool:
+    browser_entries = [
+        (item, browser)
+        for item in observations
+        if isinstance((browser := item.get("browserObservation")), dict)
+    ]
+    if len(browser_entries) < 2:
+        return False
+    latest_entry, latest_browser = browser_entries[-1]
+    _, previous_browser = browser_entries[-2]
+    if str(latest_entry.get("scope") or "") != "browser.page.scroll":
+        return False
+    return _browser_actionable_signature(latest_browser) == _browser_actionable_signature(
+        previous_browser
+    )
+
+
 class AdaptiveRuntimePlanner:
     def __init__(self, gateway: AIGateway) -> None:
         self._gateway = gateway
