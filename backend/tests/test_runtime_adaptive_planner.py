@@ -424,3 +424,277 @@ def test_planner_observation_prioritizes_form_refs_before_page_prose() -> None:
     assert browser_block.index('"formDetails"') < browser_block.index('"visibleText"')
     assert browser_block.index('"elements"') < browser_block.index('"visibleText"')
     assert "form_refs" in source
+
+
+
+@pytest.mark.asyncio
+async def test_adaptive_planner_rejects_typing_value_already_present() -> None:
+    type_tool = {
+        "resourceId": "browser-1",
+        "resourceName": "Search browser",
+        "provider": "browser",
+        "scope": "browser.element.type",
+        "operation": "element.type",
+        "description": "Type into a field.",
+        "risk": "medium",
+        "inputSchema": {
+            "type": "object",
+            "required": ["sessionId", "locator", "value"],
+            "properties": {
+                "sessionId": {"type": "string"},
+                "locator": {"type": "object"},
+                "value": {},
+            },
+        },
+        "defaultStartUrl": "",
+    }
+    gateway = FakeGateway(
+        [
+            {
+                "decision": "act",
+                "summary": "Type the query again.",
+                "title": "Enter search query",
+                "instruction": "Type the search query into the observed field.",
+                "resourceId": "browser-1",
+                "scope": "browser.element.type",
+                "input": {
+                    "locator": {"strategy": "observation_ref", "value": "e11"},
+                    "value": "latest Real Madrid result",
+                },
+            },
+            {
+                "decision": "act",
+                "summary": "Continue using the authorized search URL.",
+                "title": "Submit search",
+                "instruction": "Open the same-origin GET search URL.",
+                "resourceId": "browser-1",
+                "scope": "browser.navigation.open",
+                "input": {
+                    "url": "https://example.com/search?q=latest+Real+Madrid+result"
+                },
+            },
+        ]
+    )
+    planner = AdaptiveRuntimePlanner(gateway)
+    observations = [
+        {
+            "step": 2,
+            "scope": "browser.element.type",
+            "browserObservation": {
+                "url": "https://example.com/",
+                "elements": [
+                    {
+                        "ref": "e11",
+                        "tag": "textarea",
+                        "role": "combobox",
+                        "name": "Search",
+                        "value": "latest Real Madrid result",
+                    }
+                ],
+                "formDetails": [
+                    {"ref": "f1", "fieldRefs": ["e11"], "submitRefs": ["e16"]}
+                ],
+            },
+        }
+    ]
+
+    decision = await planner.choose_next(
+        job={
+            "name": "Search",
+            "objective": "Search for the latest result.",
+            "instructions": "",
+            "completionCriteria": ["Search results are visible."],
+        },
+        worker=_worker(),
+        trigger={},
+        tools=[*_browser_tools(), type_tool],
+        observations=observations,
+        action_count=2,
+        max_actions=8,
+    )
+
+    assert decision.scope == "browser.navigation.open"
+    assert gateway.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_adaptive_planner_redirects_enter_form_shortcut_to_form_submit() -> None:
+    press_tool = {
+        "resourceId": "browser-1",
+        "resourceName": "Search browser",
+        "provider": "browser",
+        "scope": "browser.element.press_key",
+        "operation": "element.press_key",
+        "description": "Press a key outside form submission.",
+        "risk": "medium",
+        "inputSchema": {
+            "type": "object",
+            "required": ["sessionId", "locator", "value"],
+            "properties": {
+                "sessionId": {"type": "string"},
+                "locator": {"type": "object"},
+                "value": {"type": "string"},
+            },
+        },
+        "defaultStartUrl": "",
+    }
+    submit_tool = {
+        "resourceId": "browser-1",
+        "resourceName": "Search browser",
+        "provider": "browser",
+        "scope": "browser.form.submit",
+        "operation": "form.submit",
+        "description": "Submit a governed form.",
+        "risk": "high",
+        "inputSchema": {
+            "type": "object",
+            "required": ["sessionId"],
+            "properties": {
+                "sessionId": {"type": "string"},
+                "formRef": {"type": "string"},
+            },
+        },
+        "defaultStartUrl": "",
+    }
+    gateway = FakeGateway(
+        [
+            {
+                "decision": "act",
+                "summary": "Press Enter to submit.",
+                "title": "Submit search",
+                "instruction": "Press Enter in the search field.",
+                "resourceId": "browser-1",
+                "scope": "browser.element.press_key",
+                "input": {
+                    "locator": {"strategy": "observation_ref", "value": "e11"},
+                    "value": "Enter",
+                },
+            },
+            {
+                "decision": "act",
+                "summary": "Submit the observed search form.",
+                "title": "Submit search",
+                "instruction": "Submit the observed search form.",
+                "resourceId": "browser-1",
+                "scope": "browser.form.submit",
+                "input": {"formRef": "f1"},
+            },
+        ]
+    )
+    planner = AdaptiveRuntimePlanner(gateway)
+    observations = [
+        {
+            "step": 2,
+            "scope": "browser.element.type",
+            "browserObservation": {
+                "url": "https://example.com/",
+                "elements": [
+                    {
+                        "ref": "e11",
+                        "tag": "textarea",
+                        "role": "combobox",
+                        "value": "latest result",
+                    }
+                ],
+                "formDetails": [
+                    {"ref": "f1", "fieldRefs": ["e11"], "submitRefs": ["e16"]}
+                ],
+            },
+        }
+    ]
+
+    decision = await planner.choose_next(
+        job=_job(),
+        worker=_worker(),
+        trigger={},
+        tools=[*_browser_tools(), press_tool, submit_tool],
+        observations=observations,
+        action_count=2,
+        max_actions=8,
+    )
+
+    assert decision.scope == "browser.form.submit"
+    assert decision.action_input == {"formRef": "f1"}
+    assert gateway.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_adaptive_planner_rejects_enter_form_shortcut_when_submit_not_authorized() -> None:
+    press_tool = {
+        "resourceId": "browser-1",
+        "resourceName": "Search browser",
+        "provider": "browser",
+        "scope": "browser.element.press_key",
+        "operation": "element.press_key",
+        "description": "Press a key outside form submission.",
+        "risk": "medium",
+        "inputSchema": {
+            "type": "object",
+            "required": ["sessionId", "locator", "value"],
+            "properties": {
+                "sessionId": {"type": "string"},
+                "locator": {"type": "object"},
+                "value": {"type": "string"},
+            },
+        },
+        "defaultStartUrl": "",
+    }
+    gateway = FakeGateway(
+        [
+            {
+                "decision": "act",
+                "summary": "Press Enter to submit.",
+                "title": "Submit search",
+                "instruction": "Press Enter in the search field.",
+                "resourceId": "browser-1",
+                "scope": "browser.element.press_key",
+                "input": {
+                    "locator": {"strategy": "observation_ref", "value": "e11"},
+                    "value": "Enter",
+                },
+            },
+            {
+                "decision": "act",
+                "summary": "Use the authorized GET search route.",
+                "title": "Submit search",
+                "instruction": "Navigate to the same-origin search URL.",
+                "resourceId": "browser-1",
+                "scope": "browser.navigation.open",
+                "input": {"url": "https://example.com/search?q=latest+result"},
+            },
+        ]
+    )
+    planner = AdaptiveRuntimePlanner(gateway)
+    observations = [
+        {
+            "step": 2,
+            "scope": "browser.element.type",
+            "browserObservation": {
+                "url": "https://example.com/",
+                "elements": [
+                    {
+                        "ref": "e11",
+                        "tag": "textarea",
+                        "role": "combobox",
+                        "value": "latest result",
+                    }
+                ],
+                "formDetails": [
+                    {"ref": "f1", "fieldRefs": ["e11"], "submitRefs": ["e16"]}
+                ],
+            },
+        }
+    ]
+
+    decision = await planner.choose_next(
+        job=_job(),
+        worker=_worker(),
+        trigger={},
+        tools=[*_browser_tools(), press_tool],
+        observations=observations,
+        action_count=2,
+        max_actions=8,
+    )
+
+    assert decision.scope == "browser.navigation.open"
+    assert gateway.calls == 2
