@@ -10,7 +10,12 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_dependencies import organization_principal
-from app.api.jobs_routes import work_item_public, work_item_v2
+from app.api.jobs_routes import (
+    _provision_managed_job_authority,
+    current_revision,
+    work_item_public,
+    work_item_v2,
+)
 from app.api.product_common import (
     append_audit,
     latest_setting,
@@ -506,6 +511,25 @@ async def retry_item_v1(
     payload = dict(item.payload or {})
     if int(payload.get("retryCount", 0)) >= 2:
         raise HTTPException(409, "This Work Item reached the bounded retry limit.")
+
+    # Retrying an automatically managed Worker is an explicit human action. Refresh
+    # its standing authority from the Job's currently declared capability set so
+    # stale managed REQUIRE_APPROVAL policies cannot survive an authority change.
+    job = await session.get(Job, item.job_id)
+    worker = await session.get(Worker, job.worker_id) if job is not None else None
+    if job is not None and worker is not None:
+        revision = await current_revision(session, job)
+        definition = revision.definition if isinstance(revision.definition, dict) else {}
+        required_scopes = definition.get("requiredCapabilities", [])
+        if isinstance(required_scopes, list):
+            await _provision_managed_job_authority(
+                session,
+                organization_id,
+                worker,
+                principal,
+                [str(scope) for scope in required_scopes],
+                standing_approval=True,
+            )
     stale_runs = list(
         (
             await session.scalars(
