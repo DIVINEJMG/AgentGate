@@ -88,6 +88,17 @@ def test_qstash_publish_headers_support_delayed_delivery() -> None:
     assert headers["Upstash-Delay"] == "40s"
 
 
+def test_ai_provider_retry_publishes_delayed_runtime_wakeup() -> None:
+    runtime_api = (
+        ROOT / "backend/app/api/internal/runtime.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'reason=f"ai-provider-retry:{int(retry_at.timestamp())}"' in runtime_api
+    assert "delay_seconds=retry_delay_seconds" in runtime_api
+    assert '"retryDispatchQueued": retry_dispatch_id is not None' in runtime_api
+    assert "retry_scheduled and retry_at is not None" in runtime_api
+
+
 def test_runtime_provider_retry_uses_qstash_delay_instead_of_waiting_for_sweep() -> None:
     runtime_api = (
         ROOT / "backend/app/api/internal/runtime.py"
