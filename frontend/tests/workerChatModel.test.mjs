@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { conversationFrames, discoveryWorkers, isHumanMessage, latestThreadId, threadsForWorker } from '../src/components/workerChatModel.ts';
+import { conversationFrames, discoveryWorkers, isHumanMessage, latestThreadId, liveResultReference, threadsForWorker } from '../src/components/workerChatModel.ts';
 
 const threads = [
   { id: 'a-old', workerId: 'a', updatedAt: '2026-09-01T10:00:00Z' },
@@ -57,4 +57,29 @@ test('backend human messages are identified separately from worker replies', () 
   assert.deepEqual(frames.map((frame) => [frame.direction?.id, frame.responses.map((message) => message.id)]), [
     ['sent', ['reply']],
   ]);
+});
+
+
+test('live result UI is reserved for runtime-backed completion references', () => {
+  const live = liveResultReference({
+    resultReferences: [{
+      type: 'result',
+      id: 'result-1',
+      name: 'Catalog check result',
+      presentation: 'live_result',
+      status: 'completed',
+      summary: 'Catalog check completed.',
+      runId: 'run-1',
+    }],
+  });
+  assert.equal(live?.id, 'result-1');
+  assert.equal(live?.presentation, 'live_result');
+  assert.equal(live?.runId, 'run-1');
+});
+
+test('ordinary result references stay normal chat messages', () => {
+  assert.equal(liveResultReference({
+    resultReferences: [{ type: 'result', id: 'result-2', name: 'Earlier result' }],
+  }), null);
+  assert.equal(liveResultReference({ resultReferences: [] }), null);
 });
