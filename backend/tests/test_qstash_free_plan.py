@@ -114,3 +114,12 @@ def test_runtime_continuations_use_distinct_plan_and_execute_dedupe_keys() -> No
     assert 'continuation_phase="execute"' in managed
     assert 'continuation_phase="plan"' in managed
     assert 'continuation_reason = f"continuation-{outcome.continuation_phase}"' in runtime_api
+
+
+def test_manual_process_uses_runtime_delivery_lock() -> None:
+    runtime_routes = (
+        ROOT / "backend/app/api/runtime_result_routes.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'f"runtime:{item.id}:{expected_step}"' in runtime_routes
+    assert '"Work item is already being processed."' in runtime_routes
