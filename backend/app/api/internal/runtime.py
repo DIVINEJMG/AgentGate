@@ -580,6 +580,21 @@ async def execute(
                     run.status = state
                     run.result_summary = summary
                 await session.commit()
+
+                retry_dispatch_id = None
+                if retry_scheduled and retry_at is not None:
+                    retry_delay_seconds = max(
+                        1,
+                        ceil((retry_at - datetime.now(UTC)).total_seconds()),
+                    )
+                    retry_dispatch_id = await request_runtime_execution(
+                        organization_id=item.organization_id,
+                        work_item_id=item.id,
+                        expected_step=_runtime_step(item),
+                        reason=f"ai-provider-retry:{int(retry_at.timestamp())}",
+                        delay_seconds=retry_delay_seconds,
+                    )
+
                 return {
                     "status": state,
                     "workItemId": str(item.id),
@@ -590,6 +605,7 @@ async def execute(
                     "failureCategory": runtime_meta["failureCategory"],
                     "retryScheduled": retry_scheduled,
                     "retryAt": retry_at.isoformat() if retry_at is not None else None,
+                    "retryDispatchQueued": retry_dispatch_id is not None,
                 }
             except RuntimeError as exc:
                 item.status = "failed"
