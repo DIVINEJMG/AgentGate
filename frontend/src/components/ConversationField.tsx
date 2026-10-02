@@ -4,7 +4,7 @@ import type { ApprovalRecord } from '../lib/approvalApi';
 import type { ConversationMessage, ConversationReceipt, ConversationThread } from '../lib/conversationApi';
 import type { ManagedWorker } from '../lib/workforceApi';
 import type { AppView } from '../navigation';
-import { discoveryWorkers } from './workerChatModel';
+import { discoveryWorkers, isHumanMessage } from './workerChatModel';
 
 type Props = {
   workers: ManagedWorker[]; worker: ManagedWorker | null; workerId: string | null;
@@ -161,7 +161,7 @@ export default function ConversationField(props: Props) {
           <div className="cf-transcript-inner">
             {error && <div className="cf-error" role="alert">{error}</div>}
             {threadLoading ? <div className="cf-chat-empty">Opening conversation…</div> : messages.length ? messages.map(message => {
-              const isUser = message.role === 'user';
+              const isUser = isHumanMessage(message.role);
               return <article key={message.id} className={'cf-message ' + (isUser ? 'is-user' : 'is-worker')}><span className="cf-message-avatar">{isUser ? 'You' : initials(worker?.name ?? 'Worker')}</span><div className="cf-message-main"><div className="cf-message-body">{message.content}{message.artifactReferences?.length > 0 && <span className="cf-message-file"><FileUp size={13}/>{message.artifactReferences.length} attached file{message.artifactReferences.length === 1 ? '' : 's'}</span>}</div><time dateTime={message.createdAt}>{shortTime(message.createdAt)}</time></div></article>;
             }) : responsePhase ? null : <div className="cf-chat-empty"><span className="cf-empty-ring"><Send size={19}/></span><strong>{activeThread?.title || ('Start with ' + (worker?.name || 'a worker'))}</strong><p>Give a clear direction. The conversation remains connected to this worker's identity, capabilities, and approvals.</p></div>}
             {responsePhase && <div className="cf-response-pending" role="status" aria-live="polite"><span className="cf-message-avatar">{initials(worker?.name ?? 'Worker')}</span><div className="cf-response-pending-bubble"><span>{worker?.name ?? 'Worker'} · {responsePhase === 'preparing' ? 'Preparing context' : 'Working on your reply'}</span><span className="cf-response-dots" aria-hidden="true"><i/><i/><i/></span></div></div>}

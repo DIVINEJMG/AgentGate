@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { conversationFrames, discoveryWorkers, latestThreadId, threadsForWorker } from '../src/components/workerChatModel.ts';
+import { conversationFrames, discoveryWorkers, isHumanMessage, latestThreadId, threadsForWorker } from '../src/components/workerChatModel.ts';
 
 const threads = [
   { id: 'a-old', workerId: 'a', updatedAt: '2026-09-01T10:00:00Z' },
@@ -43,4 +43,18 @@ test('exchange frames preserve message order including worker-first and unanswer
     ['unanswered', []],
   ]);
   assert.deepEqual(messages.map((message) => message.id), ['opening', 'question', 'answer', 'follow-up', 'unanswered']);
+});
+
+test('backend human messages are identified separately from worker replies', () => {
+  assert.equal(isHumanMessage('human'), true);
+  assert.equal(isHumanMessage('user'), true);
+  assert.equal(isHumanMessage('worker'), false);
+  assert.equal(isHumanMessage('system'), false);
+  const frames = conversationFrames([
+    { id: 'sent', role: 'human' },
+    { id: 'reply', role: 'worker' },
+  ]);
+  assert.deepEqual(frames.map((frame) => [frame.direction?.id, frame.responses.map((message) => message.id)]), [
+    ['sent', ['reply']],
+  ]);
 });
