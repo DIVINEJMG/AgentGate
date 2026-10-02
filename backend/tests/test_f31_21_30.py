@@ -439,6 +439,50 @@ async def test_browser_capability_resolver_rejects_unrelated_connected_origin() 
 
 
 @pytest.mark.asyncio
+async def test_ai_browser_capability_resolver_fails_closed_without_authorized_origin() -> None:
+    integration = Integration(
+        id=uuid4(),
+        organization_id=uuid4(),
+        provider="browser",
+        display_name="Unrelated managed site",
+        status="connected",
+        config={
+            "availableCapabilities": [
+                "browser.navigation.open",
+                "browser.page.read",
+            ],
+            "metadata": {
+                "allowedOrigins": ["https://unrelated.example"],
+            },
+        },
+    )
+    gateway = StructuredGateway([])
+    resolver = SemanticCapabilityResolver(
+        cast(AsyncSession, CapabilitySession(integration, None)),
+        gateway,
+    )
+
+    result = await resolver.resolve(
+        organization_id=integration.organization_id,
+        needs=[
+            CapabilityNeed(
+                provider="browser",
+                need="Open the requested website",
+                actions=["open", "read"],
+            )
+        ],
+        required_browser_origins=(),
+        require_browser_origin_authority=True,
+        invocation_context=AIInvocationContext(),
+    )
+
+    assert result.scopes == ()
+    assert result.missing_integrations == ("browser",)
+    assert result.mappings[0]["state"] == "missing_authorized_origin"
+    assert gateway.schemas == []
+
+
+@pytest.mark.asyncio
 async def test_browser_capability_resolver_accepts_matching_origin() -> None:
     integration = Integration(
         id=uuid4(),
