@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
-
 import json
+from typing import Any
 
 from app.domain.ai.providers import AIGateway, AIInvocationContext
 from app.domain.workforce.drafts import WorkerDraft
