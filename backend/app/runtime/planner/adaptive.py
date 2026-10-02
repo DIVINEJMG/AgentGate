@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.domain.ai.providers import AIGateway, AIInvocationContext
 from app.execution.browser.policy import normalize_origin
@@ -155,6 +156,95 @@ def _form_ref_for_element(
 def _single_observation_ref(action_input: dict[str, object]) -> str | None:
     refs = _locator_refs(action_input)
     return refs[0] if len(refs) == 1 else None
+
+
+def _safe_get_form_navigation(
+    *,
+    latest_browser: dict[str, object],
+    target_ref: str,
+    tools: list[dict[str, object]],
+    resource_id: str,
+) -> tuple[str, str] | None:
+    raw_forms = latest_browser.get("formDetails")
+    forms = raw_forms if isinstance(raw_forms, list) else []
+    form: dict[str, object] | None = None
+    for raw_form in forms:
+        if not isinstance(raw_form, dict):
+            continue
+        if str(raw_form.get("method") or "").lower() != "get":
+            continue
+        raw_refs = raw_form.get("fieldRefs")
+        refs = raw_refs if isinstance(raw_refs, list) else []
+        if target_ref in {str(ref) for ref in refs}:
+            form = {str(key): value for key, value in raw_form.items()}
+            break
+    if form is None:
+        return None
+
+    action = str(form.get("action") or "").strip()
+    if not action:
+        return None
+
+    navigation_tool = next(
+        (
+            tool
+            for tool in tools
+            if str(tool.get("resourceId") or "") == resource_id
+            and str(tool.get("scope") or "") == "browser.navigation.open"
+        ),
+        None,
+    )
+    if navigation_tool is None:
+        return None
+
+    raw_allowed = navigation_tool.get("allowedOrigins")
+    allowed_origins = {
+        origin
+        for value in raw_allowed
+        if (origin := normalize_origin(str(value))) is not None
+    } if isinstance(raw_allowed, list) else set()
+    action_origin = normalize_origin(action)
+    if allowed_origins and action_origin not in allowed_origins:
+        return None
+
+    raw_elements = latest_browser.get("elements")
+    elements = raw_elements if isinstance(raw_elements, list) else []
+    element_by_ref = {
+        str(element.get("ref") or ""): element
+        for element in elements
+        if isinstance(element, dict)
+    }
+    raw_field_refs = form.get("fieldRefs")
+    field_refs = raw_field_refs if isinstance(raw_field_refs, list) else []
+
+    pairs: list[tuple[str, str]] = []
+    for raw_ref in field_refs:
+        element = element_by_ref.get(str(raw_ref))
+        if element is None:
+            continue
+        field_name = str(element.get("field_name") or "").strip()
+        if not field_name:
+            continue
+        if element.get("checked") is False:
+            continue
+        raw_value = element.get("value")
+        if raw_value in (None, ""):
+            continue
+        value = str(raw_value)
+        if "[REDACTED]" in value:
+            return None
+        pairs.append((field_name, value))
+
+    if not pairs:
+        return None
+
+    parts = urlsplit(action)
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    query.extend(pairs)
+    target_url = urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, urlencode(query, doseq=True), parts.fragment)
+    )
+    return str(navigation_tool.get("resourceId") or resource_id), target_url
 
 
 def _previous_successful_type_target(
@@ -474,11 +564,31 @@ class AdaptiveRuntimePlanner:
                         "Enter on this observed field would submit a form. "
                         f"Use browser.form.submit with formRef {form_ref} instead."
                     )
+                assert target_ref is not None
+                safe_navigation = _safe_get_form_navigation(
+                    latest_browser=latest_browser,
+                    target_ref=target_ref,
+                    tools=tools,
+                    resource_id=resource_id,
+                )
+                if safe_navigation is not None:
+                    navigation_resource_id, target_url = safe_navigation
+                    return AdaptivePlanDecision(
+                        decision="act",
+                        summary=summary,
+                        title=title or "Submit search",
+                        instruction=(
+                            "Navigate to the observed GET form action using the "
+                            "already populated non-sensitive fields."
+                        ),
+                        resource_id=navigation_resource_id,
+                        scope="browser.navigation.open",
+                        action_input={"url": target_url},
+                    )
                 raise RuntimeError(
                     "Enter on this observed field would submit a form, but "
-                    "browser.form.submit is not authorized. Do not use press_key as a "
-                    "submission shortcut; use another authorized route such as same-origin "
-                    "browser.navigation.open for an equivalent GET form when appropriate."
+                    "browser.form.submit is not authorized and no safe same-origin GET "
+                    "navigation could be derived from the observed form."
                 )
 
         if latest_browser is not None:
