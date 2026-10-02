@@ -5,6 +5,7 @@ from typing import Any
 
 from app.domain.ai.providers import AIGateway, AIInvocationContext
 from app.domain.workforce.drafts import WorkerDraft
+
 _EXPLICIT_APPROVAL_CUES = (
     "ask me",
     "ask before",
