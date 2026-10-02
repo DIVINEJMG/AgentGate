@@ -5,7 +5,8 @@ import type { ApiVersion } from '../lib/systemApi';
 import { loadWorkforce, type ManagedWorker } from '../lib/workforceApi';
 import { confirmConversationCommand, createConversation, getConversation, listConversations, sendConversationMessage, uploadConversationAttachment, type ConversationMessage, type ConversationReceipt, type ConversationThread } from '../lib/conversationApi';
 import type { AppView } from '../navigation';
-import { latestThreadId, threadsForWorker } from './workerChatModel';
+import { subscribeOrganizationRealtime } from '../platform/realtimeClient';
+import { latestThreadId, threadsForWorker, type LiveResultReference } from './workerChatModel';
 import ConversationField from './ConversationField';
 
 function errorText(value: unknown) {
@@ -81,6 +82,28 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
     return () => { active = false; };
   }, [apiVersion, organization.id, threadId]);
 
+  useEffect(() => {
+    if (!threadId) return;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const result = await getConversation(apiVersion, organization.id, threadId);
+        if (!active) return;
+        setMessages(result.messages);
+        setThreads((current) => current.map((item) => item.id === threadId ? result.thread : item));
+      } catch {
+        // Realtime refresh is best-effort; normal conversation errors remain user-visible.
+      }
+    };
+    const unsubscribe = subscribeOrganizationRealtime({
+      organizationId: organization.id,
+      eventTypes: ['result.created', 'conversation.response.created', 'run.completed'],
+      onEvent: () => { void refresh(); },
+      poll: () => refresh(),
+    });
+    return () => { active = false; unsubscribe(); };
+  }, [apiVersion, organization.id, threadId]);
+
   useEffect(() => { timeline.current?.scrollTo({ top: timeline.current.scrollHeight, behavior: 'smooth' }); }, [messages, threadLoading, responsePhase]);
 
   function chooseWorker(id: string) {
@@ -150,6 +173,33 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
     } catch (caught) { setError(errorText(caught)); } finally { setBusy(false); }
   }
 
+  function openResult(reference: LiveResultReference) {
+    sessionStorage.setItem(`audoryn:open-result:${organization.id}`, reference.id);
+    onNavigate('results');
+  }
+
+  async function explainResult(reference: LiveResultReference) {
+    if (!threadId || busy) return;
+    setBusy(true); setError(null); setReceipt(null); setResponsePhase('responding');
+    try {
+      const turn = await sendConversationMessage(
+        apiVersion,
+        organization.id,
+        threadId,
+        `Explain this specific completed result to me: "${reference.name}" (result ID: ${reference.id}). Tell me what was completed, what the result means, and anything I should pay attention to.`,
+      );
+      const result = await getConversation(apiVersion, organization.id, threadId);
+      setMessages(result.messages);
+      setReceipt(turn.receipt);
+      setThreads((current) => current.map((item) => item.id === threadId ? result.thread : item));
+    } catch (caught) {
+      setError(errorText(caught));
+    } finally {
+      setBusy(false);
+      setResponsePhase(null);
+    }
+  }
+
   return <ConversationField
     workers={workers}
     worker={worker}
@@ -178,6 +228,8 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
     onSend={send}
     onConfirm={() => void confirm()}
     onDecide={(approval, decision) => void decide(approval, decision)}
+    onOpenResult={openResult}
+    onExplainResult={(reference) => void explainResult(reference)}
     onNavigate={onNavigate}
     onBack={back}
   />;

@@ -22,6 +22,7 @@ from app.application.services.browser_origin_authority import (
     browser_integration_origins,
     explicit_http_origins,
 )
+from app.application.services.live_results import append_live_result_message
 from app.application.services.worker_memory import WorkerMemoryService
 from app.bootstrap.settings import settings
 from app.domain.actions.gateway import (
@@ -1915,6 +1916,15 @@ class ManagedRuntimeExecutor:
                     "result_id": str(result.id),
                     "correlation_id": item.correlation_id,
                 },
+            )
+            await append_live_result_message(
+                self._session,
+                item=item,
+                run=run,
+                job=job,
+                worker=worker,
+                result=result,
+                summary=summary,
             )
 
         await self._close_browser_session(

@@ -4,7 +4,7 @@ import type { ApprovalRecord } from '../lib/approvalApi';
 import type { ConversationMessage, ConversationReceipt, ConversationThread } from '../lib/conversationApi';
 import type { ManagedWorker } from '../lib/workforceApi';
 import type { AppView } from '../navigation';
-import { discoveryWorkers, isHumanMessage } from './workerChatModel';
+import { discoveryWorkers, isHumanMessage, liveResultReference, type LiveResultReference } from './workerChatModel';
 
 type Props = {
   workers: ManagedWorker[]; worker: ManagedWorker | null; workerId: string | null;
@@ -17,6 +17,8 @@ type Props = {
   onWorker: (id: string) => void; onThread: (id: string) => void; onNewThread: () => void;
   onSend: (event: FormEvent) => void; onConfirm: () => void;
   onDecide: (approval: ApprovalRecord, decision: 'approve' | 'reject') => void;
+  onOpenResult: (reference: LiveResultReference) => void;
+  onExplainResult: (reference: LiveResultReference) => void;
   onNavigate: (view: AppView) => void; onBack: () => void;
 };
 
@@ -40,7 +42,7 @@ function shortTime(value: string) {
 }
 
 export default function ConversationField(props: Props) {
-  const { workers, worker, workerId, workerThreads, threadId, messages, receipt, pendingApprovals, query, draft, files, loading, threadLoading, busy, responsePhase, error, fileInput, timeline, onQuery, onDraft, onFiles, onWorker, onThread, onNewThread, onSend, onConfirm, onDecide, onNavigate, onBack } = props;
+  const { workers, worker, workerId, workerThreads, threadId, messages, receipt, pendingApprovals, query, draft, files, loading, threadLoading, busy, responsePhase, error, fileInput, timeline, onQuery, onDraft, onFiles, onWorker, onThread, onNewThread, onSend, onConfirm, onDecide, onOpenResult, onExplainResult, onNavigate, onBack } = props;
   const [arcOffset, setArcOffset] = useState(0);
   const [historyQuery, setHistoryQuery] = useState('');
   const [position, setPosition] = useState({ progress: 0, size: 1 });
@@ -162,7 +164,8 @@ export default function ConversationField(props: Props) {
             {error && <div className="cf-error" role="alert">{error}</div>}
             {threadLoading ? <div className="cf-chat-empty">Opening conversation…</div> : messages.length ? messages.map(message => {
               const isUser = isHumanMessage(message.role);
-              return <article key={message.id} className={'cf-message ' + (isUser ? 'is-user' : 'is-worker')}><span className="cf-message-avatar">{isUser ? 'You' : initials(worker?.name ?? 'Worker')}</span><div className="cf-message-main"><div className="cf-message-body">{message.content}{message.artifactReferences?.length > 0 && <span className="cf-message-file"><FileUp size={13}/>{message.artifactReferences.length} attached file{message.artifactReferences.length === 1 ? '' : 's'}</span>}</div><time dateTime={message.createdAt}>{shortTime(message.createdAt)}</time></div></article>;
+              const liveResult = isUser ? null : liveResultReference(message);
+              return <article key={message.id} className={'cf-message ' + (isUser ? 'is-user' : 'is-worker')}><span className="cf-message-avatar">{isUser ? 'You' : initials(worker?.name ?? 'Worker')}</span><div className="cf-message-main"><div className="cf-message-body">{liveResult ? <div className="cf-live-result"><span className="cf-live-result-label">LIVE RESULT · COMPLETED</span><strong>{liveResult.name}</strong><p>{liveResult.summary || message.content}</p><div className="cf-live-result-actions"><button type="button" onClick={() => onOpenResult(liveResult)}>See full result</button><button type="button" disabled={busy} onClick={() => onExplainResult(liveResult)}>Explain result</button></div></div> : <>{message.content}{message.artifactReferences?.length > 0 && <span className="cf-message-file"><FileUp size={13}/>{message.artifactReferences.length} attached file{message.artifactReferences.length === 1 ? '' : 's'}</span>}</>}</div><time dateTime={message.createdAt}>{shortTime(message.createdAt)}</time></div></article>;
             }) : responsePhase ? null : <div className="cf-chat-empty"><span className="cf-empty-ring"><Send size={19}/></span><strong>{activeThread?.title || ('Start with ' + (worker?.name || 'a worker'))}</strong><p>Give a clear direction. The conversation remains connected to this worker's identity, capabilities, and approvals.</p></div>}
             {responsePhase && <div className="cf-response-pending" role="status" aria-live="polite"><span className="cf-message-avatar">{initials(worker?.name ?? 'Worker')}</span><div className="cf-response-pending-bubble"><span>{worker?.name ?? 'Worker'} · {responsePhase === 'preparing' ? 'Preparing context' : 'Working on your reply'}</span><span className="cf-response-dots" aria-hidden="true"><i/><i/><i/></span></div></div>}
             {receipt && <div className={'cf-receipt ' + receipt.status}><span className="cf-receipt-label">EXECUTION RECEIPT · {receipt.status.replaceAll('_', ' ')}</span><p>{receipt.message}</p><div>{receipt.action_hints.map((hint, index) => hint.kind === 'connect_integration' ? <button type="button" key={index} onClick={() => onNavigate('integrations')}>{hint.label || 'Connect integration'}</button> : hint.kind === 'confirm_command' && receipt.command_id ? <button type="button" key={index} onClick={onConfirm} disabled={busy}><Check size={14}/>{hint.label || 'Confirm action'}</button> : null)}</div></div>}
