@@ -646,7 +646,12 @@ class ManagedRuntimeExecutor:
                     ):
                         if key in element:
                             compact[key] = element.get(key)
-                    for key, limit in (("name", 240), ("text", 240), ("href", 320)):
+                    for key, limit in (
+                        ("name", 240),
+                        ("text", 240),
+                        ("href", 320),
+                        ("value", 240),
+                    ):
                         if key in element and element.get(key) is not None:
                             compact[key] = str(element.get(key))[:limit]
                     compact_elements.append(compact)
@@ -656,6 +661,7 @@ class ManagedRuntimeExecutor:
                     {
                         "operation": action_evidence.get("operation"),
                         "stateChanged": action_evidence.get("stateChanged"),
+                        "elementReference": action_evidence.get("elementReference"),
                         "beforeObservationId": action_evidence.get("beforeObservationId"),
                         "afterObservationId": action_evidence.get("afterObservationId"),
                     }
