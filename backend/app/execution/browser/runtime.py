@@ -99,6 +99,14 @@ class BrowserRuntimeContract(Protocol):
         worker_id: UUID | None,
     ) -> BrowserObservation: ...
 
+    async def current_observation(
+        self,
+        session_id: UUID,
+        *,
+        organization_id: UUID,
+        worker_id: UUID | None,
+    ) -> BrowserObservation: ...
+
     async def navigate(
         self,
         session_id: UUID,
@@ -946,6 +954,26 @@ class BrowserRuntime:
         await self._shutdown_browser_engine()
         if self._coordinator is not None:
             await self._coordinator.close()
+
+    async def current_observation(
+        self,
+        session_id: UUID,
+        *,
+        organization_id: UUID,
+        worker_id: UUID | None,
+    ) -> BrowserObservation:
+        handle = self._handle(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        if handle.last_observation is not None:
+            return handle.last_observation
+        return await self.observe(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
 
     async def observe(
         self,
