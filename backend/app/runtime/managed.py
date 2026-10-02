@@ -641,6 +641,7 @@ class ManagedRuntimeExecutor:
                         "tag",
                         "role",
                         "element_type",
+                        "field_name",
                         "checked",
                         "disabled",
                     ):
