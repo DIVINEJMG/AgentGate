@@ -115,6 +115,7 @@ class BrowserElement:
     selected: bool | None
     disabled: bool
     href: str | None
+    field_name: str | None = None
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)
