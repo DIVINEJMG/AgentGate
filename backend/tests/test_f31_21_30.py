@@ -574,6 +574,7 @@ def test_planner_rejects_browser_resource_destination_mismatch_before_execution(
             latest_browser=None,
         )
 
+
 def test_schedule_inference_normalizes_daily_weekly_once_and_stop_after() -> None:
     daily = compile_schedule(
         ScheduleDraft(
