@@ -318,3 +318,16 @@ def test_browser_scroll_contract_accepts_semantic_boundaries() -> None:
 
     assert '"enum": ["top", "bottom"]' in browser_provider
     assert "Browser page.scroll value must be an integer, top, or bottom." in browser_runtime
+
+
+def test_browser_execution_preserves_current_observation_for_locator_actions() -> None:
+    runtime = (
+        ROOT / "backend/app/execution/browser/runtime.py"
+    ).read_text(encoding="utf-8")
+    provider = (
+        ROOT / "backend/app/execution/providers/browser.py"
+    ).read_text(encoding="utf-8")
+
+    assert "async def current_observation(" in runtime
+    assert "if handle.last_observation is not None:" in runtime
+    assert "before_observation = await self._runtime.current_observation(" in provider
