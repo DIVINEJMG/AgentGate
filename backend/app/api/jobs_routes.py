@@ -1569,6 +1569,8 @@ async def _provision_managed_job_authority(
     worker: Worker,
     principal: HumanPrincipal,
     scopes: list[str],
+    *,
+    standing_approval: bool = False,
 ) -> None:
     profile = worker.profile if isinstance(worker.profile, dict) else {}
     if profile.get("agentIdentityProvisioning") != "automatic":
@@ -1608,6 +1610,7 @@ async def _provision_managed_job_authority(
         )
 
     registry = execution_provider_registry()
+
     async def upsert_policy(
         *,
         effect: str,
@@ -1621,6 +1624,12 @@ async def _provision_managed_job_authority(
                 Policy.name == name,
             )
         )
+        if not selected_scopes:
+            if policy is not None:
+                policy.status = "disabled"
+                policy.updated_at = now
+            return
+
         if policy is None:
             policy = Policy(
                 organization_id=organization_id,
@@ -1641,6 +1650,12 @@ async def _provision_managed_job_authority(
             revision_number = policy.current_revision
             created_at = policy.created_at.isoformat()
 
+        description = (
+            "Standing authority granted by the human when creating or starting "
+            "this managed Worker Job."
+            if effect == "allow" and standing_approval
+            else "Automatic least-authority policy for managed Worker Jobs."
+        )
         session.add(
             PolicyRevision(
                 policy_id=policy.id,
@@ -1654,7 +1669,8 @@ async def _provision_managed_job_authority(
                     "scopes": sorted(selected_scopes),
                     "risks": [],
                     "_meta": {
-                        "description": "Automatic least-authority policy for managed Worker Jobs.",
+                        "description": description,
+                        "standingApproval": standing_approval,
                         "createdBy": str(principal.user_id),
                         "updatedBy": str(principal.user_id),
                         "createdAt": created_at,
@@ -1678,7 +1694,10 @@ async def _provision_managed_job_authority(
             ),
             None,
         )
-        if capability is not None and (
+        explicitly_granted_now = standing_approval and scope in requested
+        if capability is not None and explicitly_granted_now and capability.risk != "critical":
+            allow_all.add(scope)
+        elif capability is not None and (
             capability.approval_recommendation == "none"
             and capability.risk not in {"high", "critical"}
         ):
@@ -1686,14 +1705,12 @@ async def _provision_managed_job_authority(
         else:
             approval_all.add(scope)
 
-    if allow_all:
-        await upsert_policy(effect="allow", selected_scopes=allow_all, priority=100)
-    if approval_all:
-        await upsert_policy(
-            effect="require_approval",
-            selected_scopes=approval_all,
-            priority=200,
-        )
+    await upsert_policy(effect="allow", selected_scopes=allow_all, priority=100)
+    await upsert_policy(
+        effect="require_approval",
+        selected_scopes=approval_all,
+        priority=200,
+    )
 
     await append_audit(
         session,
@@ -1709,6 +1726,8 @@ async def _provision_managed_job_authority(
         metadata={
             "scopes": sorted(all_active_scopes),
             "automatic": True,
+            "standingApproval": standing_approval,
+            "standingApprovalScopes": sorted(requested) if standing_approval else [],
         },
     )
     await session.commit()
@@ -1819,6 +1838,7 @@ async def worker_quick_start(
             worker,
             principal,
             [str(scope) for scope in job_entry.get("requiredCapabilities", [])],
+            standing_approval=True,
         )
         raw_timing = job_entry.get("timing")
         timing: dict[str, Any] = (
@@ -1899,6 +1919,7 @@ async def job_quick_start(
         worker,
         principal,
         [str(scope) for scope in job_payload.get("requiredCapabilities", [])],
+        standing_approval=True,
     )
     raw_timing = payload.get("timing")
     timing: dict[str, Any] = (
