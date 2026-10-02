@@ -75,6 +75,7 @@ class RuntimeStepOutcome:
     run_id: UUID
     current_step: int
     summary: str
+    continuation_phase: Literal["plan", "execute"] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,6 +268,7 @@ class ManagedRuntimeExecutor:
                 run_id=run.id,
                 current_step=current_step,
                 summary="Next governed action planned and queued for execution.",
+                continuation_phase="execute",
             )
 
         step = steps[current_step]
@@ -279,6 +281,7 @@ class ManagedRuntimeExecutor:
                 run_id=run.id,
                 current_step=current_step + 1,
                 summary="Completed step checkpoint advanced.",
+                continuation_phase="plan",
             )
 
         if step.status == "waiting_approval":
@@ -1175,6 +1178,7 @@ class ManagedRuntimeExecutor:
                 run_id=run.id,
                 current_step=current_step + 1,
                 summary="Previously executed action checkpoint reused.",
+                continuation_phase="plan",
             )
 
         if decision["outcome"] == "DENY":
@@ -1555,6 +1559,7 @@ class ManagedRuntimeExecutor:
             run.id,
             current_step + 1,
             result.summary,
+            "plan",
         )
 
     def _action_record_payload(
