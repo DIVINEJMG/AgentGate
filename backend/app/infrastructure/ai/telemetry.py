@@ -24,6 +24,7 @@ class SQLAlchemyAIInvocationRecorder:
         provider: str,
         model: str,
         schema_name: str | None,
+        transport_identity: dict | None = None,
     ) -> UUID:
         row = AIInvocation(
             organization_id=context.organization_id,
@@ -38,6 +39,7 @@ class SQLAlchemyAIInvocationRecorder:
             correlation_id=context.correlation_id,
             success=False,
             usage={},
+            transport_identity=transport_identity or {},
         )
         self._session.add(row)
         await self._session.flush()
@@ -62,3 +64,35 @@ class SQLAlchemyAIInvocationRecorder:
         row.usage = dict(usage)
         row.error_category = error_category
         await self._session.flush()
+
+
+class DurableAIInvocationRecorder:
+    """Planner telemetry uses short transactions outside the run checkpoint."""
+
+    async def start(self, **kwargs) -> UUID:
+        from app.infrastructure.database.session import session_factory
+
+        async with session_factory() as session:
+            identity = await SQLAlchemyAIInvocationRecorder(session).start(**kwargs)
+            await session.commit()
+            return identity
+
+    async def finish(self, invocation_id: UUID, **kwargs) -> None:
+        from app.infrastructure.database.session import session_factory
+
+        async with session_factory() as session:
+            await SQLAlchemyAIInvocationRecorder(session).finish(invocation_id, **kwargs)
+            await session.commit()
+
+
+class TransportInvocationRecorder:
+    """Attach non-secret endpoint identity without storing inference prompts."""
+
+    def __init__(self, recorder, identity):
+        self.recorder, self.identity = recorder, identity
+
+    async def start(self, **kwargs):
+        return await self.recorder.start(**kwargs, transport_identity=self.identity)
+
+    async def finish(self, *args, **kwargs):
+        return await self.recorder.finish(*args, **kwargs)

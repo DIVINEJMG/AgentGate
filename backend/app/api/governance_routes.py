@@ -336,6 +336,50 @@ def _risk_v2(assessment: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+async def _live_policy_resource(
+    session: AsyncSession, organization_id: UUID, resource_id: str,
+) -> dict[str, Any] | None:
+    """Resolve the resource identity used by both planning and execution.
+
+    Catalog presence is not a grant. Task authority is still checked by the
+    foundation before execution, and this evaluator still applies org policy.
+    """
+    from app.bootstrap.settings import settings
+
+    if settings.integration_foundation_enabled:
+        from app.application.services.integration_foundation import IntegrationFoundation
+        from app.execution.bootstrap import execution_provider_registry
+        from app.infrastructure.database.models import Integration, IntegrationResource
+
+        try:
+            identity = UUID(resource_id)
+        except ValueError:
+            identity = None
+        row = await session.get(IntegrationResource, identity) if identity else None
+        if row is not None:
+            if row.organization_id != organization_id:
+                return None
+            # Browser and public research retain their existing catalog contracts.
+            if row.provider not in {"browser", "web_research"}:
+                connection = await session.get(Integration, row.connection_id)
+                if not connection or connection.organization_id != organization_id or connection.provider != row.provider:
+                    return None
+                try:
+                    provider = execution_provider_registry().get(row.provider)
+                except KeyError:
+                    return None
+                scopes = await IntegrationFoundation(session).resource_capabilities(row)
+                connected = row.health == "healthy" and connection.status == "connected"
+                return {"id": str(row.id), "displayName": row.display_name,
+                    "provider": row.provider, "status": "connected" if connected else "degraded",
+                    "actions": [{"scope": c.scope, "action": c.operation.rsplit(".", 1)[-1],
+                        "target": c.target, "risk": c.risk, "providerOperation": c.operation,
+                        "sideEffect": c.side_effect, "approvalRecommendation": c.approval_recommendation}
+                        for c in provider.manifest.capabilities if c.scope in scopes]}
+    catalog = await _catalog(session, organization_id)
+    return next((item for item in catalog["resources"] if item["id"] == resource_id), None)
+
+
 async def _evaluate(
     session: AsyncSession,
     organization_id: UUID,
@@ -344,14 +388,21 @@ async def _evaluate(
     agent_id: UUID,
     resource_id: str,
     scope: str,
+    preparation_cache: dict[Any, Any] | None = None,
 ) -> dict[str, Any]:
     require_permission(principal, "policies.read")
-    agent = await session.scalar(
-        select(AgentIdentity).where(
-            AgentIdentity.organization_id == organization_id,
-            AgentIdentity.id == agent_id,
+    # Only the tool-preparation caller supplies this pass-local read snapshot.
+    # Execution and approval revalidation continue to read current policy data.
+    cache = preparation_cache if preparation_cache is not None else {}
+    agent_key = (organization_id, agent_id, "agent")
+    if agent_key not in cache:
+        cache[agent_key] = await session.scalar(
+            select(AgentIdentity).where(
+                AgentIdentity.organization_id == organization_id,
+                AgentIdentity.id == agent_id,
+            )
         )
-    )
+    agent = cache[agent_key]
     request = {
         "agentId": str(agent_id),
         "resourceId": resource_id,
@@ -382,11 +433,10 @@ async def _evaluate(
             "riskAssessment": None,
         }
 
-    catalog = await _catalog(session, organization_id)
-    resource = next(
-        (item for item in catalog["resources"] if item["id"] == resource_id),
-        None,
-    )
+    resource_key = (organization_id, resource_id, "resource")
+    if resource_key not in cache:
+        cache[resource_key] = await _live_policy_resource(session, organization_id, resource_id)
+    resource = cache[resource_key]
     if resource is None:
         return {
             "outcome": "DENY",
@@ -431,7 +481,10 @@ async def _evaluate(
             "riskAssessment": None,
         }
 
-    profile = await _profile(session, organization_id, agent_id)
+    profile_key = (organization_id, agent_id, "profile")
+    if profile_key not in cache:
+        cache[profile_key] = await _profile(session, organization_id, agent_id)
+    profile = cache[profile_key]
     declared = scope in profile["activeScopes"]
     assessment = _risk_for_capability(
         capability,
@@ -472,17 +525,20 @@ async def _evaluate(
             "riskAssessment": assessment,
         }
 
-    policies = list(
-        (
-            await session.scalars(
-                select(Policy).where(
-                    Policy.organization_id == organization_id,
-                    Policy.status == "enabled",
+    policies_key = (organization_id, "policies")
+    if policies_key not in cache:
+        policies = list(
+            (
+                await session.scalars(
+                    select(Policy).where(
+                        Policy.organization_id == organization_id,
+                        Policy.status == "enabled",
+                    )
                 )
-            )
-        ).all()
-    )
-    public = [await _policy_public(session, item) for item in policies]
+            ).all()
+        )
+        cache[policies_key] = [await _policy_public(session, item) for item in policies]
+    public = cache[policies_key]
     matched = [
         item
         for item in public
@@ -747,11 +803,7 @@ async def _assess_risk(
         raise HTTPException(400, "Risk assessment requires a valid agentId.") from error
     resource_id = str(payload.get("resourceId", "")).strip()
     scope = str(payload.get("scope", "")).strip()
-    catalog = await _catalog(session, organization_id)
-    resource = next(
-        (item for item in catalog["resources"] if item["id"] == resource_id),
-        None,
-    )
+    resource = await _live_policy_resource(session, organization_id, resource_id)
     if resource is None:
         raise not_found("Capability resource")
     capability = next(
@@ -1263,6 +1315,8 @@ async def _approval_public(
     if action is None:
         raise HTTPException(500, "Approval action is unavailable.")
     action_public = await _action_public(session, action)
+    from app.application.services.approval_conversation import approval_conversation_id
+    conversation_thread_id = await approval_conversation_id(session, action)
     decision = None
     if approval.decided_by is not None:
         decision = {
@@ -1275,6 +1329,8 @@ async def _approval_public(
         "id": str(approval.id),
         "organizationId": str(approval.organization_id),
         "actionId": str(action.id),
+        "runId": str(action.run_id) if action.run_id else None,
+        "conversationThreadId": conversation_thread_id,
         "agentId": action_public["agent"]["id"],
         "agentName": action_public["agent"]["name"],
         "request": action_public["request"],
@@ -1317,6 +1373,8 @@ def _approval_v2(public: dict[str, Any]) -> dict[str, Any]:
         },
         "action": {
             "id": public["actionId"],
+            "runId": public["runId"],
+            "conversationThreadId": public.get("conversationThreadId"),
             "agent": {
                 "id": public["agentId"],
                 "name": public["agentName"],

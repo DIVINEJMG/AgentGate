@@ -139,6 +139,7 @@ async def _fetch_http_page_impl(
 
     async with httpx.AsyncClient(
         follow_redirects=False,
+        trust_env=False,
         timeout=httpx.Timeout(timeout_seconds),
         headers={
             "User-Agent": "Aduoryn/1.0 governed-http-reader",

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Check, ChevronRight, LockKeyhole, Mail, RotateCcw, Send, ShieldCheck, Users } from 'lucide-react';
+import { Check, LockKeyhole, Mail, RotateCcw, Send } from 'lucide-react';
+import { SettingsHeader } from '../workspace/pages/LegacyPage';
+import { Notice, Section, SkeletonLines, State, sentence } from '../workspace/ui';
 import AIOperationsPanel from './AIOperationsPanel';
 import type { OrganizationAccess } from '../lib/identityApi';
 import { loadProductization, updateWorkspaceSettings, type Productization } from '../lib/productApi';
 import { createOrganizationInvite, loadCommercial, type CommercialSnapshot, type InvitationRole } from '../lib/commercialApi';
 import type { ApiVersion } from '../lib/systemApi';
 
-export default function SettingsPanel({ organization, apiVersion, onApiVersionChange, onWorkspaceUpdated }: { organization: OrganizationAccess; apiVersion: ApiVersion; onApiVersionChange: (version: ApiVersion) => void; onWorkspaceUpdated: (name: string) => void }) {
+export default function SettingsPanel({ organization, apiVersion, onWorkspaceUpdated }: { organization: OrganizationAccess; apiVersion: ApiVersion; onApiVersionChange?: (version: ApiVersion) => void; onWorkspaceUpdated: (name: string) => void }) {
   const [product, setProduct] = useState<Productization | null>(null);
   const [commercial, setCommercial] = useState<CommercialSnapshot | null>(null);
   const [form, setForm] = useState({ name: organization.name, securityContactEmail: '', companyUrl: '' });
@@ -52,20 +54,60 @@ export default function SettingsPanel({ organization, apiVersion, onApiVersionCh
     } catch (caught) { setError(messageFor(caught)); }
     finally { setInviting(false); }
   }
-  return <section className="org-stage org-settings">
-    <header className="org-intro org-enter"><div><p className="org-kicker">ORGANIZATION / SETTINGS</p><h1>Set the workspace.</h1><p>Keep its identity, security contact, and human access clear.</p></div><div className="org-intro-actions"><span className="org-api-label">API</span><select aria-label="API version" value={apiVersion} onChange={e => onApiVersionChange(e.target.value as ApiVersion)}><option value="v1">v1</option><option value="v2">v2</option></select></div></header>
-    {error && <div className="org-error" role="alert">{error}<button onClick={() => void hydrate()}>Reload</button></div>}
-    {notice && <div className="org-notice" role="status"><Check size={16}/>{notice}</div>}
-    {!product && loading && <div className="org-loading">Loading workspace settings…</div>}
-    {product && <div className="org-settings-grid">
-      <nav className="org-settings-index" aria-label="Settings sections"><a href="#org-profile"><span>01</span> Workspace profile <ChevronRight size={14}/></a><a href="#org-people"><span>02</span> People & access <ChevronRight size={14}/></a><a href="#org-readiness"><span>03</span> Readiness <ChevronRight size={14}/></a><a href="#org-diagnostics"><span>04</span> Diagnostics <ChevronRight size={14}/></a></nav>
-      <div className="org-settings-main">
-        <section className="org-settings-section org-enter" id="org-profile"><div className="org-settings-heading"><div><span className="org-kicker">01 / IDENTITY</span><h2>Workspace profile</h2><p>The details people use to identify and contact this organization.</p></div><ShieldCheck size={20}/></div><form onSubmit={save} className="org-profile-form"><label>Workspace name<input required minLength={2} maxLength={80} value={form.name} disabled={!canManage} onChange={e => setForm(current => ({...current,name:e.target.value}))}/><small>Shown across the workspace.</small></label><div className="org-field-pair"><label>Security contact<input type="email" placeholder="security@company.com" value={form.securityContactEmail} disabled={!canManage} onChange={e => setForm(current => ({...current,securityContactEmail:e.target.value}))}/><small>For security correspondence.</small></label><label>Company URL<input type="url" placeholder="https://company.com" value={form.companyUrl} disabled={!canManage} onChange={e => setForm(current => ({...current,companyUrl:e.target.value}))}/><small>Public organization website.</small></label></div><div className="org-form-actions">{canManage ? <><button type="button" className="org-secondary" disabled={!dirty || saving} onClick={() => setForm({name:product.workspace.name,securityContactEmail:product.workspace.securityContactEmail,companyUrl:product.workspace.companyUrl})}><RotateCcw size={14}/> Reset</button><button className="org-primary" disabled={!dirty || saving}>{saving ? 'Saving…' : 'Save changes'}</button></> : <p><LockKeyhole size={14}/> Your role can view these settings but cannot edit them.</p>}</div></form></section>
-        <section className="org-settings-section org-enter" id="org-people"><div className="org-settings-heading"><div><span className="org-kicker">02 / ACCESS</span><h2>People & invitations</h2><p>Bring a human teammate into this organization with a defined role.</p></div><Users size={20}/></div>{invitationsUnavailable && <p className="org-caveat">Invitation data is temporarily unavailable. Workspace profile editing remains available.</p>}{commercial?.invitations.canInvite ? <form className="org-invite-form" onSubmit={invite}><label>Email address<input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="teammate@company.com"/></label><label>Organization role<select value={role} onChange={e => setRole(e.target.value as InvitationRole)}><option value="admin">Admin</option><option value="security_manager">Security manager</option><option value="operator">Operator</option><option value="approver">Approver</option><option value="viewer">Viewer</option></select></label><button className="org-primary" disabled={inviting || !email}><Send size={14}/>{inviting ? 'Creating…' : 'Create invite'}</button></form> : !invitationsUnavailable && <p className="org-permission"><LockKeyhole size={15}/> Your role can view invitations but cannot create them.</p>}{inviteUrl && <div className="org-invite-result"><strong>One-week authenticated link</strong><input readOnly value={inviteUrl} onFocus={e => e.currentTarget.select()} aria-label="Invitation link"/><small>Share only with the email address entered. The link is allow-listed to that person.</small></div>}<div className="org-invite-list"><div className="org-list-label"><span>RECENT INVITATIONS</span><span>{commercial?.invitations.recent.length ?? 0}</span></div>{commercial?.invitations.recent.length ? commercial.invitations.recent.map(item => <div className="org-person-row" key={item.id}><Mail size={16}/><span><strong>{item.email}</strong><small>{item.role.replace('_',' ')} · expires {new Date(item.expiresAt).toLocaleDateString()}</small></span><em>{item.status}</em></div>) : <p className="org-empty">{invitationsUnavailable ? 'Invitation history could not be loaded.' : 'No invitations have been created yet.'}</p>}{commercial?.invitations.windowTruncated && <p className="org-caveat">Only a bounded invitation window is shown.</p>}</div></section>
-        <section className="org-settings-section org-enter" id="org-readiness"><div className="org-settings-heading"><div><span className="org-kicker">03 / SETUP</span><h2>Readiness</h2><p>{product.onboarding.complete} of {product.onboarding.total} steps complete.</p></div><strong className="org-readiness-number">{product.onboarding.percent}%</strong></div><div className="org-readiness-track"><span style={{width:`${product.onboarding.percent}%`}}/></div><div className="org-steps">{product.onboarding.steps.map(step => <div key={step.id}><span className={step.complete ? 'complete' : ''}>{step.complete ? <Check size={13}/> : null}</span><strong>{step.label}</strong><small>{step.complete ? 'Complete' : 'Next step'}</small></div>)}</div></section>
-        <details className="org-settings-section org-diagnostics org-enter" id="org-diagnostics"><summary><span><span className="org-kicker">04 / TECHNICAL</span><strong>Provider diagnostics</strong><small>Configuration, model routes, and recent AI operations.</small></span><ChevronRight size={18}/></summary><AIOperationsPanel organizationId={organization.id} apiVersion={apiVersion}/></details>
-      </div>
-    </div>}
-  </section>;
+  const percent = product?.onboarding.percent ?? 0;
+  return <div className='ws-page'>
+    <SettingsHeader active='workspace' />
+    {error && <Notice tone='danger' action={<button type='button' className='ws-button ws-button-sm' onClick={() => void hydrate()}>Reload</button>}>{error}</Notice>}
+    {notice && <Notice tone='ok'>{notice}</Notice>}
+    {!product && loading && <SkeletonLines rows={6} />}
+    {product && <>
+      <Section title='Workspace profile' description='How people identify and reach this organization.'>
+        <form onSubmit={save} className='ws-form ws-narrow'>
+          <label className='ws-field'>Workspace name<input required minLength={2} maxLength={80} value={form.name} disabled={!canManage} onChange={e => setForm(current => ({ ...current, name: e.target.value }))} /><small>Shown across the workspace.</small></label>
+          <div className='ws-field-pair'>
+            <label className='ws-field'>Security contact<input type='email' placeholder='security@company.com' value={form.securityContactEmail} disabled={!canManage} onChange={e => setForm(current => ({ ...current, securityContactEmail: e.target.value }))} /><small>Where security correspondence goes.</small></label>
+            <label className='ws-field'>Company website<input type='url' placeholder='https://company.com' value={form.companyUrl} disabled={!canManage} onChange={e => setForm(current => ({ ...current, companyUrl: e.target.value }))} /><small>Your public website.</small></label>
+          </div>
+          {canManage ? <div className='ws-form-actions ws-form-actions-start'>
+            <button type='submit' className='ws-button ws-button-primary' disabled={!dirty || saving}>{saving ? 'Saving…' : 'Save changes'}</button>
+            <button type='button' className='ws-button ws-button-quiet' disabled={!dirty || saving} onClick={() => setForm({ name: product.workspace.name, securityContactEmail: product.workspace.securityContactEmail, companyUrl: product.workspace.companyUrl })}><RotateCcw size={14} />Reset</button>
+          </div> : <p className='ws-muted ws-small'><LockKeyhole size={13} /> Your role can view these settings but cannot change them.</p>}
+        </form>
+      </Section>
+
+      <Section title='People & invitations' description='Invite a teammate with a defined role. Each link works only for the email it was created for.'>
+        {invitationsUnavailable && <Notice tone='warn'>Invitation data is unavailable right now. You can still edit the workspace profile.</Notice>}
+        {commercial?.invitations.canInvite ? <form className='ws-invite' onSubmit={invite}>
+          <label className='ws-field'>Email<input type='email' required value={email} onChange={e => setEmail(e.target.value)} placeholder='teammate@company.com' /></label>
+          <label className='ws-field'>Role<select value={role} onChange={e => setRole(e.target.value as InvitationRole)}><option value='admin'>Admin</option><option value='security_manager'>Security manager</option><option value='operator'>Operator</option><option value='approver'>Approver</option><option value='viewer'>Viewer</option></select></label>
+          <button type='submit' className='ws-button ws-button-primary' disabled={inviting || !email}><Send size={14} />{inviting ? 'Creating…' : 'Create invite'}</button>
+        </form> : !invitationsUnavailable && <p className='ws-muted ws-small'><LockKeyhole size={13} /> Your role can see invitations but cannot create them.</p>}
+        {inviteUrl && <div className='ws-invite-link'><strong>Invite link, valid for one week</strong><input readOnly value={inviteUrl} onFocus={e => e.currentTarget.select()} aria-label='Invitation link' /><small>Share it only with the person you entered.</small></div>}
+        <ul className='ws-rows'>
+          {commercial?.invitations.recent.length ? commercial.invitations.recent.map(item => <li className='ws-row' key={item.id}>
+            <span className='ws-doc-icon' aria-hidden='true'><Mail size={15} /></span>
+            <span className='ws-row-main'><strong>{item.email}</strong><small>{sentence(item.role)} · expires {new Date(item.expiresAt).toLocaleDateString()}</small></span>
+            <div className='ws-row-meta'><State value={item.status} /></div>
+          </li>) : <li className='ws-quiet'>{invitationsUnavailable ? 'Invitation history could not be loaded.' : 'No invitations yet.'}</li>}
+        </ul>
+        {commercial?.invitations.windowTruncated && <p className='ws-muted ws-small'>Showing recent invitations only.</p>}
+      </Section>
+
+      <Section title='Setup' count={`${product.onboarding.complete}/${product.onboarding.total}`} description={percent === 100 ? 'Everything is set up.' : 'What is left before work can run on its own.'}>
+        <div className='ws-meter' role='progressbar' aria-label='Setup progress' aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${percent}%` }} /></div>
+        <ul className='ws-rows ws-checklist'>{product.onboarding.steps.map(step => <li key={step.id} className='ws-row ws-compact-row' data-done={step.complete ? 'true' : undefined}>
+          <span className='ws-check-dot' aria-hidden='true'>{step.complete ? <Check size={12} strokeWidth={3} /> : null}</span>
+          <span className='ws-row-main'><strong>{step.label}</strong></span>
+          <div className='ws-row-meta'>{step.complete ? 'Done' : 'To do'}</div>
+        </li>)}</ul>
+      </Section>
+
+      <details className='ws-technical'>
+        <summary>AI provider diagnostics</summary>
+        <p className='ws-muted ws-small' style={{ margin: '0 0 12px' }}>Configuration, model routes and recent AI operations.</p>
+        <div className='ws-legacy-embed'><AIOperationsPanel organizationId={organization.id} apiVersion={apiVersion} /></div>
+      </details>
+    </>}
+  </div>;
 }
 function messageFor(value:unknown){const data=value as {response?:{data?:{error?:string}};message?:string};return data.response?.data?.error||data.message||'Workspace settings request failed.'}

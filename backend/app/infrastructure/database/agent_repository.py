@@ -41,8 +41,6 @@ class SQLAlchemyAgentRepository:
 
     async def _view(self, agent: AgentIdentity) -> AgentIdentityView:
         credential = await self._latest_credential(agent.id)
-        if credential is None:
-            raise AgentDomainError("Agent credential is unavailable.", 500)
         return AgentIdentityView(
             id=agent.id,
             organization_id=agent.organization_id,
@@ -51,10 +49,10 @@ class SQLAlchemyAgentRepository:
             owner_user_id=agent.created_by,
             status=agent.status,
             credential=AgentCredentialView(
-                status=credential.status,
-                fingerprint=credential.fingerprint,
-                version=credential.version,
-                scopes=("agent.authenticate",),
+                status=credential.status if credential is not None else "missing",
+                fingerprint=credential.fingerprint if credential is not None else "",
+                version=credential.version if credential is not None else 0,
+                scopes=("agent.authenticate",) if credential is not None else (),
                 expires_at=None,
                 last_used_at=None,
             ),

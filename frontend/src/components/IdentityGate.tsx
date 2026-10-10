@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from 'lucide-react';
-import type { AuthCredentials, AuthUser } from '../platform/client';
+import { auth, type AuthCredentials, type AuthUser } from '../platform/client';
 import type { ApiVersion } from '../lib/systemApi';
 import type { OrganizationAccess } from '../lib/identityApi';
 
@@ -8,6 +8,9 @@ function Brand(){return <div className='identity-wordmark'><strong>Audoryn</stro
 
 export function SignInGate({onAuthenticate,error,mode='signin',onBack,onModeChange,pendingInvitation=false}:{onAuthenticate:(credentials:AuthCredentials,mode:'signin'|'signup')=>Promise<void>;error:string|null;mode?:'signin'|'signup';onBack?:()=>void;onModeChange:(mode:'signin'|'signup')=>void;pendingInvitation?:boolean}){
   const [busy,setBusy]=useState(false);
+  const [githubEnabled,setGitHubEnabled]=useState(false);
+  const [githubError,setGitHubError]=useState<string|null>(null);
+  useEffect(()=>{let active=true;void auth.githubEnabled().then(enabled=>{if(active)setGitHubEnabled(enabled)}).catch(()=>{});return()=>{active=false}},[]);
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
   const [name,setName]=useState('');
@@ -59,7 +62,16 @@ export function SignInGate({onAuthenticate,error,mode='signin',onBack,onModeChan
           <button type='button' className={signup?'is-active':''} aria-current={signup?'page':undefined} onClick={()=>onModeChange('signup')} disabled={busy}>Create account</button>
         </div>
         {visibleError&&<div className='auth-error' role='alert' tabIndex={-1} ref={errorRef}><strong>We couldn’t {signup?'create your account':'sign you in'}.</strong><span>{error}</span></div>}
-        <form className='auth-form' onSubmit={submit} aria-busy={busy}>
+        {githubEnabled&&<div className='auth-github'>
+          <button type='button' className='secondary-button' disabled={busy} onClick={async()=>{
+            setBusy(true);setGitHubError(null);
+            try{await auth.startGitHub(mode)}catch(cause){setGitHubError(cause instanceof Error?cause.message:'GitHub sign-in could not start.');setBusy(false)}
+          }}><img src='/provider-marks/github.svg' alt=''/>Continue with GitHub</button>
+          {signup&&<p>GitHub will also connect to your chosen workspace after you approve repository access.</p>}
+          {githubError&&<p role='alert'>{githubError}</p>}
+          <span>or use your email</span>
+        </div>}
+        <form className='auth-form'  onSubmit={submit} aria-busy={busy}>
           {signup&&<div className='auth-field'><label htmlFor='auth-name'>Your name <span>Optional</span></label><div className='auth-input-wrap'><UserRound size={17} aria-hidden='true'/><input id='auth-name' value={name} onChange={event=>setName(event.target.value)} autoComplete='name' maxLength={160} placeholder='How should we address you?' disabled={busy}/></div></div>}
           <div className='auth-field'><label htmlFor='auth-email'>Email address</label><div className='auth-input-wrap'><Mail size={17} aria-hidden='true'/><input id='auth-email' type='email' inputMode='email' required value={email} onChange={event=>{setEmail(event.target.value);setDismissedError(true)}} autoComplete='email' maxLength={320} placeholder='you@company.com' spellCheck={false} disabled={busy}/></div></div>
           <div className='auth-field'><label htmlFor='auth-password'>{signup?'Create password':'Password'}</label><div className='auth-input-wrap'><LockKeyhole size={17} aria-hidden='true'/><input id='auth-password' type={showPassword?'text':'password'} required minLength={signup?10:1} maxLength={1024} value={password} onChange={event=>{setPassword(event.target.value);setDismissedError(true)}} onKeyUp={event=>setCapsLock(event.getModifierState('CapsLock'))} onBlur={()=>setCapsLock(false)} autoComplete={signup?'new-password':'current-password'} aria-describedby={signup?'auth-password-help':capsLock?'auth-caps-lock':undefined} placeholder={signup?'At least 10 characters':'Enter your password'} disabled={busy}/><button className='auth-password-toggle' type='button' onClick={()=>setShowPassword(value=>!value)} aria-label={showPassword?'Hide password':'Show password'} aria-pressed={showPassword} disabled={busy}>{showPassword?<EyeOff size={17}/>:<Eye size={17}/>}</button></div>{signup&&<p className='auth-field-help' id='auth-password-help'>Use 10 or more characters. You can use a password manager.</p>}{capsLock&&<p className='auth-field-help auth-caps' id='auth-caps-lock'>Caps Lock is on.</p>}</div>

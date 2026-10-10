@@ -142,13 +142,15 @@ class NativeProvider(ABC):
         operation: str,
         correlation_id: str,
     ) -> ExecutionProviderError:
-        return self._execution_error(
+        return ExecutionProviderError(
+            provider=self.manifest.provider,
             operation=operation,
             correlation_id=correlation_id,
             code=error.code,
             retryable=error.retryable,
             safe_message=error.safe_message,
             internal_details=error.internal_details,
+            retry_after_seconds=error.retry_after_seconds,
         )
 
     def _result(

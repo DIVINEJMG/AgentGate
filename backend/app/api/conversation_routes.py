@@ -164,6 +164,27 @@ async def get_thread_v2(
     return {"data": await get_thread_v1(organization_id, thread_id, principal, session)}
 
 
+@v1_router.get("/organizations/{organization_id}/conversations/{thread_id}/activity")
+@v2_router.get("/organizations/{organization_id}/conversations/{thread_id}/activity")
+async def task_activity(
+    organization_id: UUID,
+    thread_id: UUID,
+    principal: Annotated[HumanPrincipal, Depends(organization_principal)],
+    session: Annotated[AsyncSession, Depends(database_session)],
+) -> dict[str, Any]:
+    from app.application.services.task_activity import conversation_activity
+    from app.infrastructure.database.models import ConversationThread
+
+    require_permission(principal, "workforce.read")
+    # Same access boundary as opening the thread, without fetching its entire transcript.
+    if principal.organization_id != organization_id:
+        raise HTTPException(403, "Cross-organization conversation denied.")
+    thread = await session.get(ConversationThread, thread_id)
+    if not thread or thread.organization_id != organization_id:
+        raise HTTPException(404, "Conversation not found.")
+    return await conversation_activity(session, organization_id, thread_id, principal)
+
+
 async def _upload_attachment(
     organization_id: UUID,
     thread_id: UUID,

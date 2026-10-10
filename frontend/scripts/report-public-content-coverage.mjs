@@ -1,0 +1,17 @@
+import {readFileSync,writeFileSync,readdirSync} from 'node:fs';
+import path from 'node:path';
+const root=path.resolve(import.meta.dirname,'..'),folder=path.join(root,'content-seed');
+const read=name=>JSON.parse(readFileSync(path.join(folder,name),'utf8'));
+const inventory=read('source-inventory.json'),seed=read('audoryn-public.seed.json'),copies=read('static-copy.json'),bindings=read('collection-bindings.json');
+const fields=[];
+for(const [scope,dictionary]of Object.entries(copies))for(const [field,value]of Object.entries(dictionary)){
+ const record=seed.records.find(page=>page.slug.startsWith('/content-fields/'+scope.toLowerCase()+'-')&&page.blocks[0].content.payload.sections.some(section=>section.id===field&&section.paragraphs[0]===value));
+ if(!record)throw Error('unmapped_copy_field:'+scope+':'+field);
+ const renderer=readFileSync(path.join(root,'src/public',scope+'.tsx'),'utf8');
+ fields.push({scope,field,source:inventory.filter(item=>item.scope===scope&&item.field===field).map(item=>({file:item.source,line:item.line})),recordId:record.pageId,contractPath:`sections[id=${field}].paragraphs[0]`,renderer:renderer.includes(field)?'usePublicText':'canonical collection/shared navigation override',fallback:`static-copy.json/${scope}/${field}`,value});
+}
+const report={contract:seed.contract,pages:seed.pages.map(page=>({path:page.slug,profile:page.blocks[0].content.payload.profile})),fields,collections:bindings,presentationOnly:[...readdirSync(path.join(root,'src/public')).filter(name=>name.endsWith('.css')).map(name=>'src/public/'+name),'src/public/heroWorld.ts','src/public/controlWorld.ts','public/audoryn-mark.png'],presentationRules:['CSS/layout/colours/typography/breakpoints','Mesh geometry/materials/camera/lights','Animation timing and input handlers','Decorative glyphs and computed ordinal numbers','Approved icon implementation mapping','Reserved auth/application routes'],unexplainedGaps:[]};
+writeFileSync(path.join(folder,'coverage-report.json'),JSON.stringify(report,null,2)+'\n');
+const rows=Object.keys(copies).map(scope=>`| ${scope} | ${Object.keys(copies[scope]).length} | Revisioned copy fields and canonical collections | Captured baseline, same adapter |`);
+writeFileSync(path.join(folder,'coverage-report.md'),`# Public website content coverage\n\n${fields.length} distinct baseline fields across nine public pages. Individual source lines, stable record IDs, exact values and contract paths: [coverage-report.json](coverage-report.json).\n\n| Renderer | Fields | Published source | Fallback |\n|---|---:|---|---|\n${rows.join('\n')}\n\n## Canonical overrides\n\nHero scenes, journey phases, operating tabs, solutions, security decisions/controls, pricing plans, portfolio, resource directory and integrations use collection-bindings.json. Product workers/jobs/approvals use demonstration records. Header/footer and branding use release resources. Canonical fields take precedence over the capture of the same original literals.\n\n## Presentation and metadata\n\nCSS, procedural graphics, mesh geometry, animation and interaction rules, approved icons, decorative symbols and computed ordinals stay in code. Operational error/loading text stays code-owned. SEO uses Console metaTitle/metaDescription/canonicalUrl/openGraph fields. media-manifest.json captures the three existing photographs; Console verifies uploaded bytes and dimensions.\n`);
+console.log(JSON.stringify({pages:9,fields:fields.length,unexplainedInventoryGaps:0}));

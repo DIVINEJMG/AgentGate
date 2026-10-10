@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "operation": "organization",
+  "requestTarget": "/internal/console/v1/organization?organization_id=0b9c8d7e-6f5a-4b3c-8d2e-1f0a9b8c7d6e",
+  "requestId": "example-organization",
+  "observedAt": "2026-10-10T12:00:00+00:00",
+  "data": {
+    "organization": {
+      "id": "0b9c8d7e-6f5a-4b3c-8d2e-1f0a9b8c7d6e",
+      "name": "Example Org",
+      "created_by": "4f1c2a9e-6b7d-4c3e-9a1b-2d3e4f5a6b7c",
+      "created_at": "2026-09-01T09:00:00+00:00",
+      "updated_at": "2026-10-09T15:30:00+00:00",
+      "member_count": 2,
+      "worker_count": 1,
+      "job_count": 1,
+      "runs_30d": 12
+    },
+    "members": [
+      {
+        "user_id": "4f1c2a9e-6b7d-4c3e-9a1b-2d3e4f5a6b7c",
+        "email": "ada@example.com",
+        "display_name": "Ada Example",
+        "role": "owner",
+        "joined_at": "2026-09-01T09:00:00+00:00"
+      },
+      {
+        "user_id": "8a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+        "email": null,
+        "display_name": null,
+        "role": "member",
+        "joined_at": "2026-10-09T15:30:00+00:00"
+      }
+    ],
+    "workers": [
+      {
+        "id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "name": "Repo Reviewer",
+        "department": "Engineering",
+        "status": "active",
+        "created_at": "2026-09-01T09:00:00+00:00",
+        "updated_at": "2026-10-09T15:30:00+00:00"
+      }
+    ],
+    "jobs": [
+      {
+        "id": "d4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f7a",
+        "worker_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "name": "Weekly review",
+        "status": "active",
+        "current_revision": 3,
+        "created_at": "2026-09-01T09:00:00+00:00",
+        "updated_at": "2026-10-09T15:30:00+00:00"
+      }
+    ],
+    "integrations": [
+      {
+        "id": "f0a1b2c3-d4e5-4f6a-9b7c-8d9e0f1a2b3c",
+        "provider": "github",
+        "display_name": "Sample repository",
+        "status": "active",
+        "created_at": "2026-09-01T09:00:00+00:00",
+        "updated_at": "2026-10-09T15:30:00+00:00"
+      }
+    ],
+    "incidents": [
+      {
+        "id": "e7f8a9b0-c1d2-4e3f-8a4b-5c6d7e8f9a0b",
+        "status": "resolved",
+        "severity": "low",
+        "summary": "Example incident",
+        "created_at": "2026-09-01T09:00:00+00:00",
+        "updated_at": "2026-10-09T15:30:00+00:00"
+      }
+    ],
+    "usage": {
+      "runs_30d": 12,
+      "failed_runs_30d": 1,
+      "ai_invocations_30d": 40
+    },
+    "operational_state": {
+      "state": "healthy",
+      "open_incidents": 0,
+      "unresolved_queue_failures": 0,
+      "failed_runs_24h": 0
+    },
+    "audit_summary": {
+      "events_30d": 25,
+      "high_or_critical_30d": 1
+    }
+  }
+}

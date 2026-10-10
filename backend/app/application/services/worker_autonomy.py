@@ -28,7 +28,6 @@ from app.api.workforce_routes import (
 )
 from app.application.services.browser_origin_authority import (
     ensure_managed_browser_origins,
-    explicit_http_origins,
 )
 from app.application.services.capability_autoresolver import (
     CapabilityResolution,
@@ -38,16 +37,25 @@ from app.application.services.schedule_inference import (
     CompiledSchedule,
     compile_schedule,
 )
+from app.application.services.web_research import configured_sources
 from app.application.services.worker_draft import WorkerDraftGenerator
 from app.application.services.worker_memory import WorkerMemoryService, contains_secret_material
+from app.application.services.worker_site_targets import (
+    AmbiguousSiteTarget,
+    apply_tool_selection,
+    extract_site_assignments,
+    resolve_site_targets,
+)
 from app.domain.ai.providers import AIGateway, AIInvocationContext, AIProviderError
 from app.domain.conversation.intent import CommandReference
 from app.domain.identity.principals import HumanPrincipal
 from app.domain.workforce.drafts import (
     ApprovalBoundaryDraft,
     JobDraft,
+    SiteTargetDraft,
     WorkerDraft,
 )
+from app.execution.bootstrap import execution_provider_registry
 from app.infrastructure.database.models import (
     HumanIdentity,
     Integration,
@@ -66,6 +74,8 @@ class PreparedJob:
     schedule: CompiledSchedule
     missing_integrations: tuple[str, ...]
     browser_origins: tuple[str, ...] = ()
+    public_web_research: bool = False
+    native_preparation: dict | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +85,7 @@ class WorkerAutonomyResult:
     draft: WorkerDraft
     missing_integrations: tuple[str, ...]
     references: tuple[CommandReference, ...]
+    wait_reasons: tuple[str, ...] = ()
 
 
 def _provider_id(value: str) -> str:
@@ -140,21 +151,108 @@ class WorkerAutonomyService:
         prepared: list[PreparedJob] = []
         has_capability_needs = False
         has_policy_boundaries = False
-        explicit_origins = explicit_http_origins(instruction)
-        draft_uses_browser = any(
-            _provider_id(need.provider) == "browser"
-            for job in draft.initial_jobs
-            for need in job.capability_needs
+        from app.application.services.integration_foundation import (
+            IntegrationFoundation,
+            IntegrationRequirementError,
         )
-        if (
-            explicit_origins
-            and draft_uses_browser
-            and "integrations.manage" in principal.permissions
-        ):
+        from app.bootstrap.settings import settings
+        tool_resources = (await IntegrationFoundation(self._session).catalog(organization_id, principal.user_id)
+            if settings.integration_foundation_enabled else [])
+        extracted_sites = await extract_site_assignments(
+            gateway=self._gateway,
+            instruction=instruction,
+            job_names=[job.name for job in draft.initial_jobs],
+            organization_id=organization_id,
+            thread_id=source_thread_id,
+            job_context=[{"index": index, "name": job.name, "objective": job.objective,
+                "instructions": job.instructions, "completionCriteria": job.completion_criteria,
+                "proposedProviders": [need.provider for need in job.capability_needs]}
+                for index, job in enumerate(draft.initial_jobs)],
+            resources=[{key: resource.get(key) for key in ("id", "provider", "name", "account", "health", "aliases")}
+                for resource in tool_resources],
+        )
+        # Independent semantic classification prevents a native platform mention
+        # from inheriting a browser target invented by the first draft.
+        native_preparations: dict[int, dict] = {}
+        normalized_jobs = []
+        for index, job in enumerate(draft.initial_jobs):
+            job = apply_tool_selection(job, index, extracted_sites)
+            needs = list(job.capability_needs)
+            normalized_jobs.append(job)
+            if settings.integration_foundation_enabled and any(
+                _provider_id(need.provider) not in {"browser", "web_research"} for need in needs
+            ):
+                preparation: dict = {"draft": None, "bindings": None, "wait": None}
+                try:
+                    foundation = IntegrationFoundation(self._session)
+                    native_draft = await foundation.interpret(self._gateway,
+                        organization_id=organization_id, user_id=principal.user_id,
+                        instruction=instruction + "\nResolve native integrations ONLY for this worker job: " + job.objective,
+                        conversation_context={"runtimeRequirements": [need.provider for need in needs
+                            if need.provider in foundation.runtime_catalog()], "jobInstructions": job.instructions})
+                    requested_runtimes = {need.provider for need in needs if need.provider in foundation.runtime_catalog()}
+                    requested_runtimes |= {requirement.provider for requirement in job.integration_requirements
+                        if requirement.provider in foundation.runtime_catalog()}
+                    native_draft = native_draft.model_copy(update={"runtime_requirements": sorted(
+                        set(native_draft.runtime_requirements) | requested_runtimes)})
+                    preparation["draft"] = native_draft
+                    preparation["bindings"] = await foundation.resolve(
+                        organization_id=organization_id, user_id=principal.user_id, draft=native_draft)
+                except (IntegrationRequirementError, AIProviderError) as error:
+                    preparation["wait"] = str(error) if isinstance(error, IntegrationRequirementError) else "AI preparation is unavailable. Retry this job's saved integration setup."
+                except PermissionError:
+                    preparation["wait"] = "Account access changed. Review connection sharing before retrying this job's integration setup."
+                native_preparations[index] = preparation
+        draft = draft.model_copy(update={"initial_jobs": normalized_jobs})
+        excerpt = (extracted_sites.public_web_request_excerpt or "").strip()
+        if excerpt and excerpt.casefold() not in instruction.casefold():
+            raise ValueError("The proposed open-web authority is not present in your request.")
+        draft = draft.model_copy(update={"public_web_request_excerpt": excerpt or None})
+        public_web_research = bool(excerpt)
+        if any(job.public_web_research for job in draft.initial_jobs) and not public_web_research:
+            raise AmbiguousSiteTarget("The selected public web research needs a human request for that access.")
+        if public_web_research and any(job.public_web_research for job in draft.initial_jobs) and "integrations.manage" in principal.permissions:
+            await self._ensure_web_research_integration(
+                organization_id=organization_id, principal=principal,
+                source_message_id=source_message_id,
+            )
+        if len(extracted_sites.targets) > 10:
+            raise ValueError(
+                "This worker request names more than ten websites. Please split it into "
+                "smaller jobs so each site can be checked safely."
+            )
+        browser_jobs = [
+            job for job in draft.initial_jobs
+            if any(_provider_id(need.provider) == "browser" for need in job.capability_needs)
+        ]
+        origins_by_job: list[tuple[str, ...]] = []
+        for job_index, job_draft in enumerate(draft.initial_jobs):
+            if job_draft not in browser_jobs:
+                origins_by_job.append(())
+                continue
+            targets = list(job_draft.site_targets)
+            seen = {target.mention.casefold() for target in targets}
+            for target in extracted_sites.targets:
+                if target.job_index == job_index and target.mention.casefold() not in seen:
+                    targets.append(SiteTargetDraft(
+                        mention=target.mention, candidate_url=target.candidate_url,
+                    ))
+                    seen.add(target.mention.casefold())
+            if not targets:
+                raise AmbiguousSiteTarget("The selected browser work needs a website. Please identify the site for " + job_draft.name + ".")
+            named = await resolve_site_targets(
+                instruction=instruction, targets=targets,
+                organization_id=organization_id,
+            )
+            origins_by_job.append(named)
+        all_origins = tuple(dict.fromkeys(
+            origin for origins in origins_by_job for origin in origins
+        ))
+        if all_origins and "integrations.manage" in principal.permissions:
             await ensure_managed_browser_origins(
                 self._session,
                 organization_id=organization_id,
-                origins=explicit_origins,
+                origins=all_origins,
                 principal=principal,
                 source=f"conversation:{source_message_id}",
             )
@@ -174,17 +272,16 @@ class WorkerAutonomyService:
         for index, job_draft in enumerate(draft.initial_jobs):
             has_capability_needs = has_capability_needs or bool(job_draft.capability_needs)
             has_policy_boundaries = has_policy_boundaries or bool(job_draft.approval_boundaries)
-            browser_origins = (
-                explicit_origins
-                if any(
-                    _provider_id(need.provider) == "browser"
-                    for need in job_draft.capability_needs
-                )
-                else ()
-            )
+            browser_origins = origins_by_job[index]
+            native_preparation = native_preparations.get(index)
+            resolver_needs = job_draft.capability_needs
+            if native_preparation is not None:
+                # Native requirements already use the accessible resource catalog.
+                # A second organization-wide resolver must not override that choice.
+                resolver_needs = [need for need in resolver_needs if _provider_id(need.provider) in {"browser", "web_research"}]
             resolution = await resolver.resolve(
                 organization_id=organization_id,
-                needs=job_draft.capability_needs,
+                needs=resolver_needs,
                 required_browser_origins=browser_origins,
                 require_browser_origin_authority=any(
                     _provider_id(need.provider) == "browser"
@@ -196,10 +293,27 @@ class WorkerAutonomyService:
                     correlation_id=f"capability-draft:{source_message_id}:{index}",
                 ),
             )
-            if job_draft.capability_needs and not resolution.scopes:
+            if native_preparation is not None:
+                native_scopes = {scope for binding in (native_preparation["bindings"] or []) for scope in binding["scopes"]}
+                resolution = CapabilityResolution(
+                    scopes=tuple(sorted(set(resolution.scopes) | native_scopes)),
+                    missing_integrations=resolution.missing_integrations,
+                    mappings=resolution.mappings,
+                )
+            if (
+                job_draft.public_web_research
+                and "web_research" in connected_providers
+                and "web.research" not in resolution.scopes
+            ):
+                resolution = CapabilityResolution(
+                    scopes=tuple(sorted((*resolution.scopes, "web.research"))),
+                    missing_integrations=resolution.missing_integrations,
+                    mappings=resolution.mappings,
+                )
+            if resolver_needs and not resolution.scopes:
                 unresolved_connected = {
                     _provider_id(need.provider)
-                    for need in job_draft.capability_needs
+                    for need in resolver_needs
                     if (
                         _provider_id(need.provider) in connected_providers
                         and _provider_id(need.provider)
@@ -216,6 +330,10 @@ class WorkerAutonomyService:
                 _provider_id(requirement.provider)
                 for requirement in job_draft.integration_requirements
             }
+            if native_preparation is not None:
+                # The shared compiler owns native readiness; runtime prerequisites
+                # are not accounts that the user can connect.
+                explicit_requirements &= {"browser", "web_research"}
             explicit_missing = {
                 provider
                 for provider in explicit_requirements
@@ -229,6 +347,8 @@ class WorkerAutonomyService:
                     schedule=compile_schedule(job_draft.schedule),
                     missing_integrations=missing,
                     browser_origins=browser_origins,
+                    public_web_research=job_draft.public_web_research,
+                    native_preparation=native_preparations.get(index),
                 )
             )
 
@@ -320,6 +440,15 @@ class WorkerAutonomyService:
         )
         worker = await self._session.get(Worker, worker.id)
         assert worker is not None
+        if public_web_research:
+            profile = dict(worker.profile or {})
+            profile["publicWebResearch"] = {
+                "enabled": True,
+                "sourceMessageId": str(source_message_id),
+                "requestExcerpt": excerpt,
+                "readOnly": True,
+            }
+            worker.profile = profile
 
         memory = WorkerMemoryService(self._session)
         await memory.seed_identity(
@@ -367,6 +496,12 @@ class WorkerAutonomyService:
             all_missing.update(item.missing_integrations)
             references.append(CommandReference(type="job", id=str(job.id), name=job.name))
 
+        wait_reasons = []
+        for job in created_jobs:
+            revision = await current_revision(self._session, job)
+            reason = revision.definition.get("autonomy", {}).get("integrationWaitReason")
+            if reason:
+                wait_reasons.append(f"{job.name}: {reason}")
         for provider in sorted(all_missing):
             references.append(
                 CommandReference(
@@ -381,8 +516,49 @@ class WorkerAutonomyService:
             jobs=tuple(created_jobs),
             draft=draft,
             missing_integrations=tuple(sorted(all_missing)),
+            wait_reasons=tuple(wait_reasons),
             references=tuple(references),
         )
+
+    async def _ensure_web_research_integration(
+        self, *, organization_id: UUID, principal: HumanPrincipal, source_message_id: UUID,
+    ) -> None:
+        require_permission(principal, "integrations.manage")
+        if not configured_sources():
+            return
+        existing = await self._session.scalar(
+            select(Integration).where(
+                Integration.organization_id == organization_id,
+                Integration.provider == "web_research",
+                Integration.status == "connected",
+            )
+        )
+        if existing is not None:
+            return
+        provider = execution_provider_registry().get("web_research")
+        resource = (await provider.discover_resources(configuration={}, credential=None))[0]
+        now = datetime.now(UTC)
+        self._session.add(Integration(
+            organization_id=organization_id,
+            provider="web_research",
+            display_name=resource.display_name,
+            status="connected",
+            config={
+                "resourceKey": resource.external_id,
+                "resourceType": resource.resource_type,
+                "metadata": resource.metadata,
+                "availableCapabilities": list(resource.available_capabilities),
+                "supportedOperations": [cap.operation for cap in provider.manifest.capabilities],
+                "providerKind": provider.manifest.kind,
+                "adapterVersion": provider.manifest.version,
+                "managedBy": "worker_autonomy",
+                "managedSourceMessageId": str(source_message_id),
+                "readOnly": "true",
+            },
+            created_at=now,
+            updated_at=now,
+        ))
+        await self._session.flush()
 
     async def _resolve_supervisor(
         self,
@@ -456,6 +632,30 @@ class WorkerAutonomyService:
         index: int,
     ) -> Job:
         draft = prepared.draft
+        foundation_bindings = None
+        foundation_wait = None
+        foundation_draft = None
+        from app.bootstrap.settings import settings
+        if prepared.native_preparation is not None:
+            foundation_draft = prepared.native_preparation["draft"]
+            foundation_bindings = prepared.native_preparation["bindings"]
+            foundation_wait = prepared.native_preparation["wait"]
+        elif settings.integration_foundation_enabled and any(n.provider not in {"browser", "web_research"} for n in draft.capability_needs):
+            from app.application.services.integration_foundation import (
+                IntegrationFoundation,
+                IntegrationRequirementError,
+            )
+            foundation = IntegrationFoundation(self._session)
+            from app.infrastructure.database.models import ConversationMessage
+            source = await self._session.get(ConversationMessage, source_message_id)
+            try:
+                foundation_draft = await foundation.interpret(self._gateway, organization_id=organization_id,
+                    user_id=principal.user_id, instruction=(source.content if source else draft.instructions)
+                    + "\nResolve native integrations ONLY for this worker job: " + draft.objective)
+                foundation_bindings = await foundation.resolve(organization_id=organization_id,
+                    user_id=principal.user_id, draft=foundation_draft)
+            except (IntegrationRequirementError, AIProviderError) as error:
+                foundation_wait = str(error) if isinstance(error, IntegrationRequirementError) else "AI preparation is unavailable. This job's integration requirements remain saved."
         autonomy = {
             "createdByAI": True,
             "sourceThreadId": str(source_thread_id),
@@ -468,8 +668,13 @@ class WorkerAutonomyService:
             "capabilityMappings": list(prepared.capabilities.mappings),
             "capabilityNeeds": [need.model_dump(mode="json") for need in draft.capability_needs],
             "authorizedBrowserOrigins": list(prepared.browser_origins),
+            "publicWebResearch": prepared.public_web_research,
             "standingApproval": True,
         }
+        if foundation_bindings is not None or foundation_wait:
+            autonomy.update({"integrationFoundation": True, "integrationBindings": foundation_bindings or [],
+                "integrationDraft": foundation_draft.model_dump(mode="json") if foundation_draft else None,
+                "integrationWaitReason": foundation_wait, "resultsThreadId": str(source_thread_id)})
         job_payload = {
             "workerId": str(worker.id),
             "name": draft.name,
@@ -481,6 +686,10 @@ class WorkerAutonomyService:
             "integrationRequirements": list(prepared.missing_integrations),
             "autonomy": autonomy,
         }
+        if foundation_draft:
+            job_payload["requiredCapabilities"] = sorted(
+                {s for s in prepared.capabilities.scopes if s.startswith(("browser.", "web."))}
+                | {s for need in foundation_draft.needs for s in need.scopes})
         matches = list(
             (
                 await self._session.scalars(
@@ -511,15 +720,28 @@ class WorkerAutonomyService:
                 job_payload,
             )
 
-        if prepared.capabilities.scopes:
+        provision_scopes = list(prepared.capabilities.scopes)
+        if autonomy.get("integrationFoundation"):
+            provision_scopes = [s for s in provision_scopes if s.startswith(("browser.", "web."))]
+        if provision_scopes:
             await _provision_managed_job_authority(
                 self._session,
                 organization_id,
                 worker,
                 principal,
-                list(prepared.capabilities.scopes),
+                provision_scopes,
                 standing_approval=True,
             )
+
+        if foundation_bindings is not None:
+            from app.application.services.integration_foundation import IntegrationFoundation
+            revision = await current_revision(self._session, job)
+            await IntegrationFoundation(self._session).bind(revision=revision, worker=worker,
+                user_id=principal.user_id, bindings=foundation_bindings, standing=True)
+            await self._session.commit()
+        if foundation_wait:
+            await job_status_v1(organization_id, job.id, {"status": "waiting_integration"}, principal, self._session)
+            return job
 
         await self._apply_approval_boundaries(
             organization_id=organization_id,
@@ -716,6 +938,15 @@ class AutonomyReadinessService:
                 else {}
             )
             raw_needs = autonomy.get("capabilityNeeds")
+            if autonomy.get("integrationFoundation"):
+                # Never let the legacy provider-presence resolver activate a job
+                # that still lacks an exact accessible account/resource binding.
+                from app.application.services.integration_worker_readiness import (
+                    reconcile_worker_job,
+                )
+                if await reconcile_worker_job(self._session, self._gateway, job, revision):
+                    activated.append(job.id)
+                continue
             needs = []
             if isinstance(raw_needs, list):
                 from app.domain.workforce.drafts import CapabilityNeed
@@ -832,4 +1063,5 @@ class AutonomyReadinessService:
                         },
                     )
             activated.append(job.id)
+        await self._session.commit()
         return activated

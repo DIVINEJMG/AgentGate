@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -6,38 +7,58 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.jobs.queue import ClaimedWorkItem, WorkItemQueue
 from app.infrastructure.database.models import WorkItem
+from app.runtime.admission import admission_order, due_work_order
 
 
 class SQLAlchemyWorkItemQueue(WorkItemQueue):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def list_due_ids(self, *, limit: int = 100) -> list[UUID]:
-        statement = (
-            select(WorkItem.id)
-            .where(
-                WorkItem.status == "queued",
-                WorkItem.scheduled_at <= datetime.now(UTC),
+    async def _active_by_organization(self) -> Counter[UUID]:
+        active = await self._session.scalars(
+            select(WorkItem.organization_id).where(
+                WorkItem.status.in_(["admitted", "running"])
             )
-            .order_by(WorkItem.scheduled_at, WorkItem.id)
-            .limit(limit)
         )
-        return list((await self._session.scalars(statement)).all())
+        return Counter(active.all())
 
-    async def claim_next(self) -> ClaimedWorkItem | None:
+    async def list_due_ids(self, *, limit: int = 100) -> list[UUID]:
+        now = datetime.now(UTC)
         statement = (
             select(WorkItem)
             .where(
                 WorkItem.status == "queued",
-                WorkItem.scheduled_at <= datetime.now(UTC),
+                WorkItem.scheduled_at <= now,
             )
-            .order_by(WorkItem.scheduled_at, WorkItem.id)
-            .with_for_update(skip_locked=True)
-            .limit(1)
+            .order_by(*due_work_order(now))
+            .limit(max(limit, 1000))
         )
-        model = (await self._session.scalars(statement)).first()
-        if model is None:
+        items = list((await self._session.scalars(statement)).all())
+        ordered = admission_order(
+            items, now=datetime.now(UTC),
+            active_by_organization=await self._active_by_organization(),
+        )
+        return [item.id for item in ordered[:limit]]
+
+    async def claim_next(self) -> ClaimedWorkItem | None:
+        now = datetime.now(UTC)
+        statement = (
+            select(WorkItem)
+            .where(
+                WorkItem.status == "queued",
+                WorkItem.scheduled_at <= now,
+            )
+            .order_by(*due_work_order(now))
+            .with_for_update(skip_locked=True)
+            .limit(1000)
+        )
+        items = list((await self._session.scalars(statement)).all())
+        if not items:
             return None
+        model = admission_order(
+            items, now=datetime.now(UTC),
+            active_by_organization=await self._active_by_organization(),
+        )[0]
         model.status = "running"
         await self._session.flush()
         return ClaimedWorkItem(

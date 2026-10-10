@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "operation": "snapshot",
+  "requestTarget": "/internal/console/v1/snapshot",
+  "requestId": "example-snapshot",
+  "observedAt": "2026-10-10T12:00:00+00:00",
+  "data": {
+    "human_identities": 2,
+    "organizations": 1
+  }
+}

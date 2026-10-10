@@ -14,6 +14,7 @@ from app.infrastructure.database.models import (
     JobRevision,
     Result,
     Run,
+    RunStep,
     Worker,
     WorkItem,
 )
@@ -43,7 +44,8 @@ def live_result_reference(
         "id": str(result.id),
         "name": result.title,
         "presentation": "live_result",
-        "status": "completed",
+        "status": result.status,
+        "executionOutcome": (item.payload or {}).get("runtime", {}).get("executionOutcome"),
         "summary": summary[:2000],
         "workerId": str(worker.id),
         "jobId": str(job.id),
@@ -146,6 +148,21 @@ async def append_live_result_message(
     result: Result,
     summary: str,
 ) -> ConversationMessage | None:
+    if (item.payload or {}).get("integrationOrigin"):
+        from app.application.services.integration_foundation import notify_integration_work
+        evidence = list((await session.scalars(select(RunStep).where(RunStep.run_id == run.id,
+            RunStep.status == "completed", RunStep.kind == "action").order_by(RunStep.step_index))).all())
+        checks = [str((step.output or {}).get("data", {}).get("verification", {}).get("summary", "Verification limits were not reported.")) for step in evidence]
+        links = [str(ref["url"]) for step in evidence for ref in (step.output or {}).get("data", {}).get("externalReferences", []) if ref.get("url")]
+        content = summary[:10000] + "\n\nProvider verification: " + (
+            "; ".join(checks) if checks else "No provider actions were executed; the requested outcome is unverified.")
+        if links:
+            content += "\nProvider references:\n" + "\n".join(links[:20])
+        refs = [ref for step in evidence for ref in (step.output or {}).get("data", {}).get("externalReferences", [])]
+        await notify_integration_work(session, item, key="completed", content=content,
+            references={**live_result_reference(result=result, run=run, item=item, job=job, worker=worker, summary=summary),
+                "summary": content, "externalReferences": refs})
+        return None
     thread = await _delivery_thread(
         session,
         item=item,

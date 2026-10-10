@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "operation": "organizations",
+  "requestTarget": "/internal/console/v1/organizations?limit=50&offset=0&query=example",
+  "requestId": "example-organizations",
+  "observedAt": "2026-10-10T12:00:00+00:00",
+  "data": [
+    [
+      {
+        "id": "0b9c8d7e-6f5a-4b3c-8d2e-1f0a9b8c7d6e",
+        "name": "Example Org",
+        "created_by": "4f1c2a9e-6b7d-4c3e-9a1b-2d3e4f5a6b7c",
+        "created_at": "2026-09-01T09:00:00+00:00",
+        "updated_at": "2026-10-09T15:30:00+00:00",
+        "member_count": 2,
+        "worker_count": 1,
+        "job_count": 1,
+        "runs_30d": 12
+      }
+    ],
+    1
+  ]
+}

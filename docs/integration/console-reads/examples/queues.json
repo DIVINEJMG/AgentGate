@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "operation": "queues",
+  "requestTarget": "/internal/console/v1/queues?limit=100",
+  "requestId": "example-queues",
+  "observedAt": "2026-10-10T12:00:00+00:00",
+  "data": {
+    "audorynWorkItems": {
+      "completed": 40,
+      "queued": 3,
+      "failed": 2
+    },
+    "deliveryFailures": [
+      {
+        "id": "5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d",
+        "organizationId": "0b9c8d7e-6f5a-4b3c-8d2e-1f0a9b8c7d6e",
+        "sourceMessageId": "msg_example_1",
+        "dlqId": null,
+        "statusCode": 502,
+        "retried": 3,
+        "maxRetries": 3,
+        "destinationUrl": "https://api.example.com/internal/v1/runtime/execute",
+        "resolvedAt": null,
+        "createdAt": "2026-10-09T15:30:00+00:00"
+      }
+    ]
+  }
+}

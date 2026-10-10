@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "error": {
+    "code": "unauthorized",
+    "message": "Service request was not authorized."
+  }
+}

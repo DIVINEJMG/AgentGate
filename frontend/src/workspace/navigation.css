@@ -1,0 +1,80 @@
+/* Top bar with history arrows and breadcrumbs, scrollbars and edge fades. */
+
+/* ---------- Top bar ---------- */
+.ws-topbar { position: sticky; top: var(--ws-top, 0px); z-index: 20; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 20px; background: color-mix(in srgb, var(--ws-bg) 88%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid transparent; transition: border-color .15s; }
+.ws-topbar[data-scrolled="true"] { border-bottom-color: var(--ws-line); }
+.ws-history { position: relative; display: flex; align-items: center; gap: 2px; }
+.ws-history .ws-icon-button { width: 28px; height: 28px; border-radius: var(--ws-radius-sm); color: var(--ws-text-2); }
+.ws-history .ws-icon-button:disabled { color: var(--ws-text-3); opacity: .45; cursor: default; background: transparent; }
+.ws-history-menu { left: 0; right: auto; width: 320px; max-width: calc(100vw - 32px); }
+.ws-history-menu > button > span { display: grid; min-width: 0; line-height: 1.35; padding: 4px 0; }
+.ws-history-menu strong { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.ws-history-menu small { overflow: hidden; color: var(--ws-text-3); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.ws-crumbs { flex: 1; min-width: 0; }
+.ws-app .ws-crumbs ol { display: flex; align-items: center; gap: 4px; margin: 0; padding: 0; list-style: none; overflow-x: auto; overflow-y: hidden; white-space: nowrap; }
+.ws-crumbs li { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.ws-crumbs a, .ws-crumbs span[aria-current] { display: inline-block; max-width: 280px; overflow: hidden; padding: 3px 6px; border-radius: 5px; color: var(--ws-text-3); font-size: 13px; text-overflow: ellipsis; }
+.ws-crumbs a:hover { background: var(--ws-s3); color: var(--ws-text); }
+.ws-crumbs span[aria-current] { color: var(--ws-text); font-weight: 500; }
+.ws-crumb-sep { flex-shrink: 0; color: var(--ws-line-strong); }
+/* Pages begin below the bar, so they need less top padding. */
+.ws-app .ws-topbar ~ .ws-page { padding-top: 16px; }
+/* The conversation scene keeps its full height under the bar. */
+.ws-main:has(> .cf-scene) { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.ws-main:has(> .cf-scene) > .cf-scene { height: 100%; }
+.ws-mobile-bar .ws-history { margin-left: -2px; }
+.ws-mobile-bar .ws-history .ws-icon-button { width: 32px; height: 32px; }
+@media (max-width: 860px) {
+  .ws-topbar { display: none; }
+  .ws-app .ws-topbar ~ .ws-page { padding-top: 24px; }
+  .ws-main:has(> .cf-scene) { display: block; }
+}
+@media (min-width: 861px) { .ws-mobile-bar .ws-history { display: none; } }
+
+/* ---------- Tabs: no 1px overflow, no visible bar ---------- */
+.ws-app .ws-tabs { overflow-y: hidden; border-bottom: 0; box-shadow: inset 0 -1px 0 var(--ws-line); }
+.ws-app .ws-tabs a { margin-bottom: 0; }
+
+/* ---------- Hidden bars with edge fades ---------- */
+.ws-app :is(.ws-nav, .ws-tabs, .ws-stepper, .ws-crumbs ol), .ws-modal .ws-stepper { scrollbar-width: none !important; }
+/* The conversation keeps its own position rail and hidden native bars. */
+.ws-app .cf-scene :is(.cf-transcript, .cf-worker-viewport, .cf-history-strip) { scrollbar-width: none !important; }
+.ws-app :is(.ws-nav, .ws-tabs, .ws-stepper, .ws-crumbs ol)::-webkit-scrollbar, .ws-modal .ws-stepper::-webkit-scrollbar { display: none; }
+.ws-app .ws-nav[data-fade="start"] { mask-image: linear-gradient(to bottom, transparent, #000 28px); }
+.ws-app .ws-nav[data-fade="end"] { mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
+.ws-app .ws-nav[data-fade="both"] { mask-image: linear-gradient(to bottom, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+:is(.ws-tabs, .ws-stepper, .ws-crumbs ol)[data-fade="start"] { mask-image: linear-gradient(to right, transparent, #000 32px); }
+:is(.ws-tabs, .ws-stepper, .ws-crumbs ol)[data-fade="end"] { mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+:is(.ws-tabs, .ws-stepper, .ws-crumbs ol)[data-fade="both"] { mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
+
+/* ---------- Thin themed bars for scroll areas inside pages ---------- */
+:is(.ws-app, .ws-sheet, .ws-modal, .ws-palette) :is(.ws-table-wrap, .ws-doc-table, .ws-code, .ws-doc-body pre, .ws-sheet-body, .ws-scope-list, .ws-connect-body, ul, ol, div, pre, textarea, section) {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ws-text-3) 40%, transparent) transparent;
+}
+:is(.ws-app, .ws-sheet, .ws-modal, .ws-palette) :is(.ws-table-wrap, .ws-doc-table, .ws-code, .ws-doc-body pre, .ws-sheet-body, .ws-scope-list, .ws-connect-body, ul, ol, div, pre, textarea, section):hover {
+  scrollbar-color: var(--ws-text-3) transparent;
+}
+
+/* ---------- The page scrollbar ---------- */
+html[data-ws-scrollbar="custom"] { scrollbar-width: none; }
+html[data-ws-scrollbar="custom"]::-webkit-scrollbar { display: none; }
+.ws-scrollbar { position: fixed; top: calc(var(--ws-top, 0px) + 52px); bottom: 10px; right: 0; z-index: 60; width: 22px; cursor: default; touch-action: none; }
+.ws-scrollbar-track { position: absolute; top: 0; bottom: 0; right: 6px; width: 3px; border-radius: 2px; background: color-mix(in srgb, var(--ws-text-3) 18%, transparent); opacity: 0; transition: opacity .25s ease; }
+.ws-scrollbar-thumb { position: absolute; top: 0; right: 5px; width: 5px; min-height: 36px; border-radius: 4px; background: var(--ws-text-3); opacity: 0; transition: opacity .25s ease, width .15s ease, right .15s ease, background .15s ease; will-change: transform; }
+.ws-scrollbar[data-visible="true"] :is(.ws-scrollbar-track, .ws-scrollbar-thumb) { opacity: 1; }
+.ws-scrollbar[data-visible="true"] .ws-scrollbar-thumb { opacity: .85; }
+.ws-scrollbar[data-expanded="true"] .ws-scrollbar-thumb, .ws-scrollbar-thumb:hover { width: 8px; right: 3.5px; background: var(--ws-text-2); opacity: 1; }
+.ws-scrollbar[data-expanded="true"] .ws-scrollbar-track { width: 5px; right: 5px; }
+.ws-scrollbar-tick { position: absolute; right: 2px; width: 12px; height: 9px; margin-top: -4px; padding: 0; border: 0; background: transparent; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .25s ease; }
+.ws-scrollbar-tick::before { position: absolute; top: 4px; right: 2px; width: 8px; height: 2px; border-radius: 1px; background: var(--ws-accent-text); content: ''; transition: width .12s ease; }
+.ws-scrollbar[data-visible="true"] .ws-scrollbar-tick { opacity: 1; pointer-events: auto; }
+.ws-scrollbar-tick:hover::before { width: 12px; }
+.ws-scrollbar-label { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); padding: 4px 9px; border: 1px solid var(--ws-line); border-radius: 6px; background: var(--ws-surface); color: var(--ws-text); box-shadow: var(--ws-shadow); font: 500 12px var(--ws-font); white-space: nowrap; pointer-events: none; animation: ws-enter .12s ease-out; }
+.ws-scrollbar-here { top: 50%; right: 16px; border-color: var(--ws-accent-text); color: var(--ws-accent-text); font-family: var(--ws-mono); font-size: 11.5px; }
+@media (prefers-reduced-motion: reduce) { .ws-scrollbar *, .ws-topbar { transition: none !important; animation: none !important; } }
+@media (forced-colors: active) { .ws-scrollbar { display: none; } }
+.ws-scrollbar[data-scrollable="false"] { visibility: hidden; pointer-events: none; }
+.ws-scrollbar-thumb { z-index: 1; } .ws-scrollbar-tick { z-index: 2; }
+.ws-main:has(> .cf-scene) > .ws-topbar { position: relative; top: 0; }
+@media (max-width: 640px) { .ws-app .ws-chain { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; } .ws-chain li::before { display: none; } }

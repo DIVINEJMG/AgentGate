@@ -33,6 +33,25 @@ def test_qstash_transient_rate_limit_is_not_called_daily_quota() -> None:
     assert caught.value.daily_quota_exhausted is False
 
 
+def test_qstash_bad_publish_reports_structured_provider_reason() -> None:
+    response = _response(400, '{"error":"invalid flow control value"}')
+
+    with pytest.raises(qstash_provider.QStashRequestRejectedError) as caught:
+        qstash_provider.raise_for_qstash_status(response)
+
+    assert "invalid flow control value" in str(caught.value)
+    assert "qstash.example" not in str(caught.value)
+
+
+def test_qstash_bad_publish_does_not_echo_unstructured_response() -> None:
+    response = _response(400, "Bearer example-secret")
+
+    with pytest.raises(qstash_provider.QStashRequestRejectedError) as caught:
+        qstash_provider.raise_for_qstash_status(response)
+
+    assert "example-secret" not in str(caught.value)
+
+
 def test_work_queue_exposes_dispatch_health_without_mutating_work_items() -> None:
     trigger = (ROOT / "backend/app/runtime/qstash_trigger.py").read_text(
         encoding="utf-8"
@@ -59,7 +78,8 @@ def test_work_queue_exposes_dispatch_health_without_mutating_work_items() -> Non
     assert "RuntimeDispatchHealth" in jobs_api
     assert "JobsWorkspacePage" in jobs_panel
     assert "data={data}" in jobs_panel
-    assert "Runtime dispatch delayed." in jobs_workspace
+    assert "Starting work is delayed." in jobs_workspace
+    assert "Queued work stays safe" in jobs_workspace
     assert "dispatchBlocked" in jobs_workspace
 
 
@@ -86,6 +106,19 @@ def test_qstash_publish_headers_support_delayed_delivery() -> None:
     )
 
     assert headers["Upstash-Delay"] == "40s"
+
+
+def test_runtime_flow_control_limits_callback_delivery_pressure() -> None:
+    provider = qstash_provider.UpstashQStashProvider(
+        base_url="https://qstash.example", token="test-token"
+    )
+    headers = provider._headers(
+        retries=3, timeout_seconds=120,
+        flow_control_key="audoryn-runtime-test", parallelism=4,
+    )
+
+    assert headers["Upstash-Flow-Control-Key"] == "audoryn-runtime-test"
+    assert headers["Upstash-Flow-Control-Value"] == "parallelism=4"
 
 
 def test_ai_provider_retry_publishes_delayed_runtime_wakeup() -> None:
@@ -124,7 +157,10 @@ def test_runtime_continuations_use_distinct_plan_and_execute_dedupe_keys() -> No
 
     assert 'continuation_phase="execute"' in managed
     assert 'continuation_phase="plan"' in managed
-    assert 'continuation_reason = f"continuation-{outcome.continuation_phase}"' in runtime_api
+    assert (
+        'continuation_reason = f"continuation-{outcome.continuation_phase}:background:{outcome.run_id}"'
+        in runtime_api
+    )
 
 
 def test_manual_process_uses_runtime_delivery_lock() -> None:

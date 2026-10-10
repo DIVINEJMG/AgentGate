@@ -11,7 +11,7 @@ REQUIRED = (
     APP / "execution" / "providers" / "registry.py",
     APP / "execution" / "providers" / "resolver.py",
     APP / "execution" / "provider_executor.py",
-    APP / "execution" / "providers" / "native" / "github.py",
+    APP / "execution" / "providers" / "native" / "github" / "__init__.py",
     APP / "execution" / "providers" / "native" / "gmail.py",
     APP / "execution" / "providers" / "native" / "slack.py",
     APP / "execution" / "providers" / "native" / "google_drive.py",

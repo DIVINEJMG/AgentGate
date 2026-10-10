@@ -5,12 +5,12 @@ import type { AuthUser } from '../platform/client';
 import type { OrganizationAccess } from '../lib/identityApi';
 import { listAgents, registerAgent, revokeCredential, rotateCredential, setAgentLifecycle, type AgentIdentity, type AgentStatus, type CredentialReveal } from '../lib/agentApi';
 import type { ApiVersion } from '../lib/systemApi';
+import { navigate } from '../workspace/routes';
 
-interface Props { organization: OrganizationAccess; user: AuthUser; apiVersion: ApiVersion; onApiVersionChange: (version: ApiVersion) => void; onCountChange: (count: number) => void; }
+interface Props { organization: OrganizationAccess; user: AuthUser; apiVersion: ApiVersion; onApiVersionChange?: (version: ApiVersion) => void; onCountChange: (count: number) => void; identityId?: string; }
 
-export default function AgentsPanel({ organization, user, apiVersion, onApiVersionChange, onCountChange }: Props) {
+export default function AgentsPanel({ organization, user, apiVersion, onApiVersionChange = () => {}, onCountChange, identityId }: Props) {
     const [agents, setAgents] = useState<AgentIdentity[]>([]);
-    const [selectedId, setSelectedId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [registerOpen, setRegisterOpen] = useState(false);
@@ -24,14 +24,14 @@ export default function AgentsPanel({ organization, user, apiVersion, onApiVersi
 
     async function refreshAgents() {
         setLoading(true); setError(null);
-        try { const items = await listAgents(apiVersion, organization.id); setAgents(items); onCountChange(items.length); setSelectedId((current) => current && items.some((item) => item.id === current) ? current : items[0]?.id ?? null); }
+        try { const items = await listAgents(apiVersion, organization.id); setAgents(items); onCountChange(items.length); }
         catch { setError('Audoryn could not load agent identities for this organization.'); }
         finally { setLoading(false); }
     }
 
     useEffect(() => { void refreshAgents(); }, [apiVersion, organization.id]);
 
-    const selected = agents.find((agent) => agent.id === selectedId) ?? null;
+    const selected = agents.find((agent) => agent.id === identityId) ?? null;
     const canManage = organization.permissions.includes('agents.manage');
 
     function replaceAgent(agent: AgentIdentity) { setAgents((current) => current.map((item) => item.id === agent.id ? agent : item)); }
@@ -42,7 +42,7 @@ export default function AgentsPanel({ organization, user, apiVersion, onApiVersi
         setSubmitting(true);
         try {
             const result = await registerAgent(apiVersion, organization.id, name, description);
-            setAgents((current) => [result.agent, ...current]); onCountChange(agents.length + 1); setSelectedId(result.agent.id);
+            setAgents((current) => [result.agent, ...current]); onCountChange(agents.length + 1); navigate({ page: 'connections', view: 'identities', id: result.agent.id });
             setRegisterOpen(false); setName(''); setDescription(''); setCredentialReveal(result); setCopied(false);
         } catch (caught) { setError(apiMessage(caught, 'Agent registration failed.')); }
         finally { setSubmitting(false); }
@@ -70,7 +70,7 @@ export default function AgentsPanel({ organization, user, apiVersion, onApiVersi
     async function copyCredential() { if (!credentialReveal) return; await navigator.clipboard.writeText(credentialReveal.credential.secret); setCopied(true); }
 
     return <>
-        <IdentitiesStage organizationName={organization.name} userId={user.userId} apiVersion={apiVersion} onApiVersionChange={onApiVersionChange} agents={agents} selected={selected} select={setSelectedId} canManage={canManage} loading={loading} submitting={submitting} error={error} register={()=>setRegisterOpen(true)} lifecycle={setPendingLifecycle} credentialAction={setPendingCredentialAction}/>
+        <IdentitiesStage organization={organization} identityId={identityId} organizationName={organization.name} userId={user.userId} apiVersion={apiVersion} onApiVersionChange={onApiVersionChange} agents={agents} selected={selected} select={(id) => navigate({ page: 'connections', view: 'identities', id: id || undefined })} canManage={canManage} loading={loading} submitting={submitting} error={error} register={()=>setRegisterOpen(true)} lifecycle={setPendingLifecycle} credentialAction={setPendingCredentialAction}/>
         {registerOpen && <div className="modal-backdrop"><section className="modal-card cx-modal" role="dialog" aria-modal="true" aria-label="Register agent"><div className="modal-title"><div><p className="panel-kicker">AGENT IDENTITY</p><h2>Register agent identity</h2></div><button className="icon-button" aria-label="Close registration" onClick={() => setRegisterOpen(false)}><X size={16} /></button></div><form className="agent-form" onSubmit={handleRegister}><label htmlFor="agent-name">Agent name</label><input id="agent-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} placeholder="Support Agent" autoFocus /><label htmlFor="agent-description">Purpose</label><textarea id="agent-description" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={240} placeholder="Handles customer support triage and drafts responses." /><div className="credential-note"><KeyRound size={17} /><div><strong>A credential will be issued once.</strong><p>Audoryn stores only its SHA-256 hash. The plaintext credential cannot be recovered later.</p></div></div><button className="primary-button" disabled={submitting}>{submitting ? 'Registering…' : 'Register agent'}</button></form></section></div>}
 
         {credentialReveal && <div className="modal-backdrop"><section className="modal-card credential-modal cx-modal" role="dialog" aria-modal="true" aria-label="Agent credential"><div className="modal-title"><div><p className="panel-kicker">COPY ONCE</p><h2>Store this agent credential</h2></div></div><p className="modal-copy">This secret is shown only for this issuance. After you close this window, Audoryn will keep the fingerprint and hash — not the secret.</p><div className="credential-secret"><code>{credentialReveal.credential.secret}</code><button className="icon-button" aria-label="Copy credential" onClick={copyCredential}>{copied ? <Check size={16} /> : <Clipboard size={16} />}</button></div><div className="credential-meta"><span>Fingerprint {credentialReveal.credential.fingerprint}</span><span>Version {credentialReveal.credential.version}</span></div><button className="primary-button" onClick={() => { setCredentialReveal(null); setCopied(false); }}>{copied ? 'Credential stored' : 'I have stored this credential'}</button></section></div>}

@@ -10,6 +10,7 @@ from app.execution.browser.http_reader import (
     _BoundedHTMLParser,
 )
 from app.execution.browser.policy import BrowserDomainPolicy
+from app.execution.providers.browser import _browser_session_ttl
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,8 +48,10 @@ def test_f32_http_first_parser_is_bounded() -> None:
 
 
 def test_f32_browser_memory_budget_defaults_target_512mb_service() -> None:
-    assert settings.browser_idle_shutdown_seconds == 20
-    assert settings.browser_session_ttl_seconds == 600
+    assert settings.browser_idle_shutdown_seconds == 180
+    assert settings.browser_session_ttl_seconds == 900
+    assert settings.browser_max_active_sessions == 1
+    assert settings.browser_max_sessions_per_organization == 1
     assert settings.browser_max_pages_per_session == 3
     assert settings.browser_memory_soft_limit_percent == 85
     assert settings.browser_memory_hard_limit_percent == 90
@@ -58,6 +61,13 @@ def test_f32_browser_memory_budget_defaults_target_512mb_service() -> None:
     assert settings.browser_http_read_max_bytes <= 1_000_000
     assert settings.browser_cold_start_timeout_seconds == 65
     assert settings.browser_action_timeout_seconds == 45
+
+
+def test_managed_browser_uses_current_ttl_without_changing_manual_resource() -> None:
+    assert _browser_session_ttl(
+        {"managedBy": "worker_autonomy", "sessionTtlSeconds": "600"}
+    ) == 900
+    assert _browser_session_ttl({"sessionTtlSeconds": "600"}) == 600
 
 
 def test_f32_chromium_is_lazy_and_runtime_sweep_reaps_sessions() -> None:
@@ -135,9 +145,8 @@ def test_f32_cold_browser_start_has_separate_budget_and_reclaim_path() -> None:
     assert "browser_cold_start_timeout_seconds" in settings_source
     assert "browser_action_timeout_seconds" in settings_source
     assert 'request.operation == "navigation.open"' in provider
-    assert 'getattr(self._runtime, "prepare", None)' in provider
-    assert 'getattr(self._runtime, "shutdown_if_idle", None)' in provider
-    assert 'code="browser_cold_start_timeout"' in provider
+    assert "budget = settings.browser_action_timeout_seconds +" in provider
+    assert "create_session reserves a capacity slot before launching Chromium" in provider
     assert "async def prepare(self) -> None:" in runtime
     assert "async def shutdown_if_idle(self) -> None:" in runtime
     assert "self._browser is None and self._playwright is None" in runtime
@@ -147,7 +156,8 @@ def test_f32_cold_browser_start_has_separate_budget_and_reclaim_path() -> None:
     assert "chromium_process_ids" in runtime
     assert "async def _reap_orphaned_chromium" in runtime
     assert "signal.SIGTERM" in runtime
-    assert "signal.SIGKILL" in runtime
+    # Available force signals are exercised by test_browser_orphan_cleanup;
+    # Windows has no SIGKILL, so its literal use is not a portability requirement.
     assert "baseline_chromium_pids" in runtime
     assert 'telemetry_logger = logging.getLogger("uvicorn.error")' in runtime
 

@@ -77,10 +77,7 @@ async def evaluate_browser_egress(
             "Browser DNS safety preflight timed out.",
         )
     except socket.gaierror:
-        # DNS failure is handled by the browser as a normal navigation/provider error.
-        return BrowserEgressDecision(
-            True, host, "Destination DNS could not be resolved during preflight."
-        )
+        return BrowserEgressDecision(False, host, "Destination DNS could not be resolved safely.")
 
     addresses = {str(record[4][0]) for record in records if record and record[4]}
     if any(_ip_is_private_or_special(address) for address in addresses):

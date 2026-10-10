@@ -4,8 +4,10 @@ from app.api.adapters.system_status import serialize_v1
 from app.api.agent_routes import v1_router as agent_router
 from app.api.ai_operations_routes import v1_router as ai_operations_router
 from app.api.conversation_routes import v1_router as conversation_router
+from app.api.github_routes import router as github_router
 from app.api.governance_routes import v1_router as governance_router
 from app.api.integration_capability_routes import v1_router as integration_router
+from app.api.integration_foundation_routes import router as integration_foundation_router
 from app.api.jobs_routes import v1_router as jobs_router
 from app.api.organization_routes import v1_router as organization_router
 from app.api.product_ops_routes import v1_router as product_ops_router
@@ -21,6 +23,8 @@ router.include_router(workforce_router)
 router.include_router(jobs_router)
 router.include_router(template_router)
 router.include_router(integration_router)
+router.include_router(integration_foundation_router)
+router.include_router(github_router)
 router.include_router(governance_router)
 router.include_router(runtime_result_router)
 router.include_router(product_ops_router)

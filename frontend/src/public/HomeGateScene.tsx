@@ -1,16 +1,25 @@
+import { usePublicText, usePublicContent } from './content/ContentContext';
+import {payloadOf} from './content/contract';
+import {PublicMedia} from './ResourcePage';
 import { useEffect, useRef, useState } from 'react';
 import type { ControlWorld } from './controlWorld';
 import './home-gate-scene.css';
+import './public-media.css';
 
 type Mode = 'hero' | 'journey';
-const PHASES = ['Work is defined', 'Policy is evaluated', 'A person decides', 'Execution is recorded'];
 const clamp = (value: number) => Math.min(1, Math.max(0, value));
 
 export default function HomeGateScene({ mode = 'hero' }: { mode?: Mode }) {
+  const text = usePublicText('HomeGateScene');
+  const PHASES = [text('stage-defined','Work is defined'),text('stage-policy','Policy is evaluated'),text('stage-approval','A person decides'),text('stage-recorded','Execution is recorded')];
+
+
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ready, setReady] = useState(false);
   const [phase, setPhase] = useState(0);
+  const bundle=usePublicContent();
+  const media=mode==='journey'&&bundle.page?(payloadOf(bundle.page).journey as {media?:Parameters<typeof PublicMedia>[0]['reference'][]}[])[phase]?.media?.[0]:undefined;
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -142,17 +151,16 @@ export default function HomeGateScene({ mode = 'hero' }: { mode?: Mode }) {
       motionQuery.removeEventListener('change', onMotionChange);
       world?.dispose();
     };
-  }, [mode]);
+  }, [mode,media?.asset_id]);
 
   return (
-    <figure className={`home-gate home-gate-${mode}`} role="img" aria-label="A work unit moves through the Audoryn control path: work, policy, human approval, and execution">
+    <figure className={`home-gate home-gate-${mode}`} role="img" aria-label={text('copy-a-work-unit-moves-through-the-audoryn-control-5e489b2287', "A work unit moves through the Audoryn control path: work, policy, human approval, and execution")}>
       <div className="home-gate-art" ref={stageRef} data-ready={ready}>
-        <div className="home-gate-static" aria-hidden="true"><span /><span /><span /><i /></div>
-        <canvas ref={canvasRef} aria-hidden="true" />
-        <div className="home-gate-coordinate" aria-hidden="true"><span>AG / CONTROL PLANE</span><span>01 — 04</span></div>
+        {media?<div className='public-scene-media'><PublicMedia reference={media}/></div>:<><div className="home-gate-static" aria-hidden="true"><span /><span /><span /><i /></div><canvas ref={canvasRef} aria-hidden="true" /></>}
+        <div className="home-gate-coordinate" aria-hidden="true"><span>{text('copy-ag-control-plane-67af4ee941', "AG / CONTROL PLANE")}</span><span>01 — 04</span></div>
         {mode === 'journey' && <div className="home-gate-phase" aria-hidden="true"><span>0{phase + 1} / 04</span><strong>{PHASES[phase]}</strong></div>}
       </div>
-      <figcaption><span>THE CONTROL PATH</span><span>Work moves forward. Authority stays visible.</span></figcaption>
+      <figcaption><span>{text('copy-the-control-path-ebed635bb1', "THE CONTROL PATH")}</span><span>{text('copy-work-moves-forward-authority-stays-visible-45c3e76beb', "Work moves forward. Authority stays visible.")}</span></figcaption>
     </figure>
   );
 }

@@ -1,12 +1,14 @@
+import asyncio
 import base64
 import binascii
 import json
 import logging
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from math import ceil
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -15,6 +17,7 @@ from app.application.services.browser_origin_authority import (
     reconcile_ai_job_browser_origins,
 )
 from app.application.services.cutover import CutoverController
+from app.application.services.integration_foundation import notify_integration_work
 from app.bootstrap.settings import settings
 from app.domain.ai.providers import AIProviderError
 from app.domain.identity.principals import HumanPrincipal
@@ -31,13 +34,15 @@ from app.infrastructure.database.models import (
 )
 from app.infrastructure.database.session import session_factory
 from app.infrastructure.qstash.verifier import QStashSignatureVerifier
-from app.infrastructure.redis.coordination import RedisCoordinator
+from app.infrastructure.redis.coordination import Lease, RedisCoordinator
 from app.infrastructure.storage.provider import object_storage_from_settings
+from app.runtime.admission import admit_due_item
 from app.runtime.managed import ManagedRuntimeExecutor
 from app.runtime.qstash_trigger import request_runtime_execution
 
 router = APIRouter(prefix="/internal/v1/runtime", tags=["internal-runtime"])
 logger = logging.getLogger(__name__)
+_runtime_tasks: set[asyncio.Task] = set()
 
 
 def _verify_qstash(request: Request, raw: bytes, signature: str | None) -> None:
@@ -64,6 +69,26 @@ def _runtime_step(item: WorkItem) -> int:
     raw = payload.get("runtime")
     runtime = raw if isinstance(raw, dict) else {}
     return max(0, int(runtime.get("currentStep", 0)))
+
+
+async def _recover_runtime_item(session, message: "ExecutePayload") -> WorkItem:
+    # Cancellation may invalidate a connection and expires ORM attributes.
+    # Re-read by immutable delivery IDs after rollback, never use the stale item.
+    await session.rollback()
+    item = await session.scalar(select(WorkItem).where(
+        WorkItem.organization_id == message.organization_id, WorkItem.id == message.work_item_id))
+    if item is None:
+        raise HTTPException(404, "Work item not found during recovery.")
+    runtime = dict((item.payload or {}).get("runtime") or {})
+    phase_started = runtime.get("plannerPhaseStartedAt")
+    if phase_started and runtime.get("plannerPhase") in {"preparing_tools", "awaiting_ai"}:
+        elapsed = max(0, (datetime.now(UTC) - datetime.fromisoformat(phase_started)).total_seconds())
+        timing = dict(runtime.get("plannerTiming") or {})
+        key = "aiResponseSeconds" if runtime.get("plannerPhase") == "awaiting_ai" else "preparationSeconds"
+        timing[key] = round(elapsed, 3)
+        runtime["plannerTiming"] = timing
+        item.payload = {**item.payload, "runtime": runtime}
+    return item
 
 
 def _runtime_failure_category(message: str) -> str:
@@ -411,9 +436,10 @@ async def dispatch(
     }
 
 
-@router.post("/execute")
+@router.post("/execute", status_code=202)
 async def execute(
     request: Request,
+    background_tasks: BackgroundTasks,
     upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
 ) -> dict[str, object]:
     raw = await request.body()
@@ -442,7 +468,7 @@ async def execute(
     coordinator = RedisCoordinator.from_settings()
     lease = await coordinator.acquire_lock(
         f"runtime:{message.work_item_id}:{message.expected_step}",
-        ttl_seconds=settings.runtime_delivery_timeout_seconds + 30,
+        ttl_seconds=90,
     )
     if lease is None:
         await coordinator.close()
@@ -451,6 +477,61 @@ async def execute(
             "workItemId": str(message.work_item_id),
             "currentStep": message.expected_step,
         }
+
+    slot = None
+    for index in range(max(1, settings.runtime_qstash_parallelism)):
+        slot = await coordinator.acquire_lock(f"runtime-slot:{settings.environment}:{index}", ttl_seconds=90)
+        if slot:
+            break
+    if slot is None:
+        await coordinator.release_lock(lease)
+        await coordinator.close()
+        raise HTTPException(429, "Runtime execution capacity is full; retry delivery.")
+    # Work items already exist durably. The sweep recovers an acknowledged task
+    # after process loss; Redis leases prevent duplicate execution across processes.
+    background_tasks.add_task(_start_runtime_task, message, coordinator, lease, slot)
+    return {"status": "accepted", "workItemId": str(message.work_item_id), "currentStep": message.expected_step}
+
+
+async def _start_runtime_task(message, coordinator, lease, slot):
+    task = asyncio.create_task(_execute_runtime_message(message, coordinator, lease, slot))
+    _runtime_tasks.add(task)
+
+    def finished(completed):
+        _runtime_tasks.discard(completed)
+        if not completed.cancelled() and completed.exception() is not None:
+            logger.error("Background runtime interrupted work_item=%s error_type=%s; saved checkpoint remains eligible for recovery",
+                message.work_item_id, type(completed.exception()).__name__)
+
+    task.add_done_callback(finished)
+
+
+async def stop_runtime_tasks():
+    tasks = tuple(_runtime_tasks)
+    for task in tasks:
+        task.cancel()
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def _renew_runtime_leases(coordinator, leases, owner):
+    try:
+        while True:
+            await asyncio.sleep(30)
+            for lease in leases:
+                if not await coordinator.renew_lock(lease, ttl_seconds=90):
+                    owner.cancel()
+                    return
+    except asyncio.CancelledError:
+        raise
+    except Exception:  # noqa: BLE001 - failed coordination must not permit overlapping execution
+        owner.cancel()
+
+
+async def _execute_runtime_message(message: ExecutePayload, coordinator: RedisCoordinator,
+    lease: Lease, slot: Lease) -> dict[str, object]:
+    owner = asyncio.current_task()
+    heartbeat = asyncio.create_task(_renew_runtime_leases(coordinator, (lease, slot), owner))
 
     outcome = None
     continuation_delay_seconds = 0
@@ -482,13 +563,55 @@ async def execute(
                     "state": item.status,
                     "currentStep": _runtime_step(item),
                 }
+            if item.status == "queued":
+                admitted = await admit_due_item(session, item, now=datetime.now(UTC))
+                if not admitted:
+                    await session.refresh(item)
+                    if item.status != "queued":
+                        return {
+                            "status": "noop", "workItemId": str(item.id),
+                            "state": item.status, "currentStep": _runtime_step(item),
+                        }
+                    retry_at = datetime.now(UTC) + timedelta(seconds=5)
+                    item.scheduled_at = retry_at
+                    payload = dict(item.payload or {})
+                    runtime = dict(payload.get("runtime") or {})
+                    runtime["queueState"] = "queued"
+                    runtime["waitingReason"] = "Waiting for an earlier or higher-priority Work Item."
+                    payload["runtime"] = runtime
+                    item.payload = payload
+                    await session.commit()
+                    await request_runtime_execution(
+                        organization_id=item.organization_id,
+                        work_item_id=item.id,
+                        expected_step=message.expected_step,
+                        reason="admission-wait",
+                        delay_seconds=5,
+                    )
+                    return {
+                        "status": "queued",
+                        "workItemId": str(item.id),
+                        "state": "queued",
+                        "currentStep": message.expected_step,
+                        "summary": runtime["waitingReason"],
+                    }
+                payload = dict(item.payload or {})
+                runtime = dict(payload.get("runtime") or {})
+                runtime["queueState"] = "admitted"
+                runtime["waitingReason"] = None
+                payload["runtime"] = runtime
+                item.payload = payload
+                await session.commit()
             try:
                 outcome = await ManagedRuntimeExecutor(session).execute_step(
                     item=item,
                     expected_step=message.expected_step,
                 )
                 if outcome.state == "continue" and outcome.continuation_phase is not None:
-                    continuation_reason = f"continuation-{outcome.continuation_phase}"
+                    # The outbox may deliver its wake-up while this phase still
+                    # holds the lease. Use a distinct durable follow-up identity
+                    # after release rather than deduplicating against that wake-up.
+                    continuation_reason = f"continuation-{outcome.continuation_phase}:background:{outcome.run_id}"
                 if outcome.state == "continue" and item.scheduled_at > datetime.now(UTC):
                     continuation_delay_seconds = max(
                         1,
@@ -502,6 +625,15 @@ async def execute(
                         f"provider-retry:{int(item.scheduled_at.timestamp())}"
                     )
             except AIProviderError as exc:
+                item = await _recover_runtime_item(session, message)
+                # Keep provider bodies and prompts out of logs; record the category
+                # so transport failures can be distinguished from contract errors.
+                logger.warning(
+                    "Runtime planning failure work_item=%s category=%s retryable=%s "
+                    "http_status=%s retry_after_seconds=%s error_type=%s",
+                    item.id, exc.category, exc.retryable, exc.status_code,
+                    exc.retry_after_seconds, type(exc.__cause__ or exc).__name__,
+                )
                 now = datetime.now(UTC)
                 payload = dict(item.payload or {})
                 raw_runtime = payload.get("runtime")
@@ -511,6 +643,7 @@ async def execute(
                     else {}
                 )
                 retry_count = max(0, int(runtime_meta.get("aiRetryCount", 0)))
+                preparation_failed = runtime_meta.get("plannerPhase") == "preparing_tools"
                 configuration_error = exc.category in {
                     "configuration_missing",
                     "authentication_failed",
@@ -522,16 +655,23 @@ async def execute(
                 if configuration_error:
                     state = "waiting_configuration"
                     item.status = state
-                    summary = "AI configuration is required before this work can continue."
+                    from sqlalchemy.exc import SQLAlchemyError
+                    summary = (
+                        "Task preparation is blocked by database setup. An administrator must complete the required setup before this work can continue."
+                        if isinstance(exc.__cause__, SQLAlchemyError)
+                        else "AI configuration is required before this work can continue."
+                    )
                 elif exc.retryable and retry_count < settings.ai_max_retries:
                     retry_count += 1
-                    delay_seconds = min(300, 15 * (2 ** (retry_count - 1)))
+                    delay_seconds = max(min(300, 15 * (2 ** (retry_count - 1))), exc.retry_after_seconds or 0)
                     retry_at = now + timedelta(seconds=delay_seconds)
                     item.status = "queued"
                     item.scheduled_at = retry_at
                     state = "waiting_ai"
                     retry_scheduled = True
                     summary = "AI planner is temporarily unavailable; retry is scheduled."
+                    if preparation_failed:
+                        summary = "Task preparation is temporarily unavailable; retry is scheduled."
                 elif exc.category == "invalid_provider_response":
                     state = "waiting_ai"
                     item.status = state
@@ -543,21 +683,54 @@ async def execute(
                     state = "waiting_ai"
                     item.status = state
                     summary = "AI planner is unavailable; no external action was taken."
+                    if preparation_failed:
+                        summary = "Task preparation is unavailable; no external action was taken."
 
+                if settings.smart_planner_enabled and not preparation_failed:
+                    if exc.category == "quota_exhausted":
+                        summary = "Planning has reached its usage allowance. Your task and completed work are saved."
+                    elif exc.category == "rate_limited":
+                        summary = "Planning is waiting for available capacity. Your task and completed work are saved."
+                    elif exc.category == "context_too_large":
+                        summary = "The required task evidence exceeds the available planning limits. Your task and completed work are saved."
+                    elif exc.category == "content_rejected":
+                        summary = "The planning service declined this request. Your task is paused; completed work remains saved."
+                    elif exc.category == "timeout" and not retry_scheduled:
+                        summary = (
+                            "The planning deadline expired. Your task and completed work are saved; the remaining work needs attention."
+                            if (runtime_meta.get("plannerExhaustion") or {}).get("reason") == "deadline"
+                            else "The planning request stopped waiting for a response. Your task and completed work are saved; the remaining work needs attention."
+                        )
+                    elif not retry_scheduled and not configuration_error:
+                        summary = "Planning could not continue within its limits. Completed work remains saved; the remaining task needs attention."
+                    runtime_meta["plannerStatus"] = "retrying" if retry_scheduled else state
                 runtime_meta["aiRetryCount"] = retry_count
+                runtime_meta["queueState"] = "retrying" if retry_scheduled else state
+                runtime_meta["waitingReason"] = summary
                 runtime_meta["lastAIErrorCategory"] = exc.category
                 runtime_meta["failureCategory"] = (
                     "authentication_expiry"
                     if exc.category == "authentication_failed"
                     else "internal_platform_failure"
                     if exc.category in {"configuration_missing", "model_not_found"}
+                    else "usage_limit" if exc.category in {"quota_exhausted", "rate_limited"}
+                    else "planning_context_limit" if exc.category == "context_too_large"
+                    else "planning_refusal" if exc.category == "content_rejected"
                     else "provider_response_invalid"
                     if exc.category == "invalid_provider_response"
+                    else "internal_platform_failure" if preparation_failed
                     else "provider_model_outage"
                 )
+                logger.warning("Runtime planning recovery work_item=%s phase=%s timing=%s",
+                    message.work_item_id, runtime_meta.get("plannerPhase"), runtime_meta.get("plannerTiming"))
+                runtime_meta["plannerFailurePhase"] = runtime_meta.get("plannerPhase")
+                runtime_meta["plannerPhase"] = state
+                runtime_meta["plannerPhaseStartedAt"] = None
                 runtime_meta["lastAIErrorAt"] = now.isoformat()
                 if retry_at is not None:
                     runtime_meta["aiRetryAt"] = retry_at.isoformat()
+                else:
+                    runtime_meta.pop("aiRetryAt", None)
                 payload["runtime"] = runtime_meta
                 payload["lastError"] = {
                     "kind": "ai_provider",
@@ -579,6 +752,8 @@ async def execute(
                 }:
                     run.status = state
                     run.result_summary = summary
+                await notify_integration_work(session, item,
+                    key=f"planning-wait:{_runtime_step(item)}:{retry_count}", content=summary)
                 await session.commit()
 
                 retry_dispatch_id = None
@@ -608,6 +783,8 @@ async def execute(
                     "retryDispatchQueued": retry_dispatch_id is not None,
                 }
             except RuntimeError as exc:
+                item = await _recover_runtime_item(session, message)
+                logger.error("Runtime stopped work_item=%s category=%s error_type=%s", item.id, _runtime_failure_category(str(exc)), type(exc).__name__)
                 item.status = "failed"
                 payload = dict(item.payload or {})
                 failure_category = _runtime_failure_category(str(exc))
@@ -627,6 +804,10 @@ async def execute(
                 if run is not None and run.status not in {"completed", "failed", "cancelled"}:
                     run.status = "failed"
                     run.result_summary = str(exc)[:4000]
+                await notify_integration_work(
+                    session, item, key=f"runtime-stopped:{_runtime_step(item)}",
+                    content="Work stopped because the pending step could not be completed. Your request and completed steps remain saved. See the process record for the saved outcome.",
+                )
                 await session.commit()
                 return {
                     "status": "failed",
@@ -636,8 +817,31 @@ async def execute(
                     "summary": str(exc),
                     "failureCategory": failure_category,
                 }
+            except Exception as exc:  # noqa: BLE001 - acknowledged jobs must expose an actionable wait
+                item = await _recover_runtime_item(session, message)
+                run = await session.scalar(select(Run).where(Run.work_item_id == item.id)
+                    .order_by(Run.created_at.desc()).limit(1))
+                meta = dict((item.payload or {}).get("runtime") or {})
+                planning = run is None or meta.get("plannerPhase") in {"preparing_tools", "awaiting_ai"}
+                state = "waiting_configuration" if planning else "uncertain_outcome"
+                summary = ("Task preparation was interrupted by an internal error. Completed work is saved; this needs attention before continuing."
+                    if planning else "Execution was interrupted and its outcome needs verification. Completed work is saved; the action will not be replayed automatically.")
+                item.status = state
+                item.payload = {**item.payload, "runtime": {**meta, "queueState": state,
+                    "waitingReason": summary, "failureCategory": "internal_platform_failure"}}
+                if run is not None and run.status not in {"completed", "failed", "cancelled"}:
+                    run.status, run.result_summary = state, summary
+                await notify_integration_work(session, item, key=f"runtime-interrupted:{_runtime_step(item)}", content=summary)
+                await session.commit()
+                logger.error("Runtime interrupted work_item=%s error_type=%s state=%s",
+                    message.work_item_id, type(exc).__name__, state)
+                return {"status": state, "workItemId": str(item.id), "summary": summary}
     finally:
+        heartbeat.cancel()
+        with suppress(asyncio.CancelledError):
+            await heartbeat
         await coordinator.release_lock(lease)
+        await coordinator.release_lock(slot)
         await coordinator.close()
 
     assert outcome is not None
@@ -656,7 +860,7 @@ async def execute(
     return {
         "status": "ok",
         "workItemId": str(outcome.work_item_id),
-        "runId": str(outcome.run_id),
+        "runId": str(outcome.run_id) if outcome.run_id is not None else None,
         "state": outcome.state,
         "currentStep": outcome.current_step,
         "summary": outcome.summary,
@@ -695,7 +899,7 @@ async def sweep(
                 await session.scalars(
                     select(WorkItem)
                     .where(
-                        WorkItem.status.in_(["queued", "running", "waiting_approval"]),
+                        WorkItem.status.in_(["queued", "admitted", "running", "waiting_approval"]),
                         WorkItem.scheduled_at <= now,
                     )
                     .order_by(WorkItem.scheduled_at, WorkItem.id)

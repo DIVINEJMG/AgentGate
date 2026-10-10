@@ -1,0 +1,35 @@
+[
+  {
+    "id": "de5cb793-7e09-5703-8021-c31ecd15ab0c",
+    "path": "src/public/assets/human-oversight.webp",
+    "filename": "human-oversight.webp",
+    "width": 1774,
+    "height": 887,
+    "mediaType": "image/webp",
+    "sizeBytes": 104250,
+    "checksumSha256": "47d452f894acdfdc7146a1df5994cdd1cc22a1a8f9a9be0b50433a59f706c4be",
+    "altText": "Two colleagues reviewing a decision together at a table"
+  },
+  {
+    "id": "262bf108-0e0b-58ab-835f-9bd73d8c353c",
+    "path": "src/public/assets/operations-work.webp",
+    "filename": "operations-work.webp",
+    "width": 1672,
+    "height": 941,
+    "mediaType": "image/webp",
+    "sizeBytes": 248982,
+    "checksumSha256": "6cf8c76ee72ac6970f2830dc9a55cc89084a43324c07da48d62279b5db5b43b7",
+    "altText": "A logistics operations floor with a supervisor overseeing the work"
+  },
+  {
+    "id": "a201f4ad-5d40-51eb-8948-a5c1b09319d1",
+    "path": "src/public/assets/research-work.webp",
+    "filename": "research-work.webp",
+    "width": 1774,
+    "height": 887,
+    "mediaType": "image/webp",
+    "sizeBytes": 134388,
+    "checksumSha256": "cc30a047bdc4a45b950da33d0317204fe67463a65975fb8ea599816d257d2855",
+    "altText": "Research materials being reviewed at a worktable"
+  }
+]

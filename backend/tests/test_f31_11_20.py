@@ -6,7 +6,6 @@ from typing import Any, cast
 from uuid import uuid4
 
 import pytest
-from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.conversation_routes import v1_router, v2_router
@@ -55,6 +54,13 @@ class IntentGateway:
         self.prompt_seen = prompt
         assert schema_name == "worker_command_intent_v1"
         return self.payload
+
+    async def generate_reviewed_structured(self, *, review_system, review_prompt, review_schema, review_validator, **kwargs):
+        payload = await self.generate_structured(**kwargs)
+        message = kwargs["prompt"].split("HUMAN_MESSAGE:\n", 1)[1]
+        report = {"operation":"question", "requestQuote":message[:500], "intent":payload}
+        review_validator(report)
+        return report
 
     async def generate_text(self, **_: Any) -> AIResponse:
         raise AssertionError("intent test must use structured generation")
@@ -108,12 +114,13 @@ async def test_intent_interpreter_rejects_unknown_command_family() -> None:
             "confidence": 1.0,
         }
     )
-    with pytest.raises(ValidationError):
+    with pytest.raises(AIProviderError) as error:
         await IntentInterpreter(gateway).interpret(
             message="do something unsafe",
             context={},
             invocation_context=AIInvocationContext(),
         )
+    assert error.value.category == "invalid_provider_response"
 
 
 def test_worker_command_intent_contains_all_f31_13_families() -> None:
@@ -144,7 +151,9 @@ def test_worker_command_intent_contains_all_f31_13_families() -> None:
         "failure.explain",
         "work.execute_now",
         "integration.require",
+        "integration.execute",
         "attachment.analyze",
+        "web.research",
         "conversation.answer",
     }
     assert set(family_schema["enum"]) == expected

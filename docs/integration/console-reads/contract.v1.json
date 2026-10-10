@@ -1,0 +1,1682 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://audoryn.local/contracts/console-reads/v1",
+  "title": "AgentGate to Console private reads, contract v1",
+  "description": "Signed read-only GET responses served by AgentGate under /internal/console/v1/. Data shapes use snake_case and match Audoryn-Console backend/app/domain/audoryn/catalog.py and snapshot.py. See docs/integration/console-admin-reads-plan.md.",
+  "x-operations": {
+    "health": {
+      "path": "/internal/console/v1/health",
+      "scope": "observability.read",
+      "data": "#/$defs/data_health"
+    },
+    "snapshot": {
+      "path": "/internal/console/v1/snapshot",
+      "scope": "visibility.read",
+      "data": "#/$defs/data_snapshot"
+    },
+    "overview": {
+      "path": "/internal/console/v1/overview",
+      "scope": "visibility.read",
+      "data": "#/$defs/data_overview"
+    },
+    "users": {
+      "path": "/internal/console/v1/users",
+      "scope": "visibility.read",
+      "data": "#/$defs/data_users",
+      "parameters": [
+        "query",
+        "email",
+        "registered_from",
+        "registered_to",
+        "limit",
+        "offset"
+      ]
+    },
+    "user": {
+      "path": "/internal/console/v1/user",
+      "scope": "visibility.read",
+      "data": "#/$defs/data_user",
+      "parameters": [
+        "user_id"
+      ]
+    },
+    "organizations": {
+      "path": "/internal/console/v1/organizations",
+      "scope": "visibility.read",
+      "data": "#/$defs/data_organizations",
+      "parameters": [
+        "query",
+        "limit",
+        "offset"
+      ]
+    },
+    "organization": {
+      "path": "/internal/console/v1/organization",
+      "scope": "visibility.read",
+      "data": "#/$defs/data_organization",
+      "parameters": [
+        "organization_id"
+      ]
+    },
+    "operations": {
+      "path": "/internal/console/v1/operations",
+      "scope": "observability.read",
+      "data": "#/$defs/data_operations"
+    },
+    "queues": {
+      "path": "/internal/console/v1/queues",
+      "scope": "observability.read",
+      "data": "#/$defs/data_queues",
+      "parameters": [
+        "limit"
+      ]
+    },
+    "usage": {
+      "path": "/internal/console/v1/usage",
+      "scope": "observability.read",
+      "data": "#/$defs/data_usage",
+      "parameters": [
+        "days"
+      ]
+    },
+    "ai-usage": {
+      "path": "/internal/console/v1/ai-usage",
+      "scope": "observability.read",
+      "data": "#/$defs/data_ai_usage",
+      "parameters": [
+        "days",
+        "limit"
+      ]
+    },
+    "security": {
+      "path": "/internal/console/v1/security",
+      "scope": "security.read",
+      "data": "#/$defs/data_security",
+      "parameters": [
+        "limit"
+      ]
+    },
+    "notifications": {
+      "path": "/internal/console/v1/notifications",
+      "scope": "notifications.read",
+      "data": "#/$defs/data_notifications",
+      "parameters": [
+        "limit"
+      ]
+    },
+    "search": {
+      "path": "/internal/console/v1/search",
+      "scope": "visibility.read",
+      "data": "#/$defs/data_search",
+      "parameters": [
+        "query",
+        "limit_per_type"
+      ]
+    },
+    "support-user": {
+      "path": "/internal/console/v1/support-user",
+      "scope": "visibility.read",
+      "data": "#/$defs/data_support_user",
+      "parameters": [
+        "user_id"
+      ]
+    },
+    "support-organization": {
+      "path": "/internal/console/v1/support-organization",
+      "scope": "visibility.read",
+      "data": "#/$defs/data_support_organization",
+      "parameters": [
+        "organization_id"
+      ]
+    }
+  },
+  "x-limits": {
+    "maxObjectKeys": 100,
+    "maxListItems": 200,
+    "maxStringLength": 8192,
+    "maxDepth": 16,
+    "maxResponseBytes": 1048576,
+    "forbiddenKeys": [
+      "password",
+      "secret",
+      "token",
+      "access_token",
+      "refresh_token",
+      "authorization",
+      "prompt",
+      "messages",
+      "credentials",
+      "private_key"
+    ]
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "short_text": {
+      "type": "string",
+      "maxLength": 8192
+    },
+    "nullable_text": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 8192
+    },
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "operation",
+        "requestTarget",
+        "requestId",
+        "observedAt",
+        "data"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "operation": {
+          "enum": [
+            "health",
+            "snapshot",
+            "overview",
+            "users",
+            "user",
+            "organizations",
+            "organization",
+            "operations",
+            "queues",
+            "usage",
+            "ai-usage",
+            "security",
+            "notifications",
+            "search",
+            "support-user",
+            "support-organization"
+          ]
+        },
+        "requestTarget": {
+          "type": "string",
+          "pattern": "^/internal/console/v1/[a-z-]+(\\?[!-~]*)?$",
+          "maxLength": 2048
+        },
+        "requestId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+        },
+        "observedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "data": {}
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "error"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "code",
+            "message"
+          ],
+          "properties": {
+            "code": {
+              "enum": [
+                "not_found",
+                "unauthorized",
+                "invalid_parameters",
+                "rate_limited",
+                "unavailable",
+                "timeout"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        }
+      }
+    },
+    "data_health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compatible"
+      ],
+      "properties": {
+        "compatible": {
+          "const": true
+        }
+      }
+    },
+    "data_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "human_identities",
+        "organizations"
+      ],
+      "properties": {
+        "human_identities": {
+          "$ref": "#/$defs/count"
+        },
+        "organizations": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "data_overview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_users",
+        "active_users_30d",
+        "users_with_memberships",
+        "organizations",
+        "active_organizations_30d",
+        "workers",
+        "runs_30d",
+        "failed_runs_30d",
+        "new_registrations_30d",
+        "integrations",
+        "open_incidents",
+        "unresolved_queue_failures",
+        "agentgate_migration_heads"
+      ],
+      "properties": {
+        "total_users": {
+          "$ref": "#/$defs/count"
+        },
+        "active_users_30d": {
+          "$ref": "#/$defs/count"
+        },
+        "users_with_memberships": {
+          "$ref": "#/$defs/count"
+        },
+        "organizations": {
+          "$ref": "#/$defs/count"
+        },
+        "active_organizations_30d": {
+          "$ref": "#/$defs/count"
+        },
+        "workers": {
+          "$ref": "#/$defs/count"
+        },
+        "runs_30d": {
+          "$ref": "#/$defs/count"
+        },
+        "failed_runs_30d": {
+          "$ref": "#/$defs/count"
+        },
+        "new_registrations_30d": {
+          "$ref": "#/$defs/count"
+        },
+        "integrations": {
+          "$ref": "#/$defs/count"
+        },
+        "open_incidents": {
+          "$ref": "#/$defs/count"
+        },
+        "unresolved_queue_failures": {
+          "$ref": "#/$defs/count"
+        },
+        "agentgate_migration_heads": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          }
+        }
+      }
+    },
+    "user_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "subject",
+        "email",
+        "display_name",
+        "created_at",
+        "updated_at",
+        "organization_count",
+        "membership_roles"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "subject": {
+          "type": "string",
+          "maxLength": 320
+        },
+        "email": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 320
+        },
+        "display_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 320
+        },
+        "created_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "updated_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "organization_count": {
+          "$ref": "#/$defs/count"
+        },
+        "membership_roles": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          }
+        }
+      }
+    },
+    "data_users": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/user_item"
+          }
+        },
+        {
+          "$ref": "#/$defs/count"
+        }
+      ]
+    },
+    "data_user": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "user",
+            "memberships",
+            "activity",
+            "local_password_configured"
+          ],
+          "properties": {
+            "user": {
+              "$ref": "#/$defs/user_item"
+            },
+            "memberships": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "organization_id",
+                  "organization_name",
+                  "role",
+                  "joined_at"
+                ],
+                "properties": {
+                  "organization_id": {
+                    "$ref": "#/$defs/uuid"
+                  },
+                  "organization_name": {
+                    "type": "string",
+                    "maxLength": 320
+                  },
+                  "role": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "joined_at": {
+                    "$ref": "#/$defs/timestamp"
+                  }
+                }
+              }
+            },
+            "activity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "organizations_created_30d",
+                "conversations_started_30d",
+                "result_exports_30d",
+                "approval_decisions_30d",
+                "last_activity_at"
+              ],
+              "properties": {
+                "organizations_created_30d": {
+                  "$ref": "#/$defs/count"
+                },
+                "conversations_started_30d": {
+                  "$ref": "#/$defs/count"
+                },
+                "result_exports_30d": {
+                  "$ref": "#/$defs/count"
+                },
+                "approval_decisions_30d": {
+                  "$ref": "#/$defs/count"
+                },
+                "last_activity_at": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/$defs/timestamp"
+                    }
+                  ]
+                }
+              }
+            },
+            "local_password_configured": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "organization_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "created_by",
+        "created_at",
+        "updated_at",
+        "member_count",
+        "worker_count",
+        "job_count",
+        "runs_30d"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 320
+        },
+        "created_by": {
+          "$ref": "#/$defs/uuid"
+        },
+        "created_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "updated_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "member_count": {
+          "$ref": "#/$defs/count"
+        },
+        "worker_count": {
+          "$ref": "#/$defs/count"
+        },
+        "job_count": {
+          "$ref": "#/$defs/count"
+        },
+        "runs_30d": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "data_organizations": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/organization_item"
+          }
+        },
+        {
+          "$ref": "#/$defs/count"
+        }
+      ]
+    },
+    "data_organization": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "organization",
+            "members",
+            "workers",
+            "jobs",
+            "integrations",
+            "incidents",
+            "usage",
+            "operational_state",
+            "audit_summary"
+          ],
+          "properties": {
+            "organization": {
+              "$ref": "#/$defs/organization_item"
+            },
+            "members": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "user_id",
+                  "email",
+                  "display_name",
+                  "role",
+                  "joined_at"
+                ],
+                "properties": {
+                  "user_id": {
+                    "$ref": "#/$defs/uuid"
+                  },
+                  "email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 320
+                  },
+                  "display_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 320
+                  },
+                  "role": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "joined_at": {
+                    "$ref": "#/$defs/timestamp"
+                  }
+                }
+              }
+            },
+            "workers": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name",
+                  "department",
+                  "status",
+                  "created_at",
+                  "updated_at"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 320
+                  },
+                  "department": {
+                    "type": "string",
+                    "maxLength": 320
+                  },
+                  "status": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "created_at": {
+                    "$ref": "#/$defs/timestamp"
+                  },
+                  "updated_at": {
+                    "$ref": "#/$defs/timestamp"
+                  }
+                }
+              }
+            },
+            "jobs": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "worker_id",
+                  "name",
+                  "status",
+                  "current_revision",
+                  "created_at",
+                  "updated_at"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/uuid"
+                  },
+                  "worker_id": {
+                    "$ref": "#/$defs/uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 320
+                  },
+                  "status": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "current_revision": {
+                    "$ref": "#/$defs/count"
+                  },
+                  "created_at": {
+                    "$ref": "#/$defs/timestamp"
+                  },
+                  "updated_at": {
+                    "$ref": "#/$defs/timestamp"
+                  }
+                }
+              }
+            },
+            "integrations": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "provider",
+                  "display_name",
+                  "status",
+                  "created_at",
+                  "updated_at"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/uuid"
+                  },
+                  "provider": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "display_name": {
+                    "type": "string",
+                    "maxLength": 320
+                  },
+                  "status": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "created_at": {
+                    "$ref": "#/$defs/timestamp"
+                  },
+                  "updated_at": {
+                    "$ref": "#/$defs/timestamp"
+                  }
+                }
+              }
+            },
+            "incidents": {
+              "type": "array",
+              "maxItems": 50,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "status",
+                  "severity",
+                  "summary",
+                  "created_at",
+                  "updated_at"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/uuid"
+                  },
+                  "status": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "severity": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "summary": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "created_at": {
+                    "$ref": "#/$defs/timestamp"
+                  },
+                  "updated_at": {
+                    "$ref": "#/$defs/timestamp"
+                  }
+                }
+              }
+            },
+            "usage": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "runs_30d",
+                "failed_runs_30d",
+                "ai_invocations_30d"
+              ],
+              "properties": {
+                "runs_30d": {
+                  "$ref": "#/$defs/count"
+                },
+                "failed_runs_30d": {
+                  "$ref": "#/$defs/count"
+                },
+                "ai_invocations_30d": {
+                  "$ref": "#/$defs/count"
+                }
+              }
+            },
+            "operational_state": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "state",
+                "open_incidents",
+                "unresolved_queue_failures",
+                "failed_runs_24h"
+              ],
+              "properties": {
+                "state": {
+                  "enum": [
+                    "healthy",
+                    "degraded",
+                    "attention"
+                  ]
+                },
+                "open_incidents": {
+                  "$ref": "#/$defs/count"
+                },
+                "unresolved_queue_failures": {
+                  "$ref": "#/$defs/count"
+                },
+                "failed_runs_24h": {
+                  "$ref": "#/$defs/count"
+                }
+              }
+            },
+            "audit_summary": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "events_30d",
+                "high_or_critical_30d"
+              ],
+              "properties": {
+                "events_30d": {
+                  "$ref": "#/$defs/count"
+                },
+                "high_or_critical_30d": {
+                  "$ref": "#/$defs/count"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "data_operations": {
+      "description": "camelCase: checked key-for-key by Console's SeparatedObservabilityRepository.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "openIncidents",
+        "criticalIncidents",
+        "unresolvedQueueFailures",
+        "failedRuns24h",
+        "queuedWorkItems",
+        "unpublishedOutbox",
+        "recentIncidents"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "healthy",
+            "degraded",
+            "critical"
+          ]
+        },
+        "openIncidents": {
+          "$ref": "#/$defs/count"
+        },
+        "criticalIncidents": {
+          "$ref": "#/$defs/count"
+        },
+        "unresolvedQueueFailures": {
+          "$ref": "#/$defs/count"
+        },
+        "failedRuns24h": {
+          "$ref": "#/$defs/count"
+        },
+        "queuedWorkItems": {
+          "$ref": "#/$defs/count"
+        },
+        "unpublishedOutbox": {
+          "$ref": "#/$defs/count"
+        },
+        "recentIncidents": {
+          "type": "array",
+          "maxItems": 25,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "organizationId",
+              "status",
+              "severity",
+              "summary",
+              "createdAt",
+              "updatedAt"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/uuid"
+              },
+              "organizationId": {
+                "$ref": "#/$defs/uuid"
+              },
+              "status": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "severity": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "summary": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "createdAt": {
+                "$ref": "#/$defs/timestamp"
+              },
+              "updatedAt": {
+                "$ref": "#/$defs/timestamp"
+              }
+            }
+          }
+        }
+      }
+    },
+    "data_queues": {
+      "description": "Work-item counts by lower-cased status and the newest delivery failures. failure_payload is never included; destinationUrl has no user info, query or fragment.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audorynWorkItems",
+        "deliveryFailures"
+      ],
+      "properties": {
+        "audorynWorkItems": {
+          "type": "object",
+          "maxProperties": 50,
+          "additionalProperties": {
+            "$ref": "#/$defs/count"
+          }
+        },
+        "deliveryFailures": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "organizationId",
+              "sourceMessageId",
+              "dlqId",
+              "statusCode",
+              "retried",
+              "maxRetries",
+              "destinationUrl",
+              "resolvedAt",
+              "createdAt"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/uuid"
+              },
+              "organizationId": {
+                "$ref": "#/$defs/uuid"
+              },
+              "sourceMessageId": {
+                "type": "string",
+                "maxLength": 180
+              },
+              "dlqId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 180
+              },
+              "statusCode": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "retried": {
+                "$ref": "#/$defs/count"
+              },
+              "maxRetries": {
+                "$ref": "#/$defs/count"
+              },
+              "destinationUrl": {
+                "type": "string",
+                "maxLength": 2048,
+                "pattern": "^([a-z][a-z0-9+.-]*://[^/?#@]+[^?#@]*)?$"
+              },
+              "resolvedAt": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/$defs/timestamp"
+                  }
+                ]
+              },
+              "createdAt": {
+                "$ref": "#/$defs/timestamp"
+              }
+            }
+          }
+        }
+      }
+    },
+    "data_usage": {
+      "description": "windowDays equals the requested days. daily has one zero-filled entry per UTC day, oldest first. Console adds its own cmsPublications and paymentFailures.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "windowDays",
+        "metrics",
+        "daily"
+      ],
+      "properties": {
+        "windowDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "newUsers",
+            "organizations",
+            "activeOrganizations",
+            "workersCreated",
+            "runs",
+            "aiInvocations",
+            "integrations"
+          ],
+          "properties": {
+            "newUsers": {
+              "$ref": "#/$defs/count"
+            },
+            "organizations": {
+              "$ref": "#/$defs/count"
+            },
+            "activeOrganizations": {
+              "$ref": "#/$defs/count"
+            },
+            "workersCreated": {
+              "$ref": "#/$defs/count"
+            },
+            "runs": {
+              "$ref": "#/$defs/count"
+            },
+            "aiInvocations": {
+              "$ref": "#/$defs/count"
+            },
+            "integrations": {
+              "$ref": "#/$defs/count"
+            }
+          }
+        },
+        "daily": {
+          "type": "array",
+          "maxItems": 90,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "day",
+              "newUsers",
+              "runs",
+              "aiInvocations"
+            ],
+            "properties": {
+              "day": {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+              },
+              "newUsers": {
+                "$ref": "#/$defs/count"
+              },
+              "runs": {
+                "$ref": "#/$defs/count"
+              },
+              "aiInvocations": {
+                "$ref": "#/$defs/count"
+              }
+            }
+          }
+        }
+      }
+    },
+    "data_ai_usage": {
+      "description": "Aggregates only; no prompts, responses or per-call records. Token counts read only numeric JSON values. Cost is always unavailable.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "windowDays",
+        "summary",
+        "models",
+        "organizations",
+        "workers",
+        "daily"
+      ],
+      "properties": {
+        "windowDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "invocations",
+            "successes",
+            "failures",
+            "averageLatencyMs",
+            "promptTokens",
+            "completionTokens",
+            "totalTokens",
+            "estimatedCost",
+            "costAvailable",
+            "costNote"
+          ],
+          "properties": {
+            "invocations": {
+              "$ref": "#/$defs/count"
+            },
+            "successes": {
+              "$ref": "#/$defs/count"
+            },
+            "failures": {
+              "$ref": "#/$defs/count"
+            },
+            "averageLatencyMs": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "promptTokens": {
+              "$ref": "#/$defs/count"
+            },
+            "completionTokens": {
+              "$ref": "#/$defs/count"
+            },
+            "totalTokens": {
+              "$ref": "#/$defs/count"
+            },
+            "estimatedCost": {
+              "type": "null"
+            },
+            "costAvailable": {
+              "const": false
+            },
+            "costNote": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        },
+        "models": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "provider",
+              "model",
+              "role",
+              "invocations",
+              "successes",
+              "averageLatencyMs",
+              "totalTokens"
+            ],
+            "properties": {
+              "provider": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "model": {
+                "type": "string",
+                "maxLength": 255
+              },
+              "role": {
+                "type": "string",
+                "maxLength": 32
+              },
+              "invocations": {
+                "$ref": "#/$defs/count"
+              },
+              "successes": {
+                "$ref": "#/$defs/count"
+              },
+              "averageLatencyMs": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "totalTokens": {
+                "$ref": "#/$defs/count"
+              }
+            }
+          }
+        },
+        "organizations": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "organizationId",
+              "invocations",
+              "successes",
+              "totalTokens"
+            ],
+            "properties": {
+              "organizationId": {
+                "$ref": "#/$defs/uuid"
+              },
+              "invocations": {
+                "$ref": "#/$defs/count"
+              },
+              "successes": {
+                "$ref": "#/$defs/count"
+              },
+              "totalTokens": {
+                "$ref": "#/$defs/count"
+              }
+            }
+          }
+        },
+        "workers": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "workerId",
+              "invocations",
+              "successes",
+              "totalTokens"
+            ],
+            "properties": {
+              "workerId": {
+                "$ref": "#/$defs/uuid"
+              },
+              "invocations": {
+                "$ref": "#/$defs/count"
+              },
+              "successes": {
+                "$ref": "#/$defs/count"
+              },
+              "totalTokens": {
+                "$ref": "#/$defs/count"
+              }
+            }
+          }
+        },
+        "daily": {
+          "type": "array",
+          "maxItems": 91,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "day",
+              "invocations",
+              "successes",
+              "totalTokens"
+            ],
+            "properties": {
+              "day": {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+              },
+              "invocations": {
+                "$ref": "#/$defs/count"
+              },
+              "successes": {
+                "$ref": "#/$defs/count"
+              },
+              "totalTokens": {
+                "$ref": "#/$defs/count"
+              }
+            }
+          }
+        }
+      }
+    },
+    "data_security": {
+      "description": "Audit events with high/critical severity or a security/auth category, newest first. actor, resource and payload are never included.",
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "organizationId",
+          "eventType",
+          "category",
+          "severity",
+          "correlationId",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/uuid"
+          },
+          "organizationId": {
+            "$ref": "#/$defs/uuid"
+          },
+          "eventType": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "category": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "severity": {
+            "type": "string",
+            "maxLength": 24
+          },
+          "correlationId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          },
+          "createdAt": {
+            "$ref": "#/$defs/timestamp"
+          }
+        }
+      }
+    },
+    "data_notifications": {
+      "description": "Matches Console's ProductNotification model exactly.",
+      "type": "array",
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "severity",
+          "title",
+          "body",
+          "href",
+          "fingerprint"
+        ],
+        "properties": {
+          "source": {
+            "enum": [
+              "audoryn.incident",
+              "audoryn.queue"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "critical"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "href": {
+            "enum": [
+              "/operations/system-health",
+              "/operations/queues"
+            ]
+          },
+          "fingerprint": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^audoryn-[a-z0-9:-]+$"
+          }
+        }
+      }
+    },
+    "data_search": {
+      "description": "At most limit_per_type users then limit_per_type organisations. href is /users/{id} or /organizations/{id}.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 40,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "id",
+              "title",
+              "subtitle",
+              "href"
+            ],
+            "properties": {
+              "type": {
+                "enum": [
+                  "user",
+                  "organization"
+                ]
+              },
+              "id": {
+                "$ref": "#/$defs/uuid"
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 320
+              },
+              "subtitle": {
+                "type": "string",
+                "maxLength": 320
+              },
+              "href": {
+                "type": "string",
+                "pattern": "^/(users|organizations)/[0-9a-f-]{36}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "data_support_user": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "description": "AgentGate half only; Console adds administrativeHistory and impersonationAvailable=false.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "identity",
+            "memberships"
+          ],
+          "properties": {
+            "identity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "subject",
+                "email",
+                "displayName",
+                "createdAt",
+                "updatedAt"
+              ],
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/uuid"
+                },
+                "subject": {
+                  "type": "string",
+                  "maxLength": 320
+                },
+                "email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 320
+                },
+                "displayName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 320
+                },
+                "createdAt": {
+                  "$ref": "#/$defs/timestamp"
+                },
+                "updatedAt": {
+                  "$ref": "#/$defs/timestamp"
+                }
+              }
+            },
+            "memberships": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "organizationId",
+                  "organizationName",
+                  "role",
+                  "joinedAt"
+                ],
+                "properties": {
+                  "organizationId": {
+                    "$ref": "#/$defs/uuid"
+                  },
+                  "organizationName": {
+                    "type": "string",
+                    "maxLength": 320
+                  },
+                  "role": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "joinedAt": {
+                    "$ref": "#/$defs/timestamp"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "data_support_organization": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "description": "AgentGate half only; Console adds billing, administrativeHistory and impersonationAvailable=false.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "organization",
+            "state",
+            "incidents"
+          ],
+          "properties": {
+            "organization": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "createdAt",
+                "updatedAt"
+              ],
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "maxLength": 320
+                },
+                "createdAt": {
+                  "$ref": "#/$defs/timestamp"
+                },
+                "updatedAt": {
+                  "$ref": "#/$defs/timestamp"
+                }
+              }
+            },
+            "state": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "members",
+                "workers",
+                "runs30d",
+                "failedRuns30d",
+                "openIncidents",
+                "queueFailures"
+              ],
+              "properties": {
+                "members": {
+                  "$ref": "#/$defs/count"
+                },
+                "workers": {
+                  "$ref": "#/$defs/count"
+                },
+                "runs30d": {
+                  "$ref": "#/$defs/count"
+                },
+                "failedRuns30d": {
+                  "$ref": "#/$defs/count"
+                },
+                "openIncidents": {
+                  "$ref": "#/$defs/count"
+                },
+                "queueFailures": {
+                  "$ref": "#/$defs/count"
+                }
+              }
+            },
+            "incidents": {
+              "type": "array",
+              "maxItems": 25,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "status",
+                  "severity",
+                  "summary",
+                  "createdAt"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/uuid"
+                  },
+                  "status": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "severity": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "summary": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "createdAt": {
+                    "$ref": "#/$defs/timestamp"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

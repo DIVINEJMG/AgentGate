@@ -42,7 +42,9 @@ WorkerCommandFamily = Literal[
     "failure.explain",
     "work.execute_now",
     "integration.require",
+    "integration.execute",
     "attachment.analyze",
+    "web.research",
     "conversation.answer",
 ]
 

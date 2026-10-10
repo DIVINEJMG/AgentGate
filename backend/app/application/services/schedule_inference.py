@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import logging
+import sys
+import zoneinfo
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from importlib.util import find_spec
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.domain.workforce.drafts import ScheduleDraft
 
+_logger = logging.getLogger(__name__)
 _WEEKDAYS = {
     "monday",
     "tuesday",
@@ -28,8 +33,27 @@ class CompiledSchedule:
 def _validate_timezone(value: str) -> str:
     try:
         ZoneInfo(value)
-    except ZoneInfoNotFoundError as exc:
-        raise ValueError(f"Unknown schedule timezone: {value}.") from exc
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        # Probe separately so an absent Windows timezone database is not reported
+        # as an invalid model-selected name. Do not log the worker draft or secrets.
+        try:
+            ZoneInfo("UTC")
+            utc_available = True
+        except (ZoneInfoNotFoundError, ValueError):
+            utc_available = False
+        _logger.exception(
+            "schedule_timezone_lookup_failed value=%s codepoints=%s python=%r "
+            "tzpath=%r tzdata_available=%s utc_available=%s",
+            ascii(value), " ".join(f"U+{ord(char):04X}" for char in value),
+            sys.executable, zoneinfo.TZPATH, find_spec("tzdata") is not None,
+            utc_available,
+        )
+        if not utc_available:
+            raise ValueError(
+                f"Backend timezone data is unavailable (requested {value!a}). "
+                "Install tzdata for the backend Python runtime; see its timezone diagnostic."
+            ) from exc
+        raise ValueError(f"Unknown schedule timezone: {value!a}. See the backend timezone diagnostic.") from exc
     return value
 
 

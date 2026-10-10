@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "operation": "operations",
+  "requestTarget": "/internal/console/v1/operations",
+  "requestId": "example-operations",
+  "observedAt": "2026-10-10T12:00:00+00:00",
+  "data": {
+    "state": "degraded",
+    "openIncidents": 1,
+    "criticalIncidents": 0,
+    "unresolvedQueueFailures": 1,
+    "failedRuns24h": 2,
+    "queuedWorkItems": 3,
+    "unpublishedOutbox": 0,
+    "recentIncidents": [
+      {
+        "id": "e7f8a9b0-c1d2-4e3f-8a4b-5c6d7e8f9a0b",
+        "organizationId": "0b9c8d7e-6f5a-4b3c-8d2e-1f0a9b8c7d6e",
+        "status": "open",
+        "severity": "medium",
+        "summary": "Example incident",
+        "createdAt": "2026-10-09T15:30:00+00:00",
+        "updatedAt": "2026-10-09T15:30:00+00:00"
+      }
+    ]
+  }
+}

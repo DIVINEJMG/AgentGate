@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/public", "src/components/ScrollControl.tsx", "src/vite-env.d.ts"]
+}

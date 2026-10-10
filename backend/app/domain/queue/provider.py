@@ -19,6 +19,8 @@ class QueueProvider(Protocol):
         timeout_seconds: int = 15,
         failure_callback: str | None = None,
         delay_seconds: int | None = None,
+        flow_control_key: str | None = None,
+        parallelism: int | None = None,
     ) -> QueueMessage: ...
 
     async def schedule(

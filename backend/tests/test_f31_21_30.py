@@ -871,6 +871,27 @@ def test_managed_worker_creation_uses_standing_authority_for_granted_scopes() ->
     assert 'policy.status = "disabled"' in source
 
 
+def test_managed_authority_preserves_only_recorded_standing_grants() -> None:
+    from app.api.jobs_routes import _standing_scopes_from_managed_allow_revision
+
+    selectors = {
+        "scopes": ["browser.element.press_key", "browser.page.read"],
+        "_meta": {
+            "standingApproval": True,
+            "standingApprovalScopes": ["browser.element.press_key"],
+        },
+    }
+    assert _standing_scopes_from_managed_allow_revision(selectors) == {
+        "browser.element.press_key"
+    }
+    assert _standing_scopes_from_managed_allow_revision({
+        **selectors, "_meta": {"standingApproval": False}
+    }) == set()
+    assert _standing_scopes_from_managed_allow_revision({
+        **selectors, "_meta": {"standingApproval": True}
+    }) == {"browser.element.press_key", "browser.page.read"}
+
+
 def test_retry_refreshes_managed_standing_authority() -> None:
     from app.api import runtime_result_routes
 

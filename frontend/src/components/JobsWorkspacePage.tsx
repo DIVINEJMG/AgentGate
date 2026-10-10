@@ -1,25 +1,39 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Activity, Archive, ArrowRight, BriefcaseBusiness, CheckCircle2, ChevronRight, Clock3, Filter, ListTodo, PauseCircle, PlayCircle, Plus, Search, ShieldCheck, Trash2, X } from 'lucide-react';
+import CodingProgress from './CodingProgress';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Archive, ArrowRight, BriefcaseBusiness, CheckCircle2, ListTodo, MoreHorizontal, PauseCircle, Pencil, Play, Plus, Search, Trash2, TriangleAlert } from 'lucide-react';
 import type { AgentCapabilityProfile } from '../lib/capabilityApi';
+import { approvalExplanation, decideApproval, listApprovals, type ApprovalRecord } from '../lib/approvalApi';
+import type { OrganizationAccess } from '../lib/identityApi';
 import type { JobsWorkspace, Job, WorkItem, JobStatus } from '../lib/jobsApi';
+import type { ApiVersion } from '../lib/systemApi';
 import type { ManagedWorker } from '../lib/workforceApi';
+import { subscribeOrganizationRealtime } from '../platform/realtimeClient';
 import { filterJobs } from './workspaceListModel';
+import { IntegrationResumeControl } from './IntegrationTaskControls';
+import { linkProps, navigate, queryParam, useRoute } from '../workspace/routes';
+import { Ago, Avatar, EmptyState, Notice, PageHeader, Pills, Sheet, SkeletonLines, State, sentence } from '../workspace/ui';
+import { notify } from '../workspace/feedback';
+import { usePageTitle } from '../workspace/history';
 
 export type JobsScene = 'jobs' | 'queue' | 'triggers' | 'runtime';
 
-function displayDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+function queueLabel(item: WorkItem) {
+  if (item.status === 'waiting_reconnect') return 'Waiting for reconnection';
+  if (item.status === 'uncertain_outcome') return 'Outcome uncertain';
+  if (item.status === 'partial_completion') return 'Partially completed';
+  if (item.status === 'waiting_approval') return 'Waiting for approval';
+  if (item.status === 'queued' && item.queueState === 'waiting_browser_capacity') return 'Waiting for browser capacity';
+  if (item.status === 'queued' && item.queueState === 'retrying') return 'Retrying';
+  if (item.status === 'queued' || item.status === 'admitted') return 'Queued';
+  if (item.status === 'running' || item.status === 'claimed') return 'Running';
+  return sentence(item.status);
 }
+const queueTone = (item: WorkItem) => item.status === 'completed' ? 'ok' : ['failed', 'policy_denied'].includes(item.status) ? 'danger' : item.status.startsWith('waiting') || item.status === 'uncertain_outcome' ? 'warn' : ['running', 'claimed'].includes(item.status) ? 'info' : 'neutral';
+const PRIORITY_LABEL: Record<string, string> = { low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent' };
 
-const sections: Array<{ id: JobsScene; label: string; description: string; icon: typeof BriefcaseBusiness }> = [
-  { id: 'jobs', label: 'Definitions', description: 'What workers own', icon: BriefcaseBusiness },
-  { id: 'queue', label: 'Work queue', description: 'What is moving', icon: ListTodo },
-  { id: 'triggers', label: 'Automation', description: 'When work starts', icon: Clock3 },
-  { id: 'runtime', label: 'Run history', description: 'How work executed', icon: Activity },
-];
-
-export default function JobsWorkspacePage({ data, workers, selected, profile, missing, ready, loading, saving, canManage, canRun, scene, onSceneChange, onSelect, onCreate, onEdit, onStatus, onRun, onDelete, onCancel, onRetry, onProcess, onClearQueue, automation, runs }: {
+export default function JobsWorkspacePage({ organization, apiVersion, data, workers, selected, profile, missing, ready, loading, saving, canManage, canRun, onSceneChange, onSelect, onCreate, onEdit, onStatus, onRun, onDelete, onCancel, onRetry, onProcess, onClearQueue, onApprovalDecided, automation }: {
+  organization: OrganizationAccess;
+  apiVersion: ApiVersion;
   data: JobsWorkspace;
   workers: ManagedWorker[];
   selected: Job | null;
@@ -42,70 +56,182 @@ export default function JobsWorkspacePage({ data, workers, selected, profile, mi
   onRetry: (item: WorkItem) => void;
   onProcess: (item: WorkItem) => void;
   onClearQueue: () => void;
+  onApprovalDecided: () => void;
   automation: ReactNode;
-  runs: ReactNode;
+  runs?: ReactNode;
 }) {
+  const route = useRoute();
+  usePageTitle(selected?.name);
+  const routeJobId = route.page === 'jobs' ? route.jobId : undefined;
+  const view = (['queue', 'automation'].includes(queryParam('view')) ? queryParam('view') : 'jobs') as 'jobs' | 'queue' | 'automation';
   const [search, setSearch] = useState('');
   const [stateFilter, setStateFilter] = useState<'all' | JobStatus>('all');
   const [queueFilter, setQueueFilter] = useState<'all' | 'waiting' | 'running' | 'finished'>('all');
-  const inspectorRef = useRef<HTMLElement>(null);
+  const [approvals, setApprovals] = useState<ApprovalRecord[]>([]);
+  const [approvalBusy, setApprovalBusy] = useState<string | null>(null);
+  const [menu, setMenu] = useState(false);
   const workerMap = useMemo(() => new Map(workers.map((worker) => [worker.id, worker])), [workers]);
   const activeWorkers = workers.some((worker) => worker.status !== 'archived');
   const visibleJobs = filterJobs(data.jobs, new Map(workers.map((worker) => [worker.id, worker.name])), search, stateFilter);
   const groupedJobs = workers.map((worker) => ({ worker, jobs: visibleJobs.filter((job) => job.workerId === worker.id) })).filter((group) => group.jobs.length);
   const unassignedJobs = visibleJobs.filter((job) => !workerMap.has(job.workerId));
   const selectedWorker = selected ? workerMap.get(selected.workerId) : null;
-  const history = selected ? data.workItems.filter((item) => item.jobId === selected.id).slice(0, 5) : [];
+  const history = selected ? data.workItems.filter((item) => item.jobId === selected.id).slice(0, 6) : [];
   const dispatchBlocked = !['ok', 'queued'].includes(data.dispatch.state);
-  const queued = data.workItems.filter((item) => item.status === 'queued' || item.status.startsWith('waiting_'));
-  const inMotion = data.workItems.filter((item) => item.status === 'running' || item.status === 'claimed');
-  const finished = data.workItems.filter((item) => ['completed', 'failed', 'cancelled'].includes(item.status));
+  const queued = data.workItems.filter((item) => item.status === 'queued' || item.status === 'uncertain_outcome' || item.status.startsWith('waiting_'));
+  const inMotion = data.workItems.filter((item) => item.status === 'running' || item.status === 'claimed' || item.status === 'admitted');
+  const finished = data.workItems.filter((item) => ['completed', 'failed', 'cancelled', 'partial_completion', 'policy_denied'].includes(item.status));
   const queueRows = queueFilter === 'waiting' ? queued : queueFilter === 'running' ? inMotion : queueFilter === 'finished' ? finished : data.workItems;
+  const count = (status: JobStatus) => data.jobs.filter((job) => job.status === status).length;
+
+  // The URL owns the selected job and the section, so both survive refresh and can be shared.
+  useEffect(() => { onSceneChange(view === 'automation' ? 'triggers' : view); }, [view]);
+  useEffect(() => {
+    if (loading) return;
+    const job = routeJobId ? data.jobs.find((item) => item.id === routeJobId) ?? null : null;
+    if ((job?.id ?? null) !== (selected?.id ?? null)) onSelect(job);
+  }, [loading, routeJobId, data.jobs]);
+  useEffect(() => { setMenu(false); }, [selected?.id]);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (event: PointerEvent) => { if (!(event.target as Element).closest('[data-ws-menu]')) setMenu(false); };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [menu]);
 
   useEffect(() => {
-    if (!selected || scene !== 'jobs') return;
-    const frame = requestAnimationFrame(() => inspectorRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
-    return () => cancelAnimationFrame(frame);
-  }, [selected?.id, scene]);
+    if (!organization.permissions.includes('approvals.review')) return;
+    let active = true;
+    const refresh = () => { void listApprovals(apiVersion, organization.id).then((items) => { if (active) setApprovals(items.filter((item) => item.status === 'pending')); }).catch(() => { if (active) setApprovals([]); }); };
+    refresh();
+    const unsubscribe = subscribeOrganizationRealtime({ organizationId: organization.id, eventTypes: ['approval.created', 'approval.decided', 'run.waiting_approval'], onEvent: refresh, poll: refresh });
+    return () => { active = false; unsubscribe(); };
+  }, [apiVersion, organization.id, organization.permissions]);
 
-  return <div className='jobs-command-page'>
-    <header className='jobs-command-heading'>
-      <div><p className='eyebrow'>WORKFORCE / JOBS</p><h1>Jobs</h1><p>Define the work. Watch it enter the queue. Inspect every result of execution.</p></div>
-      {canManage && <button type='button' className='jobs-create-button' disabled={!activeWorkers} onClick={onCreate}><Plus size={16} /> New job</button>}
-    </header>
+  async function decide(record: ApprovalRecord, decision: 'approve' | 'reject') {
+    setApprovalBusy(record.id);
+    try {
+      await decideApproval(apiVersion, organization.id, record.id, decision, 'Decided in the work queue.');
+      setApprovals((current) => current.filter((item) => item.id !== record.id));
+      notify({ key: 'queue-approval', tone: 'ok', title: decision === 'approve' ? 'Approved. The run continues.' : 'Declined. The action will not run.' });
+      onApprovalDecided();
+    } catch (error) {
+      notify({ key: 'queue-approval', tone: 'danger', title: 'The decision was not saved', body: error instanceof Error ? error.message : undefined });
+    } finally { setApprovalBusy(null); }
+  }
 
-    <div className='jobs-flowline' aria-label='Job and queue summary'>
-      <div><span>01 / DEFINED</span><strong>{data.jobSummary.total}</strong><small>Job definitions</small></div>
-      <i aria-hidden='true' />
-      <div><span>02 / ACTIVE</span><strong>{data.jobSummary.active}</strong><small>Ready to receive work</small></div>
-      <i aria-hidden='true' />
-      <div className={queued.length ? 'has-motion' : ''}><span>03 / WAITING</span><strong>{queued.length}</strong><small>Work items in queue</small></div>
-      <i aria-hidden='true' />
-      <div><span>04 / FINISHED</span><strong>{finished.length}</strong><small>In the current window</small></div>
+  const openJob = (job: Job | null) => navigate((job ? linkProps({ page: 'jobs', jobId: job.id }).href : linkProps({ page: 'jobs' }).href) + window.location.search, { keepScroll: true });
+  const jobRow = (job: Job) => <li key={job.id} className='ws-row ws-job-row' aria-current={selected?.id === job.id ? 'true' : undefined}>
+    <span className='ws-priority' data-priority={job.priority} title={`${PRIORITY_LABEL[job.priority]} priority`} aria-label={`${PRIORITY_LABEL[job.priority]} priority`} />
+    <a className='ws-row-main ws-row-link' {...linkProps({ page: 'jobs', jobId: job.id })} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey) return; event.preventDefault(); openJob(job); }}>
+      <strong>{job.name}</strong><small>{job.description || job.objective}</small>
+    </a>
+    <div className='ws-row-meta'><State value={job.status} /><span className='ws-hide-sm ws-mono'>r{job.revision}</span>
+      {canRun && job.status === 'active' && <button type='button' className='ws-button ws-button-sm' disabled={saving} onClick={() => onRun(job)}><Play size={13} />Run</button>}
     </div>
+  </li>;
 
-    <div className='jobs-command-layout'>
-      <nav className='jobs-command-nav' aria-label='Jobs workspace views'>{sections.map((section) => { const Icon = section.icon; return <button key={section.id} type='button' className={scene === section.id ? 'is-current' : ''} aria-current={scene === section.id ? 'page' : undefined} onClick={() => onSceneChange(section.id)}><Icon size={16} /><span><strong>{section.label}</strong><small>{section.description}</small></span>{section.id === 'queue' && queued.length > 0 && <em>{queued.length}</em>}</button>; })}<div className='jobs-command-nav-note'><ShieldCheck size={15} /><span>Every action passes through capability, policy, approval, and audit controls.</span></div></nav>
+  return <div className='ws-page'>
+    <PageHeader title='Jobs' description='What each worker is responsible for, the work waiting in the queue, and when it starts on its own.'
+      actions={canManage && <button type='button' className='ws-button ws-button-primary' disabled={!activeWorkers} onClick={onCreate}><Plus size={15} />New job</button>} />
 
-      <main className='jobs-command-main' key={scene}>
-        {scene === 'jobs' && <>
-          <div className='jobs-scene-heading'><div><span className='jobs-scene-index'>01 / DEFINITIONS</span><h2>Work assigned to your team</h2><p>Jobs are grouped by their worker, with the next action close to each definition.</p></div><span className='jobs-scene-total'>{visibleJobs.length} shown</span></div>
-          <div className='jobs-registry-tools'><label><Search size={16} /><span className='sr-only'>Search jobs</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder='Search jobs or workers' /></label><label><Filter size={15} /><span className='sr-only'>Filter job status</span><select value={stateFilter} onChange={(event) => setStateFilter(event.target.value as 'all' | JobStatus)}><option value='all'>All states</option><option value='active'>Active</option><option value='draft'>Draft</option><option value='paused'>Paused</option><option value='archived'>Archived</option></select></label></div>
-          {loading ? <div className='jobs-command-empty'>Loading jobs…</div> : visibleJobs.length === 0 ? <div className='jobs-command-empty'><BriefcaseBusiness size={27} /><strong>{data.jobs.length ? 'Nothing matches these filters' : 'Define your first job'}</strong><p>{data.jobs.length ? 'Try another search or state.' : 'Give a worker a clear objective and Audoryn will prepare its execution path.'}</p>{!data.jobs.length && canManage && <button type='button' disabled={!activeWorkers} onClick={onCreate}>Create a job <ArrowRight size={15} /></button>}</div> : <div className='jobs-registry'>
-            {groupedJobs.map(({ worker, jobs }) => <section key={worker.id} className='jobs-worker-group'><div className='jobs-worker-group-heading'><span className='jobs-worker-initial'>{worker.name.slice(0, 1).toUpperCase()}</span><div><strong>{worker.name}</strong><small>{worker.department || 'Worker'} · {jobs.length} job{jobs.length === 1 ? '' : 's'}</small></div><ChevronRight size={16} /></div>{jobs.map((job) => <JobLine key={job.id} job={job} selected={selected?.id === job.id} onSelect={() => onSelect(job)} />)}</section>)}
-            {unassignedJobs.length > 0 && <section className='jobs-worker-group'><div className='jobs-worker-group-heading'><span className='jobs-worker-initial'>?</span><div><strong>Unavailable worker</strong><small>{unassignedJobs.length} jobs</small></div></div>{unassignedJobs.map((job) => <JobLine key={job.id} job={job} selected={selected?.id === job.id} onSelect={() => onSelect(job)} />)}</section>}
+    <nav className='ws-tabs' aria-label='Jobs sections'>
+      {([['jobs', 'Jobs', data.jobs.length], ['queue', 'Work queue', queued.length + inMotion.length], ['automation', 'Automation', null]] as const).map(([id, label, value]) =>
+        <a key={id} aria-current={view === id ? 'page' : undefined} href={linkProps({ page: 'jobs' }).href + (id === 'jobs' ? '' : `?view=${id}`)} onClick={(event) => { if (event.metaKey || event.ctrlKey) return; event.preventDefault(); navigate(linkProps({ page: 'jobs' }).href + (id === 'jobs' ? '' : `?view=${id}`)); }}>{label}{value !== null && <span className='ws-tab-count'>{value}</span>}</a>)}
+      <a className='ws-tabs-aside' {...linkProps({ page: 'runs' })}>Run history <ArrowRight size={13} /></a>
+    </nav>
+
+    {view === 'jobs' && <>
+      <div className='ws-toolbar'>
+        <Pills label='Job state' value={stateFilter} onChange={setStateFilter} options={[{ value: 'all', label: 'All', count: data.jobs.length }, { value: 'active', label: 'Active', count: count('active') }, { value: 'draft', label: 'Draft', count: count('draft') }, { value: 'paused', label: 'Paused', count: count('paused') }, { value: 'archived', label: 'Archived', count: count('archived') }]} />
+        <label className='ws-search-field'><Search size={15} aria-hidden='true' /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder='Search jobs or workers' aria-label='Search jobs' /></label>
+      </div>
+      {loading ? <SkeletonLines rows={5} /> : visibleJobs.length === 0
+        ? <EmptyState icon={<BriefcaseBusiness size={18} />} title={data.jobs.length ? 'Nothing matches these filters' : 'Give a worker its first job'} action={!data.jobs.length && canManage ? <button type='button' className='ws-button ws-button-primary' disabled={!activeWorkers} onClick={onCreate}><Plus size={15} />Create a job</button> : undefined}>{data.jobs.length ? 'Try another search or state.' : 'A job is a clear objective a worker owns. Audoryn prepares how it runs and what it may touch.'}</EmptyState>
+        : <div className='ws-day-groups'>
+          {groupedJobs.map(({ worker, jobs }) => <section key={worker.id} className='ws-section' aria-label={`${worker.name} jobs`}>
+            <div className='ws-section-head'><h2><Avatar name={worker.name} seed={worker.id} size={22} />{worker.name}</h2><span className='ws-count'>{jobs.length}</span><p>{worker.department || 'Worker'}</p></div>
+            <ul className='ws-rows'>{jobs.map(jobRow)}</ul>
+          </section>)}
+          {unassignedJobs.length > 0 && <section className='ws-section'><div className='ws-section-head'><h2>Worker unavailable</h2><span className='ws-count'>{unassignedJobs.length}</span></div><ul className='ws-rows'>{unassignedJobs.map(jobRow)}</ul></section>}
+        </div>}
+    </>}
+
+    {view === 'queue' && <>
+      {dispatchBlocked && <Notice tone='warn'>Starting work is delayed. {data.dispatch.detail || 'Queued work stays safe and starts once dispatch recovers.'}</Notice>}
+      <div className='ws-toolbar'>
+        <Pills label='Queue state' value={queueFilter} onChange={setQueueFilter} options={[{ value: 'all', label: 'All', count: data.workItems.length }, { value: 'waiting', label: 'Waiting', count: queued.length }, { value: 'running', label: 'Running', count: inMotion.length }, { value: 'finished', label: 'Finished', count: finished.length }]} />
+        {canRun && data.workItems.length > 0 && <button type='button' className='ws-button ws-button-sm ws-button-quiet ws-danger-text' disabled={saving} onClick={onClearQueue}><Trash2 size={14} />Clear queue</button>}
+      </div>
+      {loading ? <SkeletonLines rows={5} /> : queueRows.length === 0
+        ? <EmptyState icon={<ListTodo size={18} />} title='Nothing in this view'>Scheduled and event-driven jobs add work here automatically.</EmptyState>
+        : <ul className='ws-rows'>{queueRows.map((item) => {
+          const job = data.jobs.find((entry) => entry.id === item.jobId);
+          const worker = workerMap.get(item.workerId);
+          const approval = approvals.find((entry) => entry.runId === item.runId && entry.status === 'pending');
+          const note = item.status === 'waiting_approval' ? (approval ? approvalExplanation(approval) : item.waitingReason || 'Needs an approval before this run can continue.') : item.waitingReason ?? (item.status === 'queued' ? dispatchBlocked ? 'Starting is delayed' : 'Waiting to start' : null);
+          return <li key={item.id} className='ws-row ws-queue-row' data-tone={queueTone(item)}>
+            <Avatar name={worker?.name ?? 'Worker'} seed={item.workerId} size={30} live={['running', 'claimed'].includes(item.status) ? 'working' : item.status.startsWith('waiting') ? 'waiting' : undefined} />
+            <div className='ws-row-main'>
+              <strong>{job?.name ?? item.snapshot.jobName}</strong>
+              <small>{worker?.name ?? 'Unknown worker'} · {PRIORITY_LABEL[item.priority] ?? item.priority} priority · revision {item.jobRevision}{note ? ` · ${note}` : ''}</small>
+              <CodingProgress organizationId={organization.id} version={apiVersion} workItemId={item.id} canCancel={canRun} />
+            </div>
+            <div className='ws-row-meta ws-queue-meta'>
+              <span className='ws-state' data-tone={queueTone(item)}>{queueLabel(item)}</span>
+              <Ago value={item.createdAt} />
+              <div className='ws-queue-actions'>
+                {approval && <><button type='button' className='ws-button ws-button-sm' disabled={approvalBusy === approval.id} onClick={() => void decide(approval, 'reject')}>Decline</button><button type='button' className='ws-button ws-button-sm ws-button-primary' disabled={approvalBusy === approval.id} onClick={() => void decide(approval, 'approve')}>Approve</button></>}
+                {canRun && item.status === 'waiting_reconnect' && <IntegrationResumeControl organizationId={organization.id} version={apiVersion} workItemId={item.id} onDone={onApprovalDecided} />}
+                {item.runId && <a className='ws-button ws-button-sm ws-button-quiet' {...linkProps({ page: 'runs', runId: item.runId })}>Run</a>}
+                {canManage && item.status === 'queued' && <button type='button' className='ws-button ws-button-sm' disabled={saving} onClick={() => onCancel(item)}>Cancel</button>}
+                {canRun && item.status === 'failed' && item.retryCount < 2 && <button type='button' className='ws-button ws-button-sm' disabled={saving} onClick={() => onRetry(item)}>Retry</button>}
+                {canRun && item.status === 'queued' && new Date(item.scheduledAt).getTime() <= Date.now() && <button type='button' className='ws-button ws-button-sm ws-button-quiet' title='Start now instead of waiting for the dispatcher' disabled={saving} onClick={() => onProcess(item)}>Start now</button>}
+              </div>
+            </div>
+          </li>;
+        })}</ul>}
+    </>}
+
+    {view === 'automation' && <section className='ws-section ws-legacy-embed' aria-label='Automation'>
+      <div className='ws-section-head'><h2>When work starts</h2><p>Schedules, events and dependencies that queue work without anyone asking.</p></div>
+      {automation}
+    </section>}
+
+    {(data.window.jobsTruncated || data.window.workItemsTruncated) && <p className='ws-muted'>This view shows the most recent records only.</p>}
+
+    <Sheet open={Boolean(selected)} onClose={() => openJob(null)} wide title={selected?.name ?? ''} subtitle={selected ? <>{selectedWorker?.name ?? 'Worker unavailable'} · {PRIORITY_LABEL[selected.priority]} priority · revision {selected.revision}</> : undefined}
+      footer={selected && <>
+        {canManage && <div className='ws-menu-anchor' data-ws-menu style={{ marginRight: 'auto' }}>
+          <button type='button' className='ws-icon-button' aria-label='More job actions' aria-expanded={menu} onClick={() => setMenu(!menu)}><MoreHorizontal size={16} /></button>
+          {menu && <div className='ws-menu ws-menu-up' role='menu'>
+            {selected.status !== 'archived' && <button type='button' role='menuitem' disabled={saving} onClick={() => onStatus(selected, 'archived')}><Archive size={14} />Archive job</button>}
+            <button type='button' role='menuitem' className='ws-danger-text' disabled={saving} onClick={() => onDelete(selected)}><Trash2 size={14} />Delete job</button>
           </div>}
-          {selected && <section ref={inspectorRef} className='jobs-inspector' key={selected.id} aria-label={`${selected.name} details`}><div className='jobs-inspector-top'><span>JOB DOSSIER / REVISION {selected.revision}</span><button type='button' onClick={() => onSelect(null)} aria-label='Close job details'><X size={17} /></button></div><div className='jobs-inspector-heading'><div><span className={`jobs-state ${selected.status}`}>{selected.status}</span><h2>{selected.name}</h2><p>{selectedWorker?.name ?? 'Unavailable worker'} · {selected.priority} priority</p></div><div className='jobs-inspector-actions'>{canRun && selected.status === 'active' && <button type='button' className='jobs-run-button' disabled={saving} onClick={() => onRun(selected)}><PlayCircle size={15} /> Run now</button>}{canManage && selected.status !== 'archived' && <button type='button' onClick={() => onEdit(selected)}>Edit definition</button>}{canManage && (selected.status === 'draft' || selected.status === 'paused') && <button type='button' disabled={saving} onClick={() => onStatus(selected, 'active')}><PlayCircle size={15} /> {selected.status === 'paused' ? 'Resume' : 'Activate'}</button>}{canManage && selected.status === 'active' && <button type='button' disabled={saving} onClick={() => onStatus(selected, 'paused')}><PauseCircle size={15} /> Pause</button>}</div></div><div className={`jobs-inspector-readiness ${ready ? 'is-ready' : ''}`}><CheckCircle2 size={17} /><div><strong>{ready ? 'Ready to run' : 'Needs setup'}</strong><span>{selectedWorker?.status !== 'active' ? 'Worker must be active.' : profile?.agent.status !== 'active' ? 'Agent identity must be active.' : missing.length ? `Missing active capability: ${missing[0]}` : 'Requirements are checked again before each run.'}</span></div></div><div className='jobs-inspector-body'><div><div className='jobs-inspector-block'><span>OBJECTIVE</span><p>{selected.objective}</p></div><div className='jobs-inspector-block'><span>INSTRUCTIONS</span><p>{selected.instructions || 'No job-specific instructions.'}</p></div><div className='jobs-inspector-block'><span>COMPLETION CRITERIA</span>{selected.completionCriteria.length ? <ul>{selected.completionCriteria.map((item) => <li key={item}>{item}</li>)}</ul> : <p>None specified.</p>}</div></div><div><div className='jobs-inspector-block'><span>REQUIRED CAPABILITIES</span>{selected.requiredCapabilities.length ? <ul>{selected.requiredCapabilities.map((item) => <li key={item}>{item}</li>)}</ul> : <p>No external capability required.</p>}</div><div className='jobs-inspector-block'><span>RESPONSIBILITY LINKS</span>{selected.responsibilityLinks.length ? <ul>{selected.responsibilityLinks.map((item) => <li key={item}>{item}</li>)}</ul> : <p>None linked.</p>}</div><div className='jobs-inspector-block'><span>RECENT WORK</span>{history.length ? history.map((item) => <p key={item.id}><span className={`jobs-state ${item.status}`}>{item.status.replaceAll('_', ' ')}</span> {displayDate(item.createdAt)}</p>) : <p>No work items yet.</p>}</div></div></div><details className='jobs-inspector-danger'><summary>Administrative actions</summary><div>{canManage && selected.status !== 'archived' && <button type='button' disabled={saving} onClick={() => onStatus(selected, 'archived')}><Archive size={14} /> Archive job</button>}{canManage && <button type='button' disabled={saving} onClick={() => onDelete(selected)}><Trash2 size={14} /> Delete job</button>}</div></details></section>}
-        </>}
-        {scene === 'queue' && <><div className='jobs-scene-heading'><div><span className='jobs-scene-index'>02 / WORK QUEUE</span><h2>Work moving through Audoryn</h2><p>Live items are grouped by their current state. Manual processing remains an operator control.</p></div>{canRun && data.workItems.length > 0 && <details className='jobs-queue-management'><summary>Queue actions</summary><button type='button' disabled={saving} onClick={onClearQueue}><Trash2 size={14} /> Clear entire queue</button></details>}</div>{dispatchBlocked && <div className='jobs-dispatch-alert'><ShieldCheck size={16} /><span>Runtime dispatch delayed. {data.dispatch.detail || 'Work remains safely queued.'}</span></div>}<div className='jobs-queue-switch' aria-label='Filter work queue'>{([['all', 'All', data.workItems.length], ['waiting', 'Waiting', queued.length], ['running', 'In motion', inMotion.length], ['finished', 'Finished', finished.length]] as const).map(([id, label, count]) => <button key={id} type='button' className={queueFilter === id ? 'is-active' : ''} onClick={() => setQueueFilter(id)}>{label}<span>{count}</span></button>)}</div>{loading ? <div className='jobs-command-empty'>Loading work queue…</div> : queueRows.length ? <div className='jobs-queue-timeline'>{queueRows.map((item, index) => { const job = data.jobs.find((entry) => entry.id === item.jobId); const worker = workerMap.get(item.workerId); return <article className='jobs-queue-item' key={item.id} style={{ animationDelay: (Math.min(index, 8) * 28) + 'ms' }}><span className={`jobs-queue-node ${item.status}`} /><div className='jobs-queue-item-head'><div><span className={`jobs-state ${item.status}`}>{item.status.replaceAll('_', ' ')}</span><h3>{job?.name ?? item.snapshot.jobName}</h3><p>{worker?.name ?? 'Unknown worker'} · {item.priority} priority · revision {item.jobRevision}</p></div><time>{displayDate(item.createdAt)}</time></div><div className='jobs-queue-item-foot'><span>{item.runId ? `Run ${item.runId.slice(0, 8)}` : item.status === 'queued' ? dispatchBlocked ? 'Dispatch delayed' : 'Waiting for runtime' : `Correlation ${item.correlationId.slice(0, 8)}`}</span><div>{canRun && item.status === 'queued' && <button type='button' disabled={saving} onClick={() => onCancel(item)}>Cancel</button>}{canRun && item.status === 'failed' && item.retryCount < 2 && <button type='button' disabled={saving} onClick={() => onRetry(item)}>Retry</button>}{canRun && item.status === 'queued' && new Date(item.scheduledAt).getTime() <= Date.now() && <details><summary>Advanced</summary><button type='button' disabled={saving} onClick={() => onProcess(item)}>Process now</button></details>}</div></div></article>; })}</div> : <div className='jobs-command-empty'><ListTodo size={26} /><strong>Nothing in this view</strong><p>Scheduled and event-driven jobs add work here automatically.</p></div>}</>}
-        {scene === 'triggers' && <div className='jobs-advanced-scene'><div className='jobs-scene-heading'><div><span className='jobs-scene-index'>03 / AUTOMATION</span><h2>When work begins</h2><p>Inspect schedules, events, and dependency triggers for your jobs.</p></div></div>{automation}</div>}
-        {scene === 'runtime' && <div className='jobs-advanced-scene'><div className='jobs-scene-heading'><div><span className='jobs-scene-index'>04 / RUN HISTORY</span><h2>Execution record</h2><p>Review plans, steps, and outcomes after work enters runtime.</p></div></div>{runs}</div>}
-      </main>
-    </div>
-    {(data.window.jobsTruncated || data.window.workItemsTruncated) && <p className='audit-window-note'>This view is limited to the current bounded read window.</p>}
+        </div>}
+        {canManage && selected.status !== 'archived' && <button type='button' className='ws-button' onClick={() => onEdit(selected)}><Pencil size={14} />Edit</button>}
+        {canManage && (selected.status === 'draft' || selected.status === 'paused') && <button type='button' className='ws-button' disabled={saving} onClick={() => onStatus(selected, 'active')}><Play size={14} />{selected.status === 'paused' ? 'Resume' : 'Activate'}</button>}
+        {canManage && selected.status === 'active' && <button type='button' className='ws-button' disabled={saving} onClick={() => onStatus(selected, 'paused')}><PauseCircle size={14} />Pause</button>}
+        {canRun && selected.status === 'active' && <button type='button' className='ws-button ws-button-primary' disabled={saving} onClick={() => onRun(selected)}><Play size={14} />Run now</button>}
+      </>}>
+      {selected && <div className='ws-job-detail'>
+        <div className='ws-readiness' data-ready={ready ? 'true' : undefined}>{ready ? <CheckCircle2 size={16} /> : <TriangleAlert size={16} />}<div><strong>{ready ? 'Ready to run' : 'Needs setup before it can run'}</strong><span>{selectedWorker?.status !== 'active' ? 'The worker must be active.' : profile?.agent.status !== 'active' ? 'The worker’s agent identity must be active.' : missing.length ? `Missing capability: ${missing[0]}` : 'Requirements are checked again before every run.'}</span></div><State value={selected.status} /></div>
+        <dl className='ws-job-facts'>
+          <div><dt>Objective</dt><dd>{selected.objective}</dd></div>
+          <div><dt>Instructions</dt><dd>{selected.instructions || <span className='ws-muted'>No job-specific instructions.</span>}</dd></div>
+          <div><dt>Done when</dt><dd>{selected.completionCriteria.length ? <ul>{selected.completionCriteria.map((item) => <li key={item}>{item}</li>)}</ul> : <span className='ws-muted'>No criteria set.</span>}</dd></div>
+          <div><dt>Needs access to</dt><dd>{selected.requiredCapabilities.length ? <span className='ws-chip-list'>{selected.requiredCapabilities.map((item) => <code key={item}>{item}</code>)}</span> : <span className='ws-muted'>No external tools.</span>}</dd></div>
+          <div><dt>Responsibilities</dt><dd>{selected.responsibilityLinks.length ? selected.responsibilityLinks.join(', ') : <span className='ws-muted'>None linked.</span>}</dd></div>
+        </dl>
+        <section className='ws-section'>
+          <div className='ws-section-head'><h2>Recent work</h2><span className='ws-count'>{history.length}</span></div>
+          {history.length ? <ul className='ws-rows'>{history.map((item) => <li key={item.id} className='ws-row ws-compact-row'>
+            <span className='ws-state' data-tone={queueTone(item)}>{queueLabel(item)}</span>
+            <span className='ws-row-main'><small>{sentence(item.trigger.type)} · revision {item.jobRevision}</small></span>
+            <div className='ws-row-meta'>{item.runId && <a className='ws-link' {...linkProps({ page: 'runs', runId: item.runId })}>Run</a>}<Ago value={item.createdAt} /></div>
+          </li>)}</ul> : <p className='ws-quiet'>No work has been queued for this job yet.</p>}
+        </section>
+      </div>}
+    </Sheet>
   </div>;
-}
-
-function JobLine({ job, selected, onSelect }: { job: Job; selected: boolean; onSelect: () => void }) {
-  return <button type='button' className={`jobs-definition-line${selected ? ' is-selected' : ''}`} onClick={onSelect}><span className={`jobs-priority-mark ${job.priority}`} /><span className='jobs-definition-copy'><strong>{job.name}</strong><small>{job.description || job.objective}</small></span><span className={`jobs-state ${job.status}`}>{job.status}</span><span className='jobs-definition-revision'>R{job.revision}</span><ArrowRight size={16} /></button>;
 }

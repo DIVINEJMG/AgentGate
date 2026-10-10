@@ -33,6 +33,9 @@ class RedisSessionStore:
         digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
         return f"auth:session:{digest}"
 
+    async def close(self) -> None:
+        await self._redis.aclose()
+
     async def create(self, user_id: UUID) -> str:
         token = secrets.token_urlsafe(32)
         payload = json.dumps({"user_id": str(user_id)}, separators=(",", ":"))

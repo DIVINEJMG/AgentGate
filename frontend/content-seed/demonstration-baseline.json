@@ -1,0 +1,53 @@
+{
+  "disclosure": "Illustrative workspace view · Example data",
+  "organization_label": "NORTHSTAR OPERATIONS",
+  "workers": [
+    {
+      "id": "9680ee3b-08df-53c9-8d50-a3856e3e0ce7",
+      "label": "Research analyst",
+      "summary": "Insights team",
+      "category": "Research",
+      "detail": "Ada M.",
+      "status_label": "Active"
+    },
+    {
+      "id": "43ce2b07-0909-5310-81d6-9bf0dc603229",
+      "label": "Operations coordinator",
+      "summary": "Operations",
+      "category": "Operations",
+      "detail": "Daniel K.",
+      "status_label": "Active"
+    }
+  ],
+  "jobs": [
+    {
+      "id": "c9fbc151-de26-5acd-8378-f264e42b8c86",
+      "label": "Compile weekly research brief",
+      "summary": "Research analyst · Scheduled",
+      "status_label": "Completed"
+    },
+    {
+      "id": "65954641-f216-5227-8619-2aa8f256f2fc",
+      "label": "Review release activity",
+      "summary": "Operations coordinator · Running",
+      "status_label": "Running"
+    },
+    {
+      "id": "aaa0d5ca-2acd-51db-8265-d0840a38b435",
+      "label": "Prepare stakeholder update",
+      "summary": "Operations coordinator · Queued",
+      "status_label": "Queued"
+    }
+  ],
+  "approvals": [
+    {
+      "id": "945865e0-515a-5772-87ce-0af14b943ff1",
+      "label": "Post stakeholder update",
+      "description": "Operations coordinator requested a Slack message. The run is paused while a reviewer checks the request and its context.",
+      "summary": "Operations coordinator",
+      "detail": "Daniel K.",
+      "status_label": "ACTION HELD"
+    }
+  ],
+  "run_steps": []
+}

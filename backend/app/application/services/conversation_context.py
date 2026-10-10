@@ -14,6 +14,7 @@ from app.infrastructure.database.models import (
     Artifact,
     ArtifactAnalysis,
     CapabilityProfile,
+    ConversationCommand,
     ConversationMessage,
     ConversationThread,
     HumanIdentity,
@@ -68,6 +69,7 @@ class ConversationContextAssembler:
         *,
         organization_id: UUID,
         thread: ConversationThread,
+        user_id: UUID | None = None,
     ) -> dict[str, Any]:
         scoped_worker = None
         if thread.worker_id is not None:
@@ -102,10 +104,11 @@ class ConversationContextAssembler:
                 for job in jobs
                 if (schedule := await self._schedule_context(job)) is not None
             ],
-            "connectedIntegrations": await self._integrations(organization_id),
+            "connectedIntegrations": await self._integrations(organization_id, user_id),
+            "pendingIntegrationTasks": await self._pending_integration_tasks(organization_id, thread.id, user_id),
             "allowedCapabilities": await self._capabilities(organization_id, scoped_worker),
             "policiesAndApprovalBoundaries": await self._policies(organization_id),
-            "pendingApprovals": await self._pending_approvals(organization_id, scoped_worker),
+            "pendingApprovals": await self._pending_approvals(organization_id, scoped_worker, thread.id),
             "currentWork": [self._work_item_context(item) for item in work_items],
             "recentRuns": [await self._run_context(run) for run in runs],
             "recentResults": [await self._result_context(result) for result in results],
@@ -361,13 +364,30 @@ class ConversationContextAssembler:
         )
         return [{"id": str(item.id), "text": _clip(item.text, 1200)} for item in rows.all()]
 
-    async def _integrations(self, organization_id: UUID) -> list[dict[str, Any]]:
+    async def _pending_integration_tasks(self, organization_id, thread_id, user_id):
+        from app.bootstrap.settings import settings
+        if not settings.integration_foundation_enabled or user_id is None:
+            return []
+        commands = (await self._session.scalars(select(ConversationCommand).where(
+            ConversationCommand.organization_id == organization_id, ConversationCommand.thread_id == thread_id,
+            ConversationCommand.created_by == user_id, ConversationCommand.family == "integration.execute",
+            ConversationCommand.status.in_(["waiting_integration", "clarification_required", "waiting_ai", "policy_denied"])).limit(10))).all()
+        return [{"id": str(c.id), "status": c.status, "requirement": c.receipt.get("message", "")} for c in commands]
+
+    async def _integrations(self, organization_id: UUID, user_id: UUID | None = None) -> list[dict[str, Any]]:
         rows = await self._session.scalars(
             select(Integration)
             .where(Integration.organization_id == organization_id)
             .order_by(Integration.provider)
             .limit(MAX_INTEGRATIONS)
         )
+        visible = list(rows.all())
+        from app.bootstrap.settings import settings
+        if settings.integration_foundation_enabled:
+            from app.application.services.integration_foundation import IntegrationFoundation
+            foundation = IntegrationFoundation(self._session)
+            visible = [item for item in visible if item.provider in {"browser", "web_research"} or
+                (user_id is not None and await foundation.can_use(item.id, organization_id, user_id))]
         return [
             {
                 "id": str(item.id),
@@ -375,7 +395,7 @@ class ConversationContextAssembler:
                 "displayName": item.display_name,
                 "status": item.status,
             }
-            for item in rows.all()
+            for item in visible
         ]
 
     async def _capabilities(
@@ -440,6 +460,7 @@ class ConversationContextAssembler:
         self,
         organization_id: UUID,
         worker: Worker | None,
+        thread_id: UUID | None = None,
     ) -> list[dict[str, Any]]:
         statement = (
             select(Approval, Action)
@@ -455,6 +476,10 @@ class ConversationContextAssembler:
         if worker is not None:
             statement = statement.where(Action.agent_id == worker.agent_identity_id)
         rows = (await self._session.execute(statement)).all()
+        if thread_id is not None:
+            from app.application.services.approval_conversation import approval_conversation_id
+            rows = [(approval, action) for approval, action in rows
+                    if await approval_conversation_id(self._session, action) == str(thread_id)]
         return [
             {
                 "approvalId": str(approval.id),

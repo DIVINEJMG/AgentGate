@@ -1,0 +1,25 @@
+{
+  "repository": "DIVINEJMG/AgentGate",
+  "files": {
+    "backend/scripts/check_timezone_data.py": "check_timezone_data.py",
+    "backend/tests/test_check_timezone_data.py": "test_check_timezone_data.py"
+  },
+  "command": "cd /workspace/backend && python -B -m unittest discover -s tests -p test_check_timezone_data.py -v",
+  "steps": [
+    {"id": "metadata", "operation": "repository.metadata.read", "input": {}},
+    {"id": "branch", "operation": "repository.branch.read", "input": {"branch": {"$observed": "metadata.defaultBranch"}}},
+    {"id": "inspect_script", "operation": "repository.contents.read", "input": {"path": "backend/scripts/check_timezone_data.py", "ref": {"$observed": "branch.commit.sha"}}},
+    {"id": "inspect_tests", "operation": "repository.contents.read", "input": {"path": "backend/tests/test_check_timezone_data.py", "ref": {"$observed": "branch.commit.sha"}}},
+    {"id": "workspace", "operation": "repository.workspace.open", "input": {"sha": {"$observed": "branch.commit.sha"}}},
+    {"id": "edit_script", "operation": "repository.workspace.edit", "input": {"path": "backend/scripts/check_timezone_data.py", "content": {"$file": "backend/scripts/check_timezone_data.py"}}},
+    {"id": "edit_tests", "operation": "repository.workspace.edit", "input": {"path": "backend/tests/test_check_timezone_data.py", "content": {"$file": "backend/tests/test_check_timezone_data.py"}}},
+    {"id": "test_start", "operation": "repository.workspace.command.start", "input": {"command": {"$command": true}}},
+    {"id": "test_status", "operation": "repository.workspace.command.status", "input": {"commandId": {"$observed": "test_start.commandId"}}},
+    {"id": "diff", "operation": "repository.workspace.diff", "input": {}},
+    {"id": "task_branch", "operation": "repository.branch.create", "input": {"branch": {"$branch": true}, "sha": {"$observed": "branch.commit.sha"}}},
+    {"id": "commit", "operation": "repository.commit.create", "input": {"branch": {"$branch": true}, "baseSha": {"$observed": "branch.commit.sha"}, "message": "Add read-only timezone diagnostic and focused tests", "changes": {"$observed": "diff.changes"}}},
+    {"id": "published", "operation": "repository.branch.read", "input": {"branch": {"$branch": true}}},
+    {"id": "pull_request", "operation": "repository.pull_request.create", "input": {"title": "Add timezone data diagnostic", "body": "Controlled scripted-planner verification. Tests and diff were inspected before publication. Leave this draft unmerged.", "head": {"$branch": true}, "base": {"$observed": "metadata.defaultBranch"}}},
+    {"id": "verify_pr", "operation": "repository.pull_request.read", "input": {"number": {"$observed": "pull_request.number"}}}
+  ]
+}

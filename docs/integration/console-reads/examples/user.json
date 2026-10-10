@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "operation": "user",
+  "requestTarget": "/internal/console/v1/user?user_id=4f1c2a9e-6b7d-4c3e-9a1b-2d3e4f5a6b7c",
+  "requestId": "example-user",
+  "observedAt": "2026-10-10T12:00:00+00:00",
+  "data": {
+    "user": {
+      "id": "4f1c2a9e-6b7d-4c3e-9a1b-2d3e4f5a6b7c",
+      "subject": "local:ada@example.com",
+      "email": "ada@example.com",
+      "display_name": "Ada Example",
+      "created_at": "2026-09-01T09:00:00+00:00",
+      "updated_at": "2026-10-09T15:30:00+00:00",
+      "organization_count": 1,
+      "membership_roles": [
+        "owner"
+      ]
+    },
+    "memberships": [
+      {
+        "organization_id": "0b9c8d7e-6f5a-4b3c-8d2e-1f0a9b8c7d6e",
+        "organization_name": "Example Org",
+        "role": "owner",
+        "joined_at": "2026-09-01T09:00:00+00:00"
+      }
+    ],
+    "activity": {
+      "organizations_created_30d": 0,
+      "conversations_started_30d": 4,
+      "result_exports_30d": 1,
+      "approval_decisions_30d": 2,
+      "last_activity_at": "2026-10-09T15:30:00+00:00"
+    },
+    "local_password_configured": true
+  }
+}

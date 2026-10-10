@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "operation": "overview",
+  "requestTarget": "/internal/console/v1/overview",
+  "requestId": "example-overview",
+  "observedAt": "2026-10-10T12:00:00+00:00",
+  "data": {
+    "total_users": 2,
+    "active_users_30d": 1,
+    "users_with_memberships": 2,
+    "organizations": 1,
+    "active_organizations_30d": 1,
+    "workers": 1,
+    "runs_30d": 12,
+    "failed_runs_30d": 1,
+    "new_registrations_30d": 1,
+    "integrations": 1,
+    "open_incidents": 0,
+    "unresolved_queue_failures": 0,
+    "agentgate_migration_heads": [
+      "0042_example_head"
+    ]
+  }
+}

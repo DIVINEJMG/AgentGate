@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth_dependencies import organization_principal
 from app.api.product_common import append_audit, not_found, require_permission, utcnow
 from app.api.workforce_routes import automatic_agent, create_worker
+from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
 from app.execution.bootstrap import execution_provider_registry
 from app.infrastructure.database.models import (
@@ -563,6 +564,19 @@ async def work_item_public(
         else {}
     )
     payload = item.payload if isinstance(item.payload, dict) else {}
+    runtime_value = payload.get("runtime")
+    runtime_meta = runtime_value if isinstance(runtime_value, dict) else {}
+    queue_state = item.status
+    waiting_reason = None
+    if item.status == "queued":
+        queue_state = str(runtime_meta.get("queueState") or "queued")
+        if queue_state == "queued" and not runtime_meta.get("waitingReason") and (
+            runtime_meta.get("providerRetryAt") or runtime_meta.get("aiRetryAt")
+        ):
+            queue_state = "retrying"
+        waiting_reason = runtime_meta.get("waitingReason") or runtime_meta.get("providerRetryReason")
+    elif item.status == "waiting_approval":
+        waiting_reason = "A human decision is required before work can continue."
     run = await session.scalar(
         select(Run)
         .where(Run.work_item_id == item.id)
@@ -594,6 +608,8 @@ async def work_item_public(
         "trigger": trigger,
         "priority": item.priority,
         "status": item.status,
+        "queueState": queue_state,
+        "waitingReason": waiting_reason,
         "scheduledAt": item.scheduled_at.isoformat(),
         "startedAt": payload.get("startedAt"),
         "completedAt": payload.get("completedAt"),
@@ -644,6 +660,8 @@ async def work_item_v2(
         "trigger": public["trigger"],
         "queue": {
             "priority": public["priority"],
+            "state": public["queueState"],
+            "waitingReason": public["waitingReason"],
             "scheduledAt": public["scheduledAt"],
             "startedAt": public["startedAt"],
             "completedAt": public["completedAt"],
@@ -676,6 +694,8 @@ async def queue_job(
     revision = await current_revision(session, job)
     definition = revision.definition if isinstance(revision.definition, dict) else {}
     now = utcnow()
+    if settings.integration_foundation_enabled and definition.get("autonomy", {}).get("oneShot"):
+        raise HTTPException(409, "This job belongs to one chat request. Send a new task in the conversation instead of reusing its request-only authority.")
     dedupe_key = (
         str(trigger.get("dedupeKey"))
         if trigger is not None and trigger.get("dedupeKey")
@@ -729,7 +749,17 @@ async def queue_job(
         },
     )
     session.add(item)
+    if settings.integration_foundation_enabled:
+        autonomy = definition.get("autonomy", {})
+        if isinstance(autonomy, dict) and autonomy.get("integrationFoundation"):
+            thread_id = autonomy.get("resultsThreadId")
+            if not thread_id:
+                raise HTTPException(409, "Configure this worker job's results conversation before queueing integration work.")
+            item.payload = {**item.payload, "integrationOrigin": {"threadId": str(thread_id)}}
     await session.flush()
+    if (item.payload or {}).get("integrationOrigin"):
+        from app.application.services.integration_foundation import notify_integration_work
+        await notify_integration_work(session, item, key="queued", content=f"I queued {job.name}. I’ll report its verified outcome in this conversation.")
     await append_audit(
         session,
         organization_id=organization_id,
@@ -1193,10 +1223,12 @@ async def cancel_item(
         select(WorkItem).where(
             WorkItem.organization_id == organization_id,
             WorkItem.id == item_id,
-        )
+        ).with_for_update()
     )
     if item is None:
         raise not_found("Work item")
+    if item.status != "queued":
+        raise HTTPException(status_code=409, detail="Only queued work can be cancelled.")
     payload = dict(item.payload or {})
     item.status = "cancelled"
     now = utcnow().isoformat()
@@ -1264,6 +1296,7 @@ async def clear_queue_v1(
                     WorkItem.status.in_(
                         [
                             "queued",
+                            "admitted",
                             "claimed",
                             "running",
                             "waiting_approval",
@@ -1563,6 +1596,22 @@ async def emit_event_v2(
     }
 
 
+def _standing_scopes_from_managed_allow_revision(
+    selectors: dict[str, Any] | None,
+) -> set[str]:
+    if not isinstance(selectors, dict):
+        return set()
+    metadata = selectors.get("_meta")
+    if not isinstance(metadata, dict) or metadata.get("standingApproval") is not True:
+        return set()
+    recorded_scopes = metadata.get("standingApprovalScopes")
+    if not isinstance(recorded_scopes, list):
+        recorded_scopes = selectors.get("scopes", [])
+    if not isinstance(recorded_scopes, list):
+        return set()
+    return {scope for scope in recorded_scopes if isinstance(scope, str)}
+
+
 async def _provision_managed_job_authority(
     session: AsyncSession,
     organization_id: UUID,
@@ -1610,6 +1659,23 @@ async def _provision_managed_job_authority(
         )
 
     registry = execution_provider_registry()
+    prior_standing_scopes: set[str] = set()
+    allow_policy = await session.scalar(
+        select(Policy).where(
+            Policy.organization_id == organization_id,
+            Policy.name == f"Managed Runtime allow · {worker.id}",
+        )
+    )
+    if allow_policy is not None and allow_policy.status == "enabled":
+        allow_revision = await session.scalar(
+            select(PolicyRevision).where(
+                PolicyRevision.policy_id == allow_policy.id,
+                PolicyRevision.revision == allow_policy.current_revision,
+            )
+        )
+        prior_standing_scopes = _standing_scopes_from_managed_allow_revision(
+            allow_revision.selectors if allow_revision is not None else None
+        )
 
     async def upsert_policy(
         *,
@@ -1617,6 +1683,12 @@ async def _provision_managed_job_authority(
         selected_scopes: set[str],
         priority: int,
     ) -> None:
+        standing_scopes = (
+            (prior_standing_scopes | (requested if standing_approval else set()))
+            & selected_scopes
+            if effect == "allow"
+            else set()
+        )
         name = f"Managed Runtime {effect} · {worker.id}"
         policy = await session.scalar(
             select(Policy).where(
@@ -1653,7 +1725,7 @@ async def _provision_managed_job_authority(
         description = (
             "Standing authority granted by the human when creating or starting "
             "this managed Worker Job."
-            if effect == "allow" and standing_approval
+            if effect == "allow" and standing_scopes
             else "Automatic least-authority policy for managed Worker Jobs."
         )
         session.add(
@@ -1670,7 +1742,8 @@ async def _provision_managed_job_authority(
                     "risks": [],
                     "_meta": {
                         "description": description,
-                        "standingApproval": standing_approval,
+                        "standingApproval": bool(standing_scopes),
+                        "standingApprovalScopes": sorted(standing_scopes),
                         "createdBy": str(principal.user_id),
                         "updatedBy": str(principal.user_id),
                         "createdAt": created_at,
@@ -1695,8 +1768,9 @@ async def _provision_managed_job_authority(
             None,
         )
         explicitly_granted_now = standing_approval and scope in requested
+        has_standing_grant = explicitly_granted_now or scope in prior_standing_scopes
         if capability is not None and (
-            (explicitly_granted_now and capability.risk != "critical")
+            (has_standing_grant and capability.risk != "critical")
             or (
                 capability.approval_recommendation == "none"
                 and capability.risk not in {"high", "critical"}

@@ -1,36 +1,35 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import ProductApp from './ProductApp';
-import PublicSite, { type PublicRoute } from './public/PublicSite';
+import PublicSite from './public/PublicSite';
+import {PublicExperience} from './public/PublicExperience';
+import {readBootstrap,routePath,navigatePublic} from './public/content/runtime';
+import type {PublicConfig} from './public/content/contract';
 import { getPendingInvitationCode } from './lib/commercialApi';
 
-type AppRoute = PublicRoute | 'login' | 'signup' | 'app' | 'workspace-preview';
-
 const PreviewWorkspace = import.meta.env.DEV ? lazy(() => import('./preview/PreviewWorkspace')) : null;
-
-const PUBLIC_ROUTES = new Set<PublicRoute>(['home','product','solutions','security','pricing','resources','company','privacy','terms']);
-
-function readRoute(): AppRoute {
-  const raw = window.location.hash.replace(/^#\/?/, '').split('?')[0].replace(/\/+$/, '');
-  if (!raw) return 'home';
-  if (raw === 'login' || raw === 'signup' || raw === 'app') return raw;
-  if (import.meta.env.DEV && raw === 'workspace-preview') return raw;
-  if (PUBLIC_ROUTES.has(raw as PublicRoute)) return raw as PublicRoute;
-  return 'home';
-}
-
-function navigate(route: AppRoute) {
-  window.location.hash = route === 'home' ? '#/' : `#/${route}`;
-}
+// Public visitors do not need the authenticated workspace bundle.
+const ProductApp=lazy(()=>import('./ProductApp'));
+const defaultConfig:PublicConfig={enabled:false,origin:'',siteOrigin:'',contract:'audoryn.public.v1',locale:'en',cacheSeconds:60,timeoutSeconds:5,previewOrigin:''};
+const navigate=navigatePublic;
 
 export default function App() {
-  const [route, setRoute] = useState<AppRoute>(() => readRoute());
+  const [path, setPath] = useState(()=>routePath(window.location));
+  const [selectedId,setSelectedId]=useState(()=>new URLSearchParams(window.location.search).get('selected')||undefined);
+  const rawRoute=path==='/'?'home':path.slice(1);
+  // Workspace URLs carry their own sub-paths (/app/workers/…, /workspace-preview/…).
+  const route=rawRoute.startsWith('app/')?'app':rawRoute.startsWith('workspace-preview/')?'workspace-preview':rawRoute;
+  const [bootstrap]=useState(readBootstrap);
+  const [config,setConfig]=useState(bootstrap?.config||defaultConfig);
 
   useEffect(() => {
-    const onHashChange = () => setRoute(readRoute());
+    const onHashChange = () => {setPath(routePath(window.location));setSelectedId(new URLSearchParams(window.location.search).get('selected')||undefined);};
     window.addEventListener('hashchange', onHashChange);
-    if (!window.location.hash) window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#/`);
-    return () => window.removeEventListener('hashchange', onHashChange);
+    window.addEventListener('popstate',onHashChange);
+    return () => {window.removeEventListener('hashchange', onHashChange);window.removeEventListener('popstate',onHashChange);};
   }, []);
+  useEffect(()=>{
+    if(bootstrap)return;
+    const controller=new AbortController();void fetch('/_public/config',{credentials:'omit',signal:controller.signal}).then(response=>response.ok?response.json():null).then(value=>{if(value&&!controller.signal.aborted)setConfig(value);}).catch(()=>{});return ()=>controller.abort();
+  },[bootstrap]);
 
   const invitationPending = Boolean(getPendingInvitationCode());
   if (route === 'workspace-preview') {
@@ -39,8 +38,8 @@ export default function App() {
       : <PublicSite route='home' onNavigate={navigate} />;
   }
   if ((invitationPending && route !== 'terms' && route !== 'privacy') || route === 'login' || route === 'signup' || route === 'app') {
-    return <ProductApp entryMode={route === 'signup' ? 'signup' : route === 'app' ? 'app' : 'signin'} onBack={() => navigate('home')} onSignedIn={() => navigate('app')} onModeChange={(mode) => navigate(mode === 'signin' ? 'login' : 'signup')} />;
+    return <Suspense fallback={null}><ProductApp entryMode={route === 'signup' ? 'signup' : route === 'app' ? 'app' : 'signin'} onBack={() => navigate('home')} onSignedIn={() => navigate('app')} onModeChange={(mode) => navigate(mode === 'signin' ? 'login' : 'signup')} /></Suspense>;
   }
 
-  return <PublicSite route={route} onNavigate={navigate} />;
+  return <PublicExperience path={path} config={config} initialBundle={bootstrap?.path===path?bootstrap.bundle:undefined} onNavigate={navigate} selectedId={selectedId}/>;
 }

@@ -22,7 +22,8 @@ test('operations preview supplies inspectable records and blocks decisions', asy
   const run = await previewResponse('GET', `${base}/runs/preview-run`);
   const supervision = await previewResponse('GET', `${base}/supervision`);
   const actions = await previewResponse('GET', `${base}/actions`);
-  assert.equal(runtime.data.runs.length, 1);
+  assert.equal(runtime.data.runs.length, 2);
+  assert.equal(runtime.data.runs.filter((item) => item.status === 'running').length, 1, 'one run in progress so live states are visible');
   assert.equal(run.data.steps.length, 3);
   assert.equal(supervision.data.escalations.length, 1);
   assert.equal(actions.data.actions.length, 3);

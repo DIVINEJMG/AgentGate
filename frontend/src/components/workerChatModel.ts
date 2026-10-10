@@ -1,16 +1,29 @@
 import type { ConversationMessage, ConversationThread } from '../lib/conversationApi';
 
+export function approvalInConversation(
+  approval: { id: string; conversationThreadId?: string | null },
+  threadId: string | null,
+  messages: Pick<ConversationMessage, 'threadId' | 'resultReferences'>[],
+): boolean {
+  if (!threadId) return false;
+  if (approval.conversationThreadId) return approval.conversationThreadId === threadId;
+  return messages.some(message => message.threadId === threadId &&
+    message.resultReferences?.some(ref => ref.type === 'approval' && ref.id === approval.id));
+}
+
 export type LiveResultReference = {
   type: 'result';
   id: string;
   name: string;
   presentation: 'live_result';
-  status: 'completed';
+  status: 'completed' | 'attention';
+  executionOutcome?: 'completed' | 'partial' | 'blocked';
   summary?: string;
   workerId?: string;
   jobId?: string;
   workItemId?: string;
   runId?: string;
+  externalReferences?: Array<{ url: string; title: string }>;
 };
 
 export function liveResultReference(message: { resultReferences?: Array<Record<string, unknown>> | null }): LiveResultReference | null {
@@ -22,15 +35,27 @@ export function liveResultReference(message: { resultReferences?: Array<Record<s
       id: raw.id,
       name: typeof raw.name === 'string' && raw.name ? raw.name : 'Completed result',
       presentation: 'live_result',
-      status: 'completed',
+      status: raw.status === 'attention' ? 'attention' : 'completed',
+      executionOutcome: raw.executionOutcome === 'blocked' || raw.executionOutcome === 'partial' || raw.executionOutcome === 'completed'
+        ? raw.executionOutcome : undefined,
       summary: typeof raw.summary === 'string' ? raw.summary : undefined,
       workerId: typeof raw.workerId === 'string' ? raw.workerId : undefined,
       jobId: typeof raw.jobId === 'string' ? raw.jobId : undefined,
       workItemId: typeof raw.workItemId === 'string' ? raw.workItemId : undefined,
       runId: typeof raw.runId === 'string' ? raw.runId : undefined,
+      ...(Array.isArray(raw.externalReferences) ? { externalReferences: raw.externalReferences.filter(
+        (ref): ref is { url: string; title: string } => !!ref && typeof ref.url === 'string' &&
+          /^https:\/\//i.test(ref.url) && typeof ref.title === 'string'
+      ) } : {}),
     };
   }
   return null;
+}
+
+export function liveResultLabel(result: LiveResultReference): string {
+  if (result.executionOutcome === 'blocked') return 'NEEDS ATTENTION';
+  if (result.executionOutcome === 'partial') return 'PARTIALLY COMPLETED';
+  return result.status === 'attention' ? 'NEEDS ATTENTION' : 'COMPLETED';
 }
 
 export function isHumanMessage(role: string) {

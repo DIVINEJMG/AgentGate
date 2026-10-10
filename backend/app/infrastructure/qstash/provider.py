@@ -24,6 +24,26 @@ class QStashRateLimitedError(RuntimeError):
         self.daily_quota_exhausted = daily_quota_exhausted
 
 
+class QStashRequestRejectedError(RuntimeError):
+    """QStash rejected a publish request before creating a delivery."""
+
+
+def _rejection_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+    if isinstance(payload, dict):
+        for key in ("error", "message"):
+            detail = payload.get(key)
+            if isinstance(detail, str) and detail.strip():
+                token = settings.qstash_token
+                if token is not None:
+                    detail = detail.replace(token.get_secret_value(), "[redacted]")
+                return detail.strip()[:300]
+    return "QStash did not provide a structured rejection reason."
+
+
 def raise_for_qstash_status(response: httpx.Response) -> None:
     if response.status_code == 429:
         detail = response.text.strip()
@@ -40,6 +60,10 @@ def raise_for_qstash_status(response: httpx.Response) -> None:
         raise QStashRateLimitedError(
             detail or "QStash rate limit reached.",
             daily_quota_exhausted=daily_quota_exhausted,
+        )
+    if response.status_code == 400:
+        raise QStashRequestRejectedError(
+            f"QStash rejected the publish request (400): {_rejection_detail(response)}"
         )
     response.raise_for_status()
 
@@ -66,6 +90,8 @@ class UpstashQStashProvider(QueueProvider):
         idempotency_key: str | None = None,
         failure_callback: str | None = None,
         delay_seconds: int | None = None,
+        flow_control_key: str | None = None,
+        parallelism: int | None = None,
     ) -> dict[str, str]:
         headers = {
             "Authorization": f"Bearer {self._token}",
@@ -78,6 +104,9 @@ class UpstashQStashProvider(QueueProvider):
             headers["Upstash-Deduplication-Id"] = _deduplication_id(idempotency_key)
         if delay_seconds is not None and delay_seconds > 0:
             headers["Upstash-Delay"] = f"{int(delay_seconds)}s"
+        if flow_control_key and parallelism is not None:
+            headers["Upstash-Flow-Control-Key"] = flow_control_key
+            headers["Upstash-Flow-Control-Value"] = f"parallelism={max(1, parallelism)}"
         callback = failure_callback or settings.qstash_failure_callback_url
         if callback:
             headers["Upstash-Failure-Callback"] = callback
@@ -93,6 +122,8 @@ class UpstashQStashProvider(QueueProvider):
         timeout_seconds: int = 15,
         failure_callback: str | None = None,
         delay_seconds: int | None = None,
+        flow_control_key: str | None = None,
+        parallelism: int | None = None,
     ) -> QueueMessage:
         encoded = _destination_path(destination)
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -104,6 +135,8 @@ class UpstashQStashProvider(QueueProvider):
                     idempotency_key=idempotency_key,
                     failure_callback=failure_callback,
                     delay_seconds=delay_seconds,
+                    flow_control_key=flow_control_key,
+                    parallelism=parallelism,
                 ),
                 content=body,
             )
