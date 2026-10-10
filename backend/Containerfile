@@ -13,7 +13,7 @@ COPY backend/migrations ./migrations
 COPY backend/alembic.ini ./alembic.ini
 
 RUN pip install --upgrade pip \
-    && pip install -e . \
+    && pip install -e '.[coding]' \
     && playwright install --with-deps chromium
 
 RUN useradd --create-home --uid 10001 audoryn \
