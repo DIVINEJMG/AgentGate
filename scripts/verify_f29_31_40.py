@@ -41,7 +41,11 @@ def main() -> None:
     require(not offenders, f"provider-specific Runtime branches found: {offenders}")
 
     bootstrap = text(APP / "execution" / "bootstrap.py")
-    for provider in ("github_provider", "gmail_provider", "slack_provider", "google_drive_provider", "google_calendar_provider"):
+    require("configured_provider()" in bootstrap, "configured GitHub provider missing from universal registry")
+    github = text(APP / "execution" / "providers" / "native" / "github" / "__init__.py")
+    require("return github_provider" in github and "ExpandedGitHubProvider" in github,
+            "GitHub registry lacks legacy compatibility or expanded provider selection")
+    for provider in ("gmail_provider", "slack_provider", "google_drive_provider", "google_calendar_provider"):
         require(provider in bootstrap, f"{provider} missing from universal registry")
 
     gateway = text(APP / "domain" / "actions" / "gateway.py")

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "operation": "notifications",
+  "requestTarget": "/internal/console/v1/notifications?limit=40",
+  "requestId": "example-notifications",
+  "observedAt": "2026-10-10T12:00:00+00:00",
+  "data": [
+    {
+      "source": "audoryn.incident",
+      "severity": "critical",
+      "title": "Audoryn product incident",
+      "body": "Example incident",
+      "href": "/operations/system-health",
+      "fingerprint": "audoryn-incident:e7f8a9b0-c1d2-4e3f-8a4b-5c6d7e8f9a0b"
+    },
+    {
+      "source": "audoryn.queue",
+      "severity": "warning",
+      "title": "Audoryn queue delivery failure",
+      "body": "Message msg_example_1 is unresolved.",
+      "href": "/operations/queues",
+      "fingerprint": "audoryn-queue:5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d"
+    }
+  ]
+}

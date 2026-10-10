@@ -1,0 +1,767 @@
+{
+  "HomeHero/HERO_SCENES": {
+    "profile": "home",
+    "target": "hero_scenes",
+    "items": [
+      {
+        "id": "61497c6e-c32d-57bd-83ba-147ac6dab261",
+        "identity": "01 / THE WORK",
+        "defaults": {
+          "word": "AUTONOMY",
+          "label": "01 / THE WORK",
+          "title": "Give AI workers real work.",
+          "body": "Create focused roles, assign durable jobs, and let useful work move forward across your organization."
+        },
+        "fields": {
+          "word": "word",
+          "label": "label",
+          "title": "heading",
+          "body": "description"
+        }
+      },
+      {
+        "id": "99931c1e-99e5-5bfc-8313-b71e3a77f271",
+        "identity": "02 / THE BOUNDARY",
+        "defaults": {
+          "word": "CONTROL",
+          "label": "02 / THE BOUNDARY",
+          "title": "Decide what may happen.",
+          "body": "Every external action meets explicit capabilities and deterministic policy before it can proceed."
+        },
+        "fields": {
+          "word": "word",
+          "label": "label",
+          "title": "heading",
+          "body": "description"
+        }
+      },
+      {
+        "id": "6aeccdfd-ada1-593f-85ab-23147ddc005d",
+        "identity": "03 / THE PEOPLE",
+        "defaults": {
+          "word": "OVERSIGHT",
+          "label": "03 / THE PEOPLE",
+          "title": "Keep judgment with people.",
+          "body": "Sensitive work pauses for human approval, with the context and record needed to make a clear decision."
+        },
+        "fields": {
+          "word": "word",
+          "label": "label",
+          "title": "heading",
+          "body": "description"
+        }
+      }
+    ]
+  },
+  "HomeJourney/CHAPTERS": {
+    "profile": "home",
+    "target": "journey",
+    "items": [
+      {
+        "id": "c9ac2803-9984-5097-8de8-b66956b8cda0",
+        "identity": "WORK",
+        "defaults": {
+          "number": "01",
+          "label": "WORK",
+          "title": "Give each worker a clear job.",
+          "body": "Define the objective, expected result and limits of the work before it enters the queue."
+        },
+        "fields": {
+          "label": "label",
+          "title": "heading",
+          "body": "description"
+        }
+      },
+      {
+        "id": "f2a23cc2-3a96-5698-8dc5-01dffe13211b",
+        "identity": "POLICY",
+        "defaults": {
+          "number": "02",
+          "label": "POLICY",
+          "title": "Make authority explicit.",
+          "body": "Connected tools expose possibilities. Capabilities, risk and policy determine what the worker may actually do."
+        },
+        "fields": {
+          "label": "label",
+          "title": "heading",
+          "body": "description"
+        }
+      },
+      {
+        "id": "5ab9b57d-54f2-5b75-8b5a-26f474cec031",
+        "identity": "APPROVAL",
+        "defaults": {
+          "number": "03",
+          "label": "APPROVAL",
+          "title": "Pause where judgment matters.",
+          "body": "A sensitive action waits for a person. Approval is checked against current authority before work continues."
+        },
+        "fields": {
+          "label": "label",
+          "title": "heading",
+          "body": "description"
+        }
+      },
+      {
+        "id": "5cfddba4-aaf5-5390-8585-25d66a7396da",
+        "identity": "EXECUTION",
+        "defaults": {
+          "number": "04",
+          "label": "EXECUTION",
+          "title": "See the result and the reasoning.",
+          "body": "The action, decision and outcome remain connected in an inspectable record for the team."
+        },
+        "fields": {
+          "label": "label",
+          "title": "heading",
+          "body": "description"
+        }
+      }
+    ]
+  },
+  "HomeOperatingView/AREAS": {
+    "profile": "home",
+    "target": "operating_areas",
+    "items": [
+      {
+        "id": "4bc592a4-4c56-588f-83e6-391e2d4f14a5",
+        "identity": "Workers",
+        "defaults": {
+          "label": "Workers",
+          "index": "01",
+          "summary": "Roles, identity, schedules",
+          "title": "Every worker has a defined place in the workforce.",
+          "description": "A worker starts with a role, a responsibility, a schedule and a human supervisor. Its identity stays distinct from the people who oversee it.",
+          "path": [
+            "ROLE",
+            "IDENTITY",
+            "SUPERVISOR"
+          ],
+          "signal": "DEFINED BEFORE WORK BEGINS"
+        },
+        "fields": {
+          "label": "label",
+          "title": "heading",
+          "description": "description",
+          "summary": "summary",
+          "path": "path",
+          "signal": "signal"
+        }
+      },
+      {
+        "id": "33870b58-513f-594e-84de-4a7f9ec47339",
+        "identity": "Jobs",
+        "defaults": {
+          "label": "Jobs",
+          "index": "02",
+          "summary": "Objectives, queue, runtime",
+          "title": "Work moves with an objective and a visible state.",
+          "description": "Jobs carry the expected result, requirements and completion criteria into a durable queue. Teams can follow what is waiting, running and complete.",
+          "path": [
+            "OBJECTIVE",
+            "QUEUE",
+            "RESULT"
+          ],
+          "signal": "WORK REMAINS INSPECTABLE"
+        },
+        "fields": {
+          "label": "label",
+          "title": "heading",
+          "description": "description",
+          "summary": "summary",
+          "path": "path",
+          "signal": "signal"
+        }
+      },
+      {
+        "id": "b691eca4-1b1b-5101-8766-0a0a9ea10590",
+        "identity": "Governance",
+        "defaults": {
+          "label": "Governance",
+          "index": "03",
+          "summary": "Policy, risk, approvals",
+          "title": "Authority is checked at the action boundary.",
+          "description": "A connected tool is never permission on its own. Capabilities, risk and policy decide whether an action can proceed or must wait for approval.",
+          "path": [
+            "REQUEST",
+            "POLICY",
+            "DECISION"
+          ],
+          "signal": "AUTHORITY IS EXPLICIT"
+        },
+        "fields": {
+          "label": "label",
+          "title": "heading",
+          "description": "description",
+          "summary": "summary",
+          "path": "path",
+          "signal": "signal"
+        }
+      },
+      {
+        "id": "cd7a0f90-e258-5ee0-874a-42c85f97447c",
+        "identity": "Supervision",
+        "defaults": {
+          "label": "Supervision",
+          "index": "04",
+          "summary": "Escalations, incidents, audit",
+          "title": "People can see the moments that need them.",
+          "description": "Exceptional work is routed to a named human. The decision and outcome stay together in an audit record the team can inspect.",
+          "path": [
+            "SIGNAL",
+            "HUMAN",
+            "RECORD"
+          ],
+          "signal": "HUMAN ATTENTION STAYS VISIBLE"
+        },
+        "fields": {
+          "label": "label",
+          "title": "heading",
+          "description": "description",
+          "summary": "summary",
+          "path": "path",
+          "signal": "signal"
+        }
+      }
+    ]
+  },
+  "ProductShowcase/integrations": {
+    "profile": "product",
+    "target": "entries",
+    "items": [
+      {
+        "id": "807f8c6a-c978-59c5-8a0c-910871053458",
+        "identity": "GitHub",
+        "defaults": {
+          "mark": "GH",
+          "name": "GitHub",
+          "use": "Repository and issue workflows"
+        },
+        "fields": {
+          "name": "label",
+          "use": "description"
+        }
+      },
+      {
+        "id": "46f37ed2-1339-510a-8f9d-ef70bf272433",
+        "identity": "Gmail",
+        "defaults": {
+          "mark": "M",
+          "name": "Gmail",
+          "use": "Mailbox context and recent messages"
+        },
+        "fields": {
+          "name": "label",
+          "use": "description"
+        }
+      },
+      {
+        "id": "74e0c2fc-c6e8-5c48-8280-1f3554256b25",
+        "identity": "Google Drive",
+        "defaults": {
+          "mark": "D",
+          "name": "Google Drive",
+          "use": "Documents and files"
+        },
+        "fields": {
+          "name": "label",
+          "use": "description"
+        }
+      },
+      {
+        "id": "ce7b66d3-8eaa-58a1-8208-da1771a2f12c",
+        "identity": "Slack",
+        "defaults": {
+          "mark": "S",
+          "name": "Slack",
+          "use": "Team conversations"
+        },
+        "fields": {
+          "name": "label",
+          "use": "description"
+        }
+      },
+      {
+        "id": "4166216b-5711-526b-8ac2-5aed80ebb466",
+        "identity": "Google Calendar",
+        "defaults": {
+          "mark": "C",
+          "name": "Google Calendar",
+          "use": "Calendar context"
+        },
+        "fields": {
+          "name": "label",
+          "use": "description"
+        }
+      },
+      {
+        "id": "bda0d70d-6ff0-5905-8753-37eea98eea65",
+        "identity": "Governed Browser",
+        "defaults": {
+          "mark": "↗",
+          "name": "Governed Browser",
+          "use": "Approved site interactions"
+        },
+        "fields": {
+          "name": "label",
+          "use": "description"
+        }
+      }
+    ]
+  },
+  "SolutionsShowcase/solutions": {
+    "profile": "solutions",
+    "target": "solutions",
+    "items": [
+      {
+        "id": "3ddf2c2c-1a9a-5205-8a89-b8f25b4f672a",
+        "identity": "Operations",
+        "defaults": {
+          "name": "Operations",
+          "icon": "BriefcaseBusiness",
+          "line": "Keep the daily picture current.",
+          "worker": "Operations Assistant",
+          "job": "Daily Operations Brief",
+          "detail": "Review connected work context and prepare a concise internal update, with exceptions surfaced for a person.",
+          "tools": "Google Drive · Google Calendar",
+          "output": "A reviewable daily brief"
+        },
+        "fields": {
+          "name": "label",
+          "line": "heading",
+          "detail": "detail",
+          "worker": "worker",
+          "job": "job",
+          "output": "output"
+        }
+      },
+      {
+        "id": "44ab54c3-56e8-5e9e-8e41-4d5bbce48483",
+        "identity": "Research",
+        "defaults": {
+          "name": "Research",
+          "icon": "FlaskConical",
+          "line": "Turn source material into a clear brief.",
+          "worker": "Research Assistant",
+          "job": "Repository Research Brief",
+          "detail": "Read issues and pull requests, separate observed facts from inference and assemble a technical change brief.",
+          "tools": "GitHub",
+          "output": "A structured research brief"
+        },
+        "fields": {
+          "name": "label",
+          "line": "heading",
+          "detail": "detail",
+          "worker": "worker",
+          "job": "job",
+          "output": "output"
+        }
+      },
+      {
+        "id": "a705b4b2-cbd5-52d4-86e8-315c399b7c42",
+        "identity": "Customer support",
+        "defaults": {
+          "name": "Customer support",
+          "icon": "Headset",
+          "line": "See what needs attention first.",
+          "worker": "Customer Support Assistant",
+          "job": "Inbox Triage",
+          "detail": "Review recent messages and prepare a prioritized support triage brief for the team.",
+          "tools": "Gmail",
+          "output": "A prioritized triage brief"
+        },
+        "fields": {
+          "name": "label",
+          "line": "heading",
+          "detail": "detail",
+          "worker": "worker",
+          "job": "job",
+          "output": "output"
+        }
+      },
+      {
+        "id": "ca955ec0-2da5-5e81-851a-b4eaa56c5d2a",
+        "identity": "Sales",
+        "defaults": {
+          "name": "Sales",
+          "icon": "CalendarDays",
+          "line": "Arrive prepared for the next meeting.",
+          "worker": "Sales Assistant",
+          "job": "Upcoming Meeting Brief",
+          "detail": "Review upcoming meetings and relevant prospect context to prepare supervised follow-up.",
+          "tools": "Google Calendar · Gmail",
+          "output": "An upcoming meeting brief"
+        },
+        "fields": {
+          "name": "label",
+          "line": "heading",
+          "detail": "detail",
+          "worker": "worker",
+          "job": "job",
+          "output": "output"
+        }
+      },
+      {
+        "id": "bd083f9b-6750-59f2-8232-ef69a0b5b8b8",
+        "identity": "Marketing",
+        "defaults": {
+          "name": "Marketing",
+          "icon": "Megaphone",
+          "line": "Make campaign context easier to use.",
+          "worker": "Marketing Coordinator",
+          "job": "Campaign Asset Review",
+          "detail": "Review recent campaign material and summarize what the team needs to know.",
+          "tools": "Google Drive",
+          "output": "A campaign material summary"
+        },
+        "fields": {
+          "name": "label",
+          "line": "heading",
+          "detail": "detail",
+          "worker": "worker",
+          "job": "job",
+          "output": "output"
+        }
+      },
+      {
+        "id": "dbba8259-a688-589c-8e6a-799e018c5c0f",
+        "identity": "Engineering",
+        "defaults": {
+          "name": "Engineering",
+          "icon": "Code2",
+          "line": "Stay close to repository work.",
+          "worker": "Developer Assistant",
+          "job": "Engineering Change Review",
+          "detail": "Review repository issues and pull requests to prepare a concise engineering status brief.",
+          "tools": "GitHub",
+          "output": "An engineering status brief"
+        },
+        "fields": {
+          "name": "label",
+          "line": "heading",
+          "detail": "detail",
+          "worker": "worker",
+          "job": "job",
+          "output": "output"
+        }
+      }
+    ]
+  },
+  "SecurityShowcase/controls": {
+    "profile": "security",
+    "target": "entries",
+    "items": [
+      {
+        "id": "4d144c91-4aaf-5e62-8c1f-50b9fdcbe1f2",
+        "identity": "Distinct identities",
+        "defaults": {
+          "icon": "Fingerprint",
+          "number": "01",
+          "title": "Distinct identities",
+          "text": "A human session cannot act as an AI worker. Every managed worker has a separate agent identity, and organization boundaries are checked."
+        },
+        "fields": {
+          "title": "heading",
+          "text": "description"
+        }
+      },
+      {
+        "id": "908ea56d-5889-5e2f-8d5e-a6ca164e5056",
+        "identity": "Protected credentials",
+        "defaults": {
+          "icon": "KeyRound",
+          "number": "02",
+          "title": "Protected credentials",
+          "text": "Connected provider credentials remain in the backend credential boundary. Models do not receive provider tokens or direct provider tools."
+        },
+        "fields": {
+          "title": "heading",
+          "text": "description"
+        }
+      },
+      {
+        "id": "a2c089e5-2645-5d75-8aab-56d8247bf6f7",
+        "identity": "Human intervention",
+        "defaults": {
+          "icon": "PauseCircle",
+          "number": "03",
+          "title": "Human intervention",
+          "text": "Sensitive actions can wait for review. Organization, worker and integration execution can be suspended without deleting their configuration."
+        },
+        "fields": {
+          "title": "heading",
+          "text": "description"
+        }
+      },
+      {
+        "id": "1b3c805d-965f-501e-883d-100dc238d3e3",
+        "identity": "A record to inspect",
+        "defaults": {
+          "icon": "ScrollText",
+          "number": "04",
+          "title": "A record to inspect",
+          "text": "Requests, decisions, approvals and provider outcomes carry correlation context so operators can follow what happened."
+        },
+        "fields": {
+          "title": "heading",
+          "text": "description"
+        }
+      }
+    ]
+  },
+  "SecurityShowcase/decisions": {
+    "profile": "security",
+    "target": "security_decisions",
+    "items": [
+      {
+        "id": "fac3f6aa-a964-59c9-841a-fe6ff14f56ad",
+        "identity": "allow",
+        "defaults": {
+          "label": "ALLOW",
+          "title": "The action may proceed.",
+          "detail": "A permitted request can reach the provider adapter after the current identity, capability, risk and policy checks pass.",
+          "note": "Only an allowed request can invoke the provider.",
+          "semantic": "allow"
+        },
+        "fields": {
+          "label": "label",
+          "title": "heading",
+          "detail": "description",
+          "note": "note"
+        }
+      },
+      {
+        "id": "dfaa4723-4d29-50ad-8a93-c1ae49e72bc7",
+        "identity": "review",
+        "defaults": {
+          "label": "REQUIRE APPROVAL",
+          "title": "The action waits for a person.",
+          "detail": "The run pauses and an authorized reviewer receives the request. Before an approved action resumes, Audoryn checks its authority again.",
+          "note": "Approval is bound to the exact requested action.",
+          "semantic": "review"
+        },
+        "fields": {
+          "label": "label",
+          "title": "heading",
+          "detail": "description",
+          "note": "note"
+        }
+      },
+      {
+        "id": "66ed4b28-719e-5cef-8f18-875f0d6852d3",
+        "identity": "deny",
+        "defaults": {
+          "label": "DENY",
+          "title": "The action stops here.",
+          "detail": "A denied request is blocked at the gateway. The connected provider is never called for that action.",
+          "note": "Missing or uncertain authority fails closed.",
+          "semantic": "deny"
+        },
+        "fields": {
+          "label": "label",
+          "title": "heading",
+          "detail": "description",
+          "note": "note"
+        }
+      }
+    ]
+  },
+  "PricingShowcase/plans": {
+    "profile": "pricing",
+    "target": "plans",
+    "items": [
+      {
+        "id": "81f73751-0d63-510c-8b50-0d5cfd82cd4d",
+        "identity": "Free",
+        "defaults": {
+          "name": "Free",
+          "price": "0",
+          "limit": "3",
+          "audience": "Start with a small supervised workforce.",
+          "state": "AVAILABLE NOW"
+        },
+        "fields": {
+          "name": "label",
+          "audience": "description",
+          "state": "status_label"
+        }
+      },
+      {
+        "id": "9e6def54-990e-53e4-8b3f-19c4614d6b87",
+        "identity": "Team",
+        "defaults": {
+          "name": "Team",
+          "price": "49",
+          "limit": "15",
+          "audience": "Coordinate a growing workforce across a team.",
+          "state": "CATALOG PLAN"
+        },
+        "fields": {
+          "name": "label",
+          "audience": "description",
+          "state": "status_label"
+        }
+      },
+      {
+        "id": "6322ee67-d814-5d57-80e1-2e30e7abd745",
+        "identity": "Business",
+        "defaults": {
+          "name": "Business",
+          "price": "199",
+          "limit": "75",
+          "audience": "Run more workers across recurring company work.",
+          "state": "CATALOG PLAN"
+        },
+        "fields": {
+          "name": "label",
+          "audience": "description",
+          "state": "status_label"
+        }
+      },
+      {
+        "id": "e7dd1e33-364a-5b4a-82ae-524a15b996c8",
+        "identity": "Scale",
+        "defaults": {
+          "name": "Scale",
+          "price": "499",
+          "limit": "250",
+          "audience": "Plan for a larger governed workforce.",
+          "state": "CATALOG PLAN"
+        },
+        "fields": {
+          "name": "label",
+          "audience": "description",
+          "state": "status_label"
+        }
+      }
+    ]
+  },
+  "ResourcesShowcase/guides": {
+    "profile": "resources",
+    "target": "entries",
+    "items": [
+      {
+        "id": "3230c452-7f9b-51c6-8a2c-7177139f9981",
+        "identity": "Explore the product",
+        "defaults": {
+          "number": "01",
+          "icon": "Boxes",
+          "topic": "THE PLATFORM",
+          "title": "Explore the product",
+          "description": "See how workers, jobs, runtime, supervision and connected tools fit together.",
+          "route": "product"
+        },
+        "fields": {
+          "title": "heading",
+          "description": "description",
+          "topic": "summary"
+        }
+      },
+      {
+        "id": "8c399311-1cf0-5227-8859-f6e0dea0eda0",
+        "identity": "Find a starting point",
+        "defaults": {
+          "number": "02",
+          "icon": "Compass",
+          "topic": "WHERE IT FITS",
+          "title": "Find a starting point",
+          "description": "Browse practical responsibilities supported by Audoryn workforce templates.",
+          "route": "solutions"
+        },
+        "fields": {
+          "title": "heading",
+          "description": "description",
+          "topic": "summary"
+        }
+      },
+      {
+        "id": "7ca50da9-8524-5790-87db-88ce0aec99b7",
+        "identity": "Understand security",
+        "defaults": {
+          "number": "03",
+          "icon": "LockKeyhole",
+          "topic": "THE CONTROL MODEL",
+          "title": "Understand security",
+          "description": "Follow an action through identity, capability, policy and human review.",
+          "route": "security"
+        },
+        "fields": {
+          "title": "heading",
+          "description": "description",
+          "topic": "summary"
+        }
+      },
+      {
+        "id": "011820d6-415c-55b2-893f-b0122defa4b0",
+        "identity": "Review plan structure",
+        "defaults": {
+          "number": "04",
+          "icon": "Scale",
+          "topic": "CAPACITY",
+          "title": "Review plan structure",
+          "description": "Compare worker capacity and see the current billing availability.",
+          "route": "pricing"
+        },
+        "fields": {
+          "title": "heading",
+          "description": "description",
+          "topic": "summary"
+        }
+      }
+    ]
+  },
+  "CompanyShowcase/portfolio": {
+    "profile": "company",
+    "target": "entries",
+    "items": [
+      {
+        "id": "cac5fda5-d1c7-51eb-85b1-2725a52f0285",
+        "identity": "SOT CM",
+        "defaults": {
+          "number": "01",
+          "name": "SOT CM",
+          "category": "Content operations",
+          "description": "Publishing workflows and administrative control for websites.",
+          "href": "https://sot-org.onrender.com/products/sot-cms"
+        },
+        "fields": {
+          "name": "label",
+          "description": "description",
+          "category": "summary"
+        }
+      },
+      {
+        "id": "69efec91-c1a8-51a8-8007-e1a097eecdee",
+        "identity": "SOT TRACK",
+        "defaults": {
+          "number": "02",
+          "name": "SOT TRACK",
+          "category": "Execution visibility",
+          "description": "Planning, tracking and visibility into delivery.",
+          "href": "https://sot-org.onrender.com/products/sot-track"
+        },
+        "fields": {
+          "name": "label",
+          "description": "description",
+          "category": "summary"
+        }
+      },
+      {
+        "id": "23cebe54-1976-55bd-8b09-6045ae062616",
+        "identity": "SOT Browser",
+        "defaults": {
+          "number": "03",
+          "name": "SOT Browser",
+          "category": "Desktop software",
+          "description": "A native browser with smart handoff and installer distribution.",
+          "href": "https://sot-org.onrender.com/products/sot-browser"
+        },
+        "fields": {
+          "name": "label",
+          "description": "description",
+          "category": "summary"
+        }
+      }
+    ]
+  }
+}

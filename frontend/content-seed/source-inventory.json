@@ -1,0 +1,5338 @@
+[
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 8,
+    "scope": "CompanyShowcase",
+    "field": "field-sot-cm-e32c33dce0",
+    "category": "field",
+    "value": "SOT CM"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 8,
+    "scope": "CompanyShowcase",
+    "field": "field-publishing-workflows-and-administrative-contr-f78301d3f1",
+    "category": "field",
+    "value": "Publishing workflows and administrative control for websites."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 8,
+    "scope": "CompanyShowcase",
+    "field": "field-https-sot-org-onrender-com-products-sot-cms-c496610fe3",
+    "category": "field",
+    "value": "https://sot-org.onrender.com/products/sot-cms"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 9,
+    "scope": "CompanyShowcase",
+    "field": "field-sot-track-8f5ed54325",
+    "category": "field",
+    "value": "SOT TRACK"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 9,
+    "scope": "CompanyShowcase",
+    "field": "field-planning-tracking-and-visibility-into-deliver-4a37aa01f7",
+    "category": "field",
+    "value": "Planning, tracking and visibility into delivery."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 9,
+    "scope": "CompanyShowcase",
+    "field": "field-https-sot-org-onrender-com-products-sot-track-a0151cfb61",
+    "category": "field",
+    "value": "https://sot-org.onrender.com/products/sot-track"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 10,
+    "scope": "CompanyShowcase",
+    "field": "field-sot-browser-a87e224ab8",
+    "category": "field",
+    "value": "SOT Browser"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 10,
+    "scope": "CompanyShowcase",
+    "field": "field-a-native-browser-with-smart-handoff-and-insta-43c4c8e488",
+    "category": "field",
+    "value": "A native browser with smart handoff and installer distribution."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 10,
+    "scope": "CompanyShowcase",
+    "field": "field-https-sot-org-onrender-com-products-sot-brows-46e495e8de",
+    "category": "field",
+    "value": "https://sot-org.onrender.com/products/sot-browser"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 34,
+    "scope": "CompanyShowcase",
+    "field": "copy-audoryn-a5cc2b7928",
+    "category": "copy",
+    "value": "AUDORYN "
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 34,
+    "scope": "CompanyShowcase",
+    "field": "copy--company-f515efdc98",
+    "category": "copy",
+    "value": " COMPANY"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 35,
+    "scope": "CompanyShowcase",
+    "field": "copy-built-by-sot-435b5f42b7",
+    "category": "copy",
+    "value": "Built by SOT."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 35,
+    "scope": "CompanyShowcase",
+    "field": "copy-made-for-real-work-6e42e0437f",
+    "category": "copy",
+    "value": "Made for real work."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 36,
+    "scope": "CompanyShowcase",
+    "field": "copy-audoryn-is-an-sot-product-it-brings-ai-worker-ce180ec027",
+    "category": "copy",
+    "value": "Audoryn is an SOT product. It brings AI workers into practical workflows while keeping authority, review and responsibility visible to people."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 37,
+    "scope": "CompanyShowcase",
+    "field": "copy-meet-the-company-fa80fed94d",
+    "category": "copy",
+    "value": "Meet the company "
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 39,
+    "scope": "CompanyShowcase",
+    "field": "copy-sot-brand-mark-815e0a63eb",
+    "category": "copy",
+    "value": "SOT brand mark"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 42,
+    "scope": "CompanyShowcase",
+    "field": "alt-sot-logo-a0d43671b6",
+    "category": "alt",
+    "value": "SOT logo"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 43,
+    "scope": "CompanyShowcase",
+    "field": "copy-sot-building-in-public-e8fae90f61",
+    "category": "copy",
+    "value": "SOT / BUILDING IN PUBLIC"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 46,
+    "scope": "CompanyShowcase",
+    "field": "copy-independent-product-building-1a9c2e7940",
+    "category": "copy",
+    "value": "INDEPENDENT PRODUCT BUILDING"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 46,
+    "scope": "CompanyShowcase",
+    "field": "copy-web-data-automation-e3a6efaf56",
+    "category": "copy",
+    "value": "WEB · DATA · AUTOMATION"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 50,
+    "scope": "CompanyShowcase",
+    "field": "copy-01-the-company-f6a79fb546",
+    "category": "copy",
+    "value": "01 / THE COMPANY"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 50,
+    "scope": "CompanyShowcase",
+    "field": "copy-about-sot-cdcbdd2b0f",
+    "category": "copy",
+    "value": "ABOUT SOT"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 52,
+    "scope": "CompanyShowcase",
+    "field": "copy-a-practice-of-turning-ideas-into-working-soft-a1c12db17d",
+    "category": "copy",
+    "value": "A practice of turning ideas into working software."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 53,
+    "scope": "CompanyShowcase",
+    "field": "copy-sot-is-the-product-brand-founded-by-divine-og-a35a441d57",
+    "category": "copy",
+    "value": "SOT is the product brand founded by Divine Ogadinma Destiny in Nigeria. Its public portfolio spans web products, data analytics and intelligent automation."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 53,
+    "scope": "CompanyShowcase",
+    "field": "copy-audoryn-extends-that-work-into-autonomous-sof-8391e7c9ea",
+    "category": "copy",
+    "value": "Audoryn extends that work into autonomous software: a place to define what AI workers can do, supervise what they are doing and keep consequential decisions accountable."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 53,
+    "scope": "CompanyShowcase",
+    "field": "copy-https-sot-org-onrender-com-sot-brand-0101b7eee9",
+    "category": "copy",
+    "value": "https://sot-org.onrender.com/sot-brand"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 53,
+    "scope": "CompanyShowcase",
+    "field": "copy-visit-sot-brand-4bf7d6d880",
+    "category": "copy",
+    "value": "Visit SOT Brand "
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 59,
+    "scope": "CompanyShowcase",
+    "field": "copy-02-the-work-d0c3894473",
+    "category": "copy",
+    "value": "02 / THE WORK"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 59,
+    "scope": "CompanyShowcase",
+    "field": "copy-public-portfolio-82f46f3973",
+    "category": "copy",
+    "value": "PUBLIC PORTFOLIO"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 60,
+    "scope": "CompanyShowcase",
+    "field": "copy-more-than-one-product-abdc9f4609",
+    "category": "copy",
+    "value": "More than one product."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 60,
+    "scope": "CompanyShowcase",
+    "field": "copy-one-building-mindset-8edbdd9e91",
+    "category": "copy",
+    "value": "One building mindset."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 60,
+    "scope": "CompanyShowcase",
+    "field": "copy-three-projects-featured-on-sot-s-public-site-ac29c8d8e4",
+    "category": "copy",
+    "value": "Three projects featured on SOT’s public site show the range of work behind the brand."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 71,
+    "scope": "CompanyShowcase",
+    "field": "copy-03-the-next-question-aa6b64e4ac",
+    "category": "copy",
+    "value": "03 / THE NEXT QUESTION"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 71,
+    "scope": "CompanyShowcase",
+    "field": "copy-audoryn-d5a49e3294",
+    "category": "copy",
+    "value": "AUDORYN"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 72,
+    "scope": "CompanyShowcase",
+    "field": "copy-a-2f65dd1e9b",
+    "category": "copy",
+    "value": "A"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 72,
+    "scope": "CompanyShowcase",
+    "field": "copy-why-audoryn-af9df11167",
+    "category": "copy",
+    "value": "WHY AUDORYN"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 72,
+    "scope": "CompanyShowcase",
+    "field": "copy-when-software-can-act-c2582e34bd",
+    "category": "copy",
+    "value": "When software can act, "
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 72,
+    "scope": "CompanyShowcase",
+    "field": "copy-who-stays-in-control-cfc80078a1",
+    "category": "copy",
+    "value": "who stays in control?"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 72,
+    "scope": "CompanyShowcase",
+    "field": "copy-audoryn-is-sot-s-answer-to-a-practical-produc-e3aff102d6",
+    "category": "copy",
+    "value": "Audoryn is SOT’s answer to a practical product question. Give AI workers clear responsibilities and useful tools, then make their boundaries, approvals and activity understandable to the people operating them."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 72,
+    "scope": "CompanyShowcase",
+    "field": "copy-explore-audoryn-724748852c",
+    "category": "copy",
+    "value": "Explore Audoryn "
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 77,
+    "scope": "CompanyShowcase",
+    "field": "copy-04-the-founder-10ee143756",
+    "category": "copy",
+    "value": "04 / THE FOUNDER"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 77,
+    "scope": "CompanyShowcase",
+    "field": "copy-nigeria-ae6fc1f5ea",
+    "category": "copy",
+    "value": "NIGERIA"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 78,
+    "scope": "CompanyShowcase",
+    "field": "copy-d-44d9e7f030",
+    "category": "copy",
+    "value": "D"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 78,
+    "scope": "CompanyShowcase",
+    "field": "copy-founder-of-sot-25b416e80c",
+    "category": "copy",
+    "value": "FOUNDER OF SOT"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 78,
+    "scope": "CompanyShowcase",
+    "field": "copy-divine-ogadinma-destiny-575003ceb8",
+    "category": "copy",
+    "value": "Divine Ogadinma Destiny"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 78,
+    "scope": "CompanyShowcase",
+    "field": "copy-full-stack-developer-and-tech-entrepreneur-bu-d4040d5081",
+    "category": "copy",
+    "value": "Full-stack developer and tech entrepreneur building across software, data and automation. SOT’s public portfolio documents the products and projects behind that work."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 78,
+    "scope": "CompanyShowcase",
+    "field": "copy-https-sot-org-onrender-com-abe8807249",
+    "category": "copy",
+    "value": "https://sot-org.onrender.com/"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 78,
+    "scope": "CompanyShowcase",
+    "field": "copy-explore-the-sot-portfolio-229391aafa",
+    "category": "copy",
+    "value": "Explore the SOT portfolio "
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 81,
+    "scope": "CompanyShowcase",
+    "field": "copy-start-with-the-product-36f1733de7",
+    "category": "copy",
+    "value": "START WITH THE PRODUCT"
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 81,
+    "scope": "CompanyShowcase",
+    "field": "copy-see-the-work-e1a6f9762f",
+    "category": "copy",
+    "value": "See the work. "
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 81,
+    "scope": "CompanyShowcase",
+    "field": "copy-keep-the-control-14794c4e8a",
+    "category": "copy",
+    "value": "Keep the control."
+  },
+  {
+    "source": "src/public/CompanyShowcase.tsx",
+    "line": 81,
+    "scope": "CompanyShowcase",
+    "field": "copy-get-started-da2b012e4a",
+    "category": "copy",
+    "value": "Get started "
+  },
+  {
+    "source": "src/public/HomeGateScene.tsx",
+    "line": 148,
+    "scope": "HomeGateScene",
+    "field": "copy-a-work-unit-moves-through-the-audoryn-control-5e489b2287",
+    "category": "copy",
+    "value": "A work unit moves through the Audoryn control path: work, policy, human approval, and execution"
+  },
+  {
+    "source": "src/public/HomeGateScene.tsx",
+    "line": 152,
+    "scope": "HomeGateScene",
+    "field": "copy-ag-control-plane-67af4ee941",
+    "category": "copy",
+    "value": "AG / CONTROL PLANE"
+  },
+  {
+    "source": "src/public/HomeGateScene.tsx",
+    "line": 155,
+    "scope": "HomeGateScene",
+    "field": "copy-the-control-path-ebed635bb1",
+    "category": "copy",
+    "value": "THE CONTROL PATH"
+  },
+  {
+    "source": "src/public/HomeGateScene.tsx",
+    "line": 155,
+    "scope": "HomeGateScene",
+    "field": "copy-work-moves-forward-authority-stays-visible-45c3e76beb",
+    "category": "copy",
+    "value": "Work moves forward. Authority stays visible."
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 10,
+    "scope": "HomeHero",
+    "field": "field-autonomy-420717be0c",
+    "category": "field",
+    "value": "AUTONOMY"
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 11,
+    "scope": "HomeHero",
+    "field": "field-01-the-work-f635daf91c",
+    "category": "field",
+    "value": "01 / THE WORK"
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 12,
+    "scope": "HomeHero",
+    "field": "field-give-ai-workers-real-work-76c7eb1cf0",
+    "category": "field",
+    "value": "Give AI workers real work."
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 13,
+    "scope": "HomeHero",
+    "field": "field-create-focused-roles-assign-durable-jobs-and-e42e7e8ad8",
+    "category": "field",
+    "value": "Create focused roles, assign durable jobs, and let useful work move forward across your organization."
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 16,
+    "scope": "HomeHero",
+    "field": "field-control-46d51d1f9d",
+    "category": "field",
+    "value": "CONTROL"
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 17,
+    "scope": "HomeHero",
+    "field": "field-02-the-boundary-1113735f8a",
+    "category": "field",
+    "value": "02 / THE BOUNDARY"
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 18,
+    "scope": "HomeHero",
+    "field": "field-decide-what-may-happen-cb2e31655a",
+    "category": "field",
+    "value": "Decide what may happen."
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 19,
+    "scope": "HomeHero",
+    "field": "field-every-external-action-meets-explicit-capabili-90567e9585",
+    "category": "field",
+    "value": "Every external action meets explicit capabilities and deterministic policy before it can proceed."
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 22,
+    "scope": "HomeHero",
+    "field": "field-oversight-1717cc98a5",
+    "category": "field",
+    "value": "OVERSIGHT"
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 23,
+    "scope": "HomeHero",
+    "field": "field-03-the-people-4fed599598",
+    "category": "field",
+    "value": "03 / THE PEOPLE"
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 24,
+    "scope": "HomeHero",
+    "field": "field-keep-judgment-with-people-04e9e242da",
+    "category": "field",
+    "value": "Keep judgment with people."
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 25,
+    "scope": "HomeHero",
+    "field": "field-sensitive-work-pauses-for-human-approval-with-a8e0a68fe9",
+    "category": "field",
+    "value": "Sensitive work pauses for human approval, with the context and record needed to make a clear decision."
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 176,
+    "scope": "HomeHero",
+    "field": "copy-audoryn-introduction-9749039862",
+    "category": "copy",
+    "value": "Audoryn introduction"
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 184,
+    "scope": "HomeHero",
+    "field": "copy-audoryn-an-sot-product-c6440b4287",
+    "category": "copy",
+    "value": "AUDORYN / AN SOT PRODUCT"
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 184,
+    "scope": "HomeHero",
+    "field": "copy-ai-workforce-control-plane-3947fb7f36",
+    "category": "copy",
+    "value": "AI WORKFORCE CONTROL PLANE"
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 192,
+    "scope": "HomeHero",
+    "field": "copy-get-started-760ec87a21",
+    "category": "copy",
+    "value": "Get started"
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 192,
+    "scope": "HomeHero",
+    "field": "copy-explore-product-7927662087",
+    "category": "copy",
+    "value": "Explore product "
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 193,
+    "scope": "HomeHero",
+    "field": "copy-move-drag-to-explore-7211dd0745",
+    "category": "copy",
+    "value": "MOVE / DRAG TO EXPLORE"
+  },
+  {
+    "source": "src/public/HomeHero.tsx",
+    "line": 194,
+    "scope": "HomeHero",
+    "field": "copy-hero-scenes-035f2d30eb",
+    "category": "copy",
+    "value": "Hero scenes"
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 4,
+    "scope": "HomeJourney",
+    "field": "field-work-b31450866e",
+    "category": "field",
+    "value": "WORK"
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 4,
+    "scope": "HomeJourney",
+    "field": "field-give-each-worker-a-clear-job-f3a0e2295b",
+    "category": "field",
+    "value": "Give each worker a clear job."
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 4,
+    "scope": "HomeJourney",
+    "field": "field-define-the-objective-expected-result-and-limi-ad639d21d6",
+    "category": "field",
+    "value": "Define the objective, expected result and limits of the work before it enters the queue."
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 5,
+    "scope": "HomeJourney",
+    "field": "field-policy-94b6449539",
+    "category": "field",
+    "value": "POLICY"
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 5,
+    "scope": "HomeJourney",
+    "field": "field-make-authority-explicit-4a9b2cb19b",
+    "category": "field",
+    "value": "Make authority explicit."
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 5,
+    "scope": "HomeJourney",
+    "field": "field-connected-tools-expose-possibilities-capabili-e1c2e4b3b1",
+    "category": "field",
+    "value": "Connected tools expose possibilities. Capabilities, risk and policy determine what the worker may actually do."
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 6,
+    "scope": "HomeJourney",
+    "field": "field-approval-3393f2da9c",
+    "category": "field",
+    "value": "APPROVAL"
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 6,
+    "scope": "HomeJourney",
+    "field": "field-pause-where-judgment-matters-98f76d679e",
+    "category": "field",
+    "value": "Pause where judgment matters."
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 6,
+    "scope": "HomeJourney",
+    "field": "field-a-sensitive-action-waits-for-a-person-approva-25784a7e2a",
+    "category": "field",
+    "value": "A sensitive action waits for a person. Approval is checked against current authority before work continues."
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 7,
+    "scope": "HomeJourney",
+    "field": "field-execution-0680feabc0",
+    "category": "field",
+    "value": "EXECUTION"
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 7,
+    "scope": "HomeJourney",
+    "field": "field-see-the-result-and-the-reasoning-b32a16e4ed",
+    "category": "field",
+    "value": "See the result and the reasoning."
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 7,
+    "scope": "HomeJourney",
+    "field": "field-the-action-decision-and-outcome-remain-connec-ec16f3e0dc",
+    "category": "field",
+    "value": "The action, decision and outcome remain connected in an inspectable record for the team."
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 13,
+    "scope": "HomeJourney",
+    "field": "copy-how-controlled-work-moves-54524090c7",
+    "category": "copy",
+    "value": "HOW CONTROLLED WORK MOVES"
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 14,
+    "scope": "HomeJourney",
+    "field": "copy-autonomy-with-a-visible-boundary-4914ec64c2",
+    "category": "copy",
+    "value": "Autonomy with a visible boundary."
+  },
+  {
+    "source": "src/public/HomeJourney.tsx",
+    "line": 15,
+    "scope": "HomeJourney",
+    "field": "copy-from-the-first-instruction-to-the-final-actio-4ab9f48c0f",
+    "category": "copy",
+    "value": "From the first instruction to the final action, the worker can move forward without becoming its own authority."
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 5,
+    "scope": "HomeOperatingView",
+    "field": "field-workers-85163e5610",
+    "category": "field",
+    "value": "Workers"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 7,
+    "scope": "HomeOperatingView",
+    "field": "field-roles-identity-schedules-745e50c22d",
+    "category": "field",
+    "value": "Roles, identity, schedules"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 8,
+    "scope": "HomeOperatingView",
+    "field": "field-every-worker-has-a-defined-place-in-the-workf-89b4d9da4c",
+    "category": "field",
+    "value": "Every worker has a defined place in the workforce."
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 9,
+    "scope": "HomeOperatingView",
+    "field": "field-a-worker-starts-with-a-role-a-responsibility-ccf7d50e74",
+    "category": "field",
+    "value": "A worker starts with a role, a responsibility, a schedule and a human supervisor. Its identity stays distinct from the people who oversee it."
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 10,
+    "scope": "HomeOperatingView",
+    "field": "field-role-565aa2aef1",
+    "category": "field",
+    "value": "ROLE"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 10,
+    "scope": "HomeOperatingView",
+    "field": "field-identity-18d26c021d",
+    "category": "field",
+    "value": "IDENTITY"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 10,
+    "scope": "HomeOperatingView",
+    "field": "field-supervisor-0843250cdd",
+    "category": "field",
+    "value": "SUPERVISOR"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 11,
+    "scope": "HomeOperatingView",
+    "field": "field-defined-before-work-begins-d9b8dff0bc",
+    "category": "field",
+    "value": "DEFINED BEFORE WORK BEGINS"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 14,
+    "scope": "HomeOperatingView",
+    "field": "field-jobs-1156036829",
+    "category": "field",
+    "value": "Jobs"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 16,
+    "scope": "HomeOperatingView",
+    "field": "field-objectives-queue-runtime-5f3eb587cd",
+    "category": "field",
+    "value": "Objectives, queue, runtime"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 17,
+    "scope": "HomeOperatingView",
+    "field": "field-work-moves-with-an-objective-and-a-visible-st-789b8eb66e",
+    "category": "field",
+    "value": "Work moves with an objective and a visible state."
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 18,
+    "scope": "HomeOperatingView",
+    "field": "field-jobs-carry-the-expected-result-requirements-a-ac13242768",
+    "category": "field",
+    "value": "Jobs carry the expected result, requirements and completion criteria into a durable queue. Teams can follow what is waiting, running and complete."
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 19,
+    "scope": "HomeOperatingView",
+    "field": "field-objective-fa89312554",
+    "category": "field",
+    "value": "OBJECTIVE"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 19,
+    "scope": "HomeOperatingView",
+    "field": "field-queue-e6e1850645",
+    "category": "field",
+    "value": "QUEUE"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 19,
+    "scope": "HomeOperatingView",
+    "field": "field-result-d4499aeef2",
+    "category": "field",
+    "value": "RESULT"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 20,
+    "scope": "HomeOperatingView",
+    "field": "field-work-remains-inspectable-7ec605cb6a",
+    "category": "field",
+    "value": "WORK REMAINS INSPECTABLE"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 23,
+    "scope": "HomeOperatingView",
+    "field": "field-governance-f2b380bde6",
+    "category": "field",
+    "value": "Governance"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 25,
+    "scope": "HomeOperatingView",
+    "field": "field-policy-risk-approvals-964e9a0184",
+    "category": "field",
+    "value": "Policy, risk, approvals"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 26,
+    "scope": "HomeOperatingView",
+    "field": "field-authority-is-checked-at-the-action-boundary-6394c316f5",
+    "category": "field",
+    "value": "Authority is checked at the action boundary."
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 27,
+    "scope": "HomeOperatingView",
+    "field": "field-a-connected-tool-is-never-permission-on-its-o-e49c8a9036",
+    "category": "field",
+    "value": "A connected tool is never permission on its own. Capabilities, risk and policy decide whether an action can proceed or must wait for approval."
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 28,
+    "scope": "HomeOperatingView",
+    "field": "field-request-dcd502e679",
+    "category": "field",
+    "value": "REQUEST"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 28,
+    "scope": "HomeOperatingView",
+    "field": "field-policy-af3080a300",
+    "category": "field",
+    "value": "POLICY"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 28,
+    "scope": "HomeOperatingView",
+    "field": "field-decision-d325b21ab0",
+    "category": "field",
+    "value": "DECISION"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 29,
+    "scope": "HomeOperatingView",
+    "field": "field-authority-is-explicit-4e82d15a0e",
+    "category": "field",
+    "value": "AUTHORITY IS EXPLICIT"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 32,
+    "scope": "HomeOperatingView",
+    "field": "field-supervision-139db7b565",
+    "category": "field",
+    "value": "Supervision"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 34,
+    "scope": "HomeOperatingView",
+    "field": "field-escalations-incidents-audit-1d6ff31b17",
+    "category": "field",
+    "value": "Escalations, incidents, audit"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 35,
+    "scope": "HomeOperatingView",
+    "field": "field-people-can-see-the-moments-that-need-them-f2d0a92293",
+    "category": "field",
+    "value": "People can see the moments that need them."
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 36,
+    "scope": "HomeOperatingView",
+    "field": "field-exceptional-work-is-routed-to-a-named-human-t-50f2967ec0",
+    "category": "field",
+    "value": "Exceptional work is routed to a named human. The decision and outcome stay together in an audit record the team can inspect."
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 37,
+    "scope": "HomeOperatingView",
+    "field": "field-signal-1ead560f03",
+    "category": "field",
+    "value": "SIGNAL"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 37,
+    "scope": "HomeOperatingView",
+    "field": "field-human-ad0e3c9f5a",
+    "category": "field",
+    "value": "HUMAN"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 37,
+    "scope": "HomeOperatingView",
+    "field": "field-record-b6fb478db7",
+    "category": "field",
+    "value": "RECORD"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 38,
+    "scope": "HomeOperatingView",
+    "field": "field-human-attention-stays-visible-0798a05ed0",
+    "category": "field",
+    "value": "HUMAN ATTENTION STAYS VISIBLE"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 46,
+    "scope": "HomeOperatingView",
+    "field": "copy-explore-the-audoryn-operating-model-a9d7e0253b",
+    "category": "copy",
+    "value": "Explore the Audoryn operating model"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 47,
+    "scope": "HomeOperatingView",
+    "field": "copy-workforce-operating-model-556f4d0c82",
+    "category": "copy",
+    "value": "WORKFORCE / OPERATING MODEL"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 47,
+    "scope": "HomeOperatingView",
+    "field": "copy-select-a-layer-to-explore-1fd5163efc",
+    "category": "copy",
+    "value": "SELECT A LAYER TO EXPLORE"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 49,
+    "scope": "HomeOperatingView",
+    "field": "copy-operating-model-layers-31c3040381",
+    "category": "copy",
+    "value": "Operating model layers"
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 76,
+    "scope": "HomeOperatingView",
+    "field": "copy-view-e3aceeca52",
+    "category": "copy",
+    "value": "VIEW / "
+  },
+  {
+    "source": "src/public/HomeOperatingView.tsx",
+    "line": 76,
+    "scope": "HomeOperatingView",
+    "field": "copy-system-layer-5dfddd8ad0",
+    "category": "copy",
+    "value": "SYSTEM LAYER"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 8,
+    "scope": "LegalShowcase",
+    "field": "field-information-audoryn-handles-5124aeb51d",
+    "category": "field",
+    "value": "Information Audoryn handles"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 9,
+    "scope": "LegalShowcase",
+    "field": "field-creating-an-account-provides-an-email-address-ffc9f70d85",
+    "category": "field",
+    "value": "Creating an account provides an email address, an optional display name and a password. Within a workspace, Audoryn stores organization membership, worker and job settings, policies, approvals, incidents, conversations, memories, results, artifacts and audit records as those features are used."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 10,
+    "scope": "LegalShowcase",
+    "field": "field-account-and-membership-details-identify-peopl-6ad60cc9d6",
+    "category": "field",
+    "value": "Account and membership details identify people who can enter a workspace."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 10,
+    "scope": "LegalShowcase",
+    "field": "field-work-content-can-include-instructions-prompts-5f9572074f",
+    "category": "field",
+    "value": "Work content can include instructions, prompts, files, connected tool data and generated output."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 10,
+    "scope": "LegalShowcase",
+    "field": "field-operational-records-include-action-decisions-cced6304c6",
+    "category": "field",
+    "value": "Operational records include action decisions, usage, failures and security events."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 13,
+    "scope": "LegalShowcase",
+    "field": "field-why-it-is-used-2d3dfa8775",
+    "category": "field",
+    "value": "Why it is used"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 14,
+    "scope": "LegalShowcase",
+    "field": "field-audoryn-uses-this-information-to-authenticate-bf55b3420e",
+    "category": "field",
+    "value": "Audoryn uses this information to authenticate users, run and supervise configured work, apply capability and policy checks, request human approvals, show results, enforce plan limits, and investigate reliability or security issues. Workspace content is available according to organization membership and product permissions."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 17,
+    "scope": "LegalShowcase",
+    "field": "field-ai-models-and-connected-services-b0e804c4f1",
+    "category": "field",
+    "value": "AI models and connected services"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 18,
+    "scope": "LegalShowcase",
+    "field": "field-when-ai-features-are-used-relevant-task-conte-81e646ec87",
+    "category": "field",
+    "value": "When AI features are used, relevant task context can be sent to the configured NVIDIA model service for planning or vision analysis. A connected integration can send an authorized action and its necessary payload to the selected provider, such as GitHub, Slack, Gmail, Google Drive or Google Calendar. Those providers process information under their own terms and practices."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 19,
+    "scope": "LegalShowcase",
+    "field": "field-model-requests-are-limited-to-the-context-ass-b0d5f52a5a",
+    "category": "field",
+    "value": "Model requests are limited to the context assembled for the task; they are not a grant of provider authority."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 19,
+    "scope": "LegalShowcase",
+    "field": "field-provider-calls-remain-subject-to-audoryn-capa-d008dba439",
+    "category": "field",
+    "value": "Provider calls remain subject to Audoryn capability, policy, risk, approval and incident controls."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 22,
+    "scope": "LegalShowcase",
+    "field": "field-credentials-and-browser-storage-cdcda368b7",
+    "category": "field",
+    "value": "Credentials and browser storage"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 23,
+    "scope": "LegalShowcase",
+    "field": "field-account-passwords-are-stored-as-salted-hashes-e0432354b5",
+    "category": "field",
+    "value": "Account passwords are stored as salted hashes, rather than readable passwords. Connected service credentials are encrypted in the backend. After sign-in, the web app keeps an access token in browser local storage so it can make authenticated requests. A pending invitation code may be kept in session storage while you complete joining. Sign-out revokes the server session and removes the local token."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 26,
+    "scope": "LegalShowcase",
+    "field": "field-retention-and-deletion-852e206b28",
+    "category": "field",
+    "value": "Retention and deletion"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 27,
+    "scope": "LegalShowcase",
+    "field": "field-sessions-expire-or-can-be-revoked-operational-dc15cda002",
+    "category": "field",
+    "value": "Sessions expire or can be revoked. Operational history, audit records, results and artifacts can remain available for governance and investigation. An expiry date on a memory entry limits its eligibility as future AI context; it does not by itself mean the underlying record or file has been physically deleted. Audoryn does not currently expose a single self-service control for deleting an entire account or workspace and all associated history."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 30,
+    "scope": "LegalShowcase",
+    "field": "field-access-and-requests-ffd808893b",
+    "category": "field",
+    "value": "Access and requests"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 31,
+    "scope": "LegalShowcase",
+    "field": "field-workspace-administrators-can-manage-membershi-63392c8bc9",
+    "category": "field",
+    "value": "Workspace administrators can manage membership, workers, jobs and integrations within their permissions. Some records and connections can be removed individually in the product. For broader access, correction or deletion requests, use your organization’s existing SOT support or business contact. Requests may need to be handled alongside audit obligations and any applicable agreement."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 37,
+    "scope": "LegalShowcase",
+    "field": "field-accounts-and-workspace-authority-4896d78894",
+    "category": "field",
+    "value": "Accounts and workspace authority"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 38,
+    "scope": "LegalShowcase",
+    "field": "field-use-audoryn-through-an-account-you-control-an-638060fd2d",
+    "category": "field",
+    "value": "Use Audoryn through an account you control and only for an organization you are authorized to represent. Workspace owners and administrators manage human membership and roles. Keep credentials and invitation links private, and remove access when a person or integration no longer needs it."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 41,
+    "scope": "LegalShowcase",
+    "field": "field-permitted-use-3e0212519d",
+    "category": "field",
+    "value": "Permitted use"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 42,
+    "scope": "LegalShowcase",
+    "field": "field-configure-workers-jobs-and-connected-systems-0827ef74a5",
+    "category": "field",
+    "value": "Configure workers, jobs and connected systems only where you have permission to access the underlying data and take the requested actions. Do not use Audoryn to bypass another service’s access controls, collect data without authority, or interfere with Audoryn’s identity, policy, approval, audit or incident controls."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 45,
+    "scope": "LegalShowcase",
+    "field": "field-ai-work-and-human-decisions-32a1358468",
+    "category": "field",
+    "value": "AI work and human decisions"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 46,
+    "scope": "LegalShowcase",
+    "field": "field-audoryn-can-plan-work-and-prepare-or-execute-a0c875315d",
+    "category": "field",
+    "value": "Audoryn can plan work and prepare or execute actions within configured capabilities and policy. A policy may allow, deny or require human approval for an action. Organizations remain responsible for the workers, instructions, policies, integrations and review practices they configure, including checking generated output before relying on it for consequential decisions."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 47,
+    "scope": "LegalShowcase",
+    "field": "field-a-template-creates-draft-records-it-does-not-d67cd13a9f",
+    "category": "field",
+    "value": "A template creates draft records; it does not connect tools or authorize execution."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 47,
+    "scope": "LegalShowcase",
+    "field": "field-human-approval-applies-when-the-configured-po-cf19468164",
+    "category": "field",
+    "value": "Human approval applies when the configured policy requires it. It is not a blanket approval step for every action."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 50,
+    "scope": "LegalShowcase",
+    "field": "field-connected-providers-c55b09e798",
+    "category": "field",
+    "value": "Connected providers"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 51,
+    "scope": "LegalShowcase",
+    "field": "field-if-you-connect-a-third-party-service-you-auth-dfec19735e",
+    "category": "field",
+    "value": "If you connect a third-party service, you authorize Audoryn to use the credentials and permissions you provide for the operations you configure and permit. The connected provider controls its own account, availability, permissions and terms. Disconnect integrations that should no longer be used."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 54,
+    "scope": "LegalShowcase",
+    "field": "field-plans-and-limits-5706ddd912",
+    "category": "field",
+    "value": "Plans and limits"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 55,
+    "scope": "LegalShowcase",
+    "field": "field-the-free-workspace-is-the-current-self-servic-23743ec954",
+    "category": "field",
+    "value": "The Free workspace is the current self-service starting point. Team, Business and Scale appear in the product catalog, but the current backend has no connected checkout or self-service paid upgrade. Worker capacity and usage limits are enforced according to the plan assigned to the organization; a displayed catalog price alone does not activate a paid subscription."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 58,
+    "scope": "LegalShowcase",
+    "field": "field-service-changes-and-records-625e38267e",
+    "category": "field",
+    "value": "Service changes and records"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 59,
+    "scope": "LegalShowcase",
+    "field": "field-audoryn-uses-versioned-apis-and-may-change-av-edf6f83267",
+    "category": "field",
+    "value": "Audoryn uses versioned APIs and may change available features, model configuration, providers or limits as the service develops. Work can pause or fail when a provider is unavailable, a session expires, a limit is reached, or a security control blocks execution. Audit and operational records may remain after an individual worker, job or integration is removed."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 75,
+    "scope": "LegalShowcase",
+    "field": "copy-audoryn-legal-f025b88de2",
+    "category": "copy",
+    "value": "AUDORYN / LEGAL"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 75,
+    "scope": "LegalShowcase",
+    "field": "copy-an-sot-product-35bf08381d",
+    "category": "copy",
+    "value": "AN SOT PRODUCT"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 77,
+    "scope": "LegalShowcase",
+    "field": "copy-privacy-data-c65b3e3d93",
+    "category": "copy",
+    "value": "PRIVACY & DATA"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 77,
+    "scope": "LegalShowcase",
+    "field": "copy-product-use-097de84813",
+    "category": "copy",
+    "value": "PRODUCT USE"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 78,
+    "scope": "LegalShowcase",
+    "field": "copy-your-work-your-data-clear-boundaries-7030613fee",
+    "category": "copy",
+    "value": "Your work. Your data. Clear boundaries."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 78,
+    "scope": "LegalShowcase",
+    "field": "copy-clear-terms-for-controlled-work-f91df19b59",
+    "category": "copy",
+    "value": "Clear terms for controlled work."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 79,
+    "scope": "LegalShowcase",
+    "field": "copy-how-audoryn-handles-account-workspace-and-ope-b228a769f9",
+    "category": "copy",
+    "value": "How Audoryn handles account, workspace and operational information as the product runs."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 79,
+    "scope": "LegalShowcase",
+    "field": "copy-how-accounts-connected-systems-and-ai-workers-bb28098e0a",
+    "category": "copy",
+    "value": "How accounts, connected systems and AI workers are expected to be used in Audoryn."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 81,
+    "scope": "LegalShowcase",
+    "field": "copy-privacy-overview-780df491d9",
+    "category": "copy",
+    "value": "Privacy overview"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 81,
+    "scope": "LegalShowcase",
+    "field": "copy-terms-of-use-9d1bd81eae",
+    "category": "copy",
+    "value": "Terms of use"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 81,
+    "scope": "LegalShowcase",
+    "field": "copy-current-product-behavior-30-september-2026-10aeb1a324",
+    "category": "copy",
+    "value": "Current product behavior / 30 September 2026"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 86,
+    "scope": "LegalShowcase",
+    "field": "copy-privacy-e55194bb5e",
+    "category": "copy",
+    "value": "Privacy"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 86,
+    "scope": "LegalShowcase",
+    "field": "copy-terms-6962999226",
+    "category": "copy",
+    "value": "Terms"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 87,
+    "scope": "LegalShowcase",
+    "field": "copy-on-this-page-27dc9233a2",
+    "category": "copy",
+    "value": "ON THIS PAGE"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 93,
+    "scope": "LegalShowcase",
+    "field": "copy-this-overview-describes-the-audoryn-product-a-3d89308c47",
+    "category": "copy",
+    "value": "This overview describes the Audoryn product. An organization-specific agreement or an applicable legal notice may provide further details, including legal bases and jurisdiction-specific rights."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 94,
+    "scope": "LegalShowcase",
+    "field": "copy-these-product-use-terms-describe-the-current-30792c8e05",
+    "category": "copy",
+    "value": "These product-use terms describe the current Audoryn service. A signed agreement with SOT, where one exists, may set additional or different commercial and legal terms."
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 100,
+    "scope": "LegalShowcase",
+    "field": "copy-related-document-d2c58582a5",
+    "category": "copy",
+    "value": "RELATED DOCUMENT"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 100,
+    "scope": "LegalShowcase",
+    "field": "copy-data-practices-ec00552c09",
+    "category": "copy",
+    "value": "DATA PRACTICES"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 101,
+    "scope": "LegalShowcase",
+    "field": "copy-read-product-terms-e11a58e401",
+    "category": "copy",
+    "value": "Read product terms"
+  },
+  {
+    "source": "src/public/LegalShowcase.tsx",
+    "line": 101,
+    "scope": "LegalShowcase",
+    "field": "copy-read-privacy-overview-21c20a8cb9",
+    "category": "copy",
+    "value": "Read privacy overview"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 6,
+    "scope": "PricingShowcase",
+    "field": "field-free-3b6a9f4a90",
+    "category": "field",
+    "value": "Free"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 6,
+    "scope": "PricingShowcase",
+    "field": "field-start-with-a-small-supervised-workforce-eb3b31e4dd",
+    "category": "field",
+    "value": "Start with a small supervised workforce."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 6,
+    "scope": "PricingShowcase",
+    "field": "field-available-now-6f71ae8a74",
+    "category": "field",
+    "value": "AVAILABLE NOW"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 7,
+    "scope": "PricingShowcase",
+    "field": "field-team-5ca46d5345",
+    "category": "field",
+    "value": "Team"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 7,
+    "scope": "PricingShowcase",
+    "field": "field-coordinate-a-growing-workforce-across-a-team-a1898a8837",
+    "category": "field",
+    "value": "Coordinate a growing workforce across a team."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 7,
+    "scope": "PricingShowcase",
+    "field": "field-catalog-plan-c048e33c68",
+    "category": "field",
+    "value": "CATALOG PLAN"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 8,
+    "scope": "PricingShowcase",
+    "field": "field-business-4fd3cfee69",
+    "category": "field",
+    "value": "Business"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 8,
+    "scope": "PricingShowcase",
+    "field": "field-run-more-workers-across-recurring-company-wor-feca14c121",
+    "category": "field",
+    "value": "Run more workers across recurring company work."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 8,
+    "scope": "PricingShowcase",
+    "field": "field-catalog-plan-c048e33c68",
+    "category": "field",
+    "value": "CATALOG PLAN"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 9,
+    "scope": "PricingShowcase",
+    "field": "field-scale-12b011323d",
+    "category": "field",
+    "value": "Scale"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 9,
+    "scope": "PricingShowcase",
+    "field": "field-plan-for-a-larger-governed-workforce-0b5424bc75",
+    "category": "field",
+    "value": "Plan for a larger governed workforce."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 9,
+    "scope": "PricingShowcase",
+    "field": "field-catalog-plan-c048e33c68",
+    "category": "field",
+    "value": "CATALOG PLAN"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 24,
+    "scope": "PricingShowcase",
+    "field": "copy-audoryn-pricing-fbffa9ae4d",
+    "category": "copy",
+    "value": "AUDORYN / PRICING"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 24,
+    "scope": "PricingShowcase",
+    "field": "copy-start-free-5caa4b71a6",
+    "category": "copy",
+    "value": "Start free."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 24,
+    "scope": "PricingShowcase",
+    "field": "copy-grow-with-the-work-b5a0cf9f27",
+    "category": "copy",
+    "value": "Grow with the work."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 24,
+    "scope": "PricingShowcase",
+    "field": "copy-choose-capacity-for-the-number-of-ai-workers-6141777273",
+    "category": "copy",
+    "value": "Choose capacity for the number of AI workers you need. The same authority and oversight model applies at every size."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 24,
+    "scope": "PricingShowcase",
+    "field": "copy--free-workspace-available-now-e2ae9cdb0b",
+    "category": "copy",
+    "value": " FREE WORKSPACE AVAILABLE NOW"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 26,
+    "scope": "PricingShowcase",
+    "field": "copy-plan-catalog-da684ba55b",
+    "category": "copy",
+    "value": "PLAN CATALOG"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 26,
+    "scope": "PricingShowcase",
+    "field": "copy-capacity-at-a-glance-75145d1496",
+    "category": "copy",
+    "value": "Capacity at a glance."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 26,
+    "scope": "PricingShowcase",
+    "field": "copy-monthly-usd-catalog-prices-paid-upgrades-are-898a084f44",
+    "category": "copy",
+    "value": "Monthly USD catalog prices. Paid upgrades are not yet available for self-service purchase."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 26,
+    "scope": "PricingShowcase",
+    "field": "copy--0d3e336d0b",
+    "category": "copy",
+    "value": "$"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 26,
+    "scope": "PricingShowcase",
+    "field": "copy--month-7cadcf741a",
+    "category": "copy",
+    "value": "/ month"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 26,
+    "scope": "PricingShowcase",
+    "field": "copy-catalog-027d78805d",
+    "category": "copy",
+    "value": "catalog"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 26,
+    "scope": "PricingShowcase",
+    "field": "copy-managed-workers-7c63b92fd6",
+    "category": "copy",
+    "value": "MANAGED WORKERS"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 26,
+    "scope": "PricingShowcase",
+    "field": "copy-up-to-12f147e3dd",
+    "category": "copy",
+    "value": "Up to "
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 26,
+    "scope": "PricingShowcase",
+    "field": "copy-get-started-free-efd16b962f",
+    "category": "copy",
+    "value": "Get started free "
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 26,
+    "scope": "PricingShowcase",
+    "field": "copy-paid-activation-not-yet-open-31aeb992da",
+    "category": "copy",
+    "value": "Paid activation not yet open"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 26,
+    "scope": "PricingShowcase",
+    "field": "copy-the-backend-currently-defaults-organizations-e61500d587",
+    "category": "copy",
+    "value": "The backend currently defaults organizations to Free. The paid plan figures above describe the catalog; they are not a live checkout offer."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 28,
+    "scope": "PricingShowcase",
+    "field": "copy-the-same-control-model-6ed6dc03c2",
+    "category": "copy",
+    "value": "THE SAME CONTROL MODEL"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 28,
+    "scope": "PricingShowcase",
+    "field": "copy-capacity-changes-c7ae494b52",
+    "category": "copy",
+    "value": "Capacity changes."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 28,
+    "scope": "PricingShowcase",
+    "field": "copy-authority-does-not-956b660059",
+    "category": "copy",
+    "value": "Authority does not."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 28,
+    "scope": "PricingShowcase",
+    "field": "copy-capability-and-policy-checks-on-external-acti-689805952a",
+    "category": "copy",
+    "value": "Capability and policy checks on external actions"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 28,
+    "scope": "PricingShowcase",
+    "field": "copy-human-approval-when-the-rule-requires-it-03def9c3e0",
+    "category": "copy",
+    "value": "Human approval when the rule requires it"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 28,
+    "scope": "PricingShowcase",
+    "field": "copy-connected-tools-and-inspectable-results-dc4e201148",
+    "category": "copy",
+    "value": "Connected tools and inspectable results"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 30,
+    "scope": "PricingShowcase",
+    "field": "copy-common-questions-476ad41718",
+    "category": "copy",
+    "value": "COMMON QUESTIONS"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 30,
+    "scope": "PricingShowcase",
+    "field": "copy-before-you-begin-cec82f2702",
+    "category": "copy",
+    "value": "Before you begin."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 30,
+    "scope": "PricingShowcase",
+    "field": "copy-can-i-start-without-a-paid-plan-8aadb71d54",
+    "category": "copy",
+    "value": "Can I start without a paid plan?"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 30,
+    "scope": "PricingShowcase",
+    "field": "copy-yes-new-organizations-start-on-free-which-sup-a67aac9fd5",
+    "category": "copy",
+    "value": "Yes. New organizations start on Free, which supports up to three managed workers."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 30,
+    "scope": "PricingShowcase",
+    "field": "copy-can-i-purchase-team-business-or-scale-today-796d30cbe7",
+    "category": "copy",
+    "value": "Can I purchase Team, Business or Scale today?"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 30,
+    "scope": "PricingShowcase",
+    "field": "copy-no-the-paid-plans-are-in-the-product-catalog-db059d00b8",
+    "category": "copy",
+    "value": "No. The paid plans are in the product catalog, but a billing provider and checkout are not connected yet."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 30,
+    "scope": "PricingShowcase",
+    "field": "copy-does-a-larger-plan-give-workers-more-authorit-914ce9004a",
+    "category": "copy",
+    "value": "Does a larger plan give workers more authority?"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 30,
+    "scope": "PricingShowcase",
+    "field": "copy-no-plan-capacity-is-separate-from-identity-ca-feaede7521",
+    "category": "copy",
+    "value": "No. Plan capacity is separate from identity, capability, risk, policy, approvals and incident controls."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 32,
+    "scope": "PricingShowcase",
+    "field": "copy-start-with-audoryn-9a63f271f1",
+    "category": "copy",
+    "value": "START WITH AUDORYN"
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 32,
+    "scope": "PricingShowcase",
+    "field": "copy-put-the-first-worker-to-work-b32942fc71",
+    "category": "copy",
+    "value": "Put the first worker to work."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 32,
+    "scope": "PricingShowcase",
+    "field": "copy-begin-on-free-and-define-a-clear-role-job-and-72e5ccedf6",
+    "category": "copy",
+    "value": "Begin on Free and define a clear role, job and supervisor."
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 32,
+    "scope": "PricingShowcase",
+    "field": "copy-get-started-8942f59ca0",
+    "category": "copy",
+    "value": "Get started "
+  },
+  {
+    "source": "src/public/PricingShowcase.tsx",
+    "line": 32,
+    "scope": "PricingShowcase",
+    "field": "copy-explore-the-product-92a1b1f60e",
+    "category": "copy",
+    "value": "Explore the product "
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 14,
+    "scope": "ProductShowcase",
+    "field": "copy-illustrative-audoryn-workspace-preview-ad166b1b02",
+    "category": "copy",
+    "value": "Illustrative Audoryn workspace preview"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 15,
+    "scope": "ProductShowcase",
+    "field": "copy--audoryn-65b4c2d381",
+    "category": "copy",
+    "value": " AUDORYN "
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 15,
+    "scope": "ProductShowcase",
+    "field": "copy--workspace-20052e5553",
+    "category": "copy",
+    "value": " WORKSPACE"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 15,
+    "scope": "ProductShowcase",
+    "field": "copy-northstar-operations-12116b98c9",
+    "category": "copy",
+    "value": "NORTHSTAR OPERATIONS "
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 15,
+    "scope": "ProductShowcase",
+    "field": "copy-n-2f45d4f8fb",
+    "category": "copy",
+    "value": "N"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 17,
+    "scope": "ProductShowcase",
+    "field": "copy-operate-e40e94fdf5",
+    "category": "copy",
+    "value": "OPERATE"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 17,
+    "scope": "ProductShowcase",
+    "field": "copy-manage-17012392a1",
+    "category": "copy",
+    "value": "MANAGE"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 17,
+    "scope": "ProductShowcase",
+    "field": "copy-integrations-45e338a51c",
+    "category": "copy",
+    "value": "Integrations"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 17,
+    "scope": "ProductShowcase",
+    "field": "copy-policies-6ee683e406",
+    "category": "copy",
+    "value": "Policies"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 17,
+    "scope": "ProductShowcase",
+    "field": "copy-audit-58136373aa",
+    "category": "copy",
+    "value": "Audit"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 19,
+    "scope": "ProductShowcase",
+    "field": "copy-workspace-f0906cfdad",
+    "category": "copy",
+    "value": "WORKSPACE / "
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 19,
+    "scope": "ProductShowcase",
+    "field": "copy-example-view-bbd48542e9",
+    "category": "copy",
+    "value": "EXAMPLE VIEW"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-workforce-85e515065b",
+    "category": "copy",
+    "value": "Workforce"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-people-and-ai-one-clear-structure-263cb54823",
+    "category": "copy",
+    "value": "People and AI, one clear structure."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-02-workers-cb0ef86d72",
+    "category": "copy",
+    "value": "02 WORKERS"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-worker-d4da0c8687",
+    "category": "copy",
+    "value": "WORKER"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-role-318be8d028",
+    "category": "copy",
+    "value": "ROLE"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-supervisor-25e20c1bd5",
+    "category": "copy",
+    "value": "SUPERVISOR"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-state-a8a6917e5b",
+    "category": "copy",
+    "value": "STATE"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-ar-0598909a56",
+    "category": "copy",
+    "value": "AR"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-research-analyst-e8e2a20356",
+    "category": "copy",
+    "value": "Research analyst"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-insights-team-2564464259",
+    "category": "copy",
+    "value": "Insights team"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-research-02a25bb978",
+    "category": "copy",
+    "value": "Research"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-ada-m-b762509306",
+    "category": "copy",
+    "value": "Ada M."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy--active-0c4b4f8174",
+    "category": "copy",
+    "value": " Active"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-oc-d82560a5b2",
+    "category": "copy",
+    "value": "OC"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-operations-coordinator-1b663700a5",
+    "category": "copy",
+    "value": "Operations coordinator"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-operations-a86f93c01e",
+    "category": "copy",
+    "value": "Operations"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-operations-a86f93c01e",
+    "category": "copy",
+    "value": "Operations"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy-daniel-k-f7cc273dd1",
+    "category": "copy",
+    "value": "Daniel K."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy--active-0c4b4f8174",
+    "category": "copy",
+    "value": " Active"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy--separate-agent-identity-666a92263e",
+    "category": "copy",
+    "value": " Separate agent identity"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 20,
+    "scope": "ProductShowcase",
+    "field": "copy--defined-working-hours-999fcdef13",
+    "category": "copy",
+    "value": " Defined working hours"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-jobs-4f95b87691",
+    "category": "copy",
+    "value": "Jobs"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-work-with-a-visible-state-bb1828c59f",
+    "category": "copy",
+    "value": "Work with a visible state."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-03-work-items-384b09ff72",
+    "category": "copy",
+    "value": "03 WORK ITEMS"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-compile-weekly-research-brief-c79edfa62e",
+    "category": "copy",
+    "value": "Compile weekly research brief"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-research-analyst-scheduled-31db70fad3",
+    "category": "copy",
+    "value": "Research analyst · Scheduled"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-completed-2e610ec32f",
+    "category": "copy",
+    "value": "Completed"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-review-release-activity-a79a65d59c",
+    "category": "copy",
+    "value": "Review release activity"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-operations-coordinator-running-9397a3e7b6",
+    "category": "copy",
+    "value": "Operations coordinator · Running"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-running-d6c08c7f29",
+    "category": "copy",
+    "value": "Running"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-prepare-stakeholder-update-6391f055e1",
+    "category": "copy",
+    "value": "Prepare stakeholder update"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-operations-coordinator-queued-8e5b7e16c1",
+    "category": "copy",
+    "value": "Operations coordinator · Queued"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-queued-2ecdaf2119",
+    "category": "copy",
+    "value": "Queued"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy--objective-and-completion-criteria-cb54f4df66",
+    "category": "copy",
+    "value": " Objective and completion criteria"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 21,
+    "scope": "ProductShowcase",
+    "field": "copy-run-history-retained-f053d23c47",
+    "category": "copy",
+    "value": "Run history retained"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 22,
+    "scope": "ProductShowcase",
+    "field": "copy-approvals-5de0b61ae3",
+    "category": "copy",
+    "value": "Approvals"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 22,
+    "scope": "ProductShowcase",
+    "field": "copy-judgment-returns-to-a-person-d180bf5e84",
+    "category": "copy",
+    "value": "Judgment returns to a person."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 22,
+    "scope": "ProductShowcase",
+    "field": "copy-01-needs-review-8a9da18688",
+    "category": "copy",
+    "value": "01 NEEDS REVIEW"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 22,
+    "scope": "ProductShowcase",
+    "field": "copy--action-held-5f0165a359",
+    "category": "copy",
+    "value": " ACTION HELD"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 22,
+    "scope": "ProductShowcase",
+    "field": "copy-post-stakeholder-update-4d2ad3b593",
+    "category": "copy",
+    "value": "Post stakeholder update"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 22,
+    "scope": "ProductShowcase",
+    "field": "copy-operations-coordinator-requested-a-slack-mess-069927f608",
+    "category": "copy",
+    "value": "Operations coordinator requested a Slack message. The run is paused while a reviewer checks the request and its context."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 22,
+    "scope": "ProductShowcase",
+    "field": "copy-requested-by-09dcdd07c7",
+    "category": "copy",
+    "value": "REQUESTED BY "
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 22,
+    "scope": "ProductShowcase",
+    "field": "copy-operations-coordinator-1b663700a5",
+    "category": "copy",
+    "value": "Operations coordinator"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 22,
+    "scope": "ProductShowcase",
+    "field": "copy-reviewer-25e5eb9c62",
+    "category": "copy",
+    "value": "REVIEWER "
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 22,
+    "scope": "ProductShowcase",
+    "field": "copy-daniel-k-f7cc273dd1",
+    "category": "copy",
+    "value": "Daniel K."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 22,
+    "scope": "ProductShowcase",
+    "field": "copy--policy-and-risk-checked-again-before-resume-431b09394a",
+    "category": "copy",
+    "value": " Policy and risk checked again before resume"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 25,
+    "scope": "ProductShowcase",
+    "field": "copy-illustrative-workspace-view-example-data-160067c536",
+    "category": "copy",
+    "value": "Illustrative workspace view · Example data"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 30,
+    "scope": "ProductShowcase",
+    "field": "field-github-74f8c3b1d0",
+    "category": "field",
+    "value": "GitHub"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 31,
+    "scope": "ProductShowcase",
+    "field": "field-gmail-d3bddbea07",
+    "category": "field",
+    "value": "Gmail"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 32,
+    "scope": "ProductShowcase",
+    "field": "field-google-drive-2f0fbdbe71",
+    "category": "field",
+    "value": "Google Drive"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 33,
+    "scope": "ProductShowcase",
+    "field": "field-slack-a342ac5f54",
+    "category": "field",
+    "value": "Slack"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 34,
+    "scope": "ProductShowcase",
+    "field": "field-google-calendar-4a161453ac",
+    "category": "field",
+    "value": "Google Calendar"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 35,
+    "scope": "ProductShowcase",
+    "field": "field-governed-browser-f97bc0ca4d",
+    "category": "field",
+    "value": "Governed Browser"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 52,
+    "scope": "ProductShowcase",
+    "field": "copy-audoryn-product-2d9994e3dd",
+    "category": "copy",
+    "value": "AUDORYN / PRODUCT"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 52,
+    "scope": "ProductShowcase",
+    "field": "copy-give-work-to-ai-e3bf010963",
+    "category": "copy",
+    "value": "Give work to AI."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 52,
+    "scope": "ProductShowcase",
+    "field": "copy-keep-people-in-control-d7956073c0",
+    "category": "copy",
+    "value": "Keep people in control."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 52,
+    "scope": "ProductShowcase",
+    "field": "copy-build-a-supervised-ai-workforce-for-the-work-bbf36cd5f3",
+    "category": "copy",
+    "value": "Build a supervised AI workforce for the work your organization already does. Define the role, assign the job, connect the tools and see every important decision."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 52,
+    "scope": "ProductShowcase",
+    "field": "copy-get-started-c3d0e3b774",
+    "category": "copy",
+    "value": "Get started "
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 52,
+    "scope": "ProductShowcase",
+    "field": "copy--product-workforce-c67b46f873",
+    "category": "copy",
+    "value": "#product-workforce"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 52,
+    "scope": "ProductShowcase",
+    "field": "copy-explore-the-product-ddfb9814b1",
+    "category": "copy",
+    "value": "Explore the product "
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 52,
+    "scope": "ProductShowcase",
+    "field": "copy-workers-4f0fb03fd9",
+    "category": "copy",
+    "value": "WORKERS"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 52,
+    "scope": "ProductShowcase",
+    "field": "copy-jobs-f102d297fb",
+    "category": "copy",
+    "value": "JOBS"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 52,
+    "scope": "ProductShowcase",
+    "field": "copy-supervision-5a3701a338",
+    "category": "copy",
+    "value": "SUPERVISION"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 52,
+    "scope": "ProductShowcase",
+    "field": "copy-integrations-a1bc6fcf6d",
+    "category": "copy",
+    "value": "INTEGRATIONS"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 57,
+    "scope": "ProductShowcase",
+    "field": "copy-01-the-workforce-3ba12fc10b",
+    "category": "copy",
+    "value": "01 / THE WORKFORCE"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 57,
+    "scope": "ProductShowcase",
+    "field": "copy-a-useful-ai-worker-needs-more-than-a-prompt-a-47cea51301",
+    "category": "copy",
+    "value": "A useful AI worker needs more than a prompt. Audoryn gives it a role, a job and a place in your organization."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-workforce-01-100937443f",
+    "category": "copy",
+    "value": "WORKFORCE / 01"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-make-the-work-legible-before-it-begins-b9ac15c0f7",
+    "category": "copy",
+    "value": "Make the work legible before it begins."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-create-workers-with-responsibilities-working-5ad7147bc3",
+    "category": "copy",
+    "value": "Create workers with responsibilities, working hours and a named human supervisor. Give each job an objective, requirements and a clear definition of done."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy--named-roles-and-supervisors-f9d20e4ec3",
+    "category": "copy",
+    "value": " Named roles and supervisors"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy--scheduled-and-triggered-jobs-e43c684d7f",
+    "category": "copy",
+    "value": " Scheduled and triggered jobs"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy--a-separate-security-identity-for-every-worke-c441feb5c4",
+    "category": "copy",
+    "value": " A separate security identity for every worker"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-illustration-of-a-worker-and-a-defined-job-7bfdcf91f5",
+    "category": "copy",
+    "value": "Illustration of a worker and a defined job"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-worker-profile-c9ef3e02d9",
+    "category": "copy",
+    "value": "WORKER PROFILE"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-ar-0598909a56",
+    "category": "copy",
+    "value": "AR"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-research-insights-674be78ca5",
+    "category": "copy",
+    "value": "RESEARCH / INSIGHTS"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-research-analyst-e8e2a20356",
+    "category": "copy",
+    "value": "Research analyst"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-supervised-by-ada-m-ad11396cc4",
+    "category": "copy",
+    "value": "Supervised by Ada M."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-assigned-job-4443ac2806",
+    "category": "copy",
+    "value": "ASSIGNED JOB"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-compile-weekly-research-brief-c79edfa62e",
+    "category": "copy",
+    "value": "Compile weekly research brief"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-gather-relevant-sources-summarize-findings-an-b03204ccf4",
+    "category": "copy",
+    "value": "Gather relevant sources, summarize findings and deliver a structured brief."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-mon-09-00-69e036170d",
+    "category": "copy",
+    "value": "MON · 09:00"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-review-before-delivery-aa837859dc",
+    "category": "copy",
+    "value": "REVIEW BEFORE DELIVERY"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy--active-worker-1183fa48df",
+    "category": "copy",
+    "value": " ACTIVE WORKER"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 59,
+    "scope": "ProductShowcase",
+    "field": "copy-role-job-queue-6767ecc3f1",
+    "category": "copy",
+    "value": "ROLE → JOB → QUEUE"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-runtime-02-fbf21a690c",
+    "category": "copy",
+    "value": "RUNTIME / 02"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-from-assignment-to-a-traceable-result-ce16590421",
+    "category": "copy",
+    "value": "From assignment to a traceable result."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-jobs-enter-a-durable-queue-runs-have-steps-ch-018a38e91e",
+    "category": "copy",
+    "value": "Jobs enter a durable queue. Runs have steps, checkpoints, retries and a recorded outcome, so work can be followed instead of guessed at."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-run-weekly-research-brief-089fa7de0e",
+    "category": "copy",
+    "value": "RUN / WEEKLY RESEARCH BRIEF"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy--in-progress-90231989a0",
+    "category": "copy",
+    "value": " IN PROGRESS"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-read-assigned-context-7b1b561f61",
+    "category": "copy",
+    "value": "Read assigned context"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-sources-and-job-requirements-loaded-010599d190",
+    "category": "copy",
+    "value": "Sources and job requirements loaded"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-plan-the-work-4fe1ff535d",
+    "category": "copy",
+    "value": "Plan the work"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-bounded-ai-planning-ab01550f57",
+    "category": "copy",
+    "value": "Bounded AI planning"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-collect-observations-870b4d7a8c",
+    "category": "copy",
+    "value": "Collect observations"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-connected-tools-governed-access-234cd0ece6",
+    "category": "copy",
+    "value": "Connected tools, governed access"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-assess-completion-db5eeda954",
+    "category": "copy",
+    "value": "Assess completion"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-compare-result-with-the-job-criteria-b6903f6e6e",
+    "category": "copy",
+    "value": "Compare result with the job criteria"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-work-item-8f24-a3137c908d",
+    "category": "copy",
+    "value": "WORK ITEM / 8F24"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 61,
+    "scope": "ProductShowcase",
+    "field": "copy-example-run-acd7415fe2",
+    "category": "copy",
+    "value": "EXAMPLE RUN"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 63,
+    "scope": "ProductShowcase",
+    "field": "copy-ai-03-d6be6ed883",
+    "category": "copy",
+    "value": "AI / 03"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 63,
+    "scope": "ProductShowcase",
+    "field": "copy-intelligence-where-it-helps-8036cafd5e",
+    "category": "copy",
+    "value": "Intelligence where it helps."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 63,
+    "scope": "ProductShowcase",
+    "field": "copy-authority-where-it-belongs-be2a5cbf09",
+    "category": "copy",
+    "value": "Authority where it belongs."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 63,
+    "scope": "ProductShowcase",
+    "field": "copy-audoryn-routes-planning-and-visual-understand-0da09bb08d",
+    "category": "copy",
+    "value": "Audoryn routes planning and visual understanding through shared NVIDIA API models. The model can reason about the task; Audoryn still controls what may happen outside it."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 63,
+    "scope": "ProductShowcase",
+    "field": "copy-planning-and-coordination-0dfdfd7ce7",
+    "category": "copy",
+    "value": "Planning and coordination"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 63,
+    "scope": "ProductShowcase",
+    "field": "copy-nvidia-nemotron-supports-bounded-planning-and-9f805e070c",
+    "category": "copy",
+    "value": "NVIDIA Nemotron supports bounded planning and internal reasoning for managed runs."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 63,
+    "scope": "ProductShowcase",
+    "field": "copy-nemotron-61fbdf37e5",
+    "category": "copy",
+    "value": "NEMOTRON"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 63,
+    "scope": "ProductShowcase",
+    "field": "copy-visual-understanding-c3b9322bdb",
+    "category": "copy",
+    "value": "Visual understanding"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 63,
+    "scope": "ProductShowcase",
+    "field": "copy-nvidia-ising-analyzes-uploaded-images-and-ret-43f8b74530",
+    "category": "copy",
+    "value": "NVIDIA Ising analyzes uploaded images and returns relevant findings for the task."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 63,
+    "scope": "ProductShowcase",
+    "field": "copy-ising-4993b766a9",
+    "category": "copy",
+    "value": "ISING"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 63,
+    "scope": "ProductShowcase",
+    "field": "copy-models-provide-analysis-not-credentials-or-pe-905a7af239",
+    "category": "copy",
+    "value": "Models provide analysis, not credentials or permission to use connected tools."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 65,
+    "scope": "ProductShowcase",
+    "field": "alt-colleagues-reviewing-a-decision-together-442edd1dff",
+    "category": "alt",
+    "value": "Colleagues reviewing a decision together"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 65,
+    "scope": "ProductShowcase",
+    "field": "copy-supervision-04-b6c8cb4600",
+    "category": "copy",
+    "value": "SUPERVISION / 04"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 65,
+    "scope": "ProductShowcase",
+    "field": "copy-the-moments-that-matter-come-back-to-a-person-a3733493fb",
+    "category": "copy",
+    "value": "The moments that matter come back to a person."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 65,
+    "scope": "ProductShowcase",
+    "field": "copy-policy-can-allow-deny-or-hold-an-action-for-r-2b1f81eb3a",
+    "category": "copy",
+    "value": "Policy can allow, deny or hold an action for review. A held run waits while a human sees the context, makes a decision and leaves an auditable record."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 65,
+    "scope": "ProductShowcase",
+    "field": "copy-explore-the-security-model-b951f6a2f5",
+    "category": "copy",
+    "value": "Explore the security model "
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 65,
+    "scope": "ProductShowcase",
+    "field": "copy-request-d9b7ed51aa",
+    "category": "copy",
+    "value": "REQUEST"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 65,
+    "scope": "ProductShowcase",
+    "field": "copy-policy-cdccb8e1f4",
+    "category": "copy",
+    "value": "POLICY"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 65,
+    "scope": "ProductShowcase",
+    "field": "copy-human-review-00c5fd2e56",
+    "category": "copy",
+    "value": "HUMAN REVIEW"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 65,
+    "scope": "ProductShowcase",
+    "field": "copy-recorded-outcome-7ae945a0c4",
+    "category": "copy",
+    "value": "RECORDED OUTCOME"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 67,
+    "scope": "ProductShowcase",
+    "field": "copy-integrations-05-d8da836819",
+    "category": "copy",
+    "value": "INTEGRATIONS / 05"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 67,
+    "scope": "ProductShowcase",
+    "field": "copy-work-across-the-tools-c10fa11022",
+    "category": "copy",
+    "value": "Work across the tools"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 67,
+    "scope": "ProductShowcase",
+    "field": "copy-your-team-already-uses-e8bdd46aac",
+    "category": "copy",
+    "value": "your team already uses."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 67,
+    "scope": "ProductShowcase",
+    "field": "copy-connect-workplace-systems-to-audoryn-s-govern-f23b455117",
+    "category": "copy",
+    "value": "Connect workplace systems to Audoryn’s governed action gateway. Each provider exposes defined capabilities; a connection alone never gives a worker permission to act."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 67,
+    "scope": "ProductShowcase",
+    "field": "copy-available-operations-depend-on-provider-confi-c2b7467db5",
+    "category": "copy",
+    "value": "Available operations depend on provider configuration, declared capabilities and policy."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 69,
+    "scope": "ProductShowcase",
+    "field": "copy-start-with-a-defined-worker-e738a97808",
+    "category": "copy",
+    "value": "START WITH A DEFINED WORKER"
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 69,
+    "scope": "ProductShowcase",
+    "field": "copy-bring-ai-into-the-workflow-6737b9724e",
+    "category": "copy",
+    "value": "Bring AI into the workflow."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 69,
+    "scope": "ProductShowcase",
+    "field": "copy-keep-the-organization-in-charge-ac6020cb52",
+    "category": "copy",
+    "value": "Keep the organization in charge."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 69,
+    "scope": "ProductShowcase",
+    "field": "copy-start-small-make-authority-explicit-and-grow-19ab5d7dc0",
+    "category": "copy",
+    "value": "Start small, make authority explicit and grow the workforce as the work proves useful."
+  },
+  {
+    "source": "src/public/ProductShowcase.tsx",
+    "line": 69,
+    "scope": "ProductShowcase",
+    "field": "copy-get-started-c3d0e3b774",
+    "category": "copy",
+    "value": "Get started "
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 25,
+    "scope": "PublicSite",
+    "field": "field-product-43edd262c8",
+    "category": "field",
+    "value": "Product"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 26,
+    "scope": "PublicSite",
+    "field": "field-solutions-243cceed9d",
+    "category": "field",
+    "value": "Solutions"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 27,
+    "scope": "PublicSite",
+    "field": "field-security-f51f263d72",
+    "category": "field",
+    "value": "Security"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 28,
+    "scope": "PublicSite",
+    "field": "field-resources-0b0314f73c",
+    "category": "field",
+    "value": "Resources"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 29,
+    "scope": "PublicSite",
+    "field": "field-pricing-0b881a7ed8",
+    "category": "field",
+    "value": "Pricing"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 30,
+    "scope": "PublicSite",
+    "field": "field-company-37ed9eb4cf",
+    "category": "field",
+    "value": "Company"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 35,
+    "scope": "PublicSite",
+    "field": "field-a-clear-place-for-workers-work-and-authority-ebef5844e8",
+    "category": "field",
+    "value": "A clear place for workers, work and authority."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 36,
+    "scope": "PublicSite",
+    "field": "field-overview-75646d4665",
+    "category": "field",
+    "value": "Overview"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 36,
+    "scope": "PublicSite",
+    "field": "field-see-the-complete-operating-layer-660f4e6f3b",
+    "category": "field",
+    "value": "See the complete operating layer."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 37,
+    "scope": "PublicSite",
+    "field": "field-workforce-0ce7ac9b63",
+    "category": "field",
+    "value": "Workforce"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 37,
+    "scope": "PublicSite",
+    "field": "field-define-roles-jobs-and-supervision-5a258417a2",
+    "category": "field",
+    "value": "Define roles, jobs and supervision."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 38,
+    "scope": "PublicSite",
+    "field": "field-governance-40c11ffb69",
+    "category": "field",
+    "value": "Governance"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 38,
+    "scope": "PublicSite",
+    "field": "field-understand-the-control-path-7791499c92",
+    "category": "field",
+    "value": "Understand the control path."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 39,
+    "scope": "PublicSite",
+    "field": "field-integrations-30b24f4199",
+    "category": "field",
+    "value": "Integrations"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 39,
+    "scope": "PublicSite",
+    "field": "field-connect-work-to-your-tools-36926ab1ec",
+    "category": "field",
+    "value": "Connect work to your tools."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 41,
+    "scope": "PublicSite",
+    "field": "field-start-with-a-responsibility-that-already-matt-9d4444c944",
+    "category": "field",
+    "value": "Start with a responsibility that already matters."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 42,
+    "scope": "PublicSite",
+    "field": "field-support-8c15e21f9d",
+    "category": "field",
+    "value": "Support"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 42,
+    "scope": "PublicSite",
+    "field": "field-prioritize-the-inbox-ca29e69fbf",
+    "category": "field",
+    "value": "Prioritize the inbox."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 43,
+    "scope": "PublicSite",
+    "field": "field-research-44ac779617",
+    "category": "field",
+    "value": "Research"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 43,
+    "scope": "PublicSite",
+    "field": "field-turn-sources-into-a-brief-57443e46cd",
+    "category": "field",
+    "value": "Turn sources into a brief."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 44,
+    "scope": "PublicSite",
+    "field": "field-operations-51a0e197be",
+    "category": "field",
+    "value": "Operations"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 44,
+    "scope": "PublicSite",
+    "field": "field-keep-the-daily-picture-current-9f13e945b7",
+    "category": "field",
+    "value": "Keep the daily picture current."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 45,
+    "scope": "PublicSite",
+    "field": "field-development-cd242bf7cb",
+    "category": "field",
+    "value": "Development"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 45,
+    "scope": "PublicSite",
+    "field": "field-review-repository-work-24a248d307",
+    "category": "field",
+    "value": "Review repository work."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 47,
+    "scope": "PublicSite",
+    "field": "field-find-the-detail-you-need-to-evaluate-audoryn-82abd1aaed",
+    "category": "field",
+    "value": "Find the detail you need to evaluate Audoryn."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 48,
+    "scope": "PublicSite",
+    "field": "field-product-43edd262c8",
+    "category": "field",
+    "value": "Product"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 48,
+    "scope": "PublicSite",
+    "field": "field-how-the-system-works-28f284acdc",
+    "category": "field",
+    "value": "How the system works."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 49,
+    "scope": "PublicSite",
+    "field": "field-security-f51f263d72",
+    "category": "field",
+    "value": "Security"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 49,
+    "scope": "PublicSite",
+    "field": "field-what-controls-every-action-e5ca22261f",
+    "category": "field",
+    "value": "What controls every action."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 50,
+    "scope": "PublicSite",
+    "field": "field-pricing-0b881a7ed8",
+    "category": "field",
+    "value": "Pricing"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 50,
+    "scope": "PublicSite",
+    "field": "field-capacity-and-plan-availability-76c70514b3",
+    "category": "field",
+    "value": "Capacity and plan availability."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 52,
+    "scope": "PublicSite",
+    "field": "field-learn-about-the-product-and-its-public-notice-89338479dd",
+    "category": "field",
+    "value": "Learn about the product and its public notices."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 53,
+    "scope": "PublicSite",
+    "field": "field-about-77119b02ea",
+    "category": "field",
+    "value": "About"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 53,
+    "scope": "PublicSite",
+    "field": "field-why-sot-is-building-audoryn-6068750674",
+    "category": "field",
+    "value": "Why SOT is building Audoryn."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 54,
+    "scope": "PublicSite",
+    "field": "field-privacy-d47bcea7df",
+    "category": "field",
+    "value": "Privacy"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 54,
+    "scope": "PublicSite",
+    "field": "field-how-product-data-is-handled-4b695420b7",
+    "category": "field",
+    "value": "How product data is handled."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 55,
+    "scope": "PublicSite",
+    "field": "field-terms-5948616386",
+    "category": "field",
+    "value": "Terms"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 55,
+    "scope": "PublicSite",
+    "field": "field-how-audoryn-may-be-used-9add043234",
+    "category": "field",
+    "value": "How Audoryn may be used."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 127,
+    "scope": "PublicSite",
+    "field": "copy-audoryn-home-efd53f6877",
+    "category": "copy",
+    "value": "Audoryn home"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 127,
+    "scope": "PublicSite",
+    "field": "copy-audoryn-ada8d1a9d6",
+    "category": "copy",
+    "value": "Audoryn"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 128,
+    "scope": "PublicSite",
+    "field": "copy-public-navigation-ec37bea8fd",
+    "category": "copy",
+    "value": "Public navigation"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 132,
+    "scope": "PublicSite",
+    "field": "copy-sign-in-e33983587f",
+    "category": "copy",
+    "value": "Sign in"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 133,
+    "scope": "PublicSite",
+    "field": "copy-get-started-39de0215be",
+    "category": "copy",
+    "value": "Get started"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 135,
+    "scope": "PublicSite",
+    "field": "copy-open-navigation-782ef70628",
+    "category": "copy",
+    "value": "Open navigation"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 135,
+    "scope": "PublicSite",
+    "field": "copy-close-bc57bf736e",
+    "category": "copy",
+    "value": "Close"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 135,
+    "scope": "PublicSite",
+    "field": "copy-menu-a6bcd2a69f",
+    "category": "copy",
+    "value": "Menu"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 138,
+    "scope": "PublicSite",
+    "field": "copy-audoryn-b88932e7f1",
+    "category": "copy",
+    "value": "AUDORYN / "
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 138,
+    "scope": "PublicSite",
+    "field": "copy-explore-896702223e",
+    "category": "copy",
+    "value": "Explore "
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 145,
+    "scope": "PublicSite",
+    "field": "copy-sign-in-e33983587f",
+    "category": "copy",
+    "value": "Sign in"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 146,
+    "scope": "PublicSite",
+    "field": "copy-get-started-39de0215be",
+    "category": "copy",
+    "value": "Get started"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 189,
+    "scope": "PublicSite",
+    "field": "copy-the-product-d18e80a034",
+    "category": "copy",
+    "value": "THE PRODUCT"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 189,
+    "scope": "PublicSite",
+    "field": "copy-an-operating-system-for-your-ai-workforce-e9f52fc686",
+    "category": "copy",
+    "value": "An operating system for your AI workforce."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 189,
+    "scope": "PublicSite",
+    "field": "copy-audoryn-gives-businesses-one-place-to-create-8fbfea5f89",
+    "category": "copy",
+    "value": "Audoryn gives businesses one place to create workers, define work, connect tools and supervise the moments where human judgment matters."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 191,
+    "scope": "PublicSite",
+    "field": "copy-create-workers-e6be9bc7a5",
+    "category": "copy",
+    "value": "Create workers"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 191,
+    "scope": "PublicSite",
+    "field": "copy-give-ai-clear-roles-responsibilities-schedule-68cfc014c5",
+    "category": "copy",
+    "value": "Give AI clear roles, responsibilities, schedules and a named human supervisor."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 192,
+    "scope": "PublicSite",
+    "field": "copy-assign-work-93ca34cc0c",
+    "category": "copy",
+    "value": "Assign work"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 192,
+    "scope": "PublicSite",
+    "field": "copy-turn-business-objectives-into-durable-jobs-th-04b1993d49",
+    "category": "copy",
+    "value": "Turn business objectives into durable jobs that can be scheduled, queued and inspected."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 193,
+    "scope": "PublicSite",
+    "field": "copy-stay-in-control-3e8a8a025d",
+    "category": "copy",
+    "value": "Stay in control"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 193,
+    "scope": "PublicSite",
+    "field": "copy-capabilities-policy-approvals-and-incident-co-6136632e91",
+    "category": "copy",
+    "value": "Capabilities, policy, approvals and incident controls remain separate from AI reasoning."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 201,
+    "scope": "PublicSite",
+    "field": "copy-operating-view-5b1e501fee",
+    "category": "copy",
+    "value": "OPERATING VIEW"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 201,
+    "scope": "PublicSite",
+    "field": "copy-one-place-to-understand-what-your-ai-workforc-7c97753a20",
+    "category": "copy",
+    "value": "One place to understand what your AI workforce is doing."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 201,
+    "scope": "PublicSite",
+    "field": "copy-see-workers-queued-jobs-governance-decisions-2c8c31c69f",
+    "category": "copy",
+    "value": "See workers, queued jobs, governance decisions and the moments that need human attention."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 208,
+    "scope": "PublicSite",
+    "field": "copy-the-audoryn-principle-1faeb03124",
+    "category": "copy",
+    "value": "THE AUDORYN PRINCIPLE"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 209,
+    "scope": "PublicSite",
+    "field": "copy-ai-can-propose-2047e44d8b",
+    "category": "copy",
+    "value": "AI can propose."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 209,
+    "scope": "PublicSite",
+    "field": "copy-people-stay-in-control-369b3ea794",
+    "category": "copy",
+    "value": "People stay in control."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 210,
+    "scope": "PublicSite",
+    "field": "copy-every-external-action-meets-a-boundary-the-mo-879b704982",
+    "category": "copy",
+    "value": "Every external action meets a boundary the model cannot rewrite. The result is useful autonomy with a clear line of responsibility."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 211,
+    "scope": "PublicSite",
+    "field": "copy-allow-e9bccce23f",
+    "category": "copy",
+    "value": "ALLOW"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 211,
+    "scope": "PublicSite",
+    "field": "copy-hold-for-review-10ca7a0360",
+    "category": "copy",
+    "value": "HOLD FOR REVIEW"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 211,
+    "scope": "PublicSite",
+    "field": "copy-deny-ce4391b410",
+    "category": "copy",
+    "value": "DENY"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 220,
+    "scope": "PublicSite",
+    "field": "copy-human-oversight-e3fdd85a55",
+    "category": "copy",
+    "value": "HUMAN OVERSIGHT"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 221,
+    "scope": "PublicSite",
+    "field": "copy-autonomous-where-appropriate-8a73501311",
+    "category": "copy",
+    "value": "Autonomous where appropriate."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 221,
+    "scope": "PublicSite",
+    "field": "copy-human-where-it-matters-ca3de22304",
+    "category": "copy",
+    "value": "Human where it matters."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 222,
+    "scope": "PublicSite",
+    "field": "copy-workers-can-keep-moving-through-routine-work-f0bf2cf950",
+    "category": "copy",
+    "value": "Workers can keep moving through routine work. The decisions that need judgment return to a person with the context to act."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 223,
+    "scope": "PublicSite",
+    "field": "copy-approval-99d403180e",
+    "category": "copy",
+    "value": "APPROVAL "
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 223,
+    "scope": "PublicSite",
+    "field": "copy--exception-df50478f70",
+    "category": "copy",
+    "value": " EXCEPTION "
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 223,
+    "scope": "PublicSite",
+    "field": "copy--review-1a6d339474",
+    "category": "copy",
+    "value": " REVIEW"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 225,
+    "scope": "PublicSite",
+    "field": "alt-two-colleagues-reviewing-a-decision-together-94a43fafbf",
+    "category": "alt",
+    "value": "Two colleagues reviewing a decision together at a table"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 227,
+    "scope": "PublicSite",
+    "field": "copy-control-the-boundaries-in-practice-c254c9f723",
+    "category": "copy",
+    "value": "CONTROL / THE BOUNDARIES IN PRACTICE"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 229,
+    "scope": "PublicSite",
+    "field": "copy-capability-controls-c7e18997a5",
+    "category": "copy",
+    "value": "Capability controls"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 229,
+    "scope": "PublicSite",
+    "field": "copy-define-the-actions-an-ai-worker-may-attempt-75b620c40a",
+    "category": "copy",
+    "value": "Define the actions an AI worker may attempt."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 230,
+    "scope": "PublicSite",
+    "field": "copy-policy-734f024880",
+    "category": "copy",
+    "value": "Policy"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 230,
+    "scope": "PublicSite",
+    "field": "copy-make-authorization-deterministic-instead-of-l-069ef29891",
+    "category": "copy",
+    "value": "Make authorization deterministic instead of leaving it to model judgment."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 231,
+    "scope": "PublicSite",
+    "field": "copy-approvals-460f0f2a62",
+    "category": "copy",
+    "value": "Approvals"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 231,
+    "scope": "PublicSite",
+    "field": "copy-require-people-before-sensitive-work-can-cont-059bfe690c",
+    "category": "copy",
+    "value": "Require people before sensitive work can continue."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 232,
+    "scope": "PublicSite",
+    "field": "copy-supervision-9d6252e9d1",
+    "category": "copy",
+    "value": "Supervision"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 232,
+    "scope": "PublicSite",
+    "field": "copy-route-exceptional-autonomous-work-to-a-named-254bd8077a",
+    "category": "copy",
+    "value": "Route exceptional autonomous work to a named human."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 233,
+    "scope": "PublicSite",
+    "field": "copy-audit-877cd6b54c",
+    "category": "copy",
+    "value": "Audit"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 233,
+    "scope": "PublicSite",
+    "field": "copy-preserve-what-happened-who-acted-and-why-a-de-7cf5200292",
+    "category": "copy",
+    "value": "Preserve what happened, who acted and why a decision was made."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 238,
+    "scope": "PublicSite",
+    "field": "copy-connections-f48b6b0484",
+    "category": "copy",
+    "value": "CONNECTIONS"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 238,
+    "scope": "PublicSite",
+    "field": "copy-works-where-your-company-already-works-8c1d95a4c2",
+    "category": "copy",
+    "value": "Works where your company already works."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 238,
+    "scope": "PublicSite",
+    "field": "copy-provider-connections-expose-bounded-technical-e834379ec0",
+    "category": "copy",
+    "value": "Provider connections expose bounded technical operations. They do not become AI permissions by themselves."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 240,
+    "scope": "PublicSite",
+    "field": "copy-connected-systems-f4710b3c90",
+    "category": "copy",
+    "value": "CONNECTED SYSTEMS"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 240,
+    "scope": "PublicSite",
+    "field": "copy-controlled-action-path-e01303753e",
+    "category": "copy",
+    "value": "CONTROLLED ACTION PATH"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 242,
+    "scope": "PublicSite",
+    "field": "copy-supported-workplace-systems-776d337536",
+    "category": "copy",
+    "value": "Supported workplace systems"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 243,
+    "scope": "PublicSite",
+    "field": "copy-github-699730e6d9",
+    "category": "copy",
+    "value": "GitHub"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 243,
+    "scope": "PublicSite",
+    "field": "copy-slack-781847fa86",
+    "category": "copy",
+    "value": "Slack"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 243,
+    "scope": "PublicSite",
+    "field": "copy-gmail-49d402f2d4",
+    "category": "copy",
+    "value": "Gmail"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 243,
+    "scope": "PublicSite",
+    "field": "copy-google-drive-8377bc3c67",
+    "category": "copy",
+    "value": "Google Drive"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 243,
+    "scope": "PublicSite",
+    "field": "copy-google-calendar-eba9dd31a8",
+    "category": "copy",
+    "value": "Google Calendar"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 243,
+    "scope": "PublicSite",
+    "field": "copy-rest-mcp-50782311cb",
+    "category": "copy",
+    "value": "REST / MCP"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 245,
+    "scope": "PublicSite",
+    "field": "copy-policy-da94f8a0d4",
+    "category": "copy",
+    "value": "POLICY"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 245,
+    "scope": "PublicSite",
+    "field": "copy-boundary-c1372cc1e4",
+    "category": "copy",
+    "value": "BOUNDARY"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 247,
+    "scope": "PublicSite",
+    "field": "copy-available-action-608d11c0d3",
+    "category": "copy",
+    "value": "AVAILABLE ACTION"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 248,
+    "scope": "PublicSite",
+    "field": "copy-authority-is-checked-before-execution-83900e9160",
+    "category": "copy",
+    "value": "Authority is checked before execution."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 249,
+    "scope": "PublicSite",
+    "field": "copy-capability-b074adec9c",
+    "category": "copy",
+    "value": "CAPABILITY "
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 249,
+    "scope": "PublicSite",
+    "field": "copy--policy-ff8e9b4e45",
+    "category": "copy",
+    "value": " POLICY "
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 249,
+    "scope": "PublicSite",
+    "field": "copy--approval-0e544e9130",
+    "category": "copy",
+    "value": " APPROVAL"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 258,
+    "scope": "PublicSite",
+    "field": "copy-solutions-ef281685b9",
+    "category": "copy",
+    "value": "SOLUTIONS"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 258,
+    "scope": "PublicSite",
+    "field": "copy-built-for-different-kinds-of-work-141bd82a36",
+    "category": "copy",
+    "value": "Built for different kinds of work."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 258,
+    "scope": "PublicSite",
+    "field": "copy-start-with-a-defined-responsibility-give-the-30063a0b8d",
+    "category": "copy",
+    "value": "Start with a defined responsibility. Give the worker room to move, with a person and a policy around the actions that matter."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 259,
+    "scope": "PublicSite",
+    "field": "copy-selected-applications-01-06-9497a0c82d",
+    "category": "copy",
+    "value": "SELECTED APPLICATIONS / 01 — 06"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 263,
+    "scope": "PublicSite",
+    "field": "alt-a-logistics-operations-floor-with-a-superviso-d9749d26b7",
+    "category": "alt",
+    "value": "A logistics operations floor with a supervisor overseeing the work"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 264,
+    "scope": "PublicSite",
+    "field": "copy-01-operations-a8e081a39b",
+    "category": "copy",
+    "value": "01 / OPERATIONS"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 264,
+    "scope": "PublicSite",
+    "field": "copy-keep-recurring-work-moving-keep-exceptions-vi-9d2189f9a9",
+    "category": "copy",
+    "value": "Keep recurring work moving. Keep exceptions visible."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 264,
+    "scope": "PublicSite",
+    "field": "copy-scheduled-work-connected-tools-and-a-clear-ha-3cdf9f12b5",
+    "category": "copy",
+    "value": "Scheduled work, connected tools and a clear handoff when conditions change."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 264,
+    "scope": "PublicSite",
+    "field": "copy-explore-operations-801811b031",
+    "category": "copy",
+    "value": "Explore operations "
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 267,
+    "scope": "PublicSite",
+    "field": "alt-research-materials-being-reviewed-at-a-workta-518f7f9956",
+    "category": "alt",
+    "value": "Research materials being reviewed at a worktable"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 268,
+    "scope": "PublicSite",
+    "field": "copy-02-research-955524e2d5",
+    "category": "copy",
+    "value": "02 / RESEARCH"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 268,
+    "scope": "PublicSite",
+    "field": "copy-turn-open-questions-into-inspectable-work-bcf252ad68",
+    "category": "copy",
+    "value": "Turn open questions into inspectable work."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 268,
+    "scope": "PublicSite",
+    "field": "copy-collect-and-structure-findings-while-people-r-5008664ccb",
+    "category": "copy",
+    "value": "Collect and structure findings while people remain responsible for the result."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 268,
+    "scope": "PublicSite",
+    "field": "copy-explore-research-e333d55298",
+    "category": "copy",
+    "value": "Explore research "
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 271,
+    "scope": "PublicSite",
+    "field": "copy-more-solution-areas-a9f7646013",
+    "category": "copy",
+    "value": "More solution areas"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 272,
+    "scope": "PublicSite",
+    "field": "copy-customer-support-67aac9e13a",
+    "category": "copy",
+    "value": "Customer support"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 272,
+    "scope": "PublicSite",
+    "field": "copy-sales-ee63665ba2",
+    "category": "copy",
+    "value": "Sales"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 272,
+    "scope": "PublicSite",
+    "field": "copy-marketing-cd67025fdf",
+    "category": "copy",
+    "value": "Marketing"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 272,
+    "scope": "PublicSite",
+    "field": "copy-software-development-aaae25dc71",
+    "category": "copy",
+    "value": "Software development"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 279,
+    "scope": "PublicSite",
+    "field": "copy-trust-by-design-6e944fddd7",
+    "category": "copy",
+    "value": "TRUST / BY DESIGN"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 280,
+    "scope": "PublicSite",
+    "field": "copy-control-is-part-of-the-architecture-63aaede39d",
+    "category": "copy",
+    "value": "Control is part of the architecture."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 281,
+    "scope": "PublicSite",
+    "field": "copy-the-boundary-around-an-action-stays-visible-f-d5b20bcb56",
+    "category": "copy",
+    "value": "The boundary around an action stays visible from identity through the final record."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 282,
+    "scope": "PublicSite",
+    "field": "copy-read-about-security-a7095311a5",
+    "category": "copy",
+    "value": "Read about security "
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 285,
+    "scope": "PublicSite",
+    "field": "copy-identity-c277009abf",
+    "category": "copy",
+    "value": "Identity"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 285,
+    "scope": "PublicSite",
+    "field": "copy-human-and-ai-identities-remain-distinct-5c0abb33a9",
+    "category": "copy",
+    "value": "Human and AI identities remain distinct."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 286,
+    "scope": "PublicSite",
+    "field": "copy-authorization-e17f33e657",
+    "category": "copy",
+    "value": "Authorization"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 286,
+    "scope": "PublicSite",
+    "field": "copy-every-external-action-is-checked-against-capa-a84028b421",
+    "category": "copy",
+    "value": "Every external action is checked against capability and policy."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 287,
+    "scope": "PublicSite",
+    "field": "copy-approval-703a8bd7f1",
+    "category": "copy",
+    "value": "Approval"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 287,
+    "scope": "PublicSite",
+    "field": "copy-sensitive-work-can-pause-for-a-person-b9f2703367",
+    "category": "copy",
+    "value": "Sensitive work can pause for a person."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 288,
+    "scope": "PublicSite",
+    "field": "copy-audit-877cd6b54c",
+    "category": "copy",
+    "value": "Audit"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 288,
+    "scope": "PublicSite",
+    "field": "copy-the-decision-and-outcome-stay-connected-in-a-0509f75985",
+    "category": "copy",
+    "value": "The decision and outcome stay connected in a record."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 319,
+    "scope": "PublicSite",
+    "field": "copy-audoryn-ada8d1a9d6",
+    "category": "copy",
+    "value": "Audoryn"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 319,
+    "scope": "PublicSite",
+    "field": "copy-an-sot-product-a0e73f58fc",
+    "category": "copy",
+    "value": "An SOT Product"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 320,
+    "scope": "PublicSite",
+    "field": "copy-product-6e389d51f1",
+    "category": "copy",
+    "value": "Product"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 321,
+    "scope": "PublicSite",
+    "field": "copy-solutions-9d0bd7d665",
+    "category": "copy",
+    "value": "Solutions"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 322,
+    "scope": "PublicSite",
+    "field": "copy-resources-0b05d56444",
+    "category": "copy",
+    "value": "Resources"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 323,
+    "scope": "PublicSite",
+    "field": "copy-company-b987c6cf29",
+    "category": "copy",
+    "value": "Company"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 325,
+    "scope": "PublicSite",
+    "field": "copy--2026-sot-08b6351255",
+    "category": "copy",
+    "value": "© 2026 SOT"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 325,
+    "scope": "PublicSite",
+    "field": "copy-audoryn-controlled-autonomous-workforce-infra-7d3f2f219a",
+    "category": "copy",
+    "value": "Audoryn · Controlled autonomous workforce infrastructure"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 330,
+    "scope": "PublicSite",
+    "field": "copy-audoryn-882e539bc3",
+    "category": "copy",
+    "value": "AUDORYN"
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 330,
+    "scope": "PublicSite",
+    "field": "copy-give-ai-real-work-e3a91985c2",
+    "category": "copy",
+    "value": "Give AI real work."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 330,
+    "scope": "PublicSite",
+    "field": "copy-keep-authority-explicit-e0ff65481c",
+    "category": "copy",
+    "value": "Keep authority explicit."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 330,
+    "scope": "PublicSite",
+    "field": "copy-start-with-a-small-workforce-and-build-from-t-30cfedbe24",
+    "category": "copy",
+    "value": "Start with a small workforce and build from there."
+  },
+  {
+    "source": "src/public/PublicSite.tsx",
+    "line": 330,
+    "scope": "PublicSite",
+    "field": "copy-get-started-d9af712b77",
+    "category": "copy",
+    "value": "Get started "
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 8,
+    "scope": "ResourcesShowcase",
+    "field": "field-the-platform-38842b400a",
+    "category": "field",
+    "value": "THE PLATFORM"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 8,
+    "scope": "ResourcesShowcase",
+    "field": "field-explore-the-product-336c4b1220",
+    "category": "field",
+    "value": "Explore the product"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 8,
+    "scope": "ResourcesShowcase",
+    "field": "field-see-how-workers-jobs-runtime-supervision-and-b7055fcd00",
+    "category": "field",
+    "value": "See how workers, jobs, runtime, supervision and connected tools fit together."
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 9,
+    "scope": "ResourcesShowcase",
+    "field": "field-where-it-fits-7e4c169812",
+    "category": "field",
+    "value": "WHERE IT FITS"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 9,
+    "scope": "ResourcesShowcase",
+    "field": "field-find-a-starting-point-c4eeadc583",
+    "category": "field",
+    "value": "Find a starting point"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 9,
+    "scope": "ResourcesShowcase",
+    "field": "field-browse-practical-responsibilities-supported-b-f183a4b223",
+    "category": "field",
+    "value": "Browse practical responsibilities supported by Audoryn workforce templates."
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 10,
+    "scope": "ResourcesShowcase",
+    "field": "field-the-control-model-e3ca3c8e62",
+    "category": "field",
+    "value": "THE CONTROL MODEL"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 10,
+    "scope": "ResourcesShowcase",
+    "field": "field-understand-security-4214e7dc3d",
+    "category": "field",
+    "value": "Understand security"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 10,
+    "scope": "ResourcesShowcase",
+    "field": "field-follow-an-action-through-identity-capability-949af820d2",
+    "category": "field",
+    "value": "Follow an action through identity, capability, policy and human review."
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 11,
+    "scope": "ResourcesShowcase",
+    "field": "field-capacity-5dcc1a58dc",
+    "category": "field",
+    "value": "CAPACITY"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 11,
+    "scope": "ResourcesShowcase",
+    "field": "field-review-plan-structure-281c896d4d",
+    "category": "field",
+    "value": "Review plan structure"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 11,
+    "scope": "ResourcesShowcase",
+    "field": "field-compare-worker-capacity-and-see-the-current-b-3927b84abb",
+    "category": "field",
+    "value": "Compare worker capacity and see the current billing availability."
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 26,
+    "scope": "ResourcesShowcase",
+    "field": "copy-audoryn-resources-cdb30c137e",
+    "category": "copy",
+    "value": "AUDORYN / RESOURCES"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 26,
+    "scope": "ResourcesShowcase",
+    "field": "copy-know-the-system-292c533241",
+    "category": "copy",
+    "value": "Know the system."
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 26,
+    "scope": "ResourcesShowcase",
+    "field": "copy-then-put-it-to-work-1bd0d196a1",
+    "category": "copy",
+    "value": "Then put it to work."
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 26,
+    "scope": "ResourcesShowcase",
+    "field": "copy-clear-starting-points-for-understanding-the-p-678dcf2551",
+    "category": "copy",
+    "value": "Clear starting points for understanding the product, finding a use case and seeing how autonomous work stays controlled."
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 26,
+    "scope": "ResourcesShowcase",
+    "field": "copy-field-guide-01-04-055834eaca",
+    "category": "copy",
+    "value": "FIELD GUIDE / 01—04"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 26,
+    "scope": "ResourcesShowcase",
+    "field": "copy-start-with-what-you-need-to-know-d0437a195f",
+    "category": "copy",
+    "value": "Start with what you need to know."
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 28,
+    "scope": "ResourcesShowcase",
+    "field": "copy-explore-62f7efda09",
+    "category": "copy",
+    "value": "EXPLORE"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 28,
+    "scope": "ResourcesShowcase",
+    "field": "copy-four-ways-in-80becfe0c8",
+    "category": "copy",
+    "value": "Four ways in."
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 28,
+    "scope": "ResourcesShowcase",
+    "field": "copy-select-a-topic-to-continue-7af6132cb7",
+    "category": "copy",
+    "value": "SELECT A TOPIC TO CONTINUE"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 30,
+    "scope": "ResourcesShowcase",
+    "field": "copy-for-operators-06c21c40ac",
+    "category": "copy",
+    "value": "FOR OPERATORS"
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 30,
+    "scope": "ResourcesShowcase",
+    "field": "copy-guidance-lives-with-the-work-81d9868744",
+    "category": "copy",
+    "value": "Guidance lives with the work."
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 30,
+    "scope": "ResourcesShowcase",
+    "field": "copy-signed-in-teams-can-find-operational-guidance-87baac7d50",
+    "category": "copy",
+    "value": "Signed-in teams can find operational guidance in the workspace, close to runtime, authorization and incident controls."
+  },
+  {
+    "source": "src/public/ResourcesShowcase.tsx",
+    "line": 30,
+    "scope": "ResourcesShowcase",
+    "field": "copy-open-the-workspace-aace079591",
+    "category": "copy",
+    "value": "Open the workspace "
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 8,
+    "scope": "SecurityShowcase",
+    "field": "field-allow-167eee28ce",
+    "category": "field",
+    "value": "ALLOW"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 8,
+    "scope": "SecurityShowcase",
+    "field": "field-the-action-may-proceed-a66afdb3f4",
+    "category": "field",
+    "value": "The action may proceed."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 8,
+    "scope": "SecurityShowcase",
+    "field": "field-a-permitted-request-can-reach-the-provider-ad-a3a5249935",
+    "category": "field",
+    "value": "A permitted request can reach the provider adapter after the current identity, capability, risk and policy checks pass."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 8,
+    "scope": "SecurityShowcase",
+    "field": "field-only-an-allowed-request-can-invoke-the-provid-93b8bc397a",
+    "category": "field",
+    "value": "Only an allowed request can invoke the provider."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 9,
+    "scope": "SecurityShowcase",
+    "field": "field-require-approval-e68f25e675",
+    "category": "field",
+    "value": "REQUIRE APPROVAL"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 9,
+    "scope": "SecurityShowcase",
+    "field": "field-the-action-waits-for-a-person-560df9917e",
+    "category": "field",
+    "value": "The action waits for a person."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 9,
+    "scope": "SecurityShowcase",
+    "field": "field-the-run-pauses-and-an-authorized-reviewer-rec-15f455d318",
+    "category": "field",
+    "value": "The run pauses and an authorized reviewer receives the request. Before an approved action resumes, Audoryn checks its authority again."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 9,
+    "scope": "SecurityShowcase",
+    "field": "field-approval-is-bound-to-the-exact-requested-acti-d6959bfdb2",
+    "category": "field",
+    "value": "Approval is bound to the exact requested action."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 10,
+    "scope": "SecurityShowcase",
+    "field": "field-deny-8d0ee83500",
+    "category": "field",
+    "value": "DENY"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 10,
+    "scope": "SecurityShowcase",
+    "field": "field-the-action-stops-here-22fac81fb5",
+    "category": "field",
+    "value": "The action stops here."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 10,
+    "scope": "SecurityShowcase",
+    "field": "field-a-denied-request-is-blocked-at-the-gateway-th-798dcdbb90",
+    "category": "field",
+    "value": "A denied request is blocked at the gateway. The connected provider is never called for that action."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 10,
+    "scope": "SecurityShowcase",
+    "field": "field-missing-or-uncertain-authority-fails-closed-ea926c8d04",
+    "category": "field",
+    "value": "Missing or uncertain authority fails closed."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 14,
+    "scope": "SecurityShowcase",
+    "field": "field-distinct-identities-7236c243c1",
+    "category": "field",
+    "value": "Distinct identities"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 14,
+    "scope": "SecurityShowcase",
+    "field": "field-a-human-session-cannot-act-as-an-ai-worker-ev-7ba10d93e4",
+    "category": "field",
+    "value": "A human session cannot act as an AI worker. Every managed worker has a separate agent identity, and organization boundaries are checked."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 15,
+    "scope": "SecurityShowcase",
+    "field": "field-protected-credentials-8b6f235803",
+    "category": "field",
+    "value": "Protected credentials"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 15,
+    "scope": "SecurityShowcase",
+    "field": "field-connected-provider-credentials-remain-in-the-26bb90f2ea",
+    "category": "field",
+    "value": "Connected provider credentials remain in the backend credential boundary. Models do not receive provider tokens or direct provider tools."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 16,
+    "scope": "SecurityShowcase",
+    "field": "field-human-intervention-fe41c66238",
+    "category": "field",
+    "value": "Human intervention"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 16,
+    "scope": "SecurityShowcase",
+    "field": "field-sensitive-actions-can-wait-for-review-organiz-2087e4b7c5",
+    "category": "field",
+    "value": "Sensitive actions can wait for review. Organization, worker and integration execution can be suspended without deleting their configuration."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 17,
+    "scope": "SecurityShowcase",
+    "field": "field-a-record-to-inspect-6018015ee8",
+    "category": "field",
+    "value": "A record to inspect"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 17,
+    "scope": "SecurityShowcase",
+    "field": "field-requests-decisions-approvals-and-provider-out-04b89235ae",
+    "category": "field",
+    "value": "Requests, decisions, approvals and provider outcomes carry correlation context so operators can follow what happened."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 37,
+    "scope": "SecurityShowcase",
+    "field": "copy-audoryn-security-4397c23ce3",
+    "category": "copy",
+    "value": "AUDORYN / SECURITY"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 37,
+    "scope": "SecurityShowcase",
+    "field": "copy-every-action-has-103a099e1b",
+    "category": "copy",
+    "value": "Every action has"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 37,
+    "scope": "SecurityShowcase",
+    "field": "copy-a-boundary-bb17bed45c",
+    "category": "copy",
+    "value": "a boundary."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 37,
+    "scope": "SecurityShowcase",
+    "field": "copy-ai-can-plan-the-work-audoryn-decides-whether-78ceb6dabd",
+    "category": "copy",
+    "value": "AI can plan the work. Audoryn decides whether an external action is allowed, must wait for a person or must stop."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 37,
+    "scope": "SecurityShowcase",
+    "field": "copy-deterministic-authority-human-oversight-669069e84a",
+    "category": "copy",
+    "value": "DETERMINISTIC AUTHORITY / HUMAN OVERSIGHT"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 38,
+    "scope": "SecurityShowcase",
+    "field": "copy-illustrative-audoryn-action-decision-1a2b7b7bc1",
+    "category": "copy",
+    "value": "Illustrative Audoryn action decision"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 38,
+    "scope": "SecurityShowcase",
+    "field": "copy-an-action-request-08800080bc",
+    "category": "copy",
+    "value": "AN ACTION REQUEST"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 38,
+    "scope": "SecurityShowcase",
+    "field": "copy-illustrative-flow-ca1ccbf99b",
+    "category": "copy",
+    "value": "ILLUSTRATIVE FLOW"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 38,
+    "scope": "SecurityShowcase",
+    "field": "copy-developer-assistant-github-a54a7269ec",
+    "category": "copy",
+    "value": "DEVELOPER ASSISTANT / GITHUB"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 38,
+    "scope": "SecurityShowcase",
+    "field": "copy-create-an-issue-96426fdf3c",
+    "category": "copy",
+    "value": "Create an issue"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 38,
+    "scope": "SecurityShowcase",
+    "field": "copy-agent-identity-377692faa6",
+    "category": "copy",
+    "value": "Agent identity"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 38,
+    "scope": "SecurityShowcase",
+    "field": "copy-declared-capability-1c1e397f84",
+    "category": "copy",
+    "value": "Declared capability"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 38,
+    "scope": "SecurityShowcase",
+    "field": "copy-risk-and-current-policy-391e032d32",
+    "category": "copy",
+    "value": "Risk and current policy"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 38,
+    "scope": "SecurityShowcase",
+    "field": "copy-explore-possible-policy-decisions-5da5adb321",
+    "category": "copy",
+    "value": "Explore possible policy decisions"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-the-control-path-d052e00394",
+    "category": "copy",
+    "value": "THE CONTROL PATH"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-a-connected-tool-does-not-grant-permission-to-6075b0720d",
+    "category": "copy",
+    "value": "A connected tool does not grant permission to use it."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-each-request-passes-through-explicit-checks-b-9656188f3c",
+    "category": "copy",
+    "value": "Each request passes through explicit checks before it reaches an external system. AI instructions and memory provide context; they do not become authority."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-01-who-3c5c2b0535",
+    "category": "copy",
+    "value": "01 / WHO"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-identity-b7a0468017",
+    "category": "copy",
+    "value": "Identity"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-confirm-the-worker-and-its-organization-b55fcf9479",
+    "category": "copy",
+    "value": "Confirm the worker and its organization."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-02-what-8b73732462",
+    "category": "copy",
+    "value": "02 / WHAT"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-capability-c93e4a8046",
+    "category": "copy",
+    "value": "Capability"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-match-the-requested-operation-to-a-declared-s-a701b419ae",
+    "category": "copy",
+    "value": "Match the requested operation to a declared scope."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-03-now-0dd6c23cd5",
+    "category": "copy",
+    "value": "03 / NOW"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-risk-policy-870f2521c9",
+    "category": "copy",
+    "value": "Risk + policy"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-evaluate-current-conditions-and-the-determini-9f24af0930",
+    "category": "copy",
+    "value": "Evaluate current conditions and the deterministic rule."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-04-outcome-40a1cb34bd",
+    "category": "copy",
+    "value": "04 / OUTCOME"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-act-wait-or-stop-e441297cee",
+    "category": "copy",
+    "value": "Act, wait or stop"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 42,
+    "scope": "SecurityShowcase",
+    "field": "copy-allow-require-human-approval-or-deny-afdc969450",
+    "category": "copy",
+    "value": "Allow, require human approval or deny."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 44,
+    "scope": "SecurityShowcase",
+    "field": "copy-operational-safeguards-57559ef80d",
+    "category": "copy",
+    "value": "OPERATIONAL SAFEGUARDS"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 44,
+    "scope": "SecurityShowcase",
+    "field": "copy-control-continues-after-a-decision-6627ca03c2",
+    "category": "copy",
+    "value": "Control continues after a decision."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 44,
+    "scope": "SecurityShowcase",
+    "field": "copy-authority-can-change-while-work-is-underway-a-034f259771",
+    "category": "copy",
+    "value": "Authority can change while work is underway. Audoryn keeps the relevant checks and the human response in the execution path."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 46,
+    "scope": "SecurityShowcase",
+    "field": "copy-security-by-design-86b81a540c",
+    "category": "copy",
+    "value": "SECURITY BY DESIGN"
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 46,
+    "scope": "SecurityShowcase",
+    "field": "copy-useful-autonomy-needs-clear-authority-47bbf399c6",
+    "category": "copy",
+    "value": "Useful autonomy needs clear authority."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 46,
+    "scope": "SecurityShowcase",
+    "field": "copy-see-how-these-controls-fit-into-the-product-t-641544075f",
+    "category": "copy",
+    "value": "See how these controls fit into the product, then start with a worker and a defined job."
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 46,
+    "scope": "SecurityShowcase",
+    "field": "copy-explore-the-product-155936362b",
+    "category": "copy",
+    "value": "Explore the product "
+  },
+  {
+    "source": "src/public/SecurityShowcase.tsx",
+    "line": 46,
+    "scope": "SecurityShowcase",
+    "field": "copy-get-started-3980693691",
+    "category": "copy",
+    "value": "Get started "
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 7,
+    "scope": "SolutionsShowcase",
+    "field": "field-operations-114313e251",
+    "category": "field",
+    "value": "Operations"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 7,
+    "scope": "SolutionsShowcase",
+    "field": "field-keep-the-daily-picture-current-31f44d03fe",
+    "category": "field",
+    "value": "Keep the daily picture current."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 7,
+    "scope": "SolutionsShowcase",
+    "field": "field-operations-assistant-406d77b14a",
+    "category": "field",
+    "value": "Operations Assistant"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 7,
+    "scope": "SolutionsShowcase",
+    "field": "field-daily-operations-brief-3266259037",
+    "category": "field",
+    "value": "Daily Operations Brief"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 7,
+    "scope": "SolutionsShowcase",
+    "field": "field-review-connected-work-context-and-prepare-a-c-ce11161426",
+    "category": "field",
+    "value": "Review connected work context and prepare a concise internal update, with exceptions surfaced for a person."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 7,
+    "scope": "SolutionsShowcase",
+    "field": "field-google-drive-google-calendar-968b4e5d57",
+    "category": "field",
+    "value": "Google Drive · Google Calendar"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 7,
+    "scope": "SolutionsShowcase",
+    "field": "field-a-reviewable-daily-brief-f6fd470268",
+    "category": "field",
+    "value": "A reviewable daily brief"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 8,
+    "scope": "SolutionsShowcase",
+    "field": "field-research-ed04fe7616",
+    "category": "field",
+    "value": "Research"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 8,
+    "scope": "SolutionsShowcase",
+    "field": "field-turn-source-material-into-a-clear-brief-a371fe8849",
+    "category": "field",
+    "value": "Turn source material into a clear brief."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 8,
+    "scope": "SolutionsShowcase",
+    "field": "field-research-assistant-e2bfbd8114",
+    "category": "field",
+    "value": "Research Assistant"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 8,
+    "scope": "SolutionsShowcase",
+    "field": "field-repository-research-brief-cfe2c25681",
+    "category": "field",
+    "value": "Repository Research Brief"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 8,
+    "scope": "SolutionsShowcase",
+    "field": "field-read-issues-and-pull-requests-separate-observ-afc6df5006",
+    "category": "field",
+    "value": "Read issues and pull requests, separate observed facts from inference and assemble a technical change brief."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 8,
+    "scope": "SolutionsShowcase",
+    "field": "field-github-be59dc1624",
+    "category": "field",
+    "value": "GitHub"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 8,
+    "scope": "SolutionsShowcase",
+    "field": "field-a-structured-research-brief-080dbbddde",
+    "category": "field",
+    "value": "A structured research brief"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 9,
+    "scope": "SolutionsShowcase",
+    "field": "field-customer-support-4d8eddf2b7",
+    "category": "field",
+    "value": "Customer support"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 9,
+    "scope": "SolutionsShowcase",
+    "field": "field-see-what-needs-attention-first-910242d028",
+    "category": "field",
+    "value": "See what needs attention first."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 9,
+    "scope": "SolutionsShowcase",
+    "field": "field-customer-support-assistant-ae15f59a69",
+    "category": "field",
+    "value": "Customer Support Assistant"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 9,
+    "scope": "SolutionsShowcase",
+    "field": "field-inbox-triage-2c6c13c59c",
+    "category": "field",
+    "value": "Inbox Triage"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 9,
+    "scope": "SolutionsShowcase",
+    "field": "field-review-recent-messages-and-prepare-a-prioriti-13d1abaf75",
+    "category": "field",
+    "value": "Review recent messages and prepare a prioritized support triage brief for the team."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 9,
+    "scope": "SolutionsShowcase",
+    "field": "field-gmail-3071fbf302",
+    "category": "field",
+    "value": "Gmail"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 9,
+    "scope": "SolutionsShowcase",
+    "field": "field-a-prioritized-triage-brief-6928c64c08",
+    "category": "field",
+    "value": "A prioritized triage brief"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 10,
+    "scope": "SolutionsShowcase",
+    "field": "field-sales-149b1f2a9b",
+    "category": "field",
+    "value": "Sales"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 10,
+    "scope": "SolutionsShowcase",
+    "field": "field-arrive-prepared-for-the-next-meeting-758c9daac3",
+    "category": "field",
+    "value": "Arrive prepared for the next meeting."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 10,
+    "scope": "SolutionsShowcase",
+    "field": "field-sales-assistant-743f4736af",
+    "category": "field",
+    "value": "Sales Assistant"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 10,
+    "scope": "SolutionsShowcase",
+    "field": "field-upcoming-meeting-brief-b41c27a588",
+    "category": "field",
+    "value": "Upcoming Meeting Brief"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 10,
+    "scope": "SolutionsShowcase",
+    "field": "field-review-upcoming-meetings-and-relevant-prospec-a99d73aaeb",
+    "category": "field",
+    "value": "Review upcoming meetings and relevant prospect context to prepare supervised follow-up."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 10,
+    "scope": "SolutionsShowcase",
+    "field": "field-google-calendar-gmail-a97a1d4f6c",
+    "category": "field",
+    "value": "Google Calendar · Gmail"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 10,
+    "scope": "SolutionsShowcase",
+    "field": "field-an-upcoming-meeting-brief-b23938c765",
+    "category": "field",
+    "value": "An upcoming meeting brief"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 11,
+    "scope": "SolutionsShowcase",
+    "field": "field-marketing-96ab3a1ea7",
+    "category": "field",
+    "value": "Marketing"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 11,
+    "scope": "SolutionsShowcase",
+    "field": "field-make-campaign-context-easier-to-use-828ac93da0",
+    "category": "field",
+    "value": "Make campaign context easier to use."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 11,
+    "scope": "SolutionsShowcase",
+    "field": "field-marketing-coordinator-6c7d74c1b0",
+    "category": "field",
+    "value": "Marketing Coordinator"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 11,
+    "scope": "SolutionsShowcase",
+    "field": "field-campaign-asset-review-61bbcba001",
+    "category": "field",
+    "value": "Campaign Asset Review"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 11,
+    "scope": "SolutionsShowcase",
+    "field": "field-review-recent-campaign-material-and-summarize-4b0ffefd2e",
+    "category": "field",
+    "value": "Review recent campaign material and summarize what the team needs to know."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 11,
+    "scope": "SolutionsShowcase",
+    "field": "field-google-drive-44fee82542",
+    "category": "field",
+    "value": "Google Drive"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 11,
+    "scope": "SolutionsShowcase",
+    "field": "field-a-campaign-material-summary-85005a8c11",
+    "category": "field",
+    "value": "A campaign material summary"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 12,
+    "scope": "SolutionsShowcase",
+    "field": "field-engineering-8ea719d422",
+    "category": "field",
+    "value": "Engineering"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 12,
+    "scope": "SolutionsShowcase",
+    "field": "field-stay-close-to-repository-work-4cd6f8a016",
+    "category": "field",
+    "value": "Stay close to repository work."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 12,
+    "scope": "SolutionsShowcase",
+    "field": "field-developer-assistant-b26d94884b",
+    "category": "field",
+    "value": "Developer Assistant"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 12,
+    "scope": "SolutionsShowcase",
+    "field": "field-engineering-change-review-17f3cbaf32",
+    "category": "field",
+    "value": "Engineering Change Review"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 12,
+    "scope": "SolutionsShowcase",
+    "field": "field-review-repository-issues-and-pull-requests-to-f8073c5ac4",
+    "category": "field",
+    "value": "Review repository issues and pull requests to prepare a concise engineering status brief."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 12,
+    "scope": "SolutionsShowcase",
+    "field": "field-github-be59dc1624",
+    "category": "field",
+    "value": "GitHub"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 12,
+    "scope": "SolutionsShowcase",
+    "field": "field-an-engineering-status-brief-2f398a47ff",
+    "category": "field",
+    "value": "An engineering status brief"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 40,
+    "scope": "SolutionsShowcase",
+    "field": "alt-operations-team-working-in-a-supervised-envir-ae7ab6fc5d",
+    "category": "alt",
+    "value": "Operations team working in a supervised environment"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 42,
+    "scope": "SolutionsShowcase",
+    "field": "copy-audoryn-solutions-0b1be8a104",
+    "category": "copy",
+    "value": "AUDORYN / SOLUTIONS"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 42,
+    "scope": "SolutionsShowcase",
+    "field": "copy-work-that-already-d2df094031",
+    "category": "copy",
+    "value": "Work that already"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 42,
+    "scope": "SolutionsShowcase",
+    "field": "copy-needs-doing-3d9b074969",
+    "category": "copy",
+    "value": "needs doing."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 42,
+    "scope": "SolutionsShowcase",
+    "field": "copy-start-with-a-defined-responsibility-give-an-a-156028cbf0",
+    "category": "copy",
+    "value": "Start with a defined responsibility. Give an AI worker the right context, a clear job and a person to answer to."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 42,
+    "scope": "SolutionsShowcase",
+    "field": "copy-explore-where-to-start-aeddbfa023",
+    "category": "copy",
+    "value": "Explore where to start "
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 43,
+    "scope": "SolutionsShowcase",
+    "field": "copy-one-workforce-many-kinds-of-work-673f2389dd",
+    "category": "copy",
+    "value": "ONE WORKFORCE / MANY KINDS OF WORK"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 47,
+    "scope": "SolutionsShowcase",
+    "field": "copy-where-to-start-6d600b08ce",
+    "category": "copy",
+    "value": "WHERE TO START"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 47,
+    "scope": "SolutionsShowcase",
+    "field": "copy-choose-a-responsibility-4ad9305d6f",
+    "category": "copy",
+    "value": "Choose a responsibility."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 47,
+    "scope": "SolutionsShowcase",
+    "field": "copy-start-with-a-clear-job-c86f711a96",
+    "category": "copy",
+    "value": "Start with a clear job."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 47,
+    "scope": "SolutionsShowcase",
+    "field": "copy-six-practical-starting-points-grounded-in-aud-f95d082218",
+    "category": "copy",
+    "value": "Six practical starting points, grounded in Audoryn’s workforce templates."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 49,
+    "scope": "SolutionsShowcase",
+    "field": "copy-solution-areas-7dfd230c09",
+    "category": "copy",
+    "value": "Solution areas"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 50,
+    "scope": "SolutionsShowcase",
+    "field": "copy-example-starting-point-0-b818a22524",
+    "category": "copy",
+    "value": "EXAMPLE STARTING POINT / 0"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 50,
+    "scope": "SolutionsShowcase",
+    "field": "copy-worker-ac44e78bdc",
+    "category": "copy",
+    "value": "WORKER"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 50,
+    "scope": "SolutionsShowcase",
+    "field": "copy-example-job-21f8eb58bc",
+    "category": "copy",
+    "value": "EXAMPLE JOB"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 50,
+    "scope": "SolutionsShowcase",
+    "field": "copy-connected-context-ef272311c2",
+    "category": "copy",
+    "value": "CONNECTED CONTEXT"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 50,
+    "scope": "SolutionsShowcase",
+    "field": "copy-deliverable-38229dbb52",
+    "category": "copy",
+    "value": "DELIVERABLE"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 50,
+    "scope": "SolutionsShowcase",
+    "field": "copy-defined-role-bounded-tools-human-supervision-6a47066726",
+    "category": "copy",
+    "value": "DEFINED ROLE · BOUNDED TOOLS · HUMAN SUPERVISION"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 52,
+    "scope": "SolutionsShowcase",
+    "field": "copy-templates-create-draft-roles-and-jobs-connect-624e5e51cf",
+    "category": "copy",
+    "value": "Templates create draft roles and jobs. Connections, capabilities, policy and activation remain explicit setup steps."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 55,
+    "scope": "SolutionsShowcase",
+    "field": "copy-your-first-worker-dac8ef8562",
+    "category": "copy",
+    "value": "YOUR FIRST WORKER"
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 55,
+    "scope": "SolutionsShowcase",
+    "field": "copy-start-with-one-useful-responsibility-99d93ced82",
+    "category": "copy",
+    "value": "Start with one useful responsibility."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 55,
+    "scope": "SolutionsShowcase",
+    "field": "copy-explore-how-the-workforce-runs-or-set-up-a-su-af9e6eaab0",
+    "category": "copy",
+    "value": "Explore how the workforce runs, or set up a supervised worker in Audoryn."
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 55,
+    "scope": "SolutionsShowcase",
+    "field": "copy-get-started-127a298aa9",
+    "category": "copy",
+    "value": "Get started "
+  },
+  {
+    "source": "src/public/SolutionsShowcase.tsx",
+    "line": 55,
+    "scope": "SolutionsShowcase",
+    "field": "copy-see-the-product-4721ff1ee3",
+    "category": "copy",
+    "value": "See the product "
+  }
+]

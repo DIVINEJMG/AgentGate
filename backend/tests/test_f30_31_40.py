@@ -101,7 +101,7 @@ class IsolationBrowser:
 
 class IsolationRuntime(BrowserRuntime):
     def __init__(self, browser: IsolationBrowser) -> None:
-        super().__init__()
+        super().__init__(max_active_sessions=2, max_sessions_per_organization=2)
         self._test_browser = browser
 
     async def _ensure_browser(self) -> Browser:
@@ -203,6 +203,7 @@ class HardeningRuntime:
         *,
         organization_id: UUID,
         worker_id: UUID | None,
+        focus_text: str | None = None,
     ) -> BrowserObservation:
         await self.resume(
             session_id,
@@ -253,6 +254,8 @@ class HardeningRuntime:
         operation: str,
         locator: BrowserLocator | None = None,
         value: object = None,
+        axis: str = "vertical",
+        focus_text: str | None = None,
         dialog_action: str | None = None,
         prompt_text: str | None = None,
         timeout_ms: int = 15_000,
@@ -441,6 +444,7 @@ def request_for(
     input: dict[str, object],
     organization_id: UUID | None = None,
     worker_id: UUID | None = None,
+    run_id: UUID | None = None,
 ) -> ExecutionRequest:
     capability = next(
         item for item in provider.manifest.capabilities if item.operation == operation
@@ -451,7 +455,7 @@ def request_for(
         agent_id=uuid4(),
         job_id=uuid4(),
         work_item_id=uuid4(),
-        run_id=uuid4(),
+        run_id=run_id or uuid4(),
         capability=capability,
         resource=browser_resource(provider),
         operation=operation,
@@ -499,6 +503,7 @@ async def test_f30_31_browser_errors_are_normalized(
         },
         organization_id=org,
         worker_id=worker,
+        run_id=session.run_id,
     )
 
     with pytest.raises(ExecutionProviderError) as captured:
@@ -554,6 +559,7 @@ async def test_f30_31_navigation_timeout_is_retryable_but_side_effect_timeout_is
         },
         organization_id=org,
         worker_id=worker,
+        run_id=session.run_id,
     )
     with pytest.raises(ExecutionProviderError) as captured_click:
         await provider.execute(
@@ -586,6 +592,7 @@ async def test_f30_34_browser_crash_marks_session_failed_and_does_not_replay_sid
         },
         organization_id=org,
         worker_id=worker,
+        run_id=session.run_id,
     )
 
     with pytest.raises(ExecutionProviderError) as captured:

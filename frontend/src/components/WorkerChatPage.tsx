@@ -6,8 +6,10 @@ import { loadWorkforce, type ManagedWorker } from '../lib/workforceApi';
 import { confirmConversationCommand, createConversation, getConversation, listConversations, sendConversationMessage, uploadConversationAttachment, type ConversationMessage, type ConversationReceipt, type ConversationThread } from '../lib/conversationApi';
 import type { AppView } from '../navigation';
 import { subscribeOrganizationRealtime } from '../platform/realtimeClient';
-import { latestThreadId, threadsForWorker, type LiveResultReference } from './workerChatModel';
+import { approvalInConversation, latestThreadId, threadsForWorker, type LiveResultReference } from './workerChatModel';
 import ConversationField from './ConversationField';
+import { navigate } from '../workspace/routes';
+import { usePageTitle } from '../workspace/history';
 
 function errorText(value: unknown) {
   const data = value as { response?: { data?: { detail?: unknown; error?: string } }; message?: string };
@@ -27,7 +29,8 @@ async function base64(file: File) {
   return btoa(binary);
 }
 
-export default function WorkerChatPage({ organization, apiVersion, initialWorkerId, onNavigate }: { organization: OrganizationAccess; apiVersion: ApiVersion; initialWorkerId: string | null; onNavigate: (view: AppView) => void }) {
+/** Worker and thread live in the URL (`/conversations/:workerId/:threadId`, `new` for a fresh chat). */
+export default function WorkerChatPage({ organization, apiVersion, initialWorkerId, initialThreadId = null, onNavigate }: { organization: OrganizationAccess; apiVersion: ApiVersion; initialWorkerId: string | null; initialThreadId?: string | null; onNavigate: (view: AppView) => void }) {
   const [workers, setWorkers] = useState<ManagedWorker[]>([]);
   const [threads, setThreads] = useState<ConversationThread[]>([]);
   const [workerId, setWorkerId] = useState<string | null>(initialWorkerId);
@@ -53,23 +56,44 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
       if (!active) return;
       setWorkers(workforce.workers);
       setThreads(conversations);
-      const resolvedWorkerId = initialWorkerId && workforce.workers.some((item) => item.id === initialWorkerId) ? initialWorkerId : null;
-      setWorkerId(resolvedWorkerId);
-      setThreadId(latestThreadId(conversations, resolvedWorkerId));
       setError(null);
     }).catch((caught) => { if (active) setError(errorText(caught)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [apiVersion, organization.id]);
 
+  // Follow the URL: Back, Forward, refresh and shared links all land on the same worker and thread.
+  useEffect(() => {
+    if (loading) return;
+    const resolvedWorkerId = initialWorkerId && workers.some((item) => item.id === initialWorkerId) ? initialWorkerId : null;
+    if (resolvedWorkerId !== workerId) { setMessages([]); setReceipt(null); setDraft(''); setFiles([]); }
+    setWorkerId(resolvedWorkerId);
+    if (!resolvedWorkerId) {
+      setThreadId(null);
+      if (initialWorkerId) navigate({ page: 'conversations' }, { replace: true });
+      return;
+    }
+    if (initialThreadId === 'new') { setThreadId(null); setMessages([]); setReceipt(null); return; }
+    const known = initialThreadId && threads.some((item) => item.id === initialThreadId && item.workerId === resolvedWorkerId) ? initialThreadId : null;
+    const next = known ?? latestThreadId(threads, resolvedWorkerId);
+    if (next !== threadId) setReceipt(null);
+    setThreadId(next);
+    if ((next ?? undefined) !== (initialThreadId ?? undefined)) navigate({ page: 'conversations', workerId: resolvedWorkerId, threadId: next ?? undefined }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, initialWorkerId, initialThreadId]);
+
   const worker = workers.find((item) => item.id === workerId) ?? null;
+  usePageTitle(threads.find((item) => item.id === threadId)?.title);
   const workerThreads = useMemo(() => threadsForWorker(threads, workerId), [threads, workerId]);
-  const pendingApprovals = approvals.filter((item) => item.agentId === worker?.agentIdentityId && item.status === 'pending');
+  const pendingApprovals = threadLoading ? [] : approvals.filter(item =>
+    item.agentId === worker?.agentIdentityId && item.status === 'pending' && approvalInConversation(item, threadId, messages));
 
   useEffect(() => {
     if (!organization.permissions.includes('approvals.review')) return;
     let active = true;
-    listApprovals(apiVersion, organization.id).then((rows) => { if (active) setApprovals(rows); }).catch(() => { if (active) setApprovals([]); });
-    return () => { active = false; };
+    const refresh = () => { void listApprovals(apiVersion, organization.id).then((rows) => { if (active) setApprovals(rows); }).catch(() => { if (active) setApprovals([]); }); };
+    refresh();
+    const unsubscribe = subscribeOrganizationRealtime({ organizationId: organization.id, eventTypes: ['approval.created', 'approval.decided', 'run.waiting_approval'], onEvent: refresh, poll: refresh, pollingIntervalMs: 60000 });
+    return () => { active = false; unsubscribe(); };
   }, [apiVersion, organization.id, organization.permissions]);
 
   useEffect(() => {
@@ -100,6 +124,7 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
       eventTypes: ['result.created', 'conversation.response.created', 'run.completed'],
       onEvent: () => { void refresh(); },
       poll: () => refresh(),
+      pollingIntervalMs: 30000,
     });
     return () => { active = false; unsubscribe(); };
   }, [apiVersion, organization.id, threadId]);
@@ -107,20 +132,15 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
   useEffect(() => { timeline.current?.scrollTo({ top: timeline.current.scrollHeight, behavior: 'smooth' }); }, [messages, threadLoading, responsePhase]);
 
   function chooseWorker(id: string) {
-    if (busy) return;
-    setWorkerId(id);
-    setThreadId(latestThreadId(threads, id));
-    setMessages([]);
-    setReceipt(null);
-    setDraft('');
-    setFiles([]);
+    if (busy || id === workerId) return;
+    navigate({ page: 'conversations', workerId: id });
   }
   function back() {
-    if (workerId) { setWorkerId(null); setThreadId(null); setReceipt(null); setMessages([]); return; }
+    if (workerId) { navigate({ page: 'conversations' }); return; }
     onNavigate('workforce');
   }
-  function chooseThread(id: string) { if (busy) return; setReceipt(null); setThreadId(id); }
-  function newThread() { if (busy) return; setThreadId(null); setMessages([]); setReceipt(null); }
+  function chooseThread(id: string) { if (busy || !workerId) return; navigate({ page: 'conversations', workerId, threadId: id }); }
+  function newThread() { if (busy || !workerId) return; navigate({ page: 'conversations', workerId, threadId: 'new' }); }
 
   async function send(event: FormEvent) {
     event.preventDefault();
@@ -145,13 +165,13 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
       setResponsePhase('responding');
       const turn = await sendConversationMessage(apiVersion, organization.id, activeThreadId, content, references);
       const result = await getConversation(apiVersion, organization.id, activeThreadId);
-      if (createdThreadId) setThreadId(createdThreadId);
+      if (createdThreadId) { setThreadId(createdThreadId); navigate({ page: 'conversations', workerId: worker.id, threadId: createdThreadId }, { replace: true }); }
       setMessages(result.messages);
       setReceipt(turn.receipt);
       setThreads((current) => current.map((item) => item.id === activeThreadId ? result.thread : item));
       setDraft(''); setFiles([]);
       if (fileInput.current) fileInput.current.value = '';
-    } catch (caught) { if (createdThreadId) setThreadId(createdThreadId); setError(errorText(caught)); } finally { setBusy(false); setResponsePhase(null); }
+    } catch (caught) { if (createdThreadId) { setThreadId(createdThreadId); navigate({ page: 'conversations', workerId: worker.id, threadId: createdThreadId }, { replace: true }); } setError(errorText(caught)); } finally { setBusy(false); setResponsePhase(null); }
   }
 
   async function confirm() {
@@ -174,8 +194,7 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
   }
 
   function openResult(reference: LiveResultReference) {
-    sessionStorage.setItem(`audoryn:open-result:${organization.id}`, reference.id);
-    onNavigate('results');
+    navigate({ page: 'results', resultId: reference.id });
   }
 
   async function explainResult(reference: LiveResultReference) {
@@ -186,7 +205,7 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
         apiVersion,
         organization.id,
         threadId,
-        `Explain this specific completed result to me: "${reference.name}" (result ID: ${reference.id}). Tell me what was completed, what the result means, and anything I should pay attention to.`,
+        `Explain this specific task result to me: "${reference.name}" (result ID: ${reference.id}). Tell me what was completed, what remains blocked or unverified, what the result means, and anything I should pay attention to.`,
       );
       const result = await getConversation(apiVersion, organization.id, threadId);
       setMessages(result.messages);
@@ -201,6 +220,8 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
   }
 
   return <ConversationField
+    organizationId={organization.id}
+    apiVersion={apiVersion}
     workers={workers}
     worker={worker}
     workerId={workerId}

@@ -1,7 +1,7 @@
 import { api } from '../platform/client';
 import type { ApiVersion } from './systemApi';
 
-export type RunStatus='planning'|'running'|'waiting_approval'|'waiting_ai'|'waiting_configuration'|'completed'|'failed'|'cancelled';
+export type RunStatus='planning'|'running'|'waiting_approval'|'waiting_ai'|'waiting_configuration'|'waiting_reconnect'|'uncertain_outcome'|'partial_completion'|'policy_denied'|'completed'|'failed'|'cancelled';
 export type RunStepStatus='pending'|'running'|'waiting_approval'|'completed'|'failed';
 
 export interface RuntimeRun {
@@ -9,10 +9,13 @@ export interface RuntimeRun {
   correlationId:string;attempt:number;status:RunStatus;currentStep:number;stepIds:string[];
   contextMemoryIds:string[];artifactIds:string[];planSummary:string|null;resultSummary:string|null;
   failure:string|null;createdAt:string;startedAt:string|null;completedAt:string|null;updatedAt:string;
+  queueState?:string|null;waitingReason?:string|null;retryAt?:string|null;
+  planning?: {status?:string|null;attemptCount?:number;recoveryRound?:number;recoveryMode?:string|null;reason?:string|null}|null;
+  plannerPhase?:string|null;plannerTiming?:{preparationSeconds?:number;aiResponseSeconds?:number};
 }
 export interface RuntimeStep {
   id:string;organizationId:string;runId:string;index:number;kind:'reasoning'|'action'|'finish';
-  title:string;instruction:string;resourceId:string;scope:string;status:RunStepStatus;output:string|null;
+  title:string;instruction:string;resourceId:string;scope:string;status:RunStepStatus;actionOutcome?:string|null;output:string|null;
   actionId:string|null;approvalId:string|null;error:string|null;startedAt:string|null;completedAt:string|null;
 }
 export interface RuntimeWorkspace {
@@ -64,6 +67,12 @@ function runV2(raw:any):RuntimeRun {
     planSummary:displayText(raw.execution.planSummary),
     resultSummary:displayText(raw.execution.resultSummary),
     failure:displayText(raw.execution.failure),
+    queueState:raw.execution.queueState??null,
+    planning:raw.execution.planning??null,
+    plannerPhase:raw.execution.plannerPhase??null,
+    plannerTiming:raw.execution.plannerTiming??{},
+    waitingReason:displayText(raw.execution.waitingReason),
+    retryAt:raw.execution.retryAt??null,
     createdAt:raw.identity.createdAt,
     startedAt:raw.identity.startedAt??null,
     completedAt:raw.identity.completedAt??null,
@@ -83,6 +92,7 @@ function stepV2(raw:any):RuntimeStep {
     resourceId:raw.request.resourceId??'',
     scope:raw.request.scope??'',
     status:raw.identity.status,
+    actionOutcome:raw.identity.actionOutcome??null,
     output:displayText(raw.execution.output),
     actionId:raw.execution.actionId??null,
     approvalId:raw.execution.approvalId??null,

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "operation": "usage",
+  "requestTarget": "/internal/console/v1/usage?days=3",
+  "requestId": "example-usage",
+  "observedAt": "2026-10-10T12:00:00+00:00",
+  "data": {
+    "windowDays": 3,
+    "metrics": {
+      "newUsers": 1,
+      "organizations": 2,
+      "activeOrganizations": 1,
+      "workersCreated": 1,
+      "runs": 12,
+      "aiInvocations": 40,
+      "integrations": 1
+    },
+    "daily": [
+      {
+        "day": "2026-10-08",
+        "newUsers": 0,
+        "runs": 4,
+        "aiInvocations": 10
+      },
+      {
+        "day": "2026-10-09",
+        "newUsers": 1,
+        "runs": 5,
+        "aiInvocations": 20
+      },
+      {
+        "day": "2026-10-10",
+        "newUsers": 0,
+        "runs": 3,
+        "aiInvocations": 10
+      }
+    ]
+  }
+}

@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from legacy_execution import legacy_registry
 
 from app.api.internal.outbox import _verify_qstash as verify_outbox_qstash
 from app.api.realtime_routes import _ensure_organization_access
@@ -57,7 +58,7 @@ def _resource(provider: str, capability: CapabilityDescriptor) -> ResourceDescri
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "provider",
-    execution_provider_registry().providers(kind="native_api"),
+    legacy_registry().providers(kind="native_api"),
     ids=lambda provider: provider.manifest.provider,
 )
 async def test_f29_provider_conformance_suite(provider: ExecutionProvider) -> None:

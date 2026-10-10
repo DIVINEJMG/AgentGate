@@ -64,10 +64,13 @@ for token in (
     if token not in nvidia:
         errors.append(f"NVIDIA NIM adapter is missing: {token}")
 
-if "Draft202012Validator" not in gateway or "for repair_attempt in range(2)" not in gateway:
+if ("Draft202012Validator" not in gateway
+    or "max_inference_calls: int = 2" not in gateway
+    or "max_inference_calls not in {1, 2}" not in gateway
+    or "for repair_attempt in range(max_inference_calls)" not in gateway):
     errors.append("structured output adapter lacks schema validation + one repair attempt")
 
-if "ai_gateway_from_settings(session=session)" not in managed:
+if "ai_gateway_from_settings(planner=True)" not in managed:
     errors.append("Managed Runtime is not wired through the provider-neutral AI Gateway")
 for forbidden in ("model_provider_from_settings", "OpenAI", "NvidiaNimProvider"):
     if forbidden in managed:

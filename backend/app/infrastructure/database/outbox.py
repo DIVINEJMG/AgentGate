@@ -1,7 +1,7 @@
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import case, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database.models import OutboxEvent
@@ -36,7 +36,13 @@ class TransactionalOutbox:
         rows = await self._session.scalars(
             select(OutboxEvent)
             .where(OutboxEvent.published_at.is_(None))
-            .order_by(OutboxEvent.created_at)
+            .where(or_(OutboxEvent.next_delivery_at.is_(None), OutboxEvent.next_delivery_at <= datetime.now(UTC)))
+            # A failed unrelated event must not hide a committed runtime
+            # continuation behind the bounded drain batch.
+            .order_by(
+                case((OutboxEvent.topic == "run.progress", 0), else_=1),
+                OutboxEvent.created_at,
+            )
             .limit(limit)
             .with_for_update(skip_locked=True)
         )
@@ -44,4 +50,9 @@ class TransactionalOutbox:
 
     async def mark_published(self, event: OutboxEvent) -> None:
         event.published_at = datetime.now(UTC)
+        await self._session.flush()
+
+    async def mark_failed(self, event: OutboxEvent) -> None:
+        event.delivery_attempts = (event.delivery_attempts or 0) + 1
+        event.next_delivery_at = datetime.now(UTC) + timedelta(seconds=min(1800, 5 * 2 ** min(event.delivery_attempts, 9)))
         await self._session.flush()

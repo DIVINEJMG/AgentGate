@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.github_auth_routes import GitHubOAuthQueryMiddleware
 from app.api.router import api_router
 from app.bootstrap.lifecycle import lifespan
 from app.bootstrap.settings import settings
@@ -23,5 +24,6 @@ def create_application() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Correlation-ID"],
     )
+    application.add_middleware(GitHubOAuthQueryMiddleware)
     application.include_router(api_router)
     return application

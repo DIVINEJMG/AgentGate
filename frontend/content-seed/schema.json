@@ -1,0 +1,1443 @@
+{
+  "$defs": {
+    "Demonstration": {
+      "additionalProperties": false,
+      "properties": {
+        "disclosure": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Disclosure",
+          "type": "string"
+        },
+        "organization_label": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Organization Label",
+          "type": "string"
+        },
+        "workers": {
+          "items": {
+            "$ref": "#/$defs/Entry"
+          },
+          "maxItems": 30,
+          "title": "Workers",
+          "type": "array"
+        },
+        "jobs": {
+          "items": {
+            "$ref": "#/$defs/Entry"
+          },
+          "maxItems": 30,
+          "title": "Jobs",
+          "type": "array"
+        },
+        "approvals": {
+          "items": {
+            "$ref": "#/$defs/Entry"
+          },
+          "maxItems": 30,
+          "title": "Approvals",
+          "type": "array"
+        },
+        "run_steps": {
+          "items": {
+            "$ref": "#/$defs/Entry"
+          },
+          "maxItems": 30,
+          "title": "Run Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "disclosure",
+        "organization_label"
+      ],
+      "title": "Demonstration",
+      "type": "object"
+    },
+    "Entry": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "heading": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Heading",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Description",
+          "type": "string"
+        },
+        "summary": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Summary",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Detail",
+          "type": "string"
+        },
+        "status_label": {
+          "default": "",
+          "maxLength": 160,
+          "title": "Status Label",
+          "type": "string"
+        },
+        "category": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Category",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "maxLength": 10000,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "title": "Points",
+          "type": "array"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "enum": [
+                "workers",
+                "jobs",
+                "governance",
+                "supervision",
+                "operations",
+                "research",
+                "support",
+                "sales",
+                "marketing",
+                "engineering",
+                "github",
+                "gmail",
+                "slack",
+                "drive",
+                "calendar",
+                "browser",
+                "document",
+                "shield",
+                "check",
+                "clock"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Icon"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "maxItems": 20,
+          "title": "Links",
+          "type": "array"
+        },
+        "media": {
+          "items": {
+            "$ref": "#/$defs/MediaReference"
+          },
+          "maxItems": 20,
+          "title": "Media",
+          "type": "array"
+        },
+        "record_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Record Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "title": "Entry",
+      "type": "object"
+    },
+    "HeroScene": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "heading": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Heading",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Description",
+          "type": "string"
+        },
+        "summary": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Summary",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Detail",
+          "type": "string"
+        },
+        "status_label": {
+          "default": "",
+          "maxLength": 160,
+          "title": "Status Label",
+          "type": "string"
+        },
+        "category": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Category",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "maxLength": 10000,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "title": "Points",
+          "type": "array"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "enum": [
+                "workers",
+                "jobs",
+                "governance",
+                "supervision",
+                "operations",
+                "research",
+                "support",
+                "sales",
+                "marketing",
+                "engineering",
+                "github",
+                "gmail",
+                "slack",
+                "drive",
+                "calendar",
+                "browser",
+                "document",
+                "shield",
+                "check",
+                "clock"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Icon"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "maxItems": 20,
+          "title": "Links",
+          "type": "array"
+        },
+        "media": {
+          "items": {
+            "$ref": "#/$defs/MediaReference"
+          },
+          "maxItems": 20,
+          "title": "Media",
+          "type": "array"
+        },
+        "record_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Record Ids",
+          "type": "array"
+        },
+        "scene": {
+          "enum": [
+            "autonomy",
+            "control",
+            "oversight"
+          ],
+          "title": "Scene",
+          "type": "string"
+        },
+        "word": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Word",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "scene",
+        "word"
+      ],
+      "title": "HeroScene",
+      "type": "object"
+    },
+    "JourneyChapter": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "heading": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Heading",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Description",
+          "type": "string"
+        },
+        "summary": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Summary",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Detail",
+          "type": "string"
+        },
+        "status_label": {
+          "default": "",
+          "maxLength": 160,
+          "title": "Status Label",
+          "type": "string"
+        },
+        "category": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Category",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "maxLength": 10000,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "title": "Points",
+          "type": "array"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "enum": [
+                "workers",
+                "jobs",
+                "governance",
+                "supervision",
+                "operations",
+                "research",
+                "support",
+                "sales",
+                "marketing",
+                "engineering",
+                "github",
+                "gmail",
+                "slack",
+                "drive",
+                "calendar",
+                "browser",
+                "document",
+                "shield",
+                "check",
+                "clock"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Icon"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "maxItems": 20,
+          "title": "Links",
+          "type": "array"
+        },
+        "media": {
+          "items": {
+            "$ref": "#/$defs/MediaReference"
+          },
+          "maxItems": 20,
+          "title": "Media",
+          "type": "array"
+        },
+        "record_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Record Ids",
+          "type": "array"
+        },
+        "phase": {
+          "enum": [
+            "defined",
+            "policy",
+            "approval",
+            "recorded"
+          ],
+          "title": "Phase",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "phase"
+      ],
+      "title": "JourneyChapter",
+      "type": "object"
+    },
+    "Link": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "destination": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Destination",
+          "type": "string"
+        },
+        "section_id": {
+          "anyOf": [
+            {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section Id"
+        },
+        "selected_record_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selected Record Id"
+        }
+      },
+      "required": [
+        "label",
+        "destination"
+      ],
+      "title": "Link",
+      "type": "object"
+    },
+    "MediaReference": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "format": "uuid",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "image",
+            "logo",
+            "video",
+            "model",
+            "poster",
+            "caption",
+            "download",
+            "rendition"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "fallback_asset_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fallback Asset Id"
+        },
+        "poster_asset_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Poster Asset Id"
+        },
+        "caption_asset_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Caption Asset Ids",
+          "type": "array"
+        },
+        "duration_seconds": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 86400,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Seconds"
+        },
+        "rendition_asset_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Rendition Asset Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "asset_id",
+        "role"
+      ],
+      "title": "MediaReference",
+      "type": "object"
+    },
+    "OperatingArea": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "heading": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Heading",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Description",
+          "type": "string"
+        },
+        "summary": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Summary",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Detail",
+          "type": "string"
+        },
+        "status_label": {
+          "default": "",
+          "maxLength": 160,
+          "title": "Status Label",
+          "type": "string"
+        },
+        "category": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Category",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "maxLength": 10000,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "title": "Points",
+          "type": "array"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "enum": [
+                "workers",
+                "jobs",
+                "governance",
+                "supervision",
+                "operations",
+                "research",
+                "support",
+                "sales",
+                "marketing",
+                "engineering",
+                "github",
+                "gmail",
+                "slack",
+                "drive",
+                "calendar",
+                "browser",
+                "document",
+                "shield",
+                "check",
+                "clock"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Icon"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "maxItems": 20,
+          "title": "Links",
+          "type": "array"
+        },
+        "media": {
+          "items": {
+            "$ref": "#/$defs/MediaReference"
+          },
+          "maxItems": 20,
+          "title": "Media",
+          "type": "array"
+        },
+        "record_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Record Ids",
+          "type": "array"
+        },
+        "area": {
+          "enum": [
+            "workers",
+            "jobs",
+            "governance",
+            "supervision"
+          ],
+          "title": "Area",
+          "type": "string"
+        },
+        "path": {
+          "items": {
+            "maxLength": 10000,
+            "type": "string"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "title": "Path",
+          "type": "array"
+        },
+        "signal": {
+          "maxLength": 1000,
+          "title": "Signal",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "area",
+        "path",
+        "signal"
+      ],
+      "title": "OperatingArea",
+      "type": "object"
+    },
+    "Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "heading": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Heading",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Description",
+          "type": "string"
+        },
+        "summary": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Summary",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Detail",
+          "type": "string"
+        },
+        "status_label": {
+          "default": "",
+          "maxLength": 160,
+          "title": "Status Label",
+          "type": "string"
+        },
+        "category": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Category",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "maxLength": 10000,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "title": "Points",
+          "type": "array"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "enum": [
+                "workers",
+                "jobs",
+                "governance",
+                "supervision",
+                "operations",
+                "research",
+                "support",
+                "sales",
+                "marketing",
+                "engineering",
+                "github",
+                "gmail",
+                "slack",
+                "drive",
+                "calendar",
+                "browser",
+                "document",
+                "shield",
+                "check",
+                "clock"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Icon"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "maxItems": 20,
+          "title": "Links",
+          "type": "array"
+        },
+        "media": {
+          "items": {
+            "$ref": "#/$defs/MediaReference"
+          },
+          "maxItems": 20,
+          "title": "Media",
+          "type": "array"
+        },
+        "record_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Record Ids",
+          "type": "array"
+        },
+        "plan_key": {
+          "maxLength": 10000,
+          "pattern": "^[a-z][a-z0-9-]{0,79}$",
+          "title": "Plan Key",
+          "type": "string"
+        },
+        "price_minor": {
+          "minimum": 0,
+          "title": "Price Minor",
+          "type": "integer"
+        },
+        "currency": {
+          "maxLength": 10000,
+          "pattern": "^[A-Z]{3}$",
+          "title": "Currency",
+          "type": "string"
+        },
+        "billing_period": {
+          "enum": [
+            "month",
+            "year"
+          ],
+          "title": "Billing Period",
+          "type": "string"
+        },
+        "availability": {
+          "enum": [
+            "free_signup",
+            "unavailable",
+            "contact"
+          ],
+          "title": "Availability",
+          "type": "string"
+        },
+        "worker_capacity_display": {
+          "minimum": 0,
+          "title": "Worker Capacity Display",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "plan_key",
+        "price_minor",
+        "currency",
+        "billing_period",
+        "availability",
+        "worker_capacity_display"
+      ],
+      "title": "Plan",
+      "type": "object"
+    },
+    "Section": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 10000,
+          "pattern": "^[a-z][a-z0-9-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "eyebrow": {
+          "default": "",
+          "maxLength": 240,
+          "title": "Eyebrow",
+          "type": "string"
+        },
+        "heading": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Heading",
+          "type": "string"
+        },
+        "paragraphs": {
+          "items": {
+            "maxLength": 10000,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "title": "Paragraphs",
+          "type": "array"
+        },
+        "points": {
+          "items": {
+            "maxLength": 10000,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "title": "Points",
+          "type": "array"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "maxItems": 20,
+          "title": "Links",
+          "type": "array"
+        },
+        "media": {
+          "items": {
+            "$ref": "#/$defs/MediaReference"
+          },
+          "maxItems": 20,
+          "title": "Media",
+          "type": "array"
+        },
+        "record_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Record Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "heading"
+      ],
+      "title": "Section",
+      "type": "object"
+    },
+    "SecurityDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "heading": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Heading",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Description",
+          "type": "string"
+        },
+        "summary": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Summary",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Detail",
+          "type": "string"
+        },
+        "status_label": {
+          "default": "",
+          "maxLength": 160,
+          "title": "Status Label",
+          "type": "string"
+        },
+        "category": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Category",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "maxLength": 10000,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "title": "Points",
+          "type": "array"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "enum": [
+                "workers",
+                "jobs",
+                "governance",
+                "supervision",
+                "operations",
+                "research",
+                "support",
+                "sales",
+                "marketing",
+                "engineering",
+                "github",
+                "gmail",
+                "slack",
+                "drive",
+                "calendar",
+                "browser",
+                "document",
+                "shield",
+                "check",
+                "clock"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Icon"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "maxItems": 20,
+          "title": "Links",
+          "type": "array"
+        },
+        "media": {
+          "items": {
+            "$ref": "#/$defs/MediaReference"
+          },
+          "maxItems": 20,
+          "title": "Media",
+          "type": "array"
+        },
+        "record_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Record Ids",
+          "type": "array"
+        },
+        "decision": {
+          "enum": [
+            "allow",
+            "review",
+            "deny"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "note": {
+          "maxLength": 10000,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "decision",
+        "note"
+      ],
+      "title": "SecurityDecision",
+      "type": "object"
+    },
+    "Solution": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "heading": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Heading",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Description",
+          "type": "string"
+        },
+        "summary": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Summary",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "maxLength": 10000,
+          "title": "Detail",
+          "type": "string"
+        },
+        "status_label": {
+          "default": "",
+          "maxLength": 160,
+          "title": "Status Label",
+          "type": "string"
+        },
+        "category": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Category",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "maxLength": 10000,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "title": "Points",
+          "type": "array"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "enum": [
+                "workers",
+                "jobs",
+                "governance",
+                "supervision",
+                "operations",
+                "research",
+                "support",
+                "sales",
+                "marketing",
+                "engineering",
+                "github",
+                "gmail",
+                "slack",
+                "drive",
+                "calendar",
+                "browser",
+                "document",
+                "shield",
+                "check",
+                "clock"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Icon"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "maxItems": 20,
+          "title": "Links",
+          "type": "array"
+        },
+        "media": {
+          "items": {
+            "$ref": "#/$defs/MediaReference"
+          },
+          "maxItems": 20,
+          "title": "Media",
+          "type": "array"
+        },
+        "record_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Record Ids",
+          "type": "array"
+        },
+        "worker": {
+          "maxLength": 10000,
+          "title": "Worker",
+          "type": "string"
+        },
+        "job": {
+          "maxLength": 10000,
+          "title": "Job",
+          "type": "string"
+        },
+        "tools": {
+          "items": {
+            "maxLength": 10000,
+            "type": "string"
+          },
+          "maxItems": 30,
+          "title": "Tools",
+          "type": "array"
+        },
+        "output": {
+          "maxLength": 10000,
+          "title": "Output",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "worker",
+        "job",
+        "tools",
+        "output"
+      ],
+      "title": "Solution",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract": {
+      "const": "audoryn.public.v1",
+      "default": "audoryn.public.v1",
+      "title": "Contract",
+      "type": "string"
+    },
+    "profile": {
+      "enum": [
+        "home",
+        "product",
+        "solutions",
+        "security",
+        "pricing",
+        "resources",
+        "company",
+        "privacy",
+        "terms",
+        "branding",
+        "article",
+        "news",
+        "guide",
+        "research",
+        "changelog",
+        "resource",
+        "case_study",
+        "feature",
+        "integration",
+        "customer",
+        "testimonial",
+        "author",
+        "category",
+        "tag",
+        "faq",
+        "announcement"
+      ],
+      "title": "Profile",
+      "type": "string"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/Section"
+      },
+      "maxItems": 80,
+      "title": "Sections",
+      "type": "array"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/Entry"
+      },
+      "maxItems": 100,
+      "title": "Entries",
+      "type": "array"
+    },
+    "hero_scenes": {
+      "items": {
+        "$ref": "#/$defs/HeroScene"
+      },
+      "maxItems": 3,
+      "title": "Hero Scenes",
+      "type": "array"
+    },
+    "journey": {
+      "items": {
+        "$ref": "#/$defs/JourneyChapter"
+      },
+      "maxItems": 4,
+      "title": "Journey",
+      "type": "array"
+    },
+    "operating_areas": {
+      "items": {
+        "$ref": "#/$defs/OperatingArea"
+      },
+      "maxItems": 4,
+      "title": "Operating Areas",
+      "type": "array"
+    },
+    "solutions": {
+      "items": {
+        "$ref": "#/$defs/Solution"
+      },
+      "maxItems": 100,
+      "title": "Solutions",
+      "type": "array"
+    },
+    "security_decisions": {
+      "items": {
+        "$ref": "#/$defs/SecurityDecision"
+      },
+      "maxItems": 3,
+      "title": "Security Decisions",
+      "type": "array"
+    },
+    "plans": {
+      "items": {
+        "$ref": "#/$defs/Plan"
+      },
+      "maxItems": 30,
+      "title": "Plans",
+      "type": "array"
+    },
+    "demonstration": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Demonstration"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "effective_date": {
+      "anyOf": [
+        {
+          "maxLength": 10000,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Effective Date"
+    },
+    "document_version": {
+      "anyOf": [
+        {
+          "maxLength": 80,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Document Version"
+    }
+  },
+  "required": [
+    "profile"
+  ],
+  "title": "WebsiteContent",
+  "type": "object"
+}

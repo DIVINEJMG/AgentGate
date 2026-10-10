@@ -15,6 +15,7 @@ ExecutionStatus = Literal[
     "cancelled",
 ]
 ExecutionErrorCode = Literal[
+    "uncertain_outcome",
     "authentication_error",
     "authorization_error",
     "resource_not_found",
@@ -190,6 +191,7 @@ class ExecutionError:
     correlation_id: str
     safe_message: str
     internal_details: str | None = None
+    retry_after_seconds: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,6 +256,7 @@ class ExecutionProviderError(RuntimeError):
         correlation_id: str,
         safe_message: str,
         internal_details: str | None = None,
+        retry_after_seconds: float | None = None,
     ) -> None:
         super().__init__(safe_message)
         self.error = ExecutionError(
@@ -264,6 +267,7 @@ class ExecutionProviderError(RuntimeError):
             correlation_id=correlation_id,
             safe_message=safe_message,
             internal_details=internal_details,
+            retry_after_seconds=retry_after_seconds,
         )
 
 

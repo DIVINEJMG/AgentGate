@@ -5,8 +5,11 @@ from app.api.agent_routes import v2_router as agent_router
 from app.api.ai_operations_routes import v2_router as ai_operations_router
 from app.api.auth_routes import router as auth_router
 from app.api.conversation_routes import v2_router as conversation_router
+from app.api.github_auth_routes import router as github_auth_router
+from app.api.github_routes import router as github_router
 from app.api.governance_routes import v2_router as governance_router
 from app.api.integration_capability_routes import v2_router as integration_router
+from app.api.integration_foundation_routes import router as integration_foundation_router
 from app.api.jobs_routes import v2_router as jobs_router
 from app.api.organization_routes import v2_router as organization_router
 from app.api.product_ops_routes import v2_router as product_ops_router
@@ -23,12 +26,15 @@ router.include_router(workforce_router)
 router.include_router(jobs_router)
 router.include_router(template_router)
 router.include_router(integration_router)
+router.include_router(integration_foundation_router)
+router.include_router(github_router)
 router.include_router(governance_router)
 router.include_router(runtime_result_router)
 router.include_router(product_ops_router)
 router.include_router(realtime_router)
 router.include_router(agent_router)
 router.include_router(auth_router)
+router.include_router(github_auth_router)
 router.include_router(organization_router)
 
 

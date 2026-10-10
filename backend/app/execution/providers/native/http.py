@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 
 import httpx
 
@@ -22,12 +24,29 @@ class ProviderTransportError(RuntimeError):
         retryable: bool,
         safe_message: str,
         internal_details: str | None = None,
+        retry_after_seconds: float | None = None,
     ) -> None:
         super().__init__(safe_message)
-        self.code = code
+        self.code: ExecutionErrorCode = code
         self.retryable = retryable
         self.safe_message = safe_message
         self.internal_details = internal_details
+        self.retry_after_seconds = retry_after_seconds
+
+
+def retry_after_seconds(value: str | None) -> float | None:
+    if not value:
+        return None
+    try:
+        return max(0.0, min(86400.0, float(value)))
+    except ValueError:
+        try:
+            return max(
+                0.0,
+                min(86400.0, (parsedate_to_datetime(value) - datetime.now(UTC)).total_seconds()),
+            )
+        except (ValueError, TypeError):
+            return None
 
 
 class ProviderHTTPClient:
@@ -124,6 +143,7 @@ class ProviderHTTPClient:
                 code="rate_limited",
                 retryable=True,
                 safe_message=f"{provider} rate limit was reached.",
+                retry_after_seconds=retry_after_seconds(response.headers.get("Retry-After")),
                 internal_details=response.text[:500],
             )
         if response.status_code in {408, 425, 500, 502, 503, 504}:
@@ -131,6 +151,7 @@ class ProviderHTTPClient:
                 code="temporary_provider_error",
                 retryable=True,
                 safe_message=f"{provider} returned a temporary error.",
+                retry_after_seconds=retry_after_seconds(response.headers.get("Retry-After")),
                 internal_details=f"HTTP {response.status_code}: {response.text[:500]}",
             )
         if response.status_code >= 400:

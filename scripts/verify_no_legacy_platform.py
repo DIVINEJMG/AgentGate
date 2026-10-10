@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from repository_files import repository_files
+
 ROOT = Path(__file__).resolve().parents[1]
 
 ACTIVE_TARGETS = (
@@ -31,8 +33,8 @@ def iter_files(target: Path):
         return
     if not target.exists():
         return
-    for path in target.rglob("*"):
-        if path.is_file() and path.suffix in TEXT_SUFFIXES:
+    for path in repository_files(ROOT):
+        if path.is_relative_to(target) and path.suffix in TEXT_SUFFIXES:
             yield path
 
 

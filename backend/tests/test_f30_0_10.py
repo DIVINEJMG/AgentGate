@@ -20,6 +20,7 @@ from app.execution.browser.contracts import (
 from app.execution.contracts import (
     ExecutionPreferences,
     ExecutionRequest,
+    ExecutionResult,
     ProviderRuntimeContext,
     ResourceDescriptor,
 )
@@ -129,7 +130,7 @@ class FakeBrowserRuntime:
             observed_at=datetime.now(UTC),
         )
 
-    async def observe(self, session_id, *, organization_id, worker_id):
+    async def observe(self, session_id, *, organization_id, worker_id, focus_text=None):
         await self.resume(
             session_id,
             organization_id=organization_id,
@@ -179,6 +180,8 @@ class FakeBrowserRuntime:
         operation,
         locator=None,
         value=None,
+        axis="vertical",
+        focus_text=None,
         dialog_action=None,
         prompt_text=None,
         timeout_ms=15000,
@@ -360,6 +363,7 @@ def request_for(
     payload: dict[str, object],
     organization_id=None,
     worker_id=None,
+    run_id=None,
 ) -> ExecutionRequest:
     capability = next(
         item for item in provider.manifest.capabilities if item.operation == operation
@@ -370,7 +374,7 @@ def request_for(
         agent_id=uuid4(),
         job_id=uuid4(),
         work_item_id=uuid4(),
-        run_id=uuid4(),
+        run_id=run_id or uuid4(),
         capability=capability,
         resource=resource(provider),
         operation=operation,
@@ -409,6 +413,57 @@ def test_f30_browser_is_first_class_versioned_execution_provider() -> None:
         "page.scroll",
         "element.hover",
     } <= operations
+
+
+@pytest.mark.asyncio
+async def test_f30_page_read_refreshes_observation_after_site_content_loads() -> None:
+    class UpdatingBrowserRuntime(FakeBrowserRuntime):
+        async def current_observation(self, session_id, *, organization_id, worker_id):
+            observation = await super().current_observation(
+                session_id, organization_id=organization_id, worker_id=worker_id
+            )
+            return replace(observation, visible_text="Loading leadership")
+
+        async def observe(self, session_id, *, organization_id, worker_id, focus_text=None):
+            observation = await super().observe(
+                session_id, organization_id=organization_id, worker_id=worker_id
+            )
+            return replace(
+                observation,
+                visible_text="Rotimi Ibrahim — Group Managing Director",
+                page_state={
+                    **observation.page_state,
+                    "focusedSection": {"heading": focus_text} if focus_text else {},
+                },
+            )
+
+    runtime = UpdatingBrowserRuntime()
+    provider = PlaywrightBrowserProvider(runtime)
+    organization_id = uuid4()
+    worker_id = uuid4()
+    session = await runtime.create_session(
+        organization_id=organization_id,
+        worker_id=worker_id,
+        run_id=uuid4(),
+    )
+    request = replace(
+        request_for(
+            provider,
+            operation="page.observe",
+            payload={"sessionId": str(session.id), "focusText": "Leadership"},
+            organization_id=organization_id,
+            worker_id=worker_id,
+        ),
+        run_id=session.run_id,
+    )
+
+    result = await provider.execute(request=request, configuration={}, credential=None)
+
+    assert isinstance(result.output, dict)
+    observation = result.output["observation"]
+    assert isinstance(observation, dict)
+    assert "Rotimi Ibrahim" in str(observation["visibleText"])
+    assert observation["pageState"]["focusedSection"]["heading"] == "Leadership"
 
 
 @pytest.mark.asyncio
@@ -515,6 +570,150 @@ async def test_f30_locator_model_is_browser_neutral() -> None:
 
 
 @pytest.mark.asyncio
+async def test_f30_press_key_rejects_search_text_before_browser_execution() -> None:
+    provider = PlaywrightBrowserProvider(FakeBrowserRuntime())
+
+    with pytest.raises(ValueError, match="use element.type to enter text"):
+        await provider.normalize_input(
+            operation="element.press_key",
+            input={
+                "sessionId": str(uuid4()),
+                "locator": {"strategy": "observation_ref", "value": "e13"},
+                "value": "Real Madrid",
+            },
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("operation", "key"),
+    [
+        ("element.press_key", "Enter"),
+        ("element.press_key", "Space"),
+        ("element.click", None),
+    ],
+)
+async def test_f30_interaction_without_page_change_remains_available_to_planner(
+    operation: str, key: str | None
+) -> None:
+    provider = PlaywrightBrowserProvider(FakeBrowserRuntime())
+    payload: dict[str, object] = {
+        "locator": {"strategy": "observation_ref", "value": "e14"},
+    }
+    if key is not None:
+        payload["value"] = key
+    request = request_for(
+        provider,
+        operation=operation,
+        payload=payload,
+    )
+    result = ExecutionResult.successful(
+        provider="browser",
+        adapter="browser",
+        adapter_version="1.0.0",
+        operation=operation,
+        output={
+            "session": {"id": ""},
+            "observation": {"url": "https://example.com/current"},
+            "actionEvidence": {
+                "result": "executed",
+                "stateChanged": False,
+                "elementReference": "e14",
+            },
+        },
+        provider_request_id=None,
+        started_at=datetime.now(UTC),
+    )
+
+    verification = await provider.verify(
+        request=request, result=result, configuration={}, credential=None
+    )
+
+    assert verification.verified is True
+    assert "no observable page change" in verification.summary
+    assert isinstance(result.output, dict)
+    assert isinstance(result.output["actionEvidence"], dict)
+    assert result.output["actionEvidence"]["stateChanged"] is False
+    assert result.output["actionEvidence"]["outcome"] == "no_observable_change"
+
+    strict_request = replace(
+        request,
+        input={
+            **request.input,
+            "verify": {"urlChangedFrom": "https://example.com/current"},
+        },
+    )
+    strict_verification = await provider.verify(
+        request=strict_request, result=result, configuration={}, credential=None
+    )
+    assert strict_verification.verified is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("operation", "key", "action_result"),
+    [
+        ("element.type", "Real Madrid", "executed"),
+        ("form.submit", None, "executed"),
+    ],
+)
+async def test_f30_unchanged_other_browser_actions_still_fail_verification(
+    operation: str, key: str | None, action_result: str
+) -> None:
+    provider = PlaywrightBrowserProvider(FakeBrowserRuntime())
+    payload: dict[str, object] = {
+        "locator": {"strategy": "observation_ref", "value": "e14"},
+    }
+    if operation == "form.submit":
+        payload = {"formRef": "f1"}
+    elif key is not None:
+        payload["value"] = key
+    request = request_for(provider, operation=operation, payload=payload)
+    result = ExecutionResult.successful(
+        provider="browser",
+        adapter="browser",
+        adapter_version="1.0.0",
+        operation=operation,
+        output={
+            "session": {"id": ""},
+            "observation": {"url": "https://africa.espn.com/"},
+            "actionEvidence": {"result": action_result, "stateChanged": False},
+        },
+        provider_request_id=None,
+        started_at=datetime.now(UTC),
+    )
+
+    verification = await provider.verify(
+        request=request, result=result, configuration={}, credential=None
+    )
+
+    assert verification.verified is False
+
+
+@pytest.mark.asyncio
+async def test_f30_keyboard_timeout_returns_observation_without_claiming_submission() -> None:
+    provider = PlaywrightBrowserProvider(FakeBrowserRuntime())
+    request = request_for(provider, operation="element.press_key", payload={
+        "locator": {"strategy": "observation_ref", "value": "e14"}, "value": "Enter",
+    })
+    result = ExecutionResult.successful(
+        provider="browser", adapter="browser", adapter_version="1.0.0",
+        operation="element.press_key", provider_request_id=None, started_at=datetime.now(UTC),
+        output={"session": {"id": ""}, "observation": {"url": "https://example.com"},
+                "actionEvidence": {"result": "unconfirmed", "stateChanged": False}},
+    )
+    verification = await provider.verify(request=request, result=result, configuration={},
+                                         credential=None)
+    assert verification.verified
+    assert "unconfirmed" in verification.summary
+    assert isinstance(result.output, dict)
+    assert isinstance(result.output["actionEvidence"], dict)
+    assert result.output["actionEvidence"]["outcome"] == "unconfirmed"
+    assert isinstance(result.output["actionEvidence"]["verification"], dict)
+    assert not result.output["actionEvidence"]["verification"]["intendedOutcomeVerified"]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("operation", "extra"),
     [
@@ -563,6 +762,7 @@ async def test_f30_navigation_and_interaction_primitives_are_normalized(
         payload=normalized,
         organization_id=organization_id,
         worker_id=worker_id,
+        run_id=session.run_id,
     )
 
     result = await provider.execute(request=request, configuration={}, credential=None)
@@ -607,6 +807,7 @@ async def test_f30_cancelled_execution_terminates_browser_session() -> None:
         },
         organization_id=organization_id,
         worker_id=worker_id,
+        run_id=session.run_id,
     )
 
     with pytest.raises(asyncio.CancelledError):

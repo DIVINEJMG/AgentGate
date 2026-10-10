@@ -33,6 +33,7 @@ from app.execution.browser.errors import (
     BrowserDetachedFrame,
     BrowserDownloadFailure,
     BrowserElementNotFound,
+    BrowserOwnershipLost,
     BrowserRuntimeLimitExceeded,
     BrowserStaleObservation,
 )
@@ -88,6 +89,20 @@ def _bounded_int(
     except ValueError as error:
         raise ValueError(f"Browser configuration {key} must be an integer.") from error
     return max(minimum, min(parsed, maximum))
+
+
+def _browser_session_ttl(configuration: dict[str, str]) -> int:
+    maximum = min(MAX_SESSION_TTL_SECONDS, 900)
+    if configuration.get("managedBy") == "worker_autonomy":
+        # Managed integrations may still persist the previous default TTL.
+        return max(60, min(settings.browser_session_ttl_seconds, maximum))
+    return _bounded_int(
+        configuration,
+        "sessionTtlSeconds",
+        settings.browser_session_ttl_seconds,
+        minimum=60,
+        maximum=maximum,
+    )
 
 
 def _playwright_crash(error: PlaywrightError) -> bool:
@@ -185,7 +200,8 @@ CAPABILITIES = (
         risk="low",
         side_effect=False,
         approval="none",
-        description="Observe the current governed browser page.",
+        description="Observe the current page, optionally focusing a named section and its controls.",
+        properties={"focusText": {"type": "string", "minLength": 1, "maxLength": 160}},
     ),
     _capability(
         scope="browser.navigation.open",
@@ -300,9 +316,9 @@ CAPABILITIES = (
         operation="element.press_key",
         mode="action",
         risk="medium",
-        side_effect=True,
-        approval="recommended",
-        description="Press a key outside form-submission shortcuts.",
+        side_effect=False,
+        approval="none",
+        description="Use read-only keyboard navigation, field editing, or an observed search Enter. External writes require a governed click or form submission.",
         requires_locator=True,
         requires_value=True,
     ),
@@ -313,15 +329,18 @@ CAPABILITIES = (
         risk="low",
         side_effect=False,
         approval="none",
-        description="Scroll the governed page vertically.",
+        description="Scroll the page or an observed scrollable element vertically or horizontally.",
         requires_value=True,
         properties={
+            "locator": {"type": "object"},
+            "axis": {"type": "string", "enum": ["vertical", "horizontal"]},
+            "focusText": {"type": "string", "minLength": 1, "maxLength": 160},
             "value": {
                 "oneOf": [
                     {"type": "integer", "minimum": -100000, "maximum": 100000},
                     {"type": "string", "enum": ["top", "bottom"]},
                 ]
-            }
+            },
         },
     ),
     _capability(
@@ -750,7 +769,11 @@ class PlaywrightBrowserProvider:
                 "domSnapshot": observation.dom_snapshot,
                 "elements": [item.as_dict() for item in observation.elements],
                 "forms": [item.as_dict() for item in observation.form_details],
-                "pageState": observation.page_state,
+                "pageState": {
+                    key: value
+                    for key, value in observation.page_state.items()
+                    if key != "actionAttempt"
+                },
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -804,7 +827,7 @@ class PlaywrightBrowserProvider:
         input: dict[str, object],
     ) -> dict[str, object]:
         allowed: dict[str, set[str]] = {
-            "page.observe": {"sessionId"},
+            "page.observe": {"sessionId", "focusText"},
             "navigation.open": {"url", "sessionId"},
             "navigation.back": {"sessionId"},
             "navigation.forward": {"sessionId"},
@@ -817,7 +840,7 @@ class PlaywrightBrowserProvider:
             "element.check": {"sessionId", "locator"},
             "element.uncheck": {"sessionId", "locator"},
             "element.press_key": {"sessionId", "locator", "value"},
-            "page.scroll": {"sessionId", "value"},
+            "page.scroll": {"sessionId", "value", "locator", "axis", "focusText"},
             "element.hover": {"sessionId", "locator"},
             "form.fill": {"sessionId", "fields"},
             "form.submit": {"sessionId", "formRef", "submitLocator"},
@@ -900,6 +923,14 @@ class PlaywrightBrowserProvider:
         }
         if needs_value and "value" not in normalized:
             raise ValueError("Browser value is required for this operation.")
+        if operation == "element.press_key":
+            key = str(normalized["value"]).strip()
+            if not key or any(character.isspace() for character in key):
+                raise ValueError(
+                    "Browser press_key requires a single key or shortcut; "
+                    "use element.type to enter text."
+                )
+            normalized["value"] = key
 
         if operation == "form.fill":
             fields = self._form_fields(normalized)
@@ -951,13 +982,7 @@ class PlaywrightBrowserProvider:
                     source_url=None,
                 )
             )
-        ttl_seconds = _bounded_int(
-            request.resource.configuration,
-            "sessionTtlSeconds",
-            settings.browser_session_ttl_seconds,
-            minimum=60,
-            maximum=min(MAX_SESSION_TTL_SECONDS, 600),
-        )
+        ttl_seconds = _browser_session_ttl(request.resource.configuration)
         return await self._runtime.create_session(
             organization_id=request.organization_id,
             worker_id=request.worker_id,
@@ -1033,7 +1058,17 @@ class PlaywrightBrowserProvider:
         dialog_action, dialog_prompt = self._dialog(request.input)
 
         if request.operation == "page.observe":
-            return (before_observation, {}, ())
+            focus_text = str(request.input.get("focusText") or "").strip()[:160]
+            return (
+                await self._runtime.observe(
+                    session_id,
+                    organization_id=request.organization_id,
+                    worker_id=request.worker_id,
+                    **({"focus_text": focus_text} if focus_text else {}),
+                ),
+                {},
+                (),
+            )
 
         if request.operation.startswith("navigation."):
             observation = await self._runtime.navigate(
@@ -1187,6 +1222,16 @@ class PlaywrightBrowserProvider:
             operation=request.operation,
             locator=self._locator(request.input),
             value=request.input.get("value"),
+            **(
+                {"axis": str(request.input["axis"])}
+                if request.operation == "page.scroll" and request.input.get("axis")
+                else {}
+            ),
+            **(
+                {"focus_text": str(request.input["focusText"]).strip()[:160]}
+                if request.operation == "page.scroll" and request.input.get("focusText")
+                else {}
+            ),
             dialog_action=dialog_action,
             prompt_text=dialog_prompt,
             timeout_ms=timeout_ms,
@@ -1234,6 +1279,8 @@ class PlaywrightBrowserProvider:
                 organization_id=request.organization_id,
                 worker_id=request.worker_id,
             )
+            if session.run_id != request.run_id:
+                raise PermissionError("Browser session belongs to another run.")
             state.session_owned = True
 
         before_observation = await self._runtime.current_observation(
@@ -1318,6 +1365,9 @@ class PlaywrightBrowserProvider:
         )
         before_fingerprint = self._observation_fingerprint(before_observation)
         after_fingerprint = self._observation_fingerprint(observation)
+        attempt = observation.page_state.get("actionAttempt")
+        timed_out_attempt = isinstance(attempt, dict) and attempt.get("status") == "timed_out"
+        action_result = "unconfirmed" if timed_out_attempt else "executed"
         evidence_locator = self._locator(request.input)
         evidence_raw: dict[str, object] = {
             "sessionId": str(session_id),
@@ -1325,8 +1375,8 @@ class PlaywrightBrowserProvider:
             "capability": request.capability.scope,
             "elementReference": self._element_reference(request.input),
             "operation": request.operation,
-            "result": "executed",
-            "verification": "pending",
+            "result": action_result,
+            "verification": "timed_out_reobserved" if timed_out_attempt else "pending",
             "correlationId": request.correlation_id,
             "beforeUrl": before_observation.url,
             "afterUrl": observation.url,
@@ -1348,7 +1398,7 @@ class PlaywrightBrowserProvider:
                     "sessionId": str(session_id),
                     "capability": request.capability.scope,
                     "operation": request.operation,
-                    "result": "executed",
+                    "result": action_result,
                 },
             }
         )
@@ -1382,28 +1432,11 @@ class PlaywrightBrowserProvider:
             request.operation == "navigation.open" and self._session_id(request.input) is None
         )
         try:
-            if cold_navigation:
-                prepare = getattr(self._runtime, "prepare", None)
-                if prepare is not None:
-                    try:
-                        async with asyncio.timeout(settings.browser_cold_start_timeout_seconds):
-                            await prepare()
-                    except TimeoutError as error:
-                        reclaim = getattr(self._runtime, "shutdown_if_idle", None)
-                        if reclaim is not None:
-                            try:
-                                await asyncio.shield(reclaim())
-                            except (PlaywrightError, RuntimeError):
-                                pass
-                        raise self._error(
-                            request=request,
-                            code="browser_cold_start_timeout",
-                            retryable=True,
-                            safe_message="Governed browser startup timed out.",
-                            internal_details=str(error),
-                        ) from error
-
-            async with asyncio.timeout(settings.browser_action_timeout_seconds):
+            # create_session reserves a capacity slot before launching Chromium.
+            budget = settings.browser_action_timeout_seconds + (
+                settings.browser_cold_start_timeout_seconds if cold_navigation else 0
+            )
+            async with asyncio.timeout(budget):
                 return await self._execute_authorized(
                     request=request,
                     configuration=configuration,
@@ -1431,6 +1464,14 @@ class PlaywrightBrowserProvider:
             ) from error
         except ExecutionProviderError:
             raise
+        except BrowserOwnershipLost as error:
+            raise self._error(
+                request=request,
+                code="browser_owner_lost",
+                retryable=False,
+                safe_message="Browser ownership changed; this run stopped to protect its work.",
+                internal_details=str(error),
+            ) from error
         except BrowserCapacityUnavailable as error:
             raise self._error(
                 request=request,
@@ -1658,6 +1699,13 @@ class PlaywrightBrowserProvider:
             "resourceOrigin": request.resource.metadata.get("origin"),
         }
         verified = base_valid
+        no_progress_interaction = (
+            base_valid
+            and request.operation in {"element.click", "element.press_key"}
+            and isinstance(evidence, dict)
+            and evidence.get("result") == "executed"
+            and evidence.get("stateChanged") is False
+        )
 
         expectation = BrowserVerificationExpectation.from_mapping(request.input.get("verify"))
         if base_valid and expectation is not None:
@@ -1683,10 +1731,19 @@ class PlaywrightBrowserProvider:
             transfer_verified = output.get("fileUploadVerified") is True or isinstance(
                 output.get("downloadArtifact"), dict
             )
-            verified = state_changed or transfer_verified
+            # These interaction primitives report whether the browser accepted the
+            # action. Their effect on the job remains a separate planner decision.
+            # Form submission and other writes still require observable verification.
+            no_progress_interaction = (
+                request.operation in {"element.click", "element.press_key"}
+                and evidence_map.get("result") == "executed"
+                and evidence_map.get("stateChanged") is False
+            )
+            verified = state_changed or transfer_verified or no_progress_interaction
             details["checks"] = {
                 "stateChanged": state_changed,
                 "artifactTransferVerified": transfer_verified,
+                "interactionExecutedWithoutObservedProgress": no_progress_interaction,
             }
 
         failure_artifact: BrowserArtifactReference | None = None
@@ -1726,15 +1783,34 @@ class PlaywrightBrowserProvider:
                     }
                 )
 
+        summary = (
+            "Keyboard attempt timed out; the resulting page was observed. Outcome remains unconfirmed."
+            if request.operation == "element.press_key"
+            and isinstance(evidence, dict)
+            and evidence.get("result") == "unconfirmed"
+            else "Browser interaction executed; no observable page change. Job progress is unverified."
+            if no_progress_interaction
+            else (
+                "Browser outcome verified from observable state."
+                if verified
+                else "Browser outcome could not be verified from observable state."
+            )
+        )
         evidence_with_verification = {
             **(evidence if isinstance(evidence, dict) else {}),
+            "outcome": (
+                "unconfirmed"
+                if isinstance(evidence, dict) and evidence.get("result") == "unconfirmed"
+                else "no_observable_change"
+                if no_progress_interaction
+                else "observed_change"
+                if isinstance(evidence, dict) and evidence.get("stateChanged") is True
+                else "unverified"
+            ),
             "verification": {
                 "verified": verified,
-                "summary": (
-                    "Browser outcome verified from observable state."
-                    if verified
-                    else "Browser outcome could not be verified from observable state."
-                ),
+                "summary": summary,
+                "intendedOutcomeVerified": expectation is not None and verified,
             },
         }
         if failure_artifact is not None:
@@ -1752,11 +1828,7 @@ class PlaywrightBrowserProvider:
 
         return VerificationResult(
             verified=verified,
-            summary=(
-                "Browser outcome verified from observable state."
-                if verified
-                else "Browser outcome could not be verified from observable state."
-            ),
+            summary=summary,
             details=details,
         )
 
@@ -1765,6 +1837,8 @@ browser_provider = PlaywrightBrowserProvider(
     runtime=BrowserRuntime(
         coordinator=RedisCoordinator.from_settings(),
         idle_shutdown_seconds=settings.browser_idle_shutdown_seconds,
+        max_active_sessions=settings.browser_max_active_sessions,
+        max_sessions_per_organization=settings.browser_max_sessions_per_organization,
         memory_soft_limit_percent=settings.browser_memory_soft_limit_percent,
         memory_hard_limit_percent=settings.browser_memory_hard_limit_percent,
         max_pages_per_session=settings.browser_max_pages_per_session,

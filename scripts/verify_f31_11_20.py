@@ -89,7 +89,7 @@ for forbidden in (
     if forbidden in context:
         errors.append(f"F31.12 context exposes forbidden secret/storage data: {forbidden}")
 
-if 'role="intent"' not in interpreter or "WorkerCommandIntent.model_validate" not in interpreter:
+if '"role": "intent"' not in interpreter or "WorkerCommandIntent.model_validate" not in interpreter:
     errors.append("F31.14 interpreter is not schema-validated through the intent role")
 
 for token in (

@@ -1,16 +1,18 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Activity, ArrowRight, Bot, Check, ChevronRight, CircleAlert, CirclePause, ExternalLink, Fingerprint, Globe2, KeyRound, Layers3, Loader2, LockKeyhole, Network, Plus, RefreshCw, Search, Shield, ShieldCheck, ShieldOff, Unplug, X } from 'lucide-react';
+import IntegrationFoundationDetails from './IntegrationFoundationDetails';
+import { Bot, Check, CirclePause, ExternalLink, Globe2, KeyRound, LockKeyhole, Network, Plus, RefreshCw, Search, ShieldOff, Unplug } from 'lucide-react';
 import type { AgentIdentity, AgentStatus } from '../lib/agentApi';
-import type { AgentCapabilityProfile, CapabilityCatalog, CapabilityResource } from '../lib/capabilityApi';
 import type { IntegrationConnection, IntegrationProvider, IntegrationSecurityStatus } from '../lib/integrationApi';
 import type { ApiVersion } from '../lib/systemApi';
-import { scopeChanges, visibleIdentities, visibleProviders, type ConnectionFilter, type IdentityFilter, type ProviderOption } from './connectionsModel';
+import { visibleIdentities, visibleProviders, type ConnectionFilter, type IdentityFilter, type ProviderOption } from './connectionsModel';
+import { linkProps } from '../workspace/routes';
+import type { OrganizationAccess } from '../lib/identityApi';
+import { ConnectionsHeader as NewHeader, Pulse, ToolMark } from '../workspace/connections/Chrome';
+import { scopesFor, useConnections, type ConnectionsData } from '../workspace/connections/data';
+import { useLive } from '../workspace/live';
+import { usePageTitle } from '../workspace/history';
+import { Ago, Avatar, EmptyState, Notice, Pills, Section, SkeletonLines, State, sentence } from '../workspace/ui';
 
-function PageHeader({ number, kicker, title, description, apiVersion, onApiVersionChange, action }: { number: string; kicker: string; title: string; description: string; apiVersion: ApiVersion; onApiVersionChange: (version: ApiVersion) => void; action?: ReactNode }) {
-  return <header className="cx-header"><div><div className="cx-overline"><span>{number} / CONNECTIONS</span><span>{kicker}</span></div><h1>{title}</h1><p>{description}</p></div><div className="cx-header-tools"><div className="cx-version"><span>API VIEW</span>{(['v1', 'v2'] as const).map(version => <button key={version} className={apiVersion === version ? 'active' : ''} onClick={() => onApiVersionChange(version)}>{version}</button>)}</div>{action}</div></header>;
-}
-function SectionLabel({ children, end }: { children: ReactNode; end?: ReactNode }) { return <div className="cx-section-label"><span>{children}</span>{end && <span>{end}</span>}</div>; }
-function Empty({ icon, title, body }: { icon: ReactNode; title: string; body: string }) { return <div className="cx-empty">{icon}<strong>{title}</strong><p>{body}</p></div>; }
 const providerMarks: Partial<Record<IntegrationProvider, string>> = {
   github: '/provider-marks/github.svg',
   gmail: '/provider-marks/gmail.svg',
@@ -20,51 +22,169 @@ const providerMarks: Partial<Record<IntegrationProvider, string>> = {
 };
 function providerIcon(provider: IntegrationProvider, size = 19) {
   const mark = providerMarks[provider];
-  if (mark) return <img src={mark} width={size} height={size} alt="" aria-hidden="true"/>;
+  if (mark) return <img src={mark} width={size} height={size} alt='' aria-hidden='true' />;
   const Icon = provider === 'browser' ? Globe2 : Network;
-  return <Icon size={size} strokeWidth={1.8}/>;
+  return <Icon size={size} strokeWidth={1.8} />;
 }
-function formatDate(value: string | null) { return value ? new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Never'; }
+const HEALTH_TONE: Record<string, 'ok' | 'warn' | 'danger' | 'neutral'> = { connected: 'ok', degraded: 'warn', error: 'danger', disconnected: 'neutral' };
 
-export function IntegrationsStage(p: { organizationName: string; apiVersion: ApiVersion; onApiVersionChange: (version: ApiVersion) => void; providers: ProviderOption[]; items: IntegrationConnection[]; security: IntegrationSecurityStatus | null; selected: IntegrationConnection | null; select: (id: string) => void; canManage: boolean; loading: boolean; working: boolean; error: string | null; openProvider: (provider: ProviderOption) => void; checkHealth: () => void; disconnect: () => void }) {
-  const [query, setQuery] = useState(''); const [filter, setFilter] = useState<ConnectionFilter>('all');
+/** Header shared by the three Connections sections. */
+function ConnectionsHeader({ active, actions }: { active: 'integrations' | 'identities' | 'capabilities'; actions?: ReactNode }) {
+  return <NewHeader active={active === 'integrations' ? 'home' : active === 'capabilities' ? 'access' : 'identities'} actions={actions} />;
+}
+
+/* ---------- Integrations ---------- */
+
+export function IntegrationsStage(p: { organizationId: string; organizationName: string; apiVersion: ApiVersion; onApiVersionChange: (version: ApiVersion) => void; providers: ProviderOption[]; items: IntegrationConnection[]; security: IntegrationSecurityStatus | null; selected: IntegrationConnection | null; select: (id: string) => void; canManage: boolean; loading: boolean; working: boolean; error: string | null; openProvider: (provider: ProviderOption) => void; checkHealth: () => void; disconnect: () => void; githubControls?: ReactNode }) {
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<ConnectionFilter>('all');
   const visible = useMemo(() => visibleProviders(p.providers, p.items, query, filter), [p.providers, p.items, query, filter]);
-  const active = p.items.filter(item => item.status !== 'disconnected');
-  const degraded = active.filter(item => item.status === 'degraded').length;
-  const locked = (option: ProviderOption) => option.state === 'guarded' || (option.credential === 'required' && !p.security?.credentialVaultConfigured);
-  return <section className="cx-page cx-integrations"><PageHeader number="01" kicker="INTEGRATION SURFACE" title="Connect the work." description={`Bring ${p.organizationName}'s tools into a controlled boundary. Each provider remains a connection; policy still decides what an agent may do.`} apiVersion={p.apiVersion} onApiVersionChange={p.onApiVersionChange}/>{p.error && <div className="inline-error" role="alert">{p.error}</div>}
-    <div className="cx-integration-overview"><div className="cx-integration-intro"><span className="cx-mini-label">CONNECTED SYSTEMS</span><h2>One workspace.<br/><em>Clear boundaries.</em></h2><p>Native adapters and a governed browser bring external work into the same decision path.</p><div className="cx-overview-numbers"><div><strong>{active.length}</strong><span>active</span></div><div><strong>{degraded}</strong><span>degraded</span></div><div><strong>{p.providers.length}</strong><span>adapters</span></div></div></div>
-      <div className="cx-constellation" aria-label="Provider map"><span className="cx-orbit-ring one"/><span className="cx-orbit-ring two"/><div className="cx-center-mark"><img src="/audoryn-mark.png" alt="Audoryn"/></div><div className="cx-orbit-track">{p.providers.map((option, index) => <span key={option.provider} className={`cx-orbit-slot node-${index}`}><button type="button" className={`cx-orbit-node provider-${option.provider}`} title={`Show ${option.name}`} aria-label={`Show ${option.name}`} onClick={() => { setQuery(option.name); setFilter('all'); }}>{providerIcon(option.provider, 19)}</button></span>)}</div></div>
-      <div className="cx-overview-side"><span className="cx-mini-label">CREDENTIAL POSTURE</span><div className="cx-vault-symbol">{p.security?.credentialVaultConfigured ? <LockKeyhole size={22}/> : <KeyRound size={22}/>}</div><strong>{p.security?.credentialVaultConfigured ? 'Vault ready' : 'Vault required'}</strong><p>{p.security?.credentialVaultConfigured ? 'Credential-backed providers can be configured.' : 'Public GitHub and governed Browser resources can connect without a credential. Other providers wait for the vault.'}</p><span className="cx-flow-note"><ShieldCheck size={14}/> Providers operate through the Action Gateway</span></div></div>
-    <div className="cx-integration-layout"><div className="cx-provider-catalog"><SectionLabel end={`${visible.length} ADAPTERS`}>01 / PROVIDER CATALOG</SectionLabel><div className="cx-catalog-tools"><label className="cx-search"><Search size={15}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Find an adapter" aria-label="Search providers"/>{query && <button onClick={() => setQuery('')} aria-label="Clear provider search"><X size={13}/></button>}</label><div className="cx-filter-tabs" aria-label="Provider filter">{(['all', 'connected', 'not_connected'] as const).map(value => <button key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>{value === 'not_connected' ? 'Not connected' : value}</button>)}</div></div>
-      {visible.length ? <div className="cx-provider-grid">{visible.map((option, index) => { const connected = active.filter(item => item.provider === option.provider).length; const unavailable = locked(option); return <article key={option.provider} className={`cx-provider-tile provider-${option.provider}`} style={{ animationDelay: `${Math.min(index, 6) * 55}ms` }}><div className="cx-provider-tile-top"><span className="cx-provider-icon">{providerIcon(option.provider, 19)}</span><span className={`cx-provider-state ${unavailable ? 'guarded' : connected ? 'connected' : ''}`}>{option.state === 'guarded' ? 'GUARDED' : unavailable ? 'VAULT REQUIRED' : connected ? `${connected} CONNECTED` : 'AVAILABLE'}</span></div><h3>{option.name}</h3><p>{option.description}</p><div className="cx-provider-tile-bottom"><span>{option.credential === 'required' ? 'CREDENTIAL REQUIRED' : option.credential === 'disabled' ? 'CONNECTION GUARDED' : 'CREDENTIAL OPTIONAL'}</span>{p.canManage && option.state !== 'guarded' && <button disabled={unavailable} onClick={() => p.openProvider(option)}>Connect <Plus size={13}/></button>}</div></article>; })}</div> : <Empty icon={<Search/>} title="No matching adapters" body="Try another provider name or choose a different filter."/>}</div>
-      <aside className="cx-connection-ledger"><SectionLabel end={`${active.length} LIVE`}>02 / YOUR CONNECTIONS</SectionLabel>{p.loading ? <Empty icon={<Loader2 className="spin"/>} title="Loading connections" body="Reading current provider health."/> : p.items.length ? <div className="cx-connection-list">{p.items.map(item => <button key={item.id} className={`cx-connection-item ${p.selected?.id === item.id ? 'selected' : ''}`} onClick={() => p.select(item.id)} aria-pressed={p.selected?.id === item.id}><span className={`cx-connection-icon provider-${item.provider}`}>{providerIcon(item.provider, 17)}</span><span><strong>{item.displayName}</strong><small>{item.provider.replace(/_/g, ' ')} · {item.credential.mode === 'encrypted_secret' ? 'credential stored' : 'no credential'}</small></span><i className={`cx-health-dot ${item.status}`}/></button>)}</div> : <Empty icon={<Network/>} title="No connections yet" body="Select an available adapter to create the first controlled resource."/>}
-      <div className="cx-connection-file" key={p.selected?.id ?? 'none'}>{p.selected ? <><div className="cx-file-head"><span className={`cx-connection-icon provider-${p.selected.provider}`}>{providerIcon(p.selected.provider, 20)}</span><div><span className="cx-mini-label">SELECTED CONNECTION</span><h3>{p.selected.displayName}</h3></div><span className={`cx-file-status ${p.selected.status}`}>{p.selected.status}</span></div><p className="cx-health-message">{p.selected.health.message}</p><dl><div><dt>RESOURCE KEY</dt><dd>{p.selected.resourceKey}</dd></div><div><dt>LAST CHECKED</dt><dd>{formatDate(p.selected.health.lastCheckedAt)}</dd></div><div><dt>CREDENTIAL</dt><dd>{p.selected.credential.mode === 'encrypted_secret' ? `Encrypted · ${p.selected.credential.fingerprint ?? 'fingerprinted'}` : 'None'}</dd></div></dl><div className="cx-operations"><span>PROVIDER OPERATIONS</span><div>{p.selected.supportedOperations.map(operation => <code key={operation}>{operation}</code>)}</div><small>These are provider operations, not agent permissions.</small></div><div className="cx-file-actions">{/^https?:\/\//i.test(p.selected.webUrl) && <a href={p.selected.webUrl} target="_blank" rel="noreferrer">Open provider <ExternalLink size={13}/></a>}{p.selected.status !== 'disconnected' && <button disabled={p.working} onClick={p.checkHealth}><RefreshCw size={13}/> Check health</button>}{p.canManage && p.selected.status !== 'disconnected' && <button className="danger" disabled={p.working} onClick={p.disconnect}><Unplug size={13}/> Disconnect</button>}</div></> : <Empty icon={<Activity/>} title="Select a connection" body="Review its health, credential posture and provider operations."/>}</div></aside></div>
-  </section>;
+  const active = p.items.filter((item) => item.status !== 'disconnected');
+  const degraded = active.filter((item) => item.status === 'degraded').length;
+  const vault = Boolean(p.security?.credentialVaultConfigured);
+  const locked = (option: ProviderOption) => option.state === 'guarded' || (option.credential === 'required' && !vault);
+
+  return <div className='ws-page'>
+    <ConnectionsHeader active='integrations' />
+    {p.error && <Notice tone='danger'>{p.error}</Notice>}
+    <p className='ws-summary-line'><strong>{active.length}</strong> connected tool{active.length === 1 ? '' : 's'}{degraded ? <>, <span data-tone='warn'>{degraded} need attention</span></> : null}. {vault ? <span data-tone='ok'>The credential vault is ready.</span> : <span data-tone='warn'>The credential vault is not set up, so only tools without a stored credential can connect.</span>} Every tool runs through the gateway.</p>
+
+    <Section title='Your connections' count={p.items.length}>
+      {p.loading ? <SkeletonLines rows={3} avatar /> : p.items.length ? <div className='ws-split-inline'>
+        <ul className='ws-rows'>{p.items.map((item) => <li key={item.id} className='ws-row ws-inbox-row' aria-current={p.selected?.id === item.id ? 'true' : undefined}>
+          <span className='ws-provider-mark'>{providerIcon(item.provider, 18)}</span>
+          <button type='button' className='ws-row-main ws-row-link ws-row-button' onClick={() => p.select(item.id)}><strong>{item.displayName}</strong><small>{sentence(item.provider)} · {item.credential.mode === 'encrypted_secret' ? 'credential stored' : 'no credential'}</small></button>
+          <div className='ws-inbox-row-meta'><State value={item.status} tone={HEALTH_TONE[item.status]} /></div>
+        </li>)}</ul>
+        {p.selected && <div className='ws-detail ws-connection-detail' key={p.selected.id}>
+          <div className='ws-detail-head'><span className='ws-provider-mark ws-provider-mark-lg'>{providerIcon(p.selected.provider, 22)}</span><div><div className='ws-muted ws-small'>{sentence(p.selected.provider)}</div><h2>{p.selected.displayName}</h2><div className='ws-detail-sub'><State value={p.selected.status} tone={HEALTH_TONE[p.selected.status]} /><span className='ws-muted'>checked {p.selected.health.lastCheckedAt ? <Ago value={p.selected.health.lastCheckedAt} /> : 'never'}</span></div></div></div>
+          <p className='ws-detail-why'>{p.selected.health.message}</p>
+          <dl className='ws-facts'>
+            <div><dt>Resource</dt><dd><code>{p.selected.resourceKey}</code></dd></div>
+            <div><dt>Credential</dt><dd>{p.selected.credential.mode === 'encrypted_secret' ? <>Encrypted<small>{p.selected.credential.fingerprint ?? 'fingerprinted'}</small></> : 'None'}</dd></div>
+          </dl>
+          <div><div className='ws-muted ws-small'>What this tool can do. These are tool operations, not permissions; policy decides each request.</div><div className='ws-chip-list' style={{ marginTop: 8 }}>{p.selected.supportedOperations.map((operation) => <code key={operation}>{operation}</code>)}</div></div>
+          <div className='ws-legacy-embed'><IntegrationFoundationDetails organizationId={p.organizationId} version={p.apiVersion} connectionId={p.selected.id} /></div>
+          <div className='ws-form-actions ws-form-actions-start'>
+            {/^https?:\/\//i.test(p.selected.webUrl) && <a className='ws-button' href={p.selected.webUrl} target='_blank' rel='noreferrer'>Open in {sentence(p.selected.provider)}<ExternalLink size={13} /></a>}
+            {p.selected.status !== 'disconnected' && <button type='button' className='ws-button' disabled={p.working} onClick={p.checkHealth}><RefreshCw size={14} />Check health</button>}
+            {p.canManage && p.selected.status !== 'disconnected' && <button type='button' className='ws-button ws-button-danger' disabled={p.working} onClick={p.disconnect}><Unplug size={14} />Disconnect</button>}
+          </div>
+        </div>}
+      </div> : <EmptyState icon={<Network size={18} />} title='No tools connected yet'>Pick a tool below. Workers can only reach what is connected here, and only within policy.</EmptyState>}
+    </Section>
+
+    <Section title='Add a tool' count={visible.length}>
+      <div className='ws-toolbar ws-toolbar-tight'><Pills label='Tool filter' value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All' }, { value: 'connected', label: 'Connected' }, { value: 'not_connected', label: 'Not connected' }]} /><label className='ws-search-field'><Search size={15} aria-hidden='true' /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder='Find a tool' aria-label='Search tools' /></label></div>
+      {visible.length ? <ul className='ws-provider-grid'>{visible.map((option) => {
+        const connected = active.filter((item) => item.provider === option.provider).length;
+        const unavailable = locked(option);
+        return <li key={option.provider} className='ws-provider'>
+          <div className='ws-provider-top'><span className='ws-provider-mark'>{providerIcon(option.provider, 20)}</span><strong>{option.name}</strong>{connected > 0 ? <span className='ws-tag' data-tone='ok'>{connected} connected</span> : option.state === 'guarded' ? <span className='ws-tag'>Not available</span> : unavailable ? <span className='ws-tag' data-tone='warn'><LockKeyhole size={11} />Needs vault</span> : null}</div>
+          <p>{option.description}</p>
+          {option.provider === 'github' && p.githubControls ? <div className='ws-legacy-embed'>{p.githubControls}</div> : <div className='ws-provider-foot'>
+            <span>{option.credential === 'required' ? 'Needs a credential' : option.credential === 'disabled' ? 'Connection closed' : 'Credential optional'}</span>
+            {p.canManage && option.state !== 'guarded' && <button type='button' className='ws-button ws-button-sm' disabled={unavailable} onClick={() => p.openProvider(option)}><Plus size={13} />Connect</button>}
+          </div>}
+        </li>;
+      })}</ul> : <EmptyState icon={<Search size={18} />} title='No matching tools'>Try another name or filter.</EmptyState>}
+    </Section>
+  </div>;
 }
 
-export function IdentitiesStage(p: { organizationName: string; userId: string; apiVersion: ApiVersion; onApiVersionChange: (version: ApiVersion) => void; agents: AgentIdentity[]; selected: AgentIdentity | null; select: (id: string) => void; canManage: boolean; loading: boolean; submitting: boolean; error: string | null; register: () => void; lifecycle: (status: AgentStatus) => void; credentialAction: (action: 'rotate' | 'revoke') => void }) {
-  const [query, setQuery] = useState(''); const [filter, setFilter] = useState<IdentityFilter>('all');
+/* ---------- Agent identities ---------- */
+
+export function IdentitiesStage(p: { organization: OrganizationAccess; identityId?: string; organizationName: string; userId: string; apiVersion: ApiVersion; onApiVersionChange: (version: ApiVersion) => void; agents: AgentIdentity[]; selected: AgentIdentity | null; select: (id: string) => void; canManage: boolean; loading: boolean; submitting: boolean; error: string | null; register: () => void; lifecycle: (status: AgentStatus) => void; credentialAction: (action: 'rotate' | 'revoke') => void }) {
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<IdentityFilter>('all');
   const visible = useMemo(() => visibleIdentities(p.agents, query, filter), [p.agents, query, filter]);
-  const active = p.agents.filter(agent => agent.status === 'active').length;
-  const suspended = p.agents.filter(agent => agent.status === 'suspended').length;
-  return <section className="cx-page cx-identities"><PageHeader number="02" kicker="AGENT IDENTITY" title="Know who acts." description="Each agent has its own lifecycle, owner and credential. Review the identity before deciding what it may reach." apiVersion={p.apiVersion} onApiVersionChange={p.onApiVersionChange} action={p.canManage && <button className="cx-primary" onClick={p.register}><Plus size={15}/> Register identity</button>}/>{p.error && <div className="inline-error" role="alert">{p.error}</div>}
-    <div className="cx-identity-stats"><div><span>ORGANIZATION</span><strong>{p.organizationName}</strong></div><div><span>IDENTITIES</span><strong>{p.agents.length}</strong></div><div><span>ACTIVE</span><strong>{active}</strong></div><div><span>SUSPENDED</span><strong>{suspended}</strong></div><p><Fingerprint size={16}/> Distinct from human sessions</p></div>
-    <div className="cx-identity-layout"><div className="cx-registry"><SectionLabel end={`${visible.length} SHOWN`}>01 / IDENTITY REGISTRY</SectionLabel><div className="cx-registry-tools"><label className="cx-search"><Search size={15}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Find identity, purpose or ID" aria-label="Search agent identities"/></label><div className="cx-filter-tabs" aria-label="Identity status filter">{(['all', 'active', 'suspended', 'disabled'] as const).map(value => <button key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>{value}</button>)}</div></div>
-      <div className="cx-registry-head"><span>IDENTITY</span><span>OWNER</span><span>CREDENTIAL</span><span>STATE</span></div>{p.loading ? <Empty icon={<Loader2 className="spin"/>} title="Loading identities" body="Reading the organization registry."/> : visible.length ? visible.map((agent, index) => <button key={agent.id} className={`cx-identity-row ${p.selected?.id === agent.id ? 'selected' : ''}`} onClick={() => p.select(agent.id)} aria-pressed={p.selected?.id === agent.id} style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}><span className="cx-identity-primary"><span className="cx-identity-glyph"><Bot size={18}/></span><span><strong>{agent.name}</strong><small>{agent.description || 'No purpose recorded'}</small></span></span><span>{agent.ownerUserId === p.userId ? 'You' : agent.ownerUserId}</span><span className={`cx-credential-state ${agent.credential.status}`}>{agent.credential.status}</span><span className={`cx-identity-status ${agent.status}`}><i/>{agent.status}</span></button>) : <Empty icon={<Bot/>} title={p.agents.length ? 'No matching identities' : 'No identities registered'} body={p.agents.length ? 'Change the search or status filter.' : 'Register an identity to give a worker its own credential and lifecycle.'}/>}</div>
-      <aside className="cx-identity-dossier" key={p.selected?.id ?? 'none'}><SectionLabel>02 / IDENTITY DOSSIER</SectionLabel>{p.selected ? <><div className="cx-dossier-head"><div className="cx-dossier-emblem"><Bot size={25}/></div><span className={`cx-identity-status ${p.selected.status}`}><i/>{p.selected.status}</span><h2>{p.selected.name}</h2><p>{p.selected.description || 'No purpose recorded.'}</p></div><div className="cx-identity-path"><div className="cx-path-node current"><Fingerprint size={15}/><span>IDENTITY</span></div><ArrowRight size={15}/><div className={`cx-path-node ${p.selected.credential.status === 'active' ? 'current' : 'blocked'}`}><KeyRound size={15}/><span>CREDENTIAL</span></div><ArrowRight size={15}/><div className="cx-path-node"><Shield size={15}/><span>POLICY</span></div></div><dl className="cx-dossier-facts"><div><dt>OWNER</dt><dd>{p.selected.ownerUserId === p.userId ? 'You' : p.selected.ownerUserId}</dd></div><div><dt>IDENTITY ID</dt><dd>{p.selected.id}</dd></div><div><dt>CREDENTIAL</dt><dd>{p.selected.credential.status} · version {p.selected.credential.version}</dd></div><div><dt>FINGERPRINT</dt><dd>{p.selected.credential.fingerprint || '—'}</dd></div><div><dt>SCOPES</dt><dd>{p.selected.credential.scopes.join(', ') || '—'}</dd></div><div><dt>EXPIRES</dt><dd>{p.selected.credential.expiresAt ? formatDate(p.selected.credential.expiresAt) : 'No expiry set'}</dd></div><div><dt>CREATED</dt><dd>{formatDate(p.selected.createdAt)}</dd></div><div><dt>LAST USED</dt><dd>{formatDate(p.selected.credential.lastUsedAt)}</dd></div></dl>{p.canManage && <div className="cx-identity-controls"><div><span>LIFECYCLE</span><div>{p.selected.status === 'active' && <button disabled={p.submitting} onClick={() => p.lifecycle('suspended')}><CirclePause size={14}/> Suspend</button>}{p.selected.status === 'suspended' && p.selected.credential.status === 'active' && <button disabled={p.submitting} onClick={() => p.lifecycle('active')}><Check size={14}/> Activate</button>}{p.selected.status !== 'disabled' && <button className="danger" disabled={p.submitting} onClick={() => p.lifecycle('disabled')}><ShieldOff size={14}/> Disable</button>}</div></div><div><span>CREDENTIAL</span><div>{p.selected.status !== 'disabled' && <button disabled={p.submitting} onClick={() => p.credentialAction('rotate')}><RefreshCw size={14}/> Rotate</button>}{p.selected.credential.status === 'active' && <button className="danger" disabled={p.submitting} onClick={() => p.credentialAction('revoke')}><KeyRound size={14}/> Revoke</button>}</div></div></div>}</> : <Empty icon={<Fingerprint/>} title="Select an identity" body="Inspect its ownership, credential and lifecycle controls."/>}</aside></div>
-  </section>;
+  usePageTitle(p.identityId ? p.selected?.name : null);
+  const connections = useConnections(p.organization, p.apiVersion);
+  const live = useLive();
+  const count = (status: string) => p.agents.filter((agent) => agent.status === status).length;
+  const owner = (id: string) => id === p.userId ? 'You' : id;
+  const workersOf = (agentId: string) => live.workers.filter((worker) => worker.agentIdentityId === agentId && worker.status !== 'archived');
+
+  if (p.identityId) {
+    const agent = p.selected;
+    return <div className='ws-page'>
+
+      {p.error && <Notice tone='danger'>{p.error}</Notice>}
+      {!agent ? (p.loading ? <SkeletonLines rows={5} /> : <EmptyState icon={<Bot size={18} />} title='This identity doesn’t exist here'>It may have been removed.</EmptyState>) : <>
+        <header className='ws-tool-hero'>
+          <span className='ws-tool-mark' data-size='lg'><Bot size={24} strokeWidth={1.7} /></span>
+          <div><div className='ws-muted ws-small'>Agent identity · owned by {owner(agent.ownerUserId)}</div><h1>{agent.name}</h1><div className='ws-detail-sub'><Pulse tone={agent.status === 'active' ? 'ok' : agent.status === 'suspended' ? 'warn' : 'neutral'} label={sentence(agent.status)} /><span className='ws-muted'>credential {agent.credential.status} · v{agent.credential.version}</span></div></div>
+        </header>
+        <p className='ws-detail-why'>{agent.description || 'No purpose recorded.'}</p>
+        <ol className='ws-chain' aria-label='How this identity is checked'>
+          <li data-tone={agent.status === 'active' ? 'ok' : 'warn'}><span className='ws-chain-dot' /><strong>Identity</strong><small>{sentence(agent.status)}</small></li>
+          <li data-tone={agent.credential.status === 'active' ? 'ok' : 'danger'}><span className='ws-chain-dot' /><strong>Credential</strong><small>{sentence(agent.credential.status)} · <code>{agent.credential.fingerprint?.slice(0, 8) || '—'}</code></small></li>
+          <li data-tone={(connections.data?.profiles[agent.id]?.declaredScopes.length ?? 0) ? 'ok' : 'neutral'}><span className='ws-chain-dot' /><strong>Scopes</strong><small>{connections.data?.profiles[agent.id]?.declaredScopes.length ?? '…'} declared</small></li>
+          <li data-tone='neutral'><span className='ws-chain-dot' /><strong>Policy</strong><small>Decides each request</small></li>
+        </ol>
+        <dl className='ws-stats ws-stats-4'>
+          <div><dt>Workers</dt><dd>{workersOf(agent.id).length}</dd><small>act as this identity</small></div>
+          <div><dt>Last used</dt><dd className='ws-stat-small'>{agent.credential.lastUsedAt ? <Ago value={agent.credential.lastUsedAt} /> : 'Never'}</dd><small>by its credential</small></div>
+          <div><dt>Expires</dt><dd className='ws-stat-small'>{agent.credential.expiresAt ? new Date(agent.credential.expiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Never'}</dd><small>credential expiry</small></div>
+          <div><dt>Created</dt><dd className='ws-stat-small'>{new Date(agent.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</dd><small>{p.organizationName}</small></div>
+        </dl>
+        <IdentityAccess agentId={agent.id} connections={connections.data} />
+        {workersOf(agent.id).length > 0 && <Section title='Workers acting as this identity' count={workersOf(agent.id).length}>
+          <ul className='ws-rows'>{workersOf(agent.id).map((worker) => <li key={worker.id} className='ws-row ws-compact-row'><Avatar name={worker.name} seed={worker.id} size={26} live={live.liveness(worker)} /><a className='ws-row-main ws-row-link' {...linkProps({ page: 'worker', workerId: worker.id, tab: 'overview' })}><strong>{worker.name}</strong><small>{worker.department || 'Worker'}</small></a></li>)}</ul>
+        </Section>}
+        {p.canManage && <Section title='Controls'>
+          <div className='ws-control-rows'>
+            <div><span>Lifecycle<small className='ws-block'>Suspending is reversible; disabling is permanent.</small></span><div className='ws-form-actions ws-form-actions-start'>
+              {agent.status === 'active' && <button type='button' className='ws-button ws-button-sm' disabled={p.submitting} onClick={() => p.lifecycle('suspended')}><CirclePause size={14} />Suspend</button>}
+              {agent.status === 'suspended' && agent.credential.status === 'active' && <button type='button' className='ws-button ws-button-sm' disabled={p.submitting} onClick={() => p.lifecycle('active')}><Check size={14} />Activate</button>}
+              {agent.status !== 'disabled' && <button type='button' className='ws-button ws-button-sm ws-button-danger' disabled={p.submitting} onClick={() => p.lifecycle('disabled')}><ShieldOff size={14} />Disable</button>}
+            </div></div>
+            <div><span>Credential<small className='ws-block'>A rotated secret is shown once.</small></span><div className='ws-form-actions ws-form-actions-start'>
+              {agent.status !== 'disabled' && <button type='button' className='ws-button ws-button-sm' disabled={p.submitting} onClick={() => p.credentialAction('rotate')}><RefreshCw size={14} />Rotate</button>}
+              {agent.credential.status === 'active' && <button type='button' className='ws-button ws-button-sm ws-button-danger' disabled={p.submitting} onClick={() => p.credentialAction('revoke')}><KeyRound size={14} />Revoke</button>}
+            </div></div>
+          </div>
+        </Section>}
+        <details className='ws-technical'><summary>Technical detail</summary><dl className='ws-facts'><div><dt>Identity</dt><dd><code>{agent.id}</code></dd></div><div><dt>Fingerprint</dt><dd><code>{agent.credential.fingerprint || '—'}</code></dd></div><div><dt>Credential scopes</dt><dd>{agent.credential.scopes.length ? <span className='ws-chip-list'>{agent.credential.scopes.map((scope) => <code key={scope}>{scope}</code>)}</span> : '—'}</dd></div></dl></details>
+      </>}
+    </div>;
+  }
+
+  return <div className='ws-page ws-page-wide'>
+    <ConnectionsHeader active='identities' actions={p.canManage && <button type='button' className='ws-button ws-button-primary' onClick={p.register}><Plus size={15} />Register identity</button>} />
+    {p.error && <Notice tone='danger'>{p.error}</Notice>}
+    <p className='ws-summary-line'>Each worker acts as an agent identity: separate from people, with its own owner, credential and lifecycle. <strong>{count('active')}</strong> active{count('suspended') ? <>, <span data-tone='warn'>{count('suspended')} suspended</span></> : null}.</p>
+    <div className='ws-toolbar ws-toolbar-tight'>
+      <Pills label='Identity state' value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All', count: p.agents.length }, { value: 'active', label: 'Active', count: count('active') }, { value: 'suspended', label: 'Suspended', count: count('suspended') }, { value: 'disabled', label: 'Disabled', count: count('disabled') }]} />
+      <label className='ws-search-field'><Search size={15} aria-hidden='true' /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder='Find identity, purpose or ID' aria-label='Search agent identities' /></label>
+    </div>
+    {p.loading && !p.agents.length ? <SkeletonLines rows={4} /> : visible.length ? <ul className='ws-rows'>{visible.map((agent) => {
+      const declared = connections.data?.profiles[agent.id]?.declaredScopes.length;
+      return <li key={agent.id} className='ws-row ws-identity-row'>
+        <span className='ws-doc-icon' aria-hidden='true'><Bot size={15} /></span>
+        <a className='ws-row-main ws-row-link' {...linkProps({ page: 'connections', view: 'identities', id: agent.id })}><strong>{agent.name}</strong><small>{agent.description || 'No purpose recorded'}</small></a>
+        <div className='ws-row-meta'>
+          <span className='ws-hide-sm'>{workersOf(agent.id).length} worker{workersOf(agent.id).length === 1 ? '' : 's'}</span>
+          <span className='ws-hide-sm'>{declared ?? '…'} scope{declared === 1 ? '' : 's'}</span>
+          {agent.credential.status !== 'active' && <span className='ws-raised'>credential {agent.credential.status}</span>}
+          <Pulse tone={agent.status === 'active' ? 'ok' : agent.status === 'suspended' ? 'warn' : 'neutral'} label={sentence(agent.status)} />
+        </div>
+      </li>;
+    })}</ul> : <EmptyState icon={<Bot size={18} />} title={p.agents.length ? 'No matching identities' : 'No identities yet'}>{p.agents.length ? 'Change the search or filter.' : 'Register an identity to give a worker its own credential and lifecycle.'}</EmptyState>}
+  </div>;
 }
 
-export function CapabilitiesStage(p: { apiVersion: ApiVersion; onApiVersionChange: (version: ApiVersion) => void; catalog: CapabilityCatalog | null; agents: AgentIdentity[]; selectedResource: CapabilityResource | null; selectResource: (id: string) => void; selectedAgentId: string; selectAgent: (id: string) => void; profile: AgentCapabilityProfile | null; draftScopes: string[]; toggleScope: (scope: string) => void; discard: () => void; save: () => void; canManage: boolean; loading: boolean; profileLoading: boolean; saving: boolean; error: string | null }) {
-  const changes = scopeChanges(p.profile?.declaredScopes ?? [], p.draftScopes);
-  const dirty = changes.added.length + changes.removed.length > 0;
-  const actions = p.selectedResource?.actions ?? [];
-  return <section className="cx-page cx-capabilities"><PageHeader number="03" kicker="CAPABILITY SURFACE" title="Define the reachable." description="Inspect operations exposed by connected resources, then declare which scopes an identity expects. Declaration never authorizes execution." apiVersion={p.apiVersion} onApiVersionChange={p.onApiVersionChange}/>{p.error && <div className="inline-error" role="alert">{p.error}</div>}
-    <div className="cx-capability-logic"><div><span>01</span><strong>Connection</strong><small>Provider is reachable</small></div><ArrowRight size={17}/><div><span>02</span><strong>Capability</strong><small>Action and scope exist</small></div><ArrowRight size={17}/><div><span>03</span><strong>Declaration</strong><small>Identity expects access</small></div><ArrowRight size={17}/><div className="cx-logic-last"><span>04</span><strong>Policy</strong><small>Decision on every request</small></div></div>
-    <div className="cx-capability-counts"><span><strong>{p.catalog?.summary.resources ?? 0}</strong> resources</span><span><strong>{p.catalog?.summary.actions ?? 0}</strong> actions</span><span><strong>{p.catalog?.summary.scopes ?? 0}</strong> scopes</span><span><strong>{p.profile?.declaredScopes.length ?? 0}</strong> declared</span><em><ShieldCheck size={14}/> NO EXECUTION FROM THIS PAGE</em></div>
-    <div className="cx-capability-layout"><div className="cx-resource-rail"><SectionLabel>01 / RESOURCES</SectionLabel>{p.loading ? <Empty icon={<Loader2 className="spin"/>} title="Loading resources" body="Reading available actions."/> : p.catalog?.resources.length ? p.catalog.resources.map((resource, index) => <button key={resource.id} className={`cx-resource-row ${p.selectedResource?.id === resource.id ? 'selected' : ''}`} onClick={() => p.selectResource(resource.id)} aria-pressed={p.selectedResource?.id === resource.id} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}><span className={`cx-connection-icon provider-${resource.provider}`}>{providerIcon(resource.provider, 16)}</span><span><strong>{resource.displayName}</strong><small>{resource.type} · {resource.actions.length} actions</small></span><ChevronRight size={15}/></button>) : <Empty icon={<Layers3/>} title="No reachable resources" body="Connect an integration to expose its bounded action surface."/>}</div>
-      <div className="cx-action-surface" key={p.selectedResource?.id ?? 'none'}><SectionLabel end={p.selectedResource ? `${actions.length} ACTIONS` : undefined}>02 / ACTION SURFACE</SectionLabel>{p.selectedResource ? <><div className="cx-resource-head"><span className={`cx-connection-icon provider-${p.selectedResource.provider}`}>{providerIcon(p.selectedResource.provider, 20)}</span><div><h2>{p.selectedResource.displayName}</h2><p>{p.selectedResource.key}</p></div><span className={`cx-file-status ${p.selectedResource.status}`}>{p.selectedResource.status}</span></div><div className="cx-action-head"><span>ACTION / TARGET</span><span>SCOPE</span><span>RISK</span></div>{actions.map((action, index) => <div className="cx-action-row" key={action.id} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}><div><strong>{action.action}</strong><span>{action.target.replace(/_/g, ' ')}</span><p>{action.description}</p></div><code>{action.scope}</code><span className={`cx-risk-label ${action.risk}`}>{action.risk}</span></div>)}{!actions.length && <Empty icon={<CircleAlert/>} title="No actions exposed" body="This resource currently advertises no executable operations."/>}</> : <Empty icon={<Layers3/>} title="Select a resource" body="Its canonical actions, scopes and baseline risks will appear here."/>}</div>
-      <aside className="cx-declaration-desk"><SectionLabel>03 / IDENTITY DECLARATION</SectionLabel>{p.agents.length ? <><label htmlFor="cx-capability-agent">AGENT IDENTITY</label><select id="cx-capability-agent" value={p.selectedAgentId} onChange={event => p.selectAgent(event.target.value)} disabled={p.saving}>{p.agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name} · {agent.status}</option>)}</select><div className="cx-declaration-message"><ShieldCheck size={17}/><p><strong>Declaration is not permission.</strong> Each request still meets the current policy and risk decision.</p></div>{p.profileLoading ? <Empty icon={<Loader2 className="spin"/>} title="Loading declaration" body="Reading scopes for this identity."/> : <><div className="cx-scope-list"><span>AVAILABLE SCOPES</span>{p.catalog?.resources.flatMap(resource => resource.actions.map(action => <label key={`${resource.id}:${action.scope}`} className={`cx-scope-row ${p.draftScopes.includes(action.scope) ? 'checked' : ''}`}><input type="checkbox" checked={p.draftScopes.includes(action.scope)} onChange={() => p.toggleScope(action.scope)} disabled={!p.canManage || p.profileLoading || p.saving}/><span className="cx-scope-mark">{p.draftScopes.includes(action.scope) && <Check size={11}/>}</span><span><strong>{action.scope}</strong><small>{resource.displayName} · {action.action} {action.target.replace(/_/g, ' ')}</small></span><span className={`cx-risk-label ${action.risk}`}>{action.risk}</span></label>))}</div>{p.profile?.staleScopes.length ? <div className="cx-stale-warning"><CircleAlert size={15}/><span>{p.profile.staleScopes.length} stale declaration{p.profile.staleScopes.length === 1 ? '' : 's'}: source resource unavailable.</span></div> : null}<div className="cx-declaration-footer"><span>{dirty ? `${changes.added.length} added · ${changes.removed.length} removed` : 'No unsaved changes'}</span>{p.canManage && <div>{dirty && <button className="cx-discard" onClick={p.discard} disabled={p.saving}>Discard</button>}<button className="cx-primary" onClick={p.save} disabled={p.saving || p.profileLoading || !dirty}>{p.saving ? <Loader2 size={13} className="spin"/> : <Check size={13}/>} Save declaration</button></div>}</div></>}</> : <Empty icon={<Bot/>} title="No identities registered" body="Register an agent identity before declaring expected scopes."/>}</aside></div>
-  </section>;
+/** The connections and scopes an identity expects, grouped by connection. */
+function IdentityAccess({ agentId, connections }: { agentId: string; connections: ConnectionsData | null }) {
+  if (!connections) return <SkeletonLines rows={3} />;
+  const declared = connections.profiles[agentId]?.declaredScopes ?? [];
+  const stale = connections.profiles[agentId]?.staleScopes ?? [];
+  const groups = connections.integrations.filter((item) => item.status !== 'disconnected').map((item) => ({ item, scopes: scopesFor(connections, item.id).filter((scope) => declared.includes(scope)) })).filter((group) => group.scopes.length);
+  return <Section title='Access' count={declared.length} description='Scopes this identity expects, by connection. Policies still decide every request.' action={<a className='ws-link' {...linkProps({ page: 'connections', view: 'access' })}>Access map</a>}>
+    {groups.length ? <ul className='ws-rows'>{groups.map(({ item, scopes }) => <li key={item.id} className='ws-row ws-access-row'>
+      <ToolMark provider={item.provider} size='sm' />
+      <a className='ws-row-main ws-row-link' {...linkProps({ page: 'connections', view: 'account', id: item.id })}><strong>{item.displayName}</strong><small className='ws-chip-list'>{scopes.map((scope) => <code key={scope}>{scope}</code>)}</small></a>
+    </li>)}</ul> : <p className='ws-quiet'>This identity doesn’t declare any scopes on a connected tool yet. Grant them from a connection’s Access tab or the Access map.</p>}
+    {stale.length > 0 && <Notice tone='warn'>{stale.length} declared scope{stale.length === 1 ? '' : 's'} no longer match a connected tool: <code>{stale.join(', ')}</code></Notice>}
+  </Section>;
 }

@@ -14,6 +14,7 @@ from app.execution.browser.contracts import (
     BrowserFrame,
     BrowserObservation,
 )
+from app.execution.browser.keyboard import KEYBOARD_METADATA_SCRIPT, read_only_search_enter
 from app.execution.browser.sensitive import is_sensitive_field_metadata
 from app.execution.redaction import redact_text, redact_url
 
@@ -62,6 +63,7 @@ async def observe_page(
     sensitive_values: tuple[str, ...] = (),
     include_aria_snapshot: bool = True,
     include_dom_snapshot: bool = False,
+    focus_text: str | None = None,
 ) -> BrowserObservation:
     try:
         raw_title = await asyncio.wait_for(page.title(), timeout=3.0)
@@ -72,7 +74,27 @@ async def observe_page(
     try:
         raw_visible_text = await asyncio.wait_for(
             page.locator("body").evaluate(
-                "(body, limit) => (body.innerText || '').slice(0, limit)",
+                """(body, limit) => {
+                  const full = body.innerText || '';
+                  if (full.length <= limit) return full;
+                  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+                  const viewport = [];
+                  while (walker.nextNode()) {
+                    const node = walker.currentNode;
+                    if (!node.textContent.trim() || !node.parentElement) continue;
+                    const style = getComputedStyle(node.parentElement);
+                    if (style.display === 'none' || style.visibility === 'hidden') continue;
+                    const range = document.createRange(); range.selectNodeContents(node);
+                    const rect = range.getBoundingClientRect();
+                    if (rect.bottom > 0 && rect.top < innerHeight
+                        && rect.right > 0 && rect.left < innerWidth) {
+                      viewport.push(node.textContent.trim());
+                    }
+                  }
+                  const current = viewport.join(' ').slice(0, limit / 2);
+                  return ('CURRENT VIEWPORT\\n' + current + '\\nPAGE START\\n'
+                    + full.slice(0, limit - current.length - 32)).slice(0, limit);
+                }""",
                 MAX_VISIBLE_TEXT,
             ),
             timeout=5.0,
@@ -89,7 +111,23 @@ async def observe_page(
             page.locator(
                 "a,button,input,textarea,select,[role],[contenteditable='true']"
             ).evaluate_all(
-                """(nodes) => nodes.slice(0, 120).map((el, index) => {
+                """(nodes) => {
+          const registry = window.__audorynControlRefs ||= {ids: new WeakMap(), next: 1};
+          const candidates = nodes.map(el => {
+            if (!registry.ids.has(el)) registry.ids.set(el, 'e' + registry.next++);
+            el.setAttribute('data-audoryn-control-ref', registry.ids.get(el));
+            return el;
+          }).filter(el => {
+            const style = getComputedStyle(el);
+            const rect = el.getBoundingClientRect();
+            return style.visibility !== 'hidden' && style.display !== 'none'
+              && rect.width > 0 && rect.height > 0;
+          }).sort((a, b) => {
+            const inView = el => { const r = el.getBoundingClientRect();
+              return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; };
+            return Number(inView(b)) - Number(inView(a));
+          });
+          return candidates.slice(0, 120).map(el => {
           const style = window.getComputedStyle(el);
           const rect = el.getBoundingClientRect();
           const visible = style.visibility !== 'hidden' && style.display !== 'none'
@@ -97,7 +135,9 @@ async def observe_page(
           if (!visible) return null;
           const tag = el.tagName.toLowerCase();
           const explicitRole = el.getAttribute('role');
-          const semanticRole = explicitRole
+          const semanticRole = tag === 'input' && ['submit', 'button', 'image', 'reset'].includes(el.type)
+            ? 'button'
+            : explicitRole
             || (tag === 'a' ? 'link'
             : tag === 'button' ? 'button'
             : tag === 'textarea' ? 'textbox'
@@ -112,7 +152,8 @@ async def observe_page(
             || el.getAttribute('name')
             || null;
           return {
-            index,
+            ref: registry.ids.get(el),
+            keyboardMetadata: (KEYBOARD_METADATA)(el),
             tag,
             role: semanticRole,
             name: label,
@@ -128,7 +169,7 @@ async def observe_page(
             disabled: Boolean(el.disabled) || el.getAttribute('aria-disabled') === 'true',
             href: el.href || null
           };
-        }).filter(Boolean)"""
+        }).filter(Boolean); }""".replace("KEYBOARD_METADATA", KEYBOARD_METADATA_SCRIPT)
             ),
             timeout=5.0,
         )
@@ -157,7 +198,8 @@ async def observe_page(
             discovered_sensitive_values.append(str(raw_value))
         elements.append(
             BrowserElement(
-                ref=f"e{int(item.get('index', position - 1)) + 1}",
+                ref=str(item.get("ref") or f"e{position}"),
+                keyboard_enter_safe=read_only_search_enter(item.get("keyboardMetadata") or {}),
                 tag=str(item.get("tag") or ""),
                 role=str(item["role"]) if item.get("role") is not None else None,
                 name=redact_text(name, sensitive_values) if name is not None else None,
@@ -275,9 +317,8 @@ async def observe_page(
               form.querySelectorAll("button[type='submit'],input[type='submit'],button:not([type])")
             );
             const refs = (nodes) => nodes
-              .map((node) => interactive.indexOf(node))
-              .filter((position) => position >= 0)
-              .map((position) => "e" + String(position + 1));
+              .map(node => node.getAttribute('data-audoryn-control-ref'))
+              .filter(Boolean);
             return {
               ref: "f" + String(index + 1),
               action: form.action || null,
@@ -325,6 +366,88 @@ async def observe_page(
         item.ref for item in elements if item.role in {"textbox", "checkbox", "radio", "combobox"}
     )
 
+    focused_section: dict[str, object] | None = None
+    if focus_text:
+        try:
+            raw_section = await asyncio.wait_for(
+                page.evaluate(
+                    """(query) => {
+                      const wanted = query.trim().toLowerCase();
+                      const headings = Array.from(document.querySelectorAll(
+                        'h1,h2,h3,h4,h5,h6,[role="heading"]'
+                      ));
+                      const heading = headings.find(el =>
+                        (el.innerText || '').trim().toLowerCase().includes(wanted)
+                      );
+                      if (!heading) return null;
+                      const section = heading.closest('section,[role="region"],article')
+                        || heading.parentElement;
+                      if (!section) return null;
+                      const controls = Array.from(section.querySelectorAll(
+                        'a,button,[role="button"],[role="tab"],[tabindex]'
+                      )).filter(el => {
+                        const style = getComputedStyle(el);
+                        const rect = el.getBoundingClientRect();
+                        return style.display !== 'none' && style.visibility !== 'hidden'
+                          && rect.width > 0 && rect.height > 0;
+                      }).slice(0, 40).map(el => ({
+                        role: el.getAttribute('role') || (
+                          el.tagName.toLowerCase() === 'a' ? 'link' : 'button'
+                        ),
+                        name: el.getAttribute('aria-label') || el.getAttribute('title')
+                          || (el.innerText || '').trim().slice(0, 160),
+                        text: (el.innerText || '').trim().slice(0, 160)
+                      }));
+                      const descendants = [section, ...section.querySelectorAll('*')];
+                      const canScroll = (el, axis) => {
+                        const style = getComputedStyle(el);
+                        const overflow = axis === 'horizontal' ? style.overflowX : style.overflowY;
+                        return ['auto', 'scroll', 'hidden'].includes(overflow)
+                          && (axis === 'horizontal'
+                            ? el.scrollWidth > el.clientWidth + 2
+                            : el.scrollHeight > el.clientHeight + 2);
+                      };
+                      const scrollableAxes = [
+                        descendants.some(el => canScroll(el, 'horizontal'))
+                          ? 'horizontal' : null,
+                        descendants.some(el => canScroll(el, 'vertical'))
+                          ? 'vertical' : null
+                      ].filter(Boolean);
+                      return {
+                        heading: (heading.innerText || '').trim().slice(0, 240),
+                        text: (section.innerText || '').slice(0, 8000),
+                        controls,
+                        scrollableAxes
+                      };
+                    }""",
+                    focus_text[:160],
+                ),
+                timeout=5.0,
+            )
+            if isinstance(raw_section, dict):
+                raw_controls = raw_section.get("controls")
+                focused_section = {
+                    "heading": redact_text(
+                        str(raw_section.get("heading") or ""), all_sensitive_values
+                    ),
+                    "text": redact_text(str(raw_section.get("text") or ""), all_sensitive_values),
+                    "controls": [
+                        {
+                            key: redact_text(str(control.get(key) or ""), all_sensitive_values)
+                            for key in ("role", "name", "text")
+                        }
+                        for control in (raw_controls if isinstance(raw_controls, list) else [])
+                        if isinstance(control, dict)
+                    ],
+                    "scrollableAxes": [
+                        str(axis)
+                        for axis in raw_section.get("scrollableAxes", [])
+                        if axis in {"horizontal", "vertical"}
+                    ],
+                }
+        except (TimeoutError, PlaywrightError):
+            focused_section = None
+
     return BrowserObservation(
         id=f"obs_{uuid4().hex}",
         session_id=session_id,
@@ -345,6 +468,7 @@ async def observe_page(
             "interactiveElementCount": len(elements),
             "formCount": len(forms),
             "frameCount": len(frames),
+            **({"focusedSection": focused_section} if focused_section is not None else {}),
         },
         observed_at=datetime.now(UTC),
     )

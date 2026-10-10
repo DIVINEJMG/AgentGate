@@ -223,7 +223,7 @@ class EvidenceRuntime:
             observed_at=datetime.now(UTC),
         )
 
-    async def observe(self, session_id, *, organization_id, worker_id):
+    async def observe(self, session_id, *, organization_id, worker_id, focus_text=None):
         await self.resume(
             session_id,
             organization_id=organization_id,
@@ -273,6 +273,8 @@ class EvidenceRuntime:
         operation,
         locator=None,
         value=None,
+        axis="vertical",
+        focus_text=None,
         dialog_action=None,
         prompt_text=None,
         timeout_ms=15000,

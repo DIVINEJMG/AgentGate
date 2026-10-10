@@ -14,7 +14,13 @@ class ModelRoute:
 
 class ModelRegistry:
     def __init__(self, routes: list[ModelRoute]) -> None:
-        self._routes = {route.role: route for route in routes}
+        self._ordered: dict[AIModelRole, list[ModelRoute]] = {}
+        for route in routes:
+            self._ordered.setdefault(route.role, []).append(route)
+        self._routes = {role: values[0] for role, values in self._ordered.items()}
+
+    def routes(self, role: AIModelRole) -> tuple[ModelRoute, ...]:
+        return tuple(self._ordered.get(role, []))
 
     def route(self, role: AIModelRole) -> ModelRoute:
         try:

@@ -18,6 +18,7 @@ export interface RealtimeEvent {
 export type RealtimeTransport = 'connecting' | 'websocket' | 'sse' | 'polling';
 
 const NORMALIZED_EVENT_TYPES = [
+  'conversation.response.created',
   'run.created',
   'run.started',
   'run.progress',
@@ -102,6 +103,14 @@ export function subscribeOrganizationRealtime({
   const allowed = eventTypes ? new Set(eventTypes) : null;
   const token = accessToken();
   const seen = new Set<string>();
+  let polling = false;
+  const refreshPoll = async () => {
+    if (closed || polling || document.hidden || !poll) return;
+    polling = true;
+    try { await poll(); } finally { polling = false; }
+  };
+  const onVisibility = () => { if (!document.hidden) void refreshPoll(); };
+  document.addEventListener('visibilitychange', onVisibility);
 
   const changeTransport = (transport: RealtimeTransport) => {
     if (!closed) onTransportChange?.(transport);
@@ -131,8 +140,8 @@ export function subscribeOrganizationRealtime({
   const startPolling = () => {
     if (closed || pollTimer !== null || !poll) return;
     changeTransport('polling');
-    void poll();
-    pollTimer = window.setInterval(() => void poll(), pollingIntervalMs);
+    void refreshPoll();
+    pollTimer = window.setInterval(() => void refreshPoll(), pollingIntervalMs);
   };
 
   const startSse = () => {
@@ -234,6 +243,7 @@ export function subscribeOrganizationRealtime({
 
   return () => {
     closed = true;
+    document.removeEventListener('visibilitychange', onVisibility);
     if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
     stopPolling();
     source?.close();

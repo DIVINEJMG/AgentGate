@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
+from app.bootstrap.settings import settings
 from app.domain.identity.principals import AgentPrincipal
 from app.domain.integrations.contracts import IntegrationExecutionResult
 from app.execution.authorization import (
@@ -31,6 +32,7 @@ class ActionProposal:
     correlation_id: str
     idempotency_key: str
     risk: str = "low"
+    work_item_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,6 +177,8 @@ class ActionGateway:
         )
         if outcome == "DENY":
             raise PermissionError(reason)
+        if settings.integration_foundation_enabled and permissions.adapter == "native_api" and execution.capability.approval_recommendation == "required":
+            outcome, reason = "REQUIRE_APPROVAL", "This provider action requires approval bound to its exact resource, payload and revision."
         if outcome == "REQUIRE_APPROVAL" and request.approval_status != "approved":
             raise PermissionError("Human approval required before execution.")
         if request.approval_status == "approved":

@@ -2,7 +2,7 @@ import { api } from '../platform/client';
 import type { ApiVersion } from './systemApi';
 
 export type AgentStatus = 'active' | 'suspended' | 'disabled';
-export type CredentialStatus = 'active' | 'revoked';
+export type CredentialStatus = 'active' | 'revoked' | 'missing';
 
 export interface AgentIdentity {
     id: string;

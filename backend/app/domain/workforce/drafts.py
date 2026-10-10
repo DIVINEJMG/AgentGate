@@ -52,6 +52,13 @@ class IntegrationRequirementDraft(BaseModel):
     reason: str = Field(default="", max_length=500)
 
 
+class SiteTargetDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mention: str = Field(min_length=2, max_length=240)
+    candidate_url: str | None = Field(default=None, max_length=1000)
+
+
 class JobDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -65,6 +72,8 @@ class JobDraft(BaseModel):
     integration_requirements: list[IntegrationRequirementDraft] = Field(
         default_factory=list, max_length=20
     )
+    site_targets: list[SiteTargetDraft] = Field(default_factory=list, max_length=20)
+    public_web_research: bool = False
     start_when_ready: bool = True
 
 
@@ -78,6 +87,7 @@ class WorkerDraft(BaseModel):
     charter: str = Field(min_length=1, max_length=4000)
     responsibilities: list[str] = Field(default_factory=list, max_length=40)
     standing_instructions: list[str] = Field(default_factory=list, max_length=30)
+    public_web_request_excerpt: str | None = Field(default=None, max_length=240)
     initial_jobs: list[JobDraft] = Field(min_length=1, max_length=20)
 
     @field_validator("responsibilities", "standing_instructions")

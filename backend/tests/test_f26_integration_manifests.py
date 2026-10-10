@@ -1,4 +1,6 @@
+from app.execution.providers.native.github import github_provider
 from app.integrations.builtin import (
+    UniversalIntegrationAdapter,
     calendar_adapter,
     drive_adapter,
     github_adapter,
@@ -23,6 +25,7 @@ def test_builtin_adapters_publish_required_manifest_fields() -> None:
 
 
 def test_side_effects_default_to_approval() -> None:
-    for manifest in github_adapter.manifests:
+    # Expanded action risks are tested independently of this F26 contract.
+    for manifest in UniversalIntegrationAdapter(github_provider).manifests:
         if manifest.side_effect:
             assert manifest.approval_default is True

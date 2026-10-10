@@ -46,7 +46,8 @@ class SemanticCapabilityResolver:
 
     def __init__(self, session: AsyncSession, gateway: AIGateway) -> None:
         self._session = session
-        self._gateway = gateway
+        from app.infrastructure.ai.workloads import for_workload
+        self._gateway = for_workload(gateway, "complex", "capability_resolution")
         self._registry = execution_provider_registry()
 
     async def resolve(

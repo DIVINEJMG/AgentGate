@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from redis.exceptions import RedisError
 from app.bootstrap.settings import settings
 from app.infrastructure.qstash.provider import (
     QStashRateLimitedError,
+    QStashRequestRejectedError,
     UpstashQStashProvider,
 )
 from app.infrastructure.redis.coordination import RedisCoordinator
@@ -121,6 +123,7 @@ async def request_runtime_execution_detailed(
     expected_step: int | None = None,
     reason: str = "queued",
     delay_seconds: int | None = None,
+    queue_partition: str | None = None,
 ) -> RuntimeSignalResult:
     now = datetime.now(UTC).isoformat()
     if not settings.runtime_execution_enabled:
@@ -161,6 +164,11 @@ async def request_runtime_execution_detailed(
     dedupe_suffix = reason
     if reason == "recovery":
         dedupe_suffix = f"recovery:{datetime.now(UTC).strftime('%Y%m%d%H%M')}"
+    destination_key = hashlib.sha256(
+        settings.qstash_runtime_execute_url.encode("utf-8")
+    ).hexdigest()[:12]
+    if settings.integration_foundation_enabled and queue_partition:
+        destination_key += "-" + hashlib.sha256(queue_partition.encode()).hexdigest()[:12]
     try:
         message = await UpstashQStashProvider.from_settings().publish(
             destination=settings.qstash_runtime_execute_url,
@@ -169,6 +177,25 @@ async def request_runtime_execution_detailed(
             retries=3,
             timeout_seconds=settings.runtime_delivery_timeout_seconds,
             delay_seconds=delay_seconds,
+            flow_control_key=f"audoryn-runtime-{settings.environment}-{destination_key}",
+            parallelism=settings.runtime_qstash_parallelism,
+        )
+    except QStashRequestRejectedError as error:
+        detail = (
+            "QStash rejected runtime dispatch settings. "
+            "Work remains safely queued while the configuration is corrected."
+        )
+        await _record_dispatch_health(
+            state="unavailable",
+            detail=detail,
+            ttl_seconds=300,
+        )
+        logger.error("QStash runtime publish rejected for %s: %s", work_item_id, error)
+        return RuntimeSignalResult(
+            message_id=None,
+            state="unavailable",
+            detail=detail,
+            updated_at=now,
         )
     except QStashRateLimitedError as error:
         if error.daily_quota_exhausted:

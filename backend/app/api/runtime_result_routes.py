@@ -5,6 +5,7 @@ from datetime import timedelta
 from typing import Annotated, Any
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -103,6 +104,16 @@ async def _run_public(
         "planSummary": str(meta.get("planSummary", "")),
         "resultSummary": run.result_summary,
         "failure": meta.get("failure"),
+        "queueState": meta.get("queueState"),
+        "plannerPhase": meta.get("plannerPhase"),
+        "plannerTiming": meta.get("plannerTiming", {}),
+        "planning": {"status": meta.get("plannerStatus", meta.get("plannerPhase")),
+                     "attemptCount": meta.get("plannerAttemptCount", 0),
+                     "recoveryRound": meta.get("plannerRecoveryRound", 0),
+                     "recoveryMode": meta.get("plannerRecoveryMode"),
+                     "reason": meta.get("waitingReason")},
+        "waitingReason": meta.get("waitingReason"),
+        "retryAt": max([str(meta[key]) for key in ("providerRetryAt", "aiRetryAt") if meta.get(key)], default=None) if meta.get("queueState") == "retrying" else None,
         "cancellationReason": meta.get("cancellationReason"),
         "cancelledBy": meta.get("cancelledBy"),
         "cancelledAt": meta.get("cancelledAt"),
@@ -140,6 +151,12 @@ def _run_v2(public: dict[str, Any]) -> dict[str, Any]:
             "planSummary": public["planSummary"],
             "resultSummary": public["resultSummary"],
             "failure": public["failure"],
+            "queueState": public.get("queueState"),
+            "plannerPhase": public.get("plannerPhase"),
+            "plannerTiming": public.get("plannerTiming", {}),
+            "planning": public.get("planning", {}),
+            "waitingReason": public.get("waitingReason"),
+            "retryAt": public.get("retryAt"),
             "cancellation": {
                 "reason": public["cancellationReason"],
                 "by": public["cancelledBy"],
@@ -153,6 +170,12 @@ def _run_v2(public: dict[str, Any]) -> dict[str, Any]:
 def _step_public(step: RunStep) -> dict[str, Any]:
     inp = step.input if isinstance(step.input, dict) else {}
     out = step.output if isinstance(step.output, dict) else {}
+    raw_data = out.get("data")
+    data = raw_data if isinstance(raw_data, dict) else {}
+    raw_provider_output = data.get("output")
+    provider_output = raw_provider_output if isinstance(raw_provider_output, dict) else {}
+    raw_evidence = provider_output.get("actionEvidence")
+    evidence = raw_evidence if isinstance(raw_evidence, dict) else {}
     return {
         "id": str(step.id),
         "runId": str(step.run_id),
@@ -163,6 +186,7 @@ def _step_public(step: RunStep) -> dict[str, Any]:
         "resourceId": str(inp.get("resourceId", "")),
         "scope": str(inp.get("scope", "")),
         "status": step.status,
+        "actionOutcome": evidence.get("outcome"),
         "output": out.get("output"),
         "actionId": out.get("actionId"),
         "approvalId": out.get("approvalId"),
@@ -179,6 +203,7 @@ def _step_v2(public: dict[str, Any]) -> dict[str, Any]:
             "index": public["index"],
             "kind": public["kind"],
             "status": public["status"],
+            "actionOutcome": public["actionOutcome"],
         },
         "request": {
             "title": public["title"],
@@ -1060,7 +1085,7 @@ async def artifacts_v1(
             )
         ).all()
     )
-    public = [_artifact_public(row) for row in rows]
+    public = [_artifact_public(row) for row in rows if await _artifact_access(session, row, principal)]
     return {
         "artifacts": public,
         "summary": {"total": len(public)},
@@ -1100,6 +1125,8 @@ async def artifact_url_v1(
     )
     if artifact is None:
         raise not_found("Artifact")
+    if not await _artifact_access(session, artifact, principal):
+        raise not_found("Artifact")
     try:
         url = await object_storage_from_settings().signed_url(
             key=artifact.storage_key, expires_seconds=900
@@ -1121,6 +1148,17 @@ async def artifact_url_v2(
             organization_id, artifact_id, principal, session
         )
     }
+
+
+async def _artifact_access(session, artifact, principal):
+    identity = (artifact.metadata_json or {}).get("integrationResourceId")
+    if not identity:
+        return True
+    from app.application.services.integration_foundation import IntegrationFoundation
+    from app.infrastructure.database.models import IntegrationResource
+    resource = await session.get(IntegrationResource, UUID(identity))
+    return bool(resource and resource.organization_id == artifact.organization_id and
+        await IntegrationFoundation(session).can_use(resource.connection_id, artifact.organization_id, principal.user_id))
 
 
 
@@ -1641,3 +1679,85 @@ async def result_export_v2(
             session,
         )
     }
+
+
+@v1_router.get("/organizations/{organization_id}/planner/readiness")
+@v2_router.get("/organizations/{organization_id}/planner/readiness")
+async def planner_readiness(organization_id: UUID,
+    principal: Annotated[HumanPrincipal, Depends(organization_principal)]) -> dict[str, Any]:
+    require_permission(principal, "integrations.manage")
+    from app.runtime.smart_planner import configured_routes
+    coordinator = RedisCoordinator.from_settings()
+    try:
+        routes = configured_routes()
+        from app.infrastructure.ai.text_routes import snapshot_routes, text_routes
+        workload_routes = {kind: snapshot_routes(settings, kind) for kind in ("interactive", "complex")}
+        catalog_routes = text_routes(settings)
+        for entries in workload_routes.values():
+            for route in entries:
+                if not any(r["provider"] == route["provider"] and r["model"] == route["model"] for r in catalog_routes):
+                    catalog_routes.append(route)
+        from app.infrastructure.ai.model_profiles import DEFAULT_PROFILES
+        for route in catalog_routes:
+            profile = settings.smart_planner_model_profiles.get(f"{route['provider']}:{route['model']}") or DEFAULT_PROFILES.get(f"{route['provider']}:{route['model']}")
+            if profile:
+                route["profile"] = profile.model_dump()
+        checks: dict[str, Any] = {}
+        if settings.smart_planner_enabled and settings.openrouter_planner_data_allowed and settings.openrouter_allowed_providers:
+            try:
+                from app.infrastructure.ai.openrouter import OpenRouterPlannerProvider
+                provider = OpenRouterPlannerProvider(
+                    api_key=settings.openrouter_api_key.get_secret_value() if settings.openrouter_api_key else None,
+                    allowed_providers=settings.openrouter_allowed_providers,
+                    data_allowed=settings.openrouter_planner_data_allowed,
+                    models=[r["model"] for r in catalog_routes if r["provider"] == "openrouter"],
+                )
+                assert isinstance(provider, OpenRouterPlannerProvider)
+                checks = await provider.readiness(coordinator)
+            except (httpx.HTTPError, RuntimeError, ValueError, OSError) as exc:
+                checks = {"status": "catalog_unavailable", "errorType": type(exc).__name__}
+        from app.infrastructure.ai.model_profiles import PlannerModelProfile
+        models = []
+        for route in catalog_routes:
+            profile = route.get("profile")
+            key_ready = bool(settings.openrouter_api_key) if route["provider"] == "openrouter" else bool(settings.ai_coordinator_api_key or settings.ai_provider_api_key)
+            reason = "credentials_missing" if not key_ready else "compatibility_profile_missing" if not profile else None
+            endpoint = checks.get(route["model"], {}) if route["provider"] == "openrouter" else {}
+            endpoint = endpoint if isinstance(endpoint, dict) else {}
+            if route["provider"] == "openrouter":
+                if not settings.openrouter_planner_data_allowed or not settings.openrouter_allowed_providers:
+                    reason = reason or "data_handling_not_configured"
+                elif not endpoint.get("compatible"):
+                    reason = reason or "endpoint_unavailable_or_incompatible"
+            qualified = [kind for kind, entries in workload_routes.items() if any(
+                entry["provider"] == route["provider"] and entry["model"] == route["model"] for entry in entries)]
+            reason = reason or ("benchmark_unqualified" if not qualified else None)
+            models.append({"model": route["model"], "connection": route["provider"], "qualifiedFor": qualified,
+                "ready": reason is None, "reason": reason, "liveVerified": False,
+                "compatibility": PlannerModelProfile.model_validate(profile).model_dump() if profile else None})
+        return {"enabled": settings.smart_planner_enabled, "routes": routes,
+            "openrouterConfigured": bool(settings.openrouter_api_key),
+            "dataHandlingReady": settings.openrouter_planner_data_allowed and bool(settings.openrouter_allowed_providers),
+            "models": checks, "modelList": models, "workloads": workload_routes,
+            "budgets": {"interactiveSeconds": settings.ai_interactive_timeout_seconds,
+                        "interactiveAttemptSeconds": settings.ai_interactive_attempt_seconds,
+                        "complexDecisionSeconds": settings.runtime_planner_timeout_seconds}}
+    finally:
+        await coordinator.close()
+
+
+@v1_router.get("/organizations/{organization_id}/runs/{run_id}/planner-attempts")
+@v2_router.get("/organizations/{organization_id}/runs/{run_id}/planner-attempts")
+async def planner_attempts(organization_id: UUID, run_id: UUID,
+    principal: Annotated[HumanPrincipal, Depends(organization_principal)],
+    session: Annotated[AsyncSession, Depends(database_session)]) -> dict[str, Any]:
+    require_permission(principal, "integrations.manage")
+    from app.infrastructure.database.models import PlannerAttempt, PlannerDecision
+    rows = (await session.execute(select(PlannerAttempt, PlannerDecision).join(PlannerDecision,
+        PlannerAttempt.decision_id == PlannerDecision.id).where(
+        PlannerDecision.organization_id == organization_id, PlannerDecision.run_id == run_id,
+        PlannerAttempt.organization_id == organization_id).order_by(PlannerAttempt.created_at))).all()
+    return {"attempts": [{"decisionId": str(d.id), "provider": a.provider, "model": a.model,
+        "status": a.status, "calls": a.call_count, "transportSuccess": a.transport_success,
+        "schemaValid": a.schema_valid, "accepted": a.accepted, "latencyMs": a.latency_ms,
+        "errorCategory": a.error_category, "recoveryRound": a.recovery_round} for a, d in rows]}

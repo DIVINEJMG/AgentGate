@@ -13,7 +13,8 @@ def read(path: str) -> str:
 
 workforce = read("frontend/src/components/WorkforcePanel.tsx")
 natural = read("frontend/src/components/NaturalWorkerCreate.tsx")
-profile = read("frontend/src/components/WorkerExperienceProfile.tsx")
+profile = read("frontend/src/workspace/pages/WorkerProfilePage.tsx")
+workspace_routes = read("frontend/src/workspace/routes.ts")
 product_app = read("frontend/src/ProductApp.tsx")
 chat_page = read("frontend/src/components/WorkerChatPage.tsx")
 conversation_ui = read("frontend/src/components/ConversationField.tsx")
@@ -46,30 +47,30 @@ if "WorkerQuickStart" not in workforce:
     errors.append("F31.33 manual/advanced Worker setup was removed")
 
 for token in (
-    "DIGITAL EMPLOYEE",
-    "Current work",
+    "ws-profile-identity",
+    "Right now",
     "Next scheduled work",
-    "Recent result",
-    "Advanced diagnostics & configuration",
+    "Recent results",
+    "tab === 'settings'",
 ):
     if token not in profile:
         errors.append(f"F31.32 employee worker profile is missing: {token}")
-if "onClick={onChat}" not in profile or "Open conversation" not in profile:
+if "page: 'conversations', workerId: worker.id" not in profile:
     errors.append("F31.32 employee worker profile cannot open a conversation")
-if "WorkerChatPage" not in product_app or "view === 'conversations'" not in product_app:
+if "WorkerChatPage" not in product_app or "case 'conversations':" not in product_app:
     errors.append("F31.32 conversation page is not routed from the workspace")
 if "ConversationField" not in chat_page:
     errors.append("F31.32 conversation page is missing its chat interface")
 
 for token in (
-    "Jobs & schedules",
-    "Runs & steps",
-    "Actions",
-    "Capabilities",
-    "Policies",
-    "Audit",
+    "case 'jobs':",
+    "case 'runs':",
+    "actions: { page: 'activity' }",
+    "capabilities: { page: 'connections', view: 'access' }",
+    "case 'policies':",
+    "case 'audit':",
 ):
-    if token not in profile:
+    if token not in workspace_routes:
         errors.append(f"F31.33 advanced/admin surface link is missing: {token}")
 
 for token in (
@@ -80,9 +81,11 @@ for token in (
 ):
     if token not in commands and token not in conversation_ui:
         errors.append(f"F31.34 inline action contract is missing: {token}")
-for token in ("Approve", "Reject", "Confirm deletion"):
+for token in ("Approve", "Confirm deletion"):
     if token not in conversation_ui and token not in commands:
         errors.append(f"F31.34 actionable approval/confirmation UI is missing: {token}")
+if "onDecide(approval, 'reject')" not in conversation_ui:
+    errors.append("F31.34 approval rejection action is missing")
 
 for token in (
     "except AIProviderError as exc:",

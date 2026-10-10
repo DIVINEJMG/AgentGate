@@ -1,0 +1,63 @@
+/*
+ * Shared skin for controls the existing controllers still render: modals, forms,
+ * notices and buttons. Layout stays as those components define it; colour, type
+ * and shape follow the workspace tokens so every form matches the new pages.
+ * Older stylesheets use !important heavily, so the visual properties here do too.
+ */
+.ws-app :is(.jobs-page, .memory-page, .workforce-page) { display: block !important; gap: 0 !important; padding: 0 !important; background: none !important; }
+.ws-app :is(.jobs-page, .memory-page, .workforce-page) > :is(.inline-error, .product-success, .quick-start-needs-setup) { max-width: 1064px; margin: 24px auto -12px !important; }
+
+/* Notices */
+.ws-app .inline-error { padding: 10px 14px !important; border: 1px solid color-mix(in srgb, var(--ws-danger) 30%, var(--ws-line)) !important; border-left-width: 1px !important; border-radius: var(--ws-radius) !important; background: var(--ws-danger-soft) !important; color: var(--ws-danger) !important; font-size: 13.5px !important; font-family: var(--ws-font) !important; }
+.ws-app .product-success { padding: 10px 14px !important; border: 1px solid color-mix(in srgb, var(--ws-live) 30%, var(--ws-line)) !important; border-radius: var(--ws-radius) !important; background: var(--ws-live-soft) !important; color: var(--ws-text) !important; font-size: 13.5px !important; }
+.ws-app .quick-start-needs-setup { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; flex-wrap: wrap; padding: 12px 16px !important; border: 1px solid color-mix(in srgb, var(--ws-warn) 35%, var(--ws-line)) !important; border-radius: var(--ws-radius) !important; background: var(--ws-warn-soft) !important; color: var(--ws-text) !important; font-size: 13.5px !important; }
+.ws-app .quick-start-needs-setup span { display: block; color: var(--ws-text-2) !important; }
+
+/* Buttons */
+.ws-app :is(.primary-button, .secondary-button, .ghost-button) { display: inline-flex !important; align-items: center !important; justify-content: center; gap: 6px !important; height: 34px !important; min-height: 0 !important; padding: 0 14px !important; border-radius: var(--ws-radius-sm) !important; font: 500 13.5px var(--ws-font) !important; letter-spacing: 0 !important; text-transform: none !important; cursor: pointer; box-shadow: none !important; }
+.ws-app .primary-button { border: 1px solid var(--ws-accent) !important; background: var(--ws-accent) !important; color: var(--ws-accent-ink) !important; }
+.ws-app .primary-button:hover:not(:disabled) { background: var(--ws-accent-hover) !important; }
+.ws-app :is(.secondary-button, .ghost-button) { border: 1px solid var(--ws-line-strong) !important; background: var(--ws-surface) !important; color: var(--ws-text) !important; }
+.ws-app .ghost-button { border-color: transparent !important; background: transparent !important; }
+.ws-app :is(.secondary-button, .ghost-button):hover:not(:disabled) { background: var(--ws-s2) !important; }
+.ws-app :is(.primary-button, .secondary-button, .ghost-button):disabled { opacity: .5; cursor: not-allowed; }
+
+/* Modals: the old overlay and card become a centred workspace dialog. */
+.ws-app :is(.workforce-modal-backdrop, .modal-backdrop) { position: fixed !important; inset: 0 !important; z-index: 90 !important; display: grid !important; place-items: center !important; padding: 24px !important; background: var(--ws-scrim) !important; backdrop-filter: none !important; animation: ws-enter .15s ease-out; }
+.ws-app :is(.workforce-modal, .modal-card) { width: min(100%, 640px) !important; max-height: calc(100dvh - 48px) !important; overflow: auto !important; padding: 24px !important; border: 1px solid var(--ws-line) !important; border-radius: 12px !important; background: var(--ws-surface) !important; color: var(--ws-text) !important; box-shadow: var(--ws-shadow) !important; font-family: var(--ws-font) !important; font-size: 14px !important; animation: ws-rise .18s ease-out; }
+.ws-app .workforce-modal > header, .ws-app .modal-card > header { display: flex !important; align-items: flex-start !important; justify-content: space-between !important; gap: 16px !important; margin: 0 0 18px !important; padding: 0 0 14px !important; border-bottom: 1px solid var(--ws-line) !important; background: none !important; }
+.ws-app :is(.workforce-modal, .modal-card) :is(h2, .modal-title) { margin: 0 !important; color: var(--ws-text) !important; font: 600 18px/1.3 var(--ws-font) !important; letter-spacing: -.015em !important; }
+.ws-app :is(.workforce-modal, .modal-card) :is(.panel-kicker, .eyebrow) { margin: 0 0 4px !important; color: var(--ws-text-3) !important; font: 500 12px var(--ws-font) !important; letter-spacing: .02em !important; text-transform: none !important; }
+.ws-app :is(.workforce-modal, .modal-card) :is(p, .modal-copy, small) { color: var(--ws-text-2) !important; }
+.ws-app .workforce-modal > header > button, .ws-app .modal-card > header > button { display: grid !important; place-items: center !important; width: 30px !important; height: 30px !important; padding: 0 !important; border: 0 !important; border-radius: var(--ws-radius-sm) !important; background: transparent !important; color: var(--ws-text-3) !important; cursor: pointer; }
+.ws-app .workforce-modal > header > button:hover, .ws-app .modal-card > header > button:hover { background: var(--ws-s2) !important; color: var(--ws-text) !important; }
+.ws-app :is(.workforce-modal, .modal-card) label { color: var(--ws-text-2) !important; font: 500 13px var(--ws-font) !important; letter-spacing: 0 !important; text-transform: none !important; }
+.ws-app :is(.workforce-modal, .modal-card) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { width: 100%; min-height: 36px; padding: 7px 11px !important; border: 1px solid var(--ws-line-strong) !important; border-radius: var(--ws-radius-sm) !important; background: var(--ws-surface) !important; color: var(--ws-text) !important; font: 400 14px var(--ws-font) !important; box-shadow: none !important; }
+.ws-app :is(.workforce-modal, .modal-card) :is(input, select, textarea):focus-visible { outline: 2px solid var(--ws-focus) !important; outline-offset: -1px !important; border-color: var(--ws-focus) !important; }
+.ws-app :is(.workforce-modal, .modal-card) :is(input, select, textarea):disabled { background: var(--ws-s2) !important; color: var(--ws-text-3) !important; }
+.ws-app :is(.workforce-modal, .modal-card) :is(input[type="checkbox"], input[type="radio"]) { accent-color: var(--ws-accent); }
+.ws-app :is(.workforce-modal, .modal-card) > footer, .ws-app :is(.workforce-modal, .modal-card) .modal-actions, .ws-app .workforce-modal .form-actions { display: flex !important; justify-content: flex-end !important; gap: 8px !important; margin-top: 20px !important; padding-top: 16px !important; border-top: 1px solid var(--ws-line) !important; background: none !important; }
+.ws-app :is(.workforce-modal, .modal-card) button[type="submit"]:not(.ghost-button):not(.secondary-button) { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 1px solid var(--ws-accent) !important; border-radius: var(--ws-radius-sm) !important; background: var(--ws-accent) !important; color: var(--ws-accent-ink) !important; font: 500 13.5px var(--ws-font) !important; cursor: pointer; }
+.ws-app :is(.workforce-modal, .modal-card) :is(code, pre) { font-family: var(--ws-mono) !important; }
+
+/* Legacy panels shown inside rebuilt pages (automation, templates) */
+.ws-app .ws-legacy-embed { color: var(--ws-text); font-family: var(--ws-font); }
+.ws-app .ws-legacy-embed :is(h2, h3) { color: var(--ws-text) !important; font-family: var(--ws-font) !important; letter-spacing: -.01em !important; }
+.ws-app .ws-legacy-embed :is(select, input:not([type="checkbox"]):not([type="radio"]), textarea) { border: 1px solid var(--ws-line-strong) !important; border-radius: var(--ws-radius-sm) !important; background: var(--ws-surface) !important; color: var(--ws-text) !important; font-family: var(--ws-font) !important; }
+.ws-app .ws-legacy-embed * { border-color: var(--ws-line) !important; }
+.ws-app .ws-legacy-embed :is(strong, b, h3, h4, dd, td, .section-title, label) { color: var(--ws-text) !important; font-family: var(--ws-font) !important; }
+.ws-app .ws-legacy-embed :is(p, small, span:not(.ws-state):not([class*="outcome"]), .panel-kicker, dt, th, .trigger-help, .api-trigger-note, .audit-window-note) { color: var(--ws-text-2) !important; font-family: var(--ws-font) !important; }
+.ws-app .ws-legacy-embed .panel-kicker { color: var(--ws-text-3) !important; font-size: 12px !important; letter-spacing: .02em !important; text-transform: none !important; }
+.ws-app .ws-legacy-embed :is(.trigger-card, .scheduler-summary, .scheduler-summary > *, .trigger-history, .trigger-boundary, .schedule-fields) { background: transparent !important; box-shadow: none !important; }
+.ws-app .ws-legacy-embed .scheduler-summary strong { font-size: 26px !important; font-weight: 600 !important; letter-spacing: -.02em; }
+.ws-app .ws-legacy-embed .weekday-picker button { border: 1px solid var(--ws-line-strong) !important; border-radius: var(--ws-radius-sm) !important; background: var(--ws-surface) !important; color: var(--ws-text-2) !important; }
+.ws-app .ws-legacy-embed .weekday-picker button.active { border-color: var(--ws-text) !important; background: var(--ws-text) !important; color: var(--ws-bg) !important; }
+.ws-app .ws-legacy-embed input[type="checkbox"] { accent-color: var(--ws-accent); }
+
+/* Coding workspace progress shown under queue items */
+.ws-app .jobs-queue-management { margin-top: 6px; }
+.ws-app .jobs-queue-management summary { color: var(--ws-text-3); font-size: 12px; cursor: pointer; }
+.ws-app .jobs-queue-management button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--ws-line-strong); border-radius: var(--ws-radius-sm); background: var(--ws-surface); color: var(--ws-text); font: 500 12.5px var(--ws-font); cursor: pointer; }
+.ws-app :is(.workforce-modal, .modal-card) .modal-title { display: flex !important; align-items: flex-start !important; justify-content: space-between !important; gap: 16px; margin: 0 0 18px !important; padding-bottom: 14px !important; border-bottom: 1px solid var(--ws-line) !important; }
+.ws-app :is(.workforce-modal, .modal-card) .icon-button { display: grid !important; place-items: center !important; width: 30px !important; height: 30px !important; padding: 0 !important; border: 0 !important; border-radius: var(--ws-radius-sm) !important; background: transparent !important; color: var(--ws-text-3) !important; box-shadow: none !important; cursor: pointer; }
+.ws-app :is(.workforce-modal, .modal-card) .icon-button:hover { background: var(--ws-s2) !important; color: var(--ws-text) !important; }

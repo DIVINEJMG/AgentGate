@@ -116,6 +116,7 @@ class BrowserElement:
     disabled: bool
     href: str | None
     field_name: str | None = None
+    keyboard_enter_safe: bool = False
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)

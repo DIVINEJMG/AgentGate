@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "operation": "support-organization",
+  "requestTarget": "/internal/console/v1/support-organization?organization_id=0b9c8d7e-6f5a-4b3c-8d2e-1f0a9b8c7d6e",
+  "requestId": "example-support-organization",
+  "observedAt": "2026-10-10T12:00:00+00:00",
+  "data": {
+    "organization": {
+      "id": "0b9c8d7e-6f5a-4b3c-8d2e-1f0a9b8c7d6e",
+      "name": "Example Org",
+      "createdAt": "2026-10-09T15:30:00+00:00",
+      "updatedAt": "2026-10-09T15:30:00+00:00"
+    },
+    "state": {
+      "members": 2,
+      "workers": 1,
+      "runs30d": 12,
+      "failedRuns30d": 1,
+      "openIncidents": 0,
+      "queueFailures": 0
+    },
+    "incidents": [
+      {
+        "id": "e7f8a9b0-c1d2-4e3f-8a4b-5c6d7e8f9a0b",
+        "status": "resolved",
+        "severity": "low",
+        "summary": "Example incident",
+        "createdAt": "2026-10-09T15:30:00+00:00"
+      }
+    ]
+  }
+}

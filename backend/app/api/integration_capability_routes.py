@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_dependencies import organization_principal
 from app.api.product_common import append_audit, not_found, require_permission, utcnow
+from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
 from app.execution.bootstrap import execution_provider_registry
 from app.execution.contracts import ExecutionProviderError, ResourceDescriptor
@@ -207,6 +208,13 @@ async def _connect(
     )
     session.add(integration)
     await session.flush()
+    if settings.integration_foundation_enabled and provider_id not in {"browser", "web_research"}:
+        from app.application.services.integration_foundation import IntegrationFoundation
+
+        await IntegrationFoundation(session).register_connection(integration, principal.user_id)
+        await IntegrationFoundation(session).queue_waiting_preparation(
+            organization_id, principal.user_id
+        )
     if credential:
         try:
             ciphertext = encrypt_integration_secret(credential)
@@ -269,6 +277,16 @@ async def _health(
     )
     if integration is None:
         raise not_found("Integration")
+    if settings.integration_foundation_enabled and integration.provider not in {
+        "browser",
+        "web_research",
+    }:
+        from app.application.services.integration_foundation import IntegrationFoundation
+
+        if not await IntegrationFoundation(session).can_use(
+            integration.id, organization_id, principal.user_id
+        ):
+            raise HTTPException(403, "This account has not been shared with you.")
     if integration.status == "disconnected":
         raise HTTPException(409, "Disconnected integrations cannot be checked.")
 
@@ -279,7 +297,17 @@ async def _health(
     credential = None
     if credential_row is not None:
         try:
-            credential = decrypt_integration_secret(credential_row.ciphertext)
+            if settings.integration_foundation_enabled and integration.provider not in {
+                "browser",
+                "web_research",
+            }:
+                from app.application.services.integration_credentials import CredentialManager
+
+                credential = await CredentialManager(session).resolve(
+                    connection=integration, provider=provider, correlation_id="connection-health"
+                )
+            else:
+                credential = decrypt_integration_secret(credential_row.ciphertext)
         except IntegrationCipherError as error:
             raise HTTPException(503, str(error)) from error
     raw_config = _config(integration)
@@ -333,6 +361,18 @@ async def _disconnect(
     )
     if integration is None:
         raise not_found("Integration")
+    if settings.integration_foundation_enabled and integration.provider not in {
+        "browser",
+        "web_research",
+    }:
+        from app.api.integration_foundation_routes import owned
+
+        state = await owned(session, organization_id, integration_id, principal)
+        state.authorization_state, state.reason = (
+            "disconnected",
+            "Reconnect this account to continue.",
+        )
+        state.authority_version += 1
     await session.execute(
         delete(IntegrationCredential).where(IntegrationCredential.integration_id == integration.id)
     )
@@ -377,6 +417,16 @@ async def list_integrations_v1(
             )
         ).all()
     )
+    if settings.integration_foundation_enabled:
+        from app.application.services.integration_foundation import IntegrationFoundation
+
+        foundation = IntegrationFoundation(session)
+        rows = [
+            item
+            for item in rows
+            if item.provider in {"browser", "web_research"}
+            or await foundation.can_use(item.id, organization_id, principal.user_id)
+        ]
     public = [await integration_public(session, item) for item in rows]
     return {"integrations": public, "count": len(public)}
 

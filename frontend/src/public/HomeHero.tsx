@@ -1,32 +1,39 @@
+import { usePublicText, usePublicCollection, usePublicContent } from './content/ContentContext';
+import {payloadOf} from './content/contract';
+import {PublicMedia} from './ResourcePage';
 import { useEffect, useRef, useState } from 'react';
 import type { HeroWorld } from './heroWorld';
 import './home-hero.css';
+import './public-media.css';
 
 type TargetRoute = 'signup' | 'product';
 
 // Kept as presentation data so future CMS content can replace the copy without changing the scene logic.
-const HERO_SCENES = [
-  {
-    word: 'AUTONOMY',
-    label: '01 / THE WORK',
-    title: 'Give AI workers real work.',
-    body: 'Create focused roles, assign durable jobs, and let useful work move forward across your organization.',
-  },
-  {
-    word: 'CONTROL',
-    label: '02 / THE BOUNDARY',
-    title: 'Decide what may happen.',
-    body: 'Every external action meets explicit capabilities and deterministic policy before it can proceed.',
-  },
-  {
-    word: 'OVERSIGHT',
-    label: '03 / THE PEOPLE',
-    title: 'Keep judgment with people.',
-    body: 'Sensitive work pauses for human approval, with the context and record needed to make a clear decision.',
-  },
-] as const;
+
 
 export default function HomeHero({ onNavigate }: { onNavigate: (route: TargetRoute) => void }) {
+  const text = usePublicText('HomeHero');
+const HERO_SCENES = usePublicCollection('HomeHero','HERO_SCENES', [
+  {
+    word: text('field-autonomy-420717be0c', "AUTONOMY"),
+    label: text('field-01-the-work-f635daf91c', "01 / THE WORK"),
+    title: text('field-give-ai-workers-real-work-76c7eb1cf0', "Give AI workers real work."),
+    body: text('field-create-focused-roles-assign-durable-jobs-and-e42e7e8ad8', "Create focused roles, assign durable jobs, and let useful work move forward across your organization."),
+  },
+  {
+    word: text('field-control-46d51d1f9d', "CONTROL"),
+    label: text('field-02-the-boundary-1113735f8a', "02 / THE BOUNDARY"),
+    title: text('field-decide-what-may-happen-cb2e31655a', "Decide what may happen."),
+    body: text('field-every-external-action-meets-explicit-capabili-90567e9585', "Every external action meets explicit capabilities and deterministic policy before it can proceed."),
+  },
+  {
+    word: text('field-oversight-1717cc98a5', "OVERSIGHT"),
+    label: text('field-03-the-people-4fed599598', "03 / THE PEOPLE"),
+    title: text('field-keep-judgment-with-people-04e9e242da', "Keep judgment with people."),
+    body: text('field-sensitive-work-pauses-for-human-approval-with-a8e0a68fe9', "Sensitive work pauses for human approval, with the context and record needed to make a clear decision."),
+  },
+] as const);
+
   const sectionRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hitRef = useRef<HTMLDivElement>(null);
@@ -38,6 +45,8 @@ export default function HomeHero({ onNavigate }: { onNavigate: (route: TargetRou
   const [paused, setPaused] = useState(false);
   const [timerKey, setTimerKey] = useState(0);
   const scene = HERO_SCENES[slide];
+  const bundle=usePublicContent();
+  const media=bundle.page?(payloadOf(bundle.page).hero_scenes as {id:string;media?:Parameters<typeof PublicMedia>[0]['reference'][]}[]).find(item=>item.id===scene.id)?.media?.[0]:undefined;
 
   useEffect(() => {
     slideRef.current = slide;
@@ -156,7 +165,7 @@ export default function HomeHero({ onNavigate }: { onNavigate: (route: TargetRou
       worldRef.current?.dispose();
       worldRef.current = null;
     };
-  }, []);
+  }, [media?.asset_id]);
 
   useEffect(() => {
     if (paused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -173,15 +182,14 @@ export default function HomeHero({ onNavigate }: { onNavigate: (route: TargetRou
     setTimerKey((value) => value + 1);
   };
 
-  return <section className={`audoryn-hero home-hero-scene-${slide}`} ref={sectionRef} aria-label='Audoryn introduction' onFocusCapture={() => setPaused(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false); }}>
+  return <section className={`audoryn-hero home-hero-scene-${slide}`} ref={sectionRef} aria-label={text('copy-audoryn-introduction-9749039862', "Audoryn introduction")} onFocusCapture={() => setPaused(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false); }}>
     <div className='home-hero-atmosphere' aria-hidden='true' />
     <div className='home-hero-sculpture' data-ready={ready} aria-hidden='true'>
-      <div className='home-hero-static'><span /><span /><span /></div>
-      <canvas ref={canvasRef} />
+      {media?<div className='public-scene-media'><PublicMedia reference={media}/></div>:<><div className='home-hero-static'><span /><span /><span /></div><canvas ref={canvasRef} /></>}
     </div>
     <div className='home-hero-model-hit' ref={hitRef} aria-hidden='true' />
     <div className='home-hero-inner public-container'>
-      <div className='home-hero-topline'><span>AUDORYN / AN SOT PRODUCT</span><span>AI WORKFORCE CONTROL PLANE</span></div>
+      <div className='home-hero-topline'><span>{text('copy-audoryn-an-sot-product-c6440b4287', "AUDORYN / AN SOT PRODUCT")}</span><span>{text('copy-ai-workforce-control-plane-3947fb7f36', "AI WORKFORCE CONTROL PLANE")}</span></div>
       <div className='home-hero-display' key={`word-${slide}`}><h1>{scene.word}</h1></div>
       <div className='home-hero-content' key={`copy-${slide}`}>
         <p className='home-hero-label'>{scene.label}</p>
@@ -189,9 +197,9 @@ export default function HomeHero({ onNavigate }: { onNavigate: (route: TargetRou
         <p>{scene.body}</p>
       </div>
       <div className='home-hero-footer'>
-        <div className='home-hero-actions'><button className='public-cta' onClick={() => onNavigate('signup')}>Get started</button><button className='public-text-action' onClick={() => onNavigate('product')}>Explore product <span>→</span></button></div>
-        <span className='home-hero-interaction'>MOVE / DRAG TO EXPLORE</span>
-        <div className='home-hero-pagination' aria-label='Hero scenes'>
+        <div className='home-hero-actions'><button className='public-cta' onClick={() => onNavigate('signup')}>{text('copy-get-started-760ec87a21', "Get started")}</button><button className='public-text-action' onClick={() => onNavigate('product')}>{text('copy-explore-product-7927662087', "Explore product ")}<span>→</span></button></div>
+        <span className='home-hero-interaction'>{text('copy-move-drag-to-explore-7211dd0745', "MOVE / DRAG TO EXPLORE")}</span>
+        <div className='home-hero-pagination' aria-label={text('copy-hero-scenes-035f2d30eb', "Hero scenes")}>
           <span className='home-hero-count'>0{slide + 1} / 0{HERO_SCENES.length}</span>
           {HERO_SCENES.map((item, index) => <button key={item.word} className={index === slide ? 'is-active' : ''} onClick={() => selectSlide(index)} aria-label={`Show ${item.word.toLowerCase()} scene`} aria-current={index === slide ? 'true' : undefined}><span /></button>)}
         </div>

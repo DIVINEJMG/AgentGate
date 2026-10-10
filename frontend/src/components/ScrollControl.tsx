@@ -46,7 +46,8 @@ export default function ScrollControl() {
       frame = 0;
       const scroller = document.scrollingElement || root;
       const maxScroll = Math.max(0, scroller.scrollHeight - window.innerHeight);
-      const active = finePointer.matches && !forcedColors.matches && maxScroll > 80;
+      // The workspace uses thin native scrollbars; the custom rail serves the public site only.
+      const active = finePointer.matches && !forcedColors.matches && maxScroll > 80 && !document.querySelector('.ws-app');
       availableRef.current = active;
       maxScrollRef.current = maxScroll;
       root.classList.toggle('audoryn-rail-active', active);

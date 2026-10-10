@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 
 import httpx
 
@@ -12,14 +15,35 @@ from app.domain.ai.providers import (
     AITextRequest,
     ModelProviderCapabilities,
 )
+from app.infrastructure.ai.model_profiles import (
+    PlannerModelProfile,
+    apply_profile,
+    validate_context,
+)
+
+
+def _retry_after(value: str | None) -> int | None:
+    if not value:
+        return None
+    try:
+        return max(1, int(value))
+    except ValueError:
+        try:
+            return max(1, int((parsedate_to_datetime(value) - datetime.now(UTC)).total_seconds()))
+        except (ValueError, TypeError, OverflowError):
+            return None
 
 
 def _error_category(status_code: int, detail: str) -> tuple[AIErrorCategory, bool]:
     lowered = detail.lower()
+    if "safety" in lowered or "content" in lowered and "reject" in lowered:
+        return "content_rejected", False
     if status_code in {401, 403}:
         return "authentication_failed", False
     if status_code == 404:
         return "model_not_found", False
+    if status_code == 402:
+        return "quota_exhausted", False
     if status_code == 429:
         return "rate_limited", True
     if status_code in {408, 504}:
@@ -105,14 +129,17 @@ class NvidiaNimProvider:
         timeout_seconds: int = 60,
         extra_body: dict[str, object] | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
+        planner_profile: PlannerModelProfile | None = None,
     ) -> None:
         legacy = (api_key or "").strip() or None
         self._coordinator_api_key = (coordinator_api_key or "").strip() or legacy
         self._vision_api_key = (vision_api_key or "").strip() or legacy
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = max(10, timeout_seconds)
+        self.planner_progress: Callable[[int], Awaitable[None]] | None = None
         self._extra_body = dict(extra_body or {})
         self._transport = transport
+        self.planner_profile = planner_profile
 
     def _headers(self, correlation_id: str | None, api_key: str) -> dict[str, str]:
         headers = {
@@ -140,7 +167,10 @@ class NvidiaNimProvider:
         if request.stream:
             body["stream_options"] = {"include_usage": True}
         body.update(self._extra_body)
-        if request.response_format == "json_object":
+        if self.planner_profile is not None:
+            validate_context(self.planner_profile, request.system, request.prompt, request.max_output_tokens)
+            apply_profile(body, self.planner_profile, request)
+        elif request.response_format == "json_object" and model.startswith("nvidia/nemotron-"):
             # Hosted NVIDIA NIM has been inconsistent with native response_format
             # for Nemotron reasoning models. Audoryn already performs strict JSON
             # parsing, schema validation, and one bounded repair attempt in the
@@ -168,6 +198,9 @@ class NvidiaNimProvider:
             message,
             retryable=retryable,
             status_code=response.status_code,
+            account_scoped=category in {"authentication_failed", "quota_exhausted"} or response.status_code == 429,
+            retry_after_seconds=_retry_after(response.headers.get("Retry-After"))
+            or (60 if response.status_code == 429 else None),
         )
 
     async def _stream_text(
@@ -231,7 +264,13 @@ class NvidiaNimProvider:
                     ) as response:
                         if response.status_code >= 400:
                             await self._raise_for_error(response)
-                        text, usage = await self._stream_text(response)
+                        if self.planner_profile is not None:
+                            from app.infrastructure.ai.streaming import collect_response
+                            payload = await collect_response(response, model=model,
+                                progress=getattr(self, "planner_progress", None))
+                            text, usage = _content_from_payload(payload), _usage_from_payload(payload)
+                        else:
+                            text, usage = await self._stream_text(response)
                         request_id = response.headers.get("x-request-id")
                 else:
                     response = await client.post(
@@ -247,7 +286,22 @@ class NvidiaNimProvider:
                             "invalid_provider_response",
                             "NVIDIA NIM returned an invalid response envelope.",
                             retryable=False,
+                            rejection_reason="invalid_envelope",
                         )
+                    choices = payload.get("choices")
+                    first = choices[0] if isinstance(choices, list) and choices else {}
+                    finish = first.get("finish_reason") if isinstance(first, dict) else None
+                    message = first.get("message", {}) if isinstance(first, dict) else {}
+                    if isinstance(message, dict) and message.get("refusal"):
+                        raise AIProviderError("content_rejected", "Planner declined this request.", retryable=False)
+                    if finish in {"length", "error", "content_filter"}:
+                        raise AIProviderError(
+                            "content_rejected" if finish == "content_filter" else "invalid_provider_response",
+                            "Planner response was incomplete or refused.", retryable=False,
+                            rejection_reason="truncated_output" if finish == "length" else "incomplete_output")
+                    if self.planner_profile and payload.get("model", model) != model:
+                        raise AIProviderError("invalid_provider_response", "Unexpected planner model identity.",
+                            retryable=False, rejection_reason="model_mismatch")
                     text = _content_from_payload(payload)
                     usage = _usage_from_payload(payload)
                     request_id = response.headers.get("x-request-id")
@@ -272,6 +326,7 @@ class NvidiaNimProvider:
                 "invalid_provider_response",
                 "NVIDIA NIM returned an unreadable response.",
                 retryable=False,
+                rejection_reason="invalid_envelope",
             ) from exc
 
         if not text:
@@ -279,6 +334,7 @@ class NvidiaNimProvider:
                 "invalid_provider_response",
                 "NVIDIA NIM returned no text output.",
                 retryable=False,
+                rejection_reason="empty_output",
             )
         return AIResponse(
             text=text,
@@ -287,6 +343,12 @@ class NvidiaNimProvider:
             request_id=request_id,
             usage=usage,
         )
+
+    def validate_request(self, *, model: str, request: AITextRequest) -> None:
+        if not self._coordinator_api_key:
+            raise AIProviderError("configuration_missing", "NVIDIA planner credential is not configured.", retryable=False, account_scoped=True)
+        if self.planner_profile is not None:
+            validate_context(self.planner_profile, request.system, request.prompt, request.max_output_tokens)
 
     async def generate_text(self, *, model: str, request: AITextRequest) -> AIResponse:
         messages: list[dict[str, object]] = []

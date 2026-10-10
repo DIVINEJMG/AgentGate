@@ -52,6 +52,13 @@ class CaptureGateway:
         self.prompts.append(prompt)
         return dict(self.structured)
 
+    async def generate_reviewed_structured(self, *, review_system, review_prompt, review_schema, review_validator, **kwargs):
+        payload = await self.generate_structured(**kwargs)
+        message = kwargs["prompt"].split("HUMAN_MESSAGE:\n", 1)[1]
+        report = {"operation":"question", "requestQuote":message[:500], "intent":payload}
+        review_validator(report)
+        return report
+
     async def generate_text(self, **_: Any) -> AIResponse:
         raise AssertionError("structured test must not use text generation")
 
@@ -166,7 +173,8 @@ def test_conversation_failure_semantics_distinguish_provider_and_auth() -> None:
     assert service._provider_failure_category(auth) == "authentication_expiry"
     assert service._provider_failure_category(config) == "internal_platform_failure"
     assert service._provider_failure_category(invalid) == "provider_response_invalid"
-    assert "structured contract" in service._provider_message(invalid)
+    assert "could not pass response validation" in service._provider_message(invalid)
+    assert "Your message is saved" in service._provider_message(invalid)
     assert "No worker or external state was changed" in service._provider_message(provider)
 
 
@@ -203,8 +211,8 @@ def test_cross_tenant_conversation_scope_is_rejected() -> None:
 
 def test_runtime_checkpoints_planning_before_governed_action_delivery() -> None:
     source = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
-    assert "settings.runtime_delivery_timeout_seconds - 20" in source
-    assert "AI planner exceeded the runtime delivery budget." in source
+    assert "settings.runtime_planner_timeout_seconds" in source
+    assert "Planning exceeded its configured time budget." in source
     assert "Next governed action planned and queued for execution." in source
     assert "Runtime action checkpointed" in source
     assert "Runtime action started" in source
@@ -270,8 +278,9 @@ def test_normal_worker_ux_is_conversational_and_manual_setup_remains() -> None:
     natural = (
         ROOT / "frontend/src/components/NaturalWorkerCreate.tsx"
     ).read_text(encoding="utf-8")
+    # The worker profile moved to the redesigned workspace page.
     profile = (
-        ROOT / "frontend/src/components/WorkerExperienceProfile.tsx"
+        ROOT / "frontend/src/workspace/pages/WorkerProfilePage.tsx"
     ).read_text(encoding="utf-8")
     product_app = (ROOT / "frontend/src/ProductApp.tsx").read_text(
         encoding="utf-8"
@@ -284,15 +293,15 @@ def test_normal_worker_ux_is_conversational_and_manual_setup_remains() -> None:
     assert "WorkerQuickStart" in workforce
     assert "What should this worker do?" in natural
     assert "Advanced setup" in natural
-    assert "onClick={onChat}" in profile
-    assert "Open conversation" in profile
+    assert "linkProps({ page: 'conversations', workerId: worker.id })" in profile
+    assert "Message</a>" in profile
     assert "WorkerChatPage" in product_app
-    assert "view === 'conversations'" in product_app
+    assert "case 'conversations'" in product_app
     assert "ConversationField" in chat_page
-    assert "Current work" in profile
+    assert "title='Right now'" in profile
     assert "Next scheduled work" in profile
-    assert "Recent result" in profile
-    assert "Advanced diagnostics & configuration" in profile
+    assert "Recent results" in profile
+    assert "{ id: 'settings', label: 'Settings' }" in profile
 
 
 def test_nvidia_defaults_remain_preconfigured_without_a_secret() -> None:

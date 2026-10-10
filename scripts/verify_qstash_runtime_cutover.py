@@ -23,7 +23,7 @@ if "CUTOVER_STAGE\n        value: runtime" not in render:
 for name in ("QSTASH_RUNTIME_EXECUTE_URL", "QSTASH_RUNTIME_SWEEP_URL"):
     if name not in render or name.lower() not in settings.lower():
         errors.append(f"missing runtime QStash setting: {name}")
-for route in ('@router.post("/execute")', '@router.post("/sweep")'):
+for route in ('@router.post("/execute", status_code=202)', '@router.post("/sweep")'):
     if route not in internal:
         errors.append(f"missing protected runtime route: {route}")
 if "RedisCoordinator" not in internal:
@@ -42,8 +42,11 @@ if "AI_PROVIDER_API_KEY" not in render:
     errors.append("Render blueprint is missing the AI provider credential boundary")
 if "ai_gateway_from_settings" not in managed:
     errors.append("Managed Runtime planner is not wired through AIGateway")
-if "settings.runtime_delivery_timeout_seconds - 20" not in managed:
-    errors.append("Managed Runtime planner is not bounded below the QStash delivery timeout")
+if ("background_tasks.add_task(_start_runtime_task" not in internal
+    or "asyncio.create_task(_execute_runtime_message" not in internal
+    or "asyncio.timeout(planner_timeout_seconds)" not in managed
+    or "planner_timeout_seconds = settings.runtime_planner_timeout_seconds" not in managed):
+    errors.append("Runtime lacks quick delivery acknowledgement and independently bounded durable planning")
 if "Next governed action planned and queued for execution." not in managed:
     errors.append("Managed Runtime does not checkpoint planning before governed action delivery")
 if "continuation_id = await request_runtime_execution" not in internal:

@@ -147,7 +147,7 @@ class FakeGovernedRuntime:
             observed_at=datetime.now(UTC),
         )
 
-    async def observe(self, session_id, *, organization_id, worker_id):
+    async def observe(self, session_id, *, organization_id, worker_id, focus_text=None):
         await self.resume(
             session_id,
             organization_id=organization_id,
@@ -197,6 +197,8 @@ class FakeGovernedRuntime:
         operation,
         locator=None,
         value=None,
+        axis="vertical",
+        focus_text=None,
         dialog_action=None,
         prompt_text=None,
         timeout_ms=15000,
@@ -431,6 +433,7 @@ def request_for(
     payload: dict[str, object],
     organization_id: UUID | None = None,
     worker_id: UUID | None = None,
+    run_id: UUID | None = None,
     resource_value: ResourceDescriptor | None = None,
 ) -> ExecutionRequest:
     capability = next(
@@ -443,7 +446,7 @@ def request_for(
         agent_id=uuid4(),
         job_id=uuid4(),
         work_item_id=uuid4(),
-        run_id=uuid4(),
+        run_id=run_id or uuid4(),
         capability=capability,
         resource=selected_resource,
         operation=operation,
@@ -617,6 +620,7 @@ async def test_f30_16_17_high_risk_submit_pauses_and_resumes_exact_action() -> N
         payload={"sessionId": str(session.id), "formRef": "f1"},
         organization_id=organization_id,
         worker_id=worker_id,
+        run_id=session.run_id,
     )
     pending = universal(request)
     executor = BrowserGatewayExecutor(provider)
@@ -803,6 +807,7 @@ async def test_f30_19_20_login_injects_runtime_secret_without_output_leak() -> N
         payload=payload,
         organization_id=organization_id,
         worker_id=worker_id,
+        run_id=session.run_id,
     )
     raw_secret = '{"username":"divine@example.test","password":"raw-password"}'
 
@@ -853,6 +858,7 @@ async def test_f30_20_authentication_failure_is_normalized() -> None:
         },
         organization_id=organization_id,
         worker_id=worker_id,
+        run_id=session.run_id,
     )
 
     with pytest.raises(ExecutionProviderError) as captured:

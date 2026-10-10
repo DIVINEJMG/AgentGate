@@ -126,7 +126,11 @@ def _principal(request: UniversalActionRequest) -> AgentPrincipal:
 
 
 @pytest.mark.asyncio
-async def test_f29_action_gateway_authorizes_capability_and_resource_intersection() -> None:
+async def test_f29_action_gateway_authorizes_capability_and_resource_intersection(monkeypatch) -> None:
+    from app.bootstrap.settings import settings
+
+    # This scenario exercises legacy authorization, before foundation approvals.
+    monkeypatch.setattr(settings, "integration_foundation_enabled", False)
     request = _universal()
     executor = RecordingExecutor()
     gateway = ActionGateway((AllowGuard(),), executor)
@@ -157,6 +161,19 @@ async def test_f29_resource_bound_authorization_fails_closed() -> None:
             principal=_principal(request),
             request=request,
         )
+
+
+@pytest.mark.asyncio
+async def test_foundation_manifest_approval_cannot_be_bypassed_by_allow_guard(monkeypatch):
+    from app.bootstrap.settings import settings
+
+    monkeypatch.setattr(settings, "integration_foundation_enabled", True)
+    request = _universal()
+    executor = RecordingExecutor()
+    gateway = ActionGateway((AllowGuard(),), executor)
+    with pytest.raises(PermissionError, match="Human approval required"):
+        await gateway.execute_request(principal=_principal(request), request=request)
+    assert executor.snapshot is None
 
 
 @pytest.mark.asyncio

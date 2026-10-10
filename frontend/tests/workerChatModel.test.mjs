@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { conversationFrames, discoveryWorkers, isHumanMessage, latestThreadId, liveResultReference, threadsForWorker } from '../src/components/workerChatModel.ts';
+import { approvalInConversation, conversationFrames, discoveryWorkers, isHumanMessage, latestThreadId, liveResultLabel, liveResultReference, threadsForWorker } from '../src/components/workerChatModel.ts';
+
+test('approval ownership stays in its conversation, including legacy references and thread switches', () => {
+  const messages = [{ threadId: 'old', resultReferences: [{ type: 'approval', id: 'approval' }] }];
+  assert.equal(approvalInConversation({ id: 'approval', conversationThreadId: 'old' }, 'new', messages), false);
+  assert.equal(approvalInConversation({ id: 'approval' }, 'new', messages), false);
+  assert.equal(approvalInConversation({ id: 'approval' }, 'old', messages), true);
+  assert.equal(approvalInConversation({ id: 'approval', conversationThreadId: 'new' }, 'new', []), true);
+  assert.equal(approvalInConversation({ id: 'approval' }, null, messages), false);
+});
 
 const threads = [
   { id: 'a-old', workerId: 'a', updatedAt: '2026-09-01T10:00:00Z' },
@@ -82,4 +91,17 @@ test('ordinary result references stay normal chat messages', () => {
     resultReferences: [{ type: 'result', id: 'result-2', name: 'Earlier result' }],
   }), null);
   assert.equal(liveResultReference({ resultReferences: [] }), null);
+});
+
+
+test('blocked and partial outcomes remain live results with accurate labels', () => {
+  for (const [outcome, label] of [['blocked', 'NEEDS ATTENTION'], ['partial', 'PARTIALLY COMPLETED']]) {
+    const result = liveResultReference({ resultReferences: [{ type: 'result', id: 'r',
+      presentation: 'live_result', status: 'attention', executionOutcome: outcome }] });
+    assert.equal(result.status, 'attention');
+    assert.equal(liveResultLabel(result), label);
+  }
+  const completed = liveResultReference({ resultReferences: [{ type: 'result', id: 'r',
+    presentation: 'live_result', status: 'completed' }] });
+  assert.equal(liveResultLabel(completed), 'COMPLETED');
 });

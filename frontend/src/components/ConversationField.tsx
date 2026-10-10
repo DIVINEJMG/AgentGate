@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent, type RefObject } from 'react';
 import { ArrowLeft, Check, ChevronRight, FileUp, Paperclip, Plus, Search, Send, ShieldCheck, X } from 'lucide-react';
 import type { ApprovalRecord } from '../lib/approvalApi';
+import { approvalExplanation } from '../lib/approvalApi';
 import type { ConversationMessage, ConversationReceipt, ConversationThread } from '../lib/conversationApi';
 import type { ManagedWorker } from '../lib/workforceApi';
+import type { ApiVersion } from '../lib/systemApi';
+import { TaskActivityPanel, useTaskActivity } from './TaskActivityPanel';
+import { LivePlan, governanceOutcome, type GovernanceOutcome } from './LivePlan';
+import { isActivityActive } from './taskActivityModel';
+import { IntegrationTaskControls } from './IntegrationTaskControls';
 import type { AppView } from '../navigation';
-import { discoveryWorkers, isHumanMessage, liveResultReference, type LiveResultReference } from './workerChatModel';
+import { discoveryWorkers, isHumanMessage, liveResultLabel, liveResultReference, type LiveResultReference } from './workerChatModel';
 
 type Props = {
+  organizationId?: string; apiVersion?: ApiVersion;
   workers: ManagedWorker[]; worker: ManagedWorker | null; workerId: string | null;
   workerThreads: ConversationThread[]; threadId: string | null; messages: ConversationMessage[];
   receipt: ConversationReceipt | null; pendingApprovals: ApprovalRecord[];
@@ -23,6 +30,7 @@ type Props = {
 };
 
 const hues = ['sage', 'slate', 'mint', 'sand', 'lilac', 'blue'];
+const GOVERNANCE_LABEL: Record<GovernanceOutcome, string> = { allowed: 'Allowed', held: 'Held', blocked: 'Blocked' };
 const exampleIntegrations = [
   { name: 'GitHub', mark: '/provider-marks/github.svg', result: 'Repository review prepared', worker: 'Development worker' },
   { name: 'Gmail', mark: '/provider-marks/gmail.svg', result: 'Support inbox triaged', worker: 'Support worker' },
@@ -55,6 +63,10 @@ export default function ConversationField(props: Props) {
   const filteredThreads = useMemo(() => workerThreads.filter(item => item.title.toLowerCase().includes(historyQuery.trim().toLowerCase())), [workerThreads, historyQuery]);
   const chat = Boolean(workerId);
   const activeThread = workerThreads.find(item => item.id === threadId);
+  const activity = useTaskActivity(props.organizationId, threadId, props.apiVersion);
+  const activeTasks = activity.snapshot?.tasks.filter(isActivityActive) ?? [];
+  const savedTasks = activity.snapshot?.tasks.filter(task => !isActivityActive(task)) ?? [];
+  const hue = hues[Math.max(0, workers.findIndex(item => item.id === workerId)) % hues.length];
 
   useEffect(() => { setArcOffset(0); }, [query]);
   useEffect(() => { setHistoryQuery(''); }, [workerId]);
@@ -98,7 +110,7 @@ export default function ConversationField(props: Props) {
     if (element.firstElementChild) observer.observe(element.firstElementChild);
     syncPosition();
     return () => observer.disconnect();
-  }, [chat, messages, threadLoading, receipt, pendingApprovals.length]);
+  }, [chat, messages, threadLoading, receipt, pendingApprovals.length, activeTasks.length]);
 
   function moveTranscript(clientY: number) {
     const rail = railRef.current;
@@ -162,14 +174,20 @@ export default function ConversationField(props: Props) {
         <div id="cf-transcript" className="cf-transcript" ref={timeline} role="log" aria-label="Conversation messages" aria-live="polite" onScroll={syncPosition}>
           <div className="cf-transcript-inner">
             {error && <div className="cf-error" role="alert">{error}</div>}
-            {threadLoading ? <div className="cf-chat-empty">Opening conversation…</div> : messages.length ? messages.map(message => {
+            {threadLoading ? <div className="cf-thread-skeleton" aria-label="Opening conversation" role="status"><i/><i/><i/></div> : messages.length ? messages.map(message => {
               const isUser = isHumanMessage(message.role);
               const liveResult = isUser ? null : liveResultReference(message);
-              return <article key={message.id} className={'cf-message ' + (isUser ? 'is-user' : 'is-worker')}><span className="cf-message-avatar">{isUser ? 'You' : initials(worker?.name ?? 'Worker')}</span><div className="cf-message-main"><div className="cf-message-body">{liveResult ? <div className="cf-live-result"><span className="cf-live-result-label">LIVE RESULT · COMPLETED</span><strong>{liveResult.name}</strong><p>{liveResult.summary || message.content}</p><div className="cf-live-result-actions"><button type="button" onClick={() => onOpenResult(liveResult)}>See full result</button><button type="button" disabled={busy} onClick={() => onExplainResult(liveResult)}>Explain result</button></div></div> : <>{message.content}{message.artifactReferences?.length > 0 && <span className="cf-message-file"><FileUp size={13}/>{message.artifactReferences.length} attached file{message.artifactReferences.length === 1 ? '' : 's'}</span>}</>}</div><time dateTime={message.createdAt}>{shortTime(message.createdAt)}</time></div></article>;
+              const outcomes = isUser ? [] : (message.commandReferences ?? []).map(ref => governanceOutcome(ref.status)).filter((value): value is GovernanceOutcome => value !== null);
+              const process = isUser ? savedTasks.filter(task => task.requestMessageId === message.id) : [];
+              const body = liveResult ? <div className="cf-live-result" data-outcome={liveResult.executionOutcome ?? liveResult.status}><span className="cf-live-result-label">{liveResultLabel(liveResult)}</span><strong>{liveResult.name}</strong><p>{liveResult.summary || message.content}</p>{liveResult.externalReferences?.map(ref => <a key={ref.url} href={ref.url} target="_blank" rel="noreferrer">{ref.title}</a>)}<div className="cf-live-result-actions"><button type="button" onClick={() => onOpenResult(liveResult)}>See full result</button><button type="button" disabled={busy} onClick={() => onExplainResult(liveResult)}>Explain result</button></div></div> : <>{message.content}{props.organizationId && props.apiVersion && message.commandReferences?.filter(ref => ref.family === "integration.execute" && ["waiting_integration", "clarification_required", "waiting_ai", "policy_denied"].includes(String(ref.status))).map(ref => <IntegrationTaskControls key={String(ref.id)} organizationId={props.organizationId!} version={props.apiVersion!} commandId={String(ref.id)} clarify={ref.status === "clarification_required"}/>)}{message.artifactReferences?.length > 0 && <span className="cf-message-file"><FileUp size={13}/>{message.artifactReferences.length} attached file{message.artifactReferences.length === 1 ? '' : 's'}</span>}</>;
+              if (isUser) return <article key={message.id} className="cf-message is-user"><div className="cf-message-main"><div className="cf-message-body">{body}</div><time dateTime={message.createdAt}>{shortTime(message.createdAt)}</time>{process.length > 0 && <details className="cf-process-record"><summary>Process record <span>{process.length}</span></summary><TaskActivityPanel tasks={process} observedAt={activity.snapshot!.observedAt} now={activity.now} disconnected={activity.disconnected} historical/></details>}</div></article>;
+              return <article key={message.id} className="cf-message is-worker"><header className="cf-reply-head"><span className={'cf-message-avatar ' + hue}>{initials(worker?.name ?? 'Worker')}</span><strong>{worker?.name ?? 'Worker'}</strong><time dateTime={message.createdAt}>{shortTime(message.createdAt)}</time>{[...new Set(outcomes)].map(outcome => <span key={outcome} className="cf-gov" data-outcome={outcome}>{GOVERNANCE_LABEL[outcome]}</span>)}</header><div className="cf-message-body">{body}</div></article>;
             }) : responsePhase ? null : <div className="cf-chat-empty"><span className="cf-empty-ring"><Send size={19}/></span><strong>{activeThread?.title || ('Start with ' + (worker?.name || 'a worker'))}</strong><p>Give a clear direction. The conversation remains connected to this worker's identity, capabilities, and approvals.</p></div>}
-            {responsePhase && <div className="cf-response-pending" role="status" aria-live="polite"><span className="cf-message-avatar">{initials(worker?.name ?? 'Worker')}</span><div className="cf-response-pending-bubble"><span>{worker?.name ?? 'Worker'} · {responsePhase === 'preparing' ? 'Preparing context' : 'Working on your reply'}</span><span className="cf-response-dots" aria-hidden="true"><i/><i/><i/></span></div></div>}
-            {receipt && <div className={'cf-receipt ' + receipt.status}><span className="cf-receipt-label">EXECUTION RECEIPT · {receipt.status.replaceAll('_', ' ')}</span><p>{receipt.message}</p><div>{receipt.action_hints.map((hint, index) => hint.kind === 'connect_integration' ? <button type="button" key={index} onClick={() => onNavigate('integrations')}>{hint.label || 'Connect integration'}</button> : hint.kind === 'confirm_command' && receipt.command_id ? <button type="button" key={index} onClick={onConfirm} disabled={busy}><Check size={14}/>{hint.label || 'Confirm action'}</button> : null)}</div></div>}
-            {pendingApprovals.map(approval => <div className="cf-approval" key={approval.id}><span>HUMAN DECISION</span><strong>{approval.request.action}</strong><p>{approval.request.target || approval.request.resourceName}</p><div><button type="button" disabled={busy} onClick={() => onDecide(approval, 'approve')}>Approve</button><button type="button" disabled={busy} onClick={() => onDecide(approval, 'reject')}>Reject</button></div></div>)}
+            {!threadLoading && activity.snapshot && activeTasks.map((task, index) => <LivePlan key={task.id} task={task} index={index} total={activeTasks.length} observedAt={activity.snapshot!.observedAt} now={activity.now} disconnected={activity.disconnected} workerName={worker?.name ?? 'Worker'}/>)}
+            {responsePhase && <div className="cf-response-pending" role="status" aria-live="polite"><span className={'cf-message-avatar ' + hue}>{initials(worker?.name ?? 'Worker')}</span><span className="cf-response-text">{responsePhase === 'preparing' ? 'Preparing context' : `${worker?.name ?? 'Worker'} is working on a reply`}</span><span className="cf-response-dots" aria-hidden="true"><i/><i/><i/></span></div>}
+            {receipt && <div className={'cf-receipt ' + receipt.status}><span className="cf-receipt-label">{receipt.status.replaceAll('_', ' ')}</span><p>{receipt.message}</p><div>{receipt.action_hints.map((hint, index) => hint.kind === 'connect_integration' ? <button type="button" key={index} onClick={() => onNavigate('integrations')}>{hint.label || 'Connect integration'}</button> : hint.kind === 'confirm_command' && receipt.command_id ? <button type="button" key={index} className="is-primary" onClick={onConfirm} disabled={busy}><Check size={14}/>{hint.label || 'Confirm action'}</button> : null)}</div></div>}
+
+            {pendingApprovals.map(approval => <article className="cf-message is-worker" key={approval.id}><header className="cf-reply-head"><span className={'cf-message-avatar ' + hue}>{initials(worker?.name ?? 'Worker')}</span><strong>{worker?.name ?? 'Worker'}</strong><time dateTime={approval.requestedAt}>{shortTime(approval.requestedAt)}</time><span className="cf-gov" data-outcome="held">{GOVERNANCE_LABEL.held}</span></header><div className="cf-approval"><p>I need your approval before I continue: <strong>{approval.request.action || approval.request.scope}</strong>{approval.request.resourceName ? <> on <strong>{approval.request.resourceName}</strong></> : null}.</p><p className="cf-approval-why">{approvalExplanation(approval)}</p><div><button type="button" className="is-primary" disabled={busy} onClick={() => onDecide(approval, 'approve')}>Approve and continue</button><button type="button" disabled={busy} onClick={() => onDecide(approval, 'reject')}>Decline</button><span className="cf-approval-risk" data-risk={approval.request.risk}>{approval.request.risk} risk</span></div></div></article>)}
           </div>
         </div>
         <div className="cf-position" ref={railRef} role="scrollbar" tabIndex={chat ? 0 : -1} aria-label="Message position" aria-controls="cf-transcript" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(position.progress * 100)} onKeyDown={railKey} onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); moveTranscript(event.clientY); }} onPointerMove={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) moveTranscript(event.clientY); }}><div className="cf-position-ticks"/><span className="cf-position-thumb" style={{ top: position.progress * (100 - Math.max(8, position.size * 100)) + '%', height: Math.max(8, position.size * 100) + '%' }}/></div>

@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from repository_files import repository_files
+
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 FRONTEND = ROOT / "frontend"
@@ -21,8 +23,8 @@ secret_names = (
     "DATABASE_URL", "REDIS_URL", "UPSTASH_QSTASH_TOKEN", "QSTASH_TOKEN",
     "UPSTASH_BLOB_TOKEN", "INTEGRATION_ENCRYPTION_KEY", "MODEL_PROVIDER_API_KEY",
 )
-for path in FRONTEND.rglob("*"):
-    if not path.is_file() or "node_modules" in path.parts:
+for path in repository_files(ROOT):
+    if not path.is_relative_to(FRONTEND):
         continue
     try:
         text = path.read_text(encoding="utf-8")
@@ -34,7 +36,7 @@ for path in FRONTEND.rglob("*"):
 
 proc = subprocess.run(
     [sys.executable, "-m", "alembic", "upgrade", "head", "--sql"],
-    cwd=BACKEND, check=False, capture_output=True, text=True,
+    cwd=BACKEND, check=False, capture_output=True, text=True, timeout=60,
 )
 if proc.returncode:
     errors.append("fresh Alembic SQL generation failed")

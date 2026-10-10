@@ -17,9 +17,16 @@
 **/.venv/
 **/venv/
 **/.pytest_cache/
+**/.pytest_tmp/
+**/.pytest_cache*/
+**/.pytest_tmp*/
 **/.ruff_cache/
+**/build/
+**/*.egg-info/
+**/.local/
 **/.mypy_cache/
 **/.coverage
+**/.coverage.*
 **/htmlcov/
 
 # Editor and OS files
@@ -30,3 +37,15 @@ Thumbs.db
 
 # Local review captures
 /ChatGPT Image*.png
+# Generated public frontend server build and private local seed import receipts.
+frontend/server-dist/
+frontend/content-seed/preview/
+frontend/content-seed/*receipt*.json
+frontend/content-seed/*receipt*.json.tmp
+frontend/artifacts/public-cms/
+frontend/artifacts/
+**/test-results/
+**/playwright-report/
+**/coverage/
+*.tsbuildinfo
+**/coverage.xml

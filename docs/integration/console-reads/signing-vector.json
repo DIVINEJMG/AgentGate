@@ -1,0 +1,14 @@
+{
+  "description": "TEST-ONLY signing vector. The key below is public and must never be configured anywhere.",
+  "keyId": "console-reads-test",
+  "secretBase64url": "Y29uc29sZS1yZWFkcy10ZXN0LXZlY3Rvci1rZXktMDEyMzQ1Njc4OWFiY2RlZg",
+  "audience": "agentgate",
+  "scope": "visibility.read",
+  "method": "GET",
+  "target": "/internal/console/v1/users?email=ada%40example.com&limit=50&offset=0&query=a%20b%2Bc",
+  "timestamp": "1791626400",
+  "nonce": "0123456789abcdef0123456789abcdef",
+  "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "canonical": "audoryn-service-v1\nconsole-reads-test\nagentgate\nvisibility.read\nGET\n/internal/console/v1/users?email=ada%40example.com&limit=50&offset=0&query=a%20b%2Bc\n1791626400\n0123456789abcdef0123456789abcdef\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "signature": "v1=467b40a1554561ff7cd71b5037dbc3e4db19c463911038a14cfec235004fdec8"
+}

@@ -26,6 +26,7 @@ from playwright.async_api import (
     async_playwright,
 )
 from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from redis.exceptions import RedisError
 
 from app.execution.browser.contracts import (
@@ -45,9 +46,11 @@ from app.execution.browser.errors import (
     BrowserDetachedFrame,
     BrowserDownloadFailure,
     BrowserElementNotFound,
+    BrowserOwnershipLost,
     BrowserRuntimeLimitExceeded,
     BrowserStaleObservation,
 )
+from app.execution.browser.keyboard import KEYBOARD_METADATA_SCRIPT, read_only_key
 from app.execution.browser.memory import browser_memory_snapshot, chromium_process_ids
 from app.execution.browser.observation import observe_page, origin_for_url
 from app.execution.browser.policy import (
@@ -97,6 +100,7 @@ class BrowserRuntimeContract(Protocol):
         *,
         organization_id: UUID,
         worker_id: UUID | None,
+        focus_text: str | None = None,
     ) -> BrowserObservation: ...
 
     async def current_observation(
@@ -128,6 +132,8 @@ class BrowserRuntimeContract(Protocol):
         operation: str,
         locator: BrowserLocator | None = None,
         value: object = None,
+        axis: str = "vertical",
+        focus_text: str | None = None,
         dialog_action: str | None = None,
         prompt_text: str | None = None,
         timeout_ms: int = 15_000,
@@ -230,6 +236,10 @@ class _SessionHandle:
         navigation_policy: BrowserDomainPolicy | None,
         max_pages: int,
         capacity_lease: Lease | None = None,
+        organization_lease: Lease | None = None,
+        run_lease: Lease | None = None,
+        fencing_token: int | None = None,
+        idle_ttl_seconds: int = 900,
     ) -> None:
         self.session = session
         self.context = context
@@ -237,6 +247,10 @@ class _SessionHandle:
         self.navigation_policy = navigation_policy
         self.max_pages = max_pages
         self.capacity_lease = capacity_lease
+        self.organization_lease = organization_lease
+        self.run_lease = run_lease
+        self.fencing_token = fencing_token
+        self.idle_ttl_seconds = idle_ttl_seconds
         self.limit_error: str | None = None
         self.last_observation: BrowserObservation | None = None
         self.transition_trail: list[BrowserNavigationDecision] = []
@@ -247,6 +261,8 @@ class _SessionHandle:
         self.dialog_events: list[dict[str, object]] = []
         self.dialog_action: str | None = None
         self.dialog_prompt_text: str | None = None
+        self.keyboard_read_only_until = 0.0
+        self.keyboard_write_blocked = False
 
 
 class BrowserRuntime:
@@ -257,7 +273,9 @@ class BrowserRuntime:
         *,
         headless: bool = True,
         coordinator: RedisCoordinator | None = None,
-        idle_shutdown_seconds: int = 20,
+        idle_shutdown_seconds: int = 180,
+        max_active_sessions: int = 1,
+        max_sessions_per_organization: int = 1,
         memory_soft_limit_percent: int = 99,
         memory_hard_limit_percent: int = 100,
         max_pages_per_session: int = 3,
@@ -268,8 +286,11 @@ class BrowserRuntime:
         self._browser: Browser | None = None
         self._sessions: dict[UUID, _SessionHandle] = {}
         self._launch_lock = asyncio.Lock()
+        self._capacity_lock = asyncio.Lock()
         self._coordinator = coordinator
         self._idle_shutdown_seconds = max(1, idle_shutdown_seconds)
+        self._max_active_sessions = max(1, max_active_sessions)
+        self._max_sessions_per_organization = max(1, max_sessions_per_organization)
         self._memory_soft_limit_percent = max(1, min(memory_soft_limit_percent, 99))
         self._memory_hard_limit_percent = max(
             self._memory_soft_limit_percent,
@@ -354,9 +375,10 @@ class BrowserRuntime:
 
         await asyncio.sleep(0.75)
         survivors = chromium_process_ids() & targets
+        force_signal = getattr(signal, "SIGKILL", signal.SIGTERM)
         for pid in survivors:
             try:
-                os.kill(pid, signal.SIGKILL)
+                os.kill(pid, force_signal)
             except (ProcessLookupError, PermissionError):
                 continue
 
@@ -397,14 +419,27 @@ class BrowserRuntime:
         await self._shutdown_browser_engine()
 
     async def _release_capacity(self, handle: _SessionHandle) -> None:
-        if self._coordinator is None or handle.capacity_lease is None:
+        if self._coordinator is None:
             return
-        try:
-            await self._coordinator.release_lock(handle.capacity_lease)
-        except RedisError as error:
-            logger.warning("Failed to release browser capacity lease: %s", error)
-        finally:
-            handle.capacity_lease = None
+        for name in ("run_lease", "organization_lease", "capacity_lease"):
+            lease = getattr(handle, name)
+            if lease is None:
+                continue
+            try:
+                await self._coordinator.release_lock(lease)
+            except RedisError as error:
+                logger.warning("Failed to release browser %s: %s", name, error)
+            finally:
+                setattr(handle, name, None)
+
+    async def _acquire_slot(self, key: str, limit: int, ttl_seconds: int) -> Lease | None:
+        if self._coordinator is None:
+            return None
+        for index in range(limit):
+            lease = await self._coordinator.acquire_lock(f"{key}:{index}", ttl_seconds=ttl_seconds)
+            if lease is not None:
+                return lease
+        return None
 
     @staticmethod
     def _redact_metadata(value: object, sensitive_values: set[str]) -> object:
@@ -622,6 +657,8 @@ class BrowserRuntime:
             raise ValueError("Browser dialog action must be accept or dismiss.")
         handle.dialog_action = action
         handle.dialog_prompt_text = prompt_text
+        handle.keyboard_read_only_until = 0.0
+        handle.keyboard_write_blocked = False
 
     @staticmethod
     def _raise_if_limit(handle: _SessionHandle) -> None:
@@ -636,6 +673,14 @@ class BrowserRuntime:
         route: Route,
         request: Request,
     ) -> None:
+        if time.monotonic() < handle.keyboard_read_only_until and request.method not in {
+            "GET",
+            "HEAD",
+            "OPTIONS",
+        }:
+            handle.keyboard_write_blocked = True
+            await route.abort("blockedbyclient")
+            return
         if not request.is_navigation_request():
             policy = handle.navigation_policy
             if (
@@ -786,80 +831,119 @@ class BrowserRuntime:
         ttl_seconds: int = 1800,
         navigation_policy: BrowserDomainPolicy | None = None,
     ) -> BrowserSession:
-        snapshot = self._memory_snapshot()
-        if (
-            snapshot.cgroup_percent is not None
-            and snapshot.cgroup_percent >= self._memory_soft_limit_percent
-        ):
-            raise BrowserCapacityUnavailable(
-                "Browser capacity is temporarily paused because service memory is above "
-                f"{self._memory_soft_limit_percent}%."
-            )
-
-        capacity_lease: Lease | None = None
-        if self._coordinator is not None:
-            capacity_lease = await self._coordinator.acquire_lock(
-                "browser-capacity",
-                ttl_seconds=max(120, min(ttl_seconds, 600) + 120),
-            )
-            if capacity_lease is None:
-                raise BrowserCapacityUnavailable(
-                    "Another governed browser session currently owns the browser capacity lease."
+        async with self._capacity_lock:
+            current_memory = self._memory_snapshot()
+            if (
+                current_memory.cgroup_percent is not None
+                and current_memory.cgroup_percent >= self._memory_soft_limit_percent
+            ):
+                raise BrowserCapacityUnavailable("Browser capacity is paused by memory pressure.")
+            if len(self._sessions) >= self._max_active_sessions:
+                raise BrowserCapacityUnavailable("Waiting for browser capacity.")
+            if (
+                sum(
+                    handle.session.organization_id == organization_id
+                    for handle in self._sessions.values()
                 )
-
-        self._cancel_idle_shutdown()
-        context: BrowserContext | None = None
-        try:
-            browser = await self._ensure_browser()
-            context = await browser.new_context(
-                service_workers="block",
-                viewport={"width": 1280, "height": 720},
-                device_scale_factor=1,
-            )
-            page = await context.new_page()
-            now = datetime.now(UTC)
-            session_id = uuid4()
-            session = BrowserSession(
-                id=session_id,
-                organization_id=organization_id,
-                worker_id=worker_id,
-                run_id=run_id,
-                browser_context_id=f"ctx_{uuid4().hex}",
-                created_at=now,
-                expires_at=now + timedelta(seconds=max(60, min(ttl_seconds, 600))),
-                status="active",
-            )
-            handle = _SessionHandle(
-                session=session,
-                context=context,
-                page=page,
-                navigation_policy=navigation_policy,
-                max_pages=self._max_pages_per_session,
-                capacity_lease=capacity_lease,
-            )
-            self._register_page(handle, page)
-            context.on("page", lambda popup: self._register_page(handle, popup))
-            self._sessions[session_id] = handle
-            await context.route(
-                "**/*",
-                lambda route, request: self._route_request(handle, route, request),
-            )
-            self._log_memory("after_browser_context")
-            return session
-        except BaseException:
-            if context is not None:
-                await context.close()
-            if self._coordinator is not None and capacity_lease is not None:
-                try:
-                    await self._coordinator.release_lock(capacity_lease)
-                except RedisError as error:
-                    logger.warning(
-                        "Failed to release browser capacity lease after session setup error: %s",
-                        error,
+                >= self._max_sessions_per_organization
+            ):
+                raise BrowserCapacityUnavailable("Organization browser capacity is in use.")
+            lease_ttl = max(120, min(ttl_seconds, 900) + 120)
+            capacity_lease: Lease | None = None
+            organization_lease: Lease | None = None
+            run_lease: Lease | None = None
+            fencing_token: int | None = None
+            acquired: list[Lease] = []
+            try:
+                if self._coordinator is not None:
+                    if run_id is not None:
+                        run_lease = await self._coordinator.acquire_lock(
+                            f"browser-run:{run_id}", ttl_seconds=lease_ttl
+                        )
+                        if run_lease is None:
+                            raise BrowserCapacityUnavailable(
+                                "This run already owns a browser session."
+                            )
+                        acquired.append(run_lease)
+                        fencing_token = await self._coordinator.next_fencing_token(
+                            f"browser-run:{run_id}"
+                        )
+                    organization_lease = await self._acquire_slot(
+                        f"browser-org:{organization_id}",
+                        self._max_sessions_per_organization,
+                        lease_ttl,
                     )
-            if not self._sessions:
-                self._schedule_idle_shutdown()
-            raise
+                    if organization_lease is None:
+                        raise BrowserCapacityUnavailable("Organization browser capacity is in use.")
+                    acquired.append(organization_lease)
+                    capacity_lease = await self._acquire_slot(
+                        "browser-capacity", self._max_active_sessions, lease_ttl
+                    )
+                    if capacity_lease is None:
+                        raise BrowserCapacityUnavailable("Waiting for browser capacity.")
+                    acquired.append(capacity_lease)
+
+                self._cancel_idle_shutdown()
+                context: BrowserContext | None = None
+                session_id: UUID | None = None
+                try:
+                    browser = await self._ensure_browser()
+                    context = await browser.new_context(
+                        service_workers="block",
+                        viewport={"width": 1280, "height": 720},
+                        device_scale_factor=1,
+                    )
+                    page = await context.new_page()
+                    now = datetime.now(UTC)
+                    session_id = uuid4()
+                    idle_ttl_seconds = max(60, min(ttl_seconds, 900))
+                    session = BrowserSession(
+                        id=session_id,
+                        organization_id=organization_id,
+                        worker_id=worker_id,
+                        run_id=run_id,
+                        browser_context_id=f"ctx_{uuid4().hex}",
+                        created_at=now,
+                        expires_at=now + timedelta(seconds=idle_ttl_seconds),
+                        status="active",
+                    )
+                    handle = _SessionHandle(
+                        session=session,
+                        context=context,
+                        page=page,
+                        navigation_policy=navigation_policy,
+                        max_pages=self._max_pages_per_session,
+                        capacity_lease=capacity_lease,
+                        organization_lease=organization_lease,
+                        run_lease=run_lease,
+                        fencing_token=fencing_token,
+                        idle_ttl_seconds=idle_ttl_seconds,
+                    )
+                    self._register_page(handle, page)
+                    context.on("page", lambda popup: self._register_page(handle, popup))
+                    self._sessions[session_id] = handle
+                    await context.route(
+                        "**/*",
+                        lambda route, request: self._route_request(handle, route, request),
+                    )
+                    self._log_memory("after_browser_context")
+                    return session
+                except BaseException:
+                    if context is not None:
+                        await context.close()
+                    if session_id is not None:
+                        self._sessions.pop(session_id, None)
+                    if not self._sessions:
+                        self._schedule_idle_shutdown()
+                    raise
+            except BaseException:
+                if self._coordinator is not None:
+                    for lease in reversed(acquired):
+                        try:
+                            await self._coordinator.release_lock(lease)
+                        except RedisError as error:
+                            logger.warning("Failed to release browser lease: %s", error)
+                raise
 
     def _handle(
         self,
@@ -895,19 +979,29 @@ class BrowserRuntime:
             organization_id=organization_id,
             worker_id=worker_id,
         )
-        if self._coordinator is not None and handle.capacity_lease is not None:
+        # An active run gets a fresh idle window on every continuation.
+        handle.session = replace(
+            handle.session,
+            expires_at=datetime.now(UTC) + timedelta(seconds=handle.idle_ttl_seconds),
+        )
+        if self._coordinator is not None:
+            if handle.run_lease is not None and handle.fencing_token is not None:
+                generation = await self._coordinator.current_fencing_token(handle.run_lease.key)
+                if generation != handle.fencing_token:
+                    await self.fail(session_id)
+                    raise BrowserOwnershipLost("A newer browser owner has taken over this run.")
             remaining = max(
                 120,
                 int((handle.session.expires_at - datetime.now(UTC)).total_seconds()) + 120,
             )
-            renewed = await self._coordinator.renew_lock(
-                handle.capacity_lease,
-                ttl_seconds=remaining,
-            )
-            if not renewed:
-                raise BrowserCapacityUnavailable(
-                    "Governed browser capacity lease expired before the session completed."
-                )
+            for lease in (handle.run_lease, handle.organization_lease, handle.capacity_lease):
+                if lease is not None and not await self._coordinator.renew_lock(
+                    lease, ttl_seconds=remaining
+                ):
+                    await self.fail(session_id)
+                    raise BrowserOwnershipLost(
+                        "Browser ownership expired before the session completed."
+                    )
         return handle.session
 
     async def _finish(self, session_id: UUID, status: str) -> BrowserSession:
@@ -981,6 +1075,7 @@ class BrowserRuntime:
         *,
         organization_id: UUID,
         worker_id: UUID | None,
+        focus_text: str | None = None,
     ) -> BrowserObservation:
         handle = self._handle(
             session_id,
@@ -1012,9 +1107,11 @@ class BrowserRuntime:
                 and handle.navigation_policy.capture_dom_snapshot
                 and not under_soft_pressure
             ),
+            focus_text=focus_text,
         )
         page_state = {
             **observation.page_state,
+            "keyboardWriteBlocked": handle.keyboard_write_blocked,
             "navigationPolicy": {
                 "lastTransitions": [
                     self._redact_metadata(item.as_dict(), handle.sensitive_values)
@@ -1131,15 +1228,9 @@ class BrowserRuntime:
             refs = {item.ref for item in observation.elements}
             if locator.value not in refs:
                 raise BrowserElementNotFound("Browser observation element reference was not found.")
-            try:
-                index = int(locator.value.removeprefix("e")) - 1
-            except ValueError as error:
-                raise BrowserElementNotFound(
-                    "Browser observation element reference was invalid."
-                ) from error
-            return root.locator(
-                "a,button,input,textarea,select,[role],[contenteditable='true']"
-            ).nth(index)
+            if not locator.value.startswith("e") or not locator.value[1:].isdigit():
+                raise BrowserElementNotFound("Browser observation element reference was invalid.")
+            return root.locator(f'[data-audoryn-control-ref="{locator.value}"]')
         raise ValueError("Unsupported browser locator strategy.")
 
     @staticmethod
@@ -1159,13 +1250,15 @@ class BrowserRuntime:
         return bool(
             await target.evaluate(
                 """(el) => {
-                  const tag = el.tagName.toLowerCase();
-                  const type = (el.getAttribute('type') || '').toLowerCase();
+                  const control = el.closest('button,input[type="submit"],input[type="image"]');
+                  if (!control) return false;
+                  const tag = control.tagName.toLowerCase();
+                  const type = (control.getAttribute('type') || '').toLowerCase();
                   if (tag === 'input') {
-                    return Boolean(el.form) && (type === 'submit' || type === 'image');
+                    return Boolean(control.form) && (type === 'submit' || type === 'image');
                   }
                   if (tag === 'button') {
-                    return Boolean(el.form) && (!type || type === 'submit');
+                    return Boolean(control.form) && (!type || type === 'submit');
                   }
                   return false;
                 }"""
@@ -1321,6 +1414,7 @@ class BrowserRuntime:
             worker_id=worker_id,
         )
         handle.blocked_navigation = None
+        follow_link_timed_out = False
         try:
             if operation == "navigation.open":
                 if not url:
@@ -1358,6 +1452,14 @@ class BrowserRuntime:
                 await handle.page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
             else:
                 raise ValueError("Unsupported browser navigation operation.")
+        except PlaywrightTimeoutError as error:
+            if handle.blocked_navigation is not None:
+                await self._raise_blocked(handle, error)
+            if operation != "navigation.follow_link":
+                raise
+            # The click may have changed a same-page view before Playwright timed out.
+            # Observe it so the planner can choose a different grounded action.
+            follow_link_timed_out = True
         except PlaywrightError as error:
             await self._raise_blocked(handle, error)
         await self._raise_if_blocked(handle)
@@ -1368,6 +1470,17 @@ class BrowserRuntime:
             organization_id=organization_id,
             worker_id=worker_id,
         )
+        if follow_link_timed_out:
+            observation = replace(
+                observation,
+                page_state={
+                    **observation.page_state,
+                    "actionAttempt": {
+                        "status": "timed_out",
+                        "operation": "navigation.follow_link",
+                    },
+                },
+            )
         telemetry_logger.info(
             "Browser navigation observation completed run=%s session=%s elapsed=%.3fs url=%s",
             handle.session.run_id,
@@ -1378,6 +1491,19 @@ class BrowserRuntime:
         self._log_memory("after_navigation")
         return observation
 
+    @staticmethod
+    def _interaction_content_changed(
+        before: BrowserObservation,
+        after: BrowserObservation,
+    ) -> bool:
+        return (
+            before.url != after.url
+            or before.title != after.title
+            or before.visible_text != after.visible_text
+            or before.elements != after.elements
+            or before.form_details != after.form_details
+        )
+
     async def interact(
         self,
         session_id: UUID,
@@ -1387,6 +1513,8 @@ class BrowserRuntime:
         operation: str,
         locator: BrowserLocator | None = None,
         value: object = None,
+        axis: str = "vertical",
+        focus_text: str | None = None,
         dialog_action: str | None = None,
         prompt_text: str | None = None,
         timeout_ms: int = 15_000,
@@ -1396,6 +1524,8 @@ class BrowserRuntime:
             organization_id=organization_id,
             worker_id=worker_id,
         )
+        before_interaction = handle.last_observation
+        key_timed_out = False
         target = self._locator(handle, locator) if locator is not None else None
         self._set_dialog_policy(
             handle,
@@ -1422,18 +1552,34 @@ class BrowserRuntime:
         elif operation == "element.uncheck" and target is not None:
             await target.uncheck(timeout=timeout_ms)
         elif operation == "element.press_key" and target is not None:
-            if str(value).lower() in {"enter", "numpadenter"} and await self._inside_form(target):
-                raise ValueError("Form submission by keyboard must use browser.form.submit.")
-            await target.press(str(value or ""), timeout=timeout_ms)
+            metadata = await target.evaluate(KEYBOARD_METADATA_SCRIPT)
+            if not read_only_key(metadata, str(value or "")):
+                raise ValueError(
+                    "This key could submit or activate an external write. "
+                    "Use an authorized click or browser.form.submit instead."
+                )
+            # The keyboard capability is read-only. A misleading search label
+            # must not turn it into a POST or another external write.
+            handle.keyboard_read_only_until = time.monotonic() + timeout_ms / 1000 + 5
+            try:
+                await target.press(str(value or ""), timeout=timeout_ms)
+            except PlaywrightTimeoutError:
+                # The key may already have reached the page. Observe and replan;
+                # replaying it could activate a second action.
+                key_timed_out = True
         elif operation == "element.hover" and target is not None:
             await target.hover(timeout=timeout_ms)
         elif operation == "page.scroll":
+            if axis not in {"vertical", "horizontal"}:
+                raise ValueError("Browser scroll axis must be vertical or horizontal.")
             if isinstance(value, str) and value.strip().lower() in {"top", "bottom"}:
-                target = value.strip().lower()
+                if locator is not None or focus_text or axis != "vertical":
+                    raise ValueError("Top and bottom apply only to vertical page scrolling.")
+                position = value.strip().lower()
                 await handle.page.evaluate(
                     "position => window.scrollTo(0, position === 'bottom' "
                     "? document.documentElement.scrollHeight : 0)",
-                    target,
+                    position,
                 )
             else:
                 try:
@@ -1442,7 +1588,52 @@ class BrowserRuntime:
                     raise ValueError(
                         "Browser page.scroll value must be an integer, top, or bottom."
                     ) from error
-                await handle.page.mouse.wheel(0, amount)
+                if focus_text and target is not None:
+                    raise ValueError("Choose either a locator or focusText for browser scrolling.")
+                if focus_text:
+                    did_scroll = await handle.page.evaluate(
+                        """({query, axis, amount}) => {
+                          const heading = Array.from(document.querySelectorAll(
+                            'h1,h2,h3,h4,h5,h6,[role="heading"]'
+                          )).find(el => (el.innerText || '').trim().toLowerCase()
+                            .includes(query.trim().toLowerCase()));
+                          const section = heading?.closest('section,[role="region"],article')
+                            || heading?.parentElement;
+                          if (!section) return false;
+                          const container = [section, ...section.querySelectorAll('*')]
+                            .find(el => {
+                              const style = getComputedStyle(el);
+                              const overflow = axis === 'horizontal'
+                                ? style.overflowX : style.overflowY;
+                              return ['auto', 'scroll', 'hidden'].includes(overflow)
+                                && (axis === 'horizontal'
+                                  ? el.scrollWidth > el.clientWidth + 2
+                                  : el.scrollHeight > el.clientHeight + 2);
+                            });
+                          if (!container) return false;
+                          container.scrollBy({
+                            left: axis === 'horizontal' ? amount : 0,
+                            top: axis === 'vertical' ? amount : 0
+                          });
+                          return true;
+                        }""",
+                        {"query": focus_text[:160], "axis": axis, "amount": amount},
+                    )
+                    if not did_scroll:
+                        raise ValueError("No scrollable container was found in the named section.")
+                elif target is not None:
+                    await target.evaluate(
+                        "(el, delta) => el.scrollBy({left: delta.x, top: delta.y})",
+                        {
+                            "x": amount if axis == "horizontal" else 0,
+                            "y": amount if axis == "vertical" else 0,
+                        },
+                    )
+                else:
+                    await handle.page.mouse.wheel(
+                        amount if axis == "horizontal" else 0,
+                        amount if axis == "vertical" else 0,
+                    )
         else:
             raise ValueError("Unsupported browser interaction operation.")
 
@@ -1450,11 +1641,40 @@ class BrowserRuntime:
         handle.dialog_action = None
         handle.dialog_prompt_text = None
         await self._raise_if_blocked(handle)
-        return await self.observe(
+        observation = await self.observe(
             session_id,
             organization_id=organization_id,
             worker_id=worker_id,
         )
+        if operation == "element.press_key" and before_interaction is not None:
+            # Keyboard handlers often update the page after the key event returns.
+            # Give those changes a bounded chance to appear before the planner sees
+            # a no-progress observation; never replay the key to wait for them.
+            deadline = time.monotonic() + min(5.0, timeout_ms / 1000)
+            while time.monotonic() < deadline:
+                await asyncio.sleep(0.2)
+                await self._raise_if_blocked(handle)
+                next_observation = await self.observe(
+                    session_id,
+                    organization_id=organization_id,
+                    worker_id=worker_id,
+                )
+                settled = self._interaction_content_changed(
+                    before_interaction, next_observation
+                ) and not self._interaction_content_changed(observation, next_observation)
+                observation = next_observation
+                if settled:
+                    break
+        if key_timed_out:
+            observation = replace(
+                observation,
+                page_state={
+                    **observation.page_state,
+                    "actionAttempt": {"status": "timed_out", "operation": operation},
+                },
+            )
+            handle.last_observation = observation
+        return observation
 
     async def fill_form(
         self,

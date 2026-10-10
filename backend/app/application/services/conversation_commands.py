@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -36,12 +36,15 @@ from app.application.services.browser_origin_authority import (
     explicit_http_origins,
 )
 from app.application.services.capability_autoresolver import SemanticCapabilityResolver
+from app.application.services.web_research import configured_sources, web_research_destination
 from app.application.services.worker_autonomy import WorkerAutonomyService
 from app.application.services.worker_memory import (
     WorkerMemoryService,
     contains_secret_material,
 )
-from app.domain.ai.providers import AIGateway, AIInvocationContext
+from app.application.services.worker_site_targets import AmbiguousSiteTarget
+from app.bootstrap.settings import settings
+from app.domain.ai.providers import AIGateway, AIInvocationContext, AIProviderError
 from app.domain.conversation.intent import (
     CommandReceipt,
     CommandReference,
@@ -56,6 +59,7 @@ from app.infrastructure.database.models import (
     ConversationThread,
     Integration,
     Job,
+    Organization,
     Policy,
     Result,
     ResultVersion,
@@ -114,6 +118,15 @@ class ConversationCommandCompiler:
         if thread.organization_id != organization_id:
             raise CrossTenantReferenceError("Cross-organization thread denied.")
 
+        if intent.family == "integration.execute" and existing_command is None:
+            await self._session.scalar(select(ConversationMessage).where(
+                ConversationMessage.id == source_message.id).with_for_update())
+            prior = await self._session.scalar(select(ConversationCommand).where(
+                ConversationCommand.source_message_id == source_message.id,
+                ConversationCommand.family == "integration.execute"))
+            if prior is not None:
+                return CompiledCommandOutcome(command=prior, receipt=CommandReceipt.model_validate(prior.receipt))
+
         command = existing_command or ConversationCommand(
             organization_id=organization_id,
             thread_id=thread.id,
@@ -153,6 +166,20 @@ class ConversationCommandCompiler:
                 message=str(exc),
                 command_id=command.id,
             )
+        except AIProviderError as exc:
+            # The outer conversation handler renders the safe failure reply. This
+            # command must also leave accepted state, rather than appearing active.
+            command.status = "unavailable"
+            command.receipt = {"status": "unavailable", "command_id": str(command.id),
+                "message": "Response validation failed." if exc.category == "invalid_provider_response" else "AI preparation could not finish."}
+            command.payload = {**command.payload, "aiFailure": {
+                "category": exc.category, "reason": exc.rejection_reason,
+                "validationRule": exc.validation_rule}}
+            await self._event("conversation.command.completed", command, thread=thread,
+                worker_id=thread.worker_id, payload={"family": command.family,
+                    "status": command.status, "failureCategory": exc.category})
+            await self._session.flush()
+            raise
         except CrossTenantReferenceError:
             command.status = "rejected"
             command.receipt = {
@@ -191,8 +218,11 @@ class ConversationCommandCompiler:
                 ],
             },
         )
-        await self._session.commit()
-        await self._session.refresh(command)
+        if intent.family == "web.research":
+            await self._session.flush()
+        else:
+            await self._session.commit()
+            await self._session.refresh(command)
         return CompiledCommandOutcome(command=command, receipt=receipt)
 
     async def confirm(
@@ -243,20 +273,71 @@ class ConversationCommandCompiler:
     ) -> CommandReceipt:
         family = intent.family
 
-        if family == "worker.create":
-            result = await WorkerAutonomyService(
-                self._session,
-                self._gateway,
-            ).create_from_instruction(
-                organization_id=organization_id,
-                principal=principal,
-                instruction=source_message.content,
-                authoritative_context=context,
-                source_thread_id=thread.id,
-                source_message_id=source_message.id,
+        if family == "integration.execute":
+            if not settings.integration_foundation_enabled:
+                return CommandReceipt(status="unavailable", message="Integration task execution is not enabled in this environment.")
+            require_permission(principal, "jobs.manage")
+            require_permission(principal, "jobs.run")
+            if intent.arguments.get("resumeCommandId"):
+                pending = await self._session.scalar(select(ConversationCommand).where(
+                    ConversationCommand.id == UUID(str(intent.arguments["resumeCommandId"])),
+                    ConversationCommand.organization_id == organization_id, ConversationCommand.thread_id == thread.id,
+                    ConversationCommand.created_by == principal.user_id, ConversationCommand.family == "integration.execute",
+                    ConversationCommand.status.in_(["waiting_integration", "clarification_required", "waiting_ai", "policy_denied"])).with_for_update())
+                if pending is None:
+                    raise CommandResolutionError("That pending integration task is not available in this conversation.")
+                task = dict(pending.payload["integrationTask"])
+                task["instruction"] += "\nHuman clarification: " + source_message.content
+                task.pop("draft", None)
+                pending.payload = {**pending.payload, "integrationTask": task}
+                pending.status = "accepted"
+                from app.application.services.preparation_ai import restart_exhausted_preparation
+                retry_state = await restart_exhausted_preparation(self._session, pending)
+                await TransactionalOutbox(self._session).enqueue(topic="integration.task.prepare",
+                    aggregate_type="conversation_command", aggregate_id=str(pending.id),
+                    payload={"command_id": str(pending.id), "organization_id": str(organization_id)})
+                command.target_type, command.target_id = "command", str(pending.id)
+                return CommandReceipt(status="accepted", message=(
+                    "I saved your request and queued a fresh preparation attempt. Previous task history remains saved."
+                    if retry_state == "fresh_decision_queued" else
+                    "I saved your clarification. Task preparation is queued; I’ll report when it starts or encounters a blocker."), command_id=command.id)
+            worker = await self._resolve_worker_for_job(organization_id, intent.worker, thread)
+            if worker is None:
+                raise CommandResolutionError("Which worker should handle this integration task?")
+            from app.application.services.integration_request_context import (
+                integration_request_context,
             )
+            command.payload = {**command.payload, "integrationTask": {
+                "instruction": source_message.content, "workerId": str(worker.id),
+                "threadId": str(thread.id), "messageId": str(source_message.id),
+                "standing": False, "context": integration_request_context(context)}}
+            await TransactionalOutbox(self._session).enqueue(topic="integration.task.prepare",
+                aggregate_type="conversation_command", aggregate_id=str(command.id),
+                payload={"command_id": str(command.id), "organization_id": str(organization_id)})
+            return CommandReceipt(status="accepted", message="I accepted your integration task. I’ll resolve its account and resource, then send updates here.", command_id=command.id)
+
+        if family == "worker.create":
+            try:
+                result = await WorkerAutonomyService(
+                    self._session,
+                    self._gateway,
+                ).create_from_instruction(
+                    organization_id=organization_id,
+                    principal=principal,
+                    instruction=source_message.content,
+                    authoritative_context=context,
+                    source_thread_id=thread.id,
+                    source_message_id=source_message.id,
+                )
+            except AmbiguousSiteTarget as exc:
+                raise CommandResolutionError(str(exc)) from exc
             command.target_type = "worker"
             command.target_id = str(result.worker.id)
+            if result.wait_reasons:
+                return CommandReceipt(status="waiting_integration",
+                    message=f"I created {result.worker.name}, but its setup needs attention: " + "; ".join(result.wait_reasons),
+                    references=list(result.references), command_id=command.id,
+                    failure_category="missing_integration")
             if result.missing_integrations:
                 providers = ", ".join(result.missing_integrations)
                 return CommandReceipt(
@@ -599,6 +680,10 @@ class ConversationCommandCompiler:
                 )
             if family == "work.execute_now":
                 item = await queue_job(self._session, organization_id, job, principal)
+                item.payload = {**(item.payload or {}), "conversationOrigin": {
+                    "threadId": str(thread.id), "messageId": str(source_message.id),
+                    "commandId": str(command.id),
+                }}
                 return CommandReceipt(
                     status="accepted",
                     message=f"I queued {job.name} to run now.",
@@ -726,6 +811,23 @@ class ConversationCommandCompiler:
             )
             if not provider:
                 raise CommandResolutionError("Which integration do you need?")
+            if settings.integration_foundation_enabled and provider not in {"browser", "web_research"}:
+                from app.application.services.integration_foundation import IntegrationFoundation
+                resources = [row for row in await IntegrationFoundation(self._session).catalog(
+                    organization_id, principal.user_id) if row["provider"] == provider]
+                account = str(intent.arguments.get("account") or "").casefold()
+                resource = str(intent.arguments.get("resource") or "").casefold()
+                resources = [row for row in resources if
+                    (not account or account in {row["account"].casefold(), row["connectionId"].casefold()}) and
+                    (not resource or resource in {row["name"].casefold(), row["externalId"].casefold(), row["id"].casefold(), *(str(alias).casefold() for alias in row.get("aliases", []))})]
+                if not resources:
+                    return CommandReceipt(status="waiting_integration", message=f"Connect or share the intended {provider} account and discover its exact resources.")
+                if len(resources) != 1:
+                    raise CommandResolutionError(f"Which {provider} account and resource should I check?")
+                row = resources[0]
+                return CommandReceipt(status="completed" if row["health"] == "healthy" else "waiting_integration",
+                    message=f"{row['account']} / {row['name']}: {row['health']}. Task authority is checked separately.",
+                    references=[self._ref("integration", row["connectionId"], row["account"])])
             integration = await self._session.scalar(
                 select(Integration).where(
                     Integration.organization_id == organization_id,
@@ -816,34 +918,86 @@ class ConversationCommandCompiler:
                 command_id=command.id,
             )
 
-        if family == "conversation.answer":
-            response = await self._gateway.generate_text(
-                role="conversation",
-                system=(
-                    "Answer the user's question using only AUTHORITATIVE_CONTEXT. "
-                    "Never invent worker/job/run/result state. If the context does not "
-                    "contain the answer, say what is missing. Do not reveal secrets or "
-                    "internal credentials."
-                ),
-                prompt=(
-                    "AUTHORITATIVE_CONTEXT:\n"
-                    + json.dumps(context, separators=(",", ":"), default=str)
-                    + "\n\nQUESTION:\n"
-                    + source_message.content
-                ),
-                context=AIInvocationContext(
-                    organization_id=organization_id,
-                    worker_id=thread.worker_id,
-                    thread_id=thread.id,
-                    correlation_id=f"conversation:{source_message.id}",
-                ),
-                max_output_tokens=900,
+        if family == "web.research":
+            require_permission(principal, "workforce.read")
+            query = str(intent.arguments.get("query") or source_message.content).strip()
+            if not query or query.lower() in {"search", "search the web", "look this up"}:
+                raise CommandResolutionError("What would you like me to search for?")
+            if contains_secret_material(query):
+                raise CommandResolutionError(
+                    "The search appears to contain private credentials. Please remove them."
+                )
+            requested = str(intent.arguments.get("requiredSource") or "").strip().lower()
+            if requested and requested not in source_message.content.lower():
+                requested = ""
+            if requested and requested not in {"brave", "tavily"}:
+                return CommandReceipt(
+                    status="unavailable",
+                    message=(f"I cannot use {requested} as a required search source. "
+                             "Brave and Tavily are the configured structured search options."),
+                    command_id=command.id,
+                )
+            required_site = str(intent.arguments.get("requiredSite") or "").strip()
+            if required_site and required_site.casefold() not in source_message.content.casefold():
+                required_site = ""
+            if (
+                not configured_sources()
+                or not web_research_destination()
+                or not settings.qstash_url
+                or not settings.qstash_token
+            ):
+                return CommandReceipt(
+                    status="waiting_integration",
+                    message="Web research needs a configured search provider, QStash, and research callback.",
+                    command_id=command.id,
+                    failure_category="missing_integration",
+                )
+            # Serialize admission by organization so concurrent conversations cannot
+            # oversubscribe the daily/hourly provider spend limits.
+            await self._session.scalar(
+                select(Organization.id)
+                .where(Organization.id == organization_id)
+                .with_for_update()
             )
+            now = datetime.now(UTC)
+            for window, limit, label in (
+                (timedelta(hours=1), settings.web_research_hourly_limit_per_organization, "hour"),
+                (timedelta(days=1), settings.web_research_daily_limit_per_organization, "day"),
+            ):
+                used = await self._session.scalar(
+                    select(func.count(ConversationCommand.id)).where(
+                        ConversationCommand.organization_id == organization_id,
+                        ConversationCommand.family == "web.research",
+                        ConversationCommand.status.in_(["accepted", "completed"]),
+                        ConversationCommand.created_at >= now - window,
+                    )
+                )
+                if int(used or 0) > max(1, limit):
+                    return CommandReceipt(
+                        status="unavailable",
+                        message=f"This workspace has reached its web research limit for the {label}.",
+                        command_id=command.id,
+                    )
+            command.payload = {
+                "intent": intent.model_dump(mode="json"),
+                "query": query[:500],
+                "requiredSource": requested or None,
+                "requiredSite": required_site[:200] or None,
+                "oneRequestPublicRead": True,
+            }
             return CommandReceipt(
-                status="completed",
-                message=response.text.strip(),
+                status="accepted",
+                message="I’m checking current sources and will reply here with what I can verify.",
                 command_id=command.id,
             )
+
+        if family == "conversation.answer":
+            from app.application.services.conversation_semantics import grounded_reply
+            answer = await grounded_reply(self._gateway, message=source_message.content,
+                context=context, invocation_context=AIInvocationContext(
+                    organization_id=organization_id, worker_id=thread.worker_id,
+                    thread_id=thread.id, correlation_id=f"conversation:{source_message.id}"))
+            return CommandReceipt(status="completed", message=answer, command_id=command.id)
 
         raise CommandResolutionError(
             f"I understood the request as {family}, but that operation is not available."

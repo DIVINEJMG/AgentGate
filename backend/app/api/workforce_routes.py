@@ -330,6 +330,17 @@ async def create_worker(
     )
     if agent is None:
         raise not_found("Agent Identity")
+    if provisioning == "automatic":
+        active_credential_id = await session.scalar(
+            select(AgentCredential.id).where(
+                AgentCredential.agent_id == agent_id,
+                AgentCredential.status == "active",
+            )
+        )
+        if active_credential_id is None:
+            raise HTTPException(
+                409, "Automatic Worker creation requires an active Agent credential."
+            )
     already = await session.scalar(
         select(Worker).where(Worker.agent_identity_id == agent_id)
     )

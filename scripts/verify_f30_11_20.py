@@ -33,7 +33,9 @@ def main() -> None:
         "generic click can bypass form-submit governance",
     )
     require(
-        "Form submission by keyboard must use browser.form.submit." in runtime,
+        "read_only_key(metadata" in runtime
+        and "Use an authorized click or browser.form.submit instead." in runtime
+        and "handle.keyboard_write_blocked = True" in runtime,
         "keyboard submit bypass is not blocked",
     )
     require("allowed_origins" in policy, "allowed-origin policy missing")

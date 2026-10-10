@@ -103,6 +103,8 @@ def action_fingerprint(request: UniversalActionRequest) -> str:
         "input": execution.input,
         "idempotency_key": execution.idempotency_key,
     }
+    if "authorityVersion" in execution.resource.metadata:
+        canonical["authority_version"] = execution.resource.metadata["authorityVersion"]
     payload = json.dumps(
         canonical,
         sort_keys=True,

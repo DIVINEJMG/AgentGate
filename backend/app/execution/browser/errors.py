@@ -27,3 +27,7 @@ class BrowserRuntimeLimitExceeded(RuntimeError):
 
 class BrowserCapacityUnavailable(RuntimeError):
     """Chromium capacity is temporarily unavailable and the action should be retried."""
+
+
+class BrowserOwnershipLost(RuntimeError):
+    """The local context must stop because another browser owner superseded it."""

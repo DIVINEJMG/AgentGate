@@ -197,6 +197,7 @@ class ConversationService:
         context = await ConversationContextAssembler(self._session).assemble(
             organization_id=organization_id,
             thread=thread,
+            user_id=principal.user_id,
         )
         invocation_context = AIInvocationContext(
             organization_id=organization_id,
@@ -249,6 +250,16 @@ class ConversationService:
         self._session.add(assistant)
         await self._session.flush()
         await self._message_event(thread, assistant)
+        if receipt.status == "accepted" and command_refs and command_refs[0]["family"] == "web.research":
+            await TransactionalOutbox(self._session).enqueue(
+                topic="web.research.queued",
+                aggregate_type="conversation_command",
+                aggregate_id=str(command_refs[0]["id"]),
+                payload={
+                    "organization_id": str(organization_id),
+                    "command_id": str(command_refs[0]["id"]),
+                },
+            )
         await self._session.commit()
         await self._session.refresh(human)
         await self._session.refresh(assistant)
@@ -279,6 +290,7 @@ class ConversationService:
         context = await ConversationContextAssembler(self._session).assemble(
             organization_id=organization_id,
             thread=thread,
+            user_id=principal.user_id,
         )
         gateway = ai_gateway_from_settings(session=self._session)
         outcome = await ConversationCommandCompiler(self._session, gateway).confirm(
@@ -371,6 +383,25 @@ class ConversationService:
         return "provider_model_outage"
 
     def _provider_message(self, error: AIProviderError) -> str:
+        if error.category == "invalid_provider_response":
+            return (
+                "The AI responses could not pass response validation. Your message is saved; "
+                "this reply attempt did not execute a task. Please retry."
+                if error.validation_exhausted else
+                "The AI response could not pass response validation. Your message is saved; please retry."
+            )
+        if error.category == "rate_limited" and error.organization_scoped:
+            return "This workspace’s local AI request capacity is busy. Your message is saved; please try again shortly."
+        if error.category == "quota_exhausted":
+            if error.organization_scoped:
+                return "This workspace’s local AI budget cannot admit another request right now. Your message is saved; no model was called for this attempt."
+            return "The AI usage allowance is exhausted. Your message is saved; no new work was executed."
+        if error.category == "content_rejected":
+            return "The AI service declined this request. Your message is saved; no new work was executed."
+        if error.category == "timeout":
+            if error.retryable:
+                return "The available AI services did not respond within their attempt limits. Your message is saved; no new work was executed."
+            return "The response deadline expired. Your message is saved; no new work was executed. Remaining models may be untried."
         if error.category in {
             "configuration_missing",
             "authentication_failed",
@@ -384,11 +415,6 @@ class ConversationService:
             return (
                 "Aduoryn's AI command interpreter is temporarily unavailable. "
                 "No worker or external state was changed."
-            )
-        if error.category == "invalid_provider_response":
-            return (
-                "Aduoryn received an AI response that did not satisfy the required "
-                "structured contract. No worker or external state was changed."
             )
         return "I could not safely interpret that request. No worker or external state was changed."
 
