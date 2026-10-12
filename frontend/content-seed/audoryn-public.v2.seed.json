@@ -1,0 +1,2592 @@
+{
+  "schemaVersion": 2,
+  "contract": "audoryn.public.v2",
+  "status": "draft",
+  "publicationAllowed": false,
+  "pages": [
+    {
+      "key": "home",
+      "slug": "/",
+      "locale": "en",
+      "title": "Home",
+      "contentType": "page",
+      "document": {
+        "contract": "audoryn.public.v2",
+        "page": "home",
+        "sections": {
+          "hero": {
+            "kicker": "AI workforce control plane",
+            "headline": "Put AI workers to work.",
+            "body": "Audoryn gives your organization one place to define AI workers, assign them real jobs, connect your tools and decide exactly what they may do.",
+            "primaryAction": {
+              "label": "Get started free",
+              "href": "/signup"
+            },
+            "secondaryAction": {
+              "label": "See how control works",
+              "href": "/security"
+            },
+            "typing": {
+              "template": "Every action in {place} is checked before it runs.",
+              "places": [
+                "GitHub",
+                "Slack",
+                "Gmail",
+                "Google Drive",
+                "Google Calendar",
+                "the browser"
+              ]
+            }
+          },
+          "activity": {
+            "kicker": "The record, as it happens",
+            "headline": "Every action leaves a trace.",
+            "body": "Requests, decisions and results arrive in one stream your team can inspect.",
+            "disclosure": "Illustrative event stream · example data",
+            "records": [
+              {
+                "id": "rec-2041",
+                "reference": "REC-2041",
+                "actor": "Research analyst",
+                "action": "Read open issues in product-repo",
+                "policy": "Read access to approved repositories",
+                "decision": "allow",
+                "outcome": "Completed",
+                "time": "09:38:12"
+              },
+              {
+                "id": "rec-2042",
+                "reference": "REC-2042",
+                "actor": "Support assistant",
+                "action": "Summarize 18 new messages",
+                "policy": "Mailbox read for triage",
+                "decision": "allow",
+                "outcome": "Brief ready for review",
+                "time": "09:39:47"
+              },
+              {
+                "id": "rec-2043",
+                "reference": "REC-2043",
+                "actor": "Operations coordinator",
+                "action": "Post an update to #leadership",
+                "policy": "Leadership channels need a reviewer",
+                "decision": "review",
+                "outcome": "Waiting for Daniel K.",
+                "time": "09:40:05"
+              },
+              {
+                "id": "rec-2044",
+                "reference": "REC-2044",
+                "actor": "Developer assistant",
+                "action": "Delete branch release/2.3",
+                "policy": "Destructive repository actions are not granted",
+                "decision": "deny",
+                "outcome": "Blocked · provider not called",
+                "time": "09:40:31"
+              },
+              {
+                "id": "rec-2045",
+                "reference": "REC-2045",
+                "actor": "Sales assistant",
+                "action": "Read tomorrow's meetings",
+                "policy": "Calendar read for meeting briefs",
+                "decision": "allow",
+                "outcome": "Completed",
+                "time": "09:41:02"
+              },
+              {
+                "id": "rec-2046",
+                "reference": "REC-2046",
+                "actor": "Operations coordinator",
+                "action": "Post an update to #leadership",
+                "policy": "Approved by Daniel K.",
+                "decision": "allow",
+                "outcome": "Posted",
+                "time": "09:41:36"
+              }
+            ],
+            "metrics": [
+              {
+                "id": "decisions",
+                "label": "Decisions today",
+                "value": "1,284"
+              },
+              {
+                "id": "allowed",
+                "label": "Allowed automatically",
+                "value": "1,121"
+              },
+              {
+                "id": "held",
+                "label": "Held for a person",
+                "value": "142"
+              },
+              {
+                "id": "denied",
+                "label": "Denied at the gateway",
+                "value": "21"
+              }
+            ]
+          },
+          "decision": {
+            "kicker": "One action, three possible answers",
+            "headline": "AI can propose. Audoryn decides what happens next.",
+            "body": "Before an AI worker touches an external system, its request meets checks the model cannot rewrite.",
+            "demo": {
+              "disclosure": "Illustrative example · not live data",
+              "worker": "Operations coordinator",
+              "action": "Post a stakeholder update",
+              "target": "Slack · #leadership",
+              "checks": [
+                {
+                  "id": "identity",
+                  "label": "Agent identity confirmed",
+                  "detail": "A separate identity, inside the right organization"
+                },
+                {
+                  "id": "capability",
+                  "label": "Capability declared",
+                  "detail": "Post a message to an approved channel"
+                },
+                {
+                  "id": "policy",
+                  "label": "Policy evaluated",
+                  "detail": "Messages to leadership need a reviewer"
+                }
+              ],
+              "outcomes": {
+                "allow": {
+                  "label": "Allow",
+                  "title": "The action proceeds.",
+                  "body": "Identity, capability, risk and policy all pass, so the request reaches the provider.",
+                  "note": "Only an allowed request can call the provider."
+                },
+                "review": {
+                  "label": "Hold for review",
+                  "title": "The action waits for a person.",
+                  "body": "The run pauses. A named reviewer sees the request and its context, then approves or declines.",
+                  "note": "Approval covers this exact action only."
+                },
+                "deny": {
+                  "label": "Deny",
+                  "title": "The action stops here.",
+                  "body": "The request is blocked at the gateway and the provider is never called.",
+                  "note": "Missing or uncertain authority fails closed."
+                }
+              },
+              "record": {
+                "reference": "REC-2048",
+                "summary": "Request, checks, decision, reviewer and result kept together in one record."
+              }
+            }
+          },
+          "product": {
+            "kicker": "The product",
+            "headline": "An operating system for your AI workforce.",
+            "body": "Create workers, give them real jobs, connect your tools and supervise the moments where human judgment matters.",
+            "items": [
+              {
+                "id": "create-workers",
+                "title": "Create workers",
+                "body": "Give each AI worker a role, responsibilities, working hours and a named human supervisor.",
+                "icon": "workers"
+              },
+              {
+                "id": "assign-work",
+                "title": "Assign work",
+                "body": "Turn business objectives into durable jobs that can be scheduled, queued and inspected.",
+                "icon": "jobs"
+              },
+              {
+                "id": "stay-in-control",
+                "title": "Stay in control",
+                "body": "Capabilities, policy, approvals and incident controls stay separate from AI reasoning.",
+                "icon": "governance"
+              }
+            ]
+          },
+          "controlPath": {
+            "kicker": "How controlled work moves",
+            "headline": "Autonomy with a visible boundary.",
+            "body": "From the first instruction to the final action, a worker can keep moving without ever becoming its own authority.",
+            "steps": [
+              {
+                "id": "defined",
+                "label": "Work",
+                "title": "Each worker gets a clear job.",
+                "body": "The objective, expected result and limits are defined before the work enters the queue."
+              },
+              {
+                "id": "policy",
+                "label": "Policy",
+                "title": "Authority is explicit.",
+                "body": "Connected tools expose what is possible. Capabilities, risk and policy decide what the worker may actually do."
+              },
+              {
+                "id": "approval",
+                "label": "Approval",
+                "title": "Judgment returns to a person.",
+                "body": "A sensitive action waits for a reviewer, and is checked against current authority again before it continues."
+              },
+              {
+                "id": "recorded",
+                "label": "Record",
+                "title": "The result and the reasons stay together.",
+                "body": "The request, decision and outcome remain connected in a record your team can inspect."
+              }
+            ]
+          },
+          "policy": {
+            "kicker": "Policy as code",
+            "headline": "The model proposes.",
+            "headlineDetail": "The rule decides.",
+            "body": "Authority lives in explicit, versioned rules outside the model. The same request always meets the same rule, and every decision is written to the record.",
+            "disclosure": "Illustrative example · simplified",
+            "tabs": [
+              {
+                "id": "policy",
+                "label": "Policy",
+                "language": "yaml",
+                "lines": [
+                  "policy: leadership-channels",
+                  "applies_to:",
+                  "  worker: operations-coordinator",
+                  "  capability: slack.post_message",
+                  "when:",
+                  "  channel: \"#leadership\"",
+                  "decide: require_approval",
+                  "approver: role:operations-lead",
+                  "record: always"
+                ]
+              },
+              {
+                "id": "capability",
+                "label": "Capability",
+                "language": "yaml",
+                "lines": [
+                  "capability: slack.post_message",
+                  "provider: slack",
+                  "scope: channels:write",
+                  "granted_to:",
+                  "  - operations-coordinator",
+                  "risk: medium"
+                ]
+              },
+              {
+                "id": "record",
+                "label": "Record",
+                "language": "json",
+                "lines": [
+                  "{",
+                  "  \"record\": \"REC-2048\",",
+                  "  \"worker\": \"operations-coordinator\",",
+                  "  \"action\": \"slack.post_message\",",
+                  "  \"policy\": \"leadership-channels\",",
+                  "  \"decision\": \"held_for_review\",",
+                  "  \"reviewer\": \"Daniel K.\",",
+                  "  \"outcome\": \"approved, posted\"",
+                  "}"
+                ]
+              }
+            ],
+            "proposal": "Post the weekly stakeholder update to #leadership.",
+            "decision": {
+              "decision": "review",
+              "text": "Held for an operations lead. The approval covers this exact message and is checked again before it is sent."
+            }
+          },
+          "operatingModel": {
+            "kicker": "The operating model",
+            "headline": "One place to understand what your AI workforce is doing.",
+            "body": "See workers, queued jobs, governance decisions and the moments that need human attention.",
+            "layers": [
+              {
+                "id": "workers",
+                "title": "Workers",
+                "subtitle": "Roles, identity, schedules",
+                "headline": "Every worker has a defined place in the workforce.",
+                "body": "A worker starts with a role, a responsibility, a schedule and a human supervisor. Its identity stays separate from the people who oversee it.",
+                "path": [
+                  "Role",
+                  "Identity",
+                  "Supervisor"
+                ],
+                "signal": "Defined before work begins",
+                "icon": "workers"
+              },
+              {
+                "id": "jobs",
+                "title": "Jobs",
+                "subtitle": "Objectives, queue, runtime",
+                "headline": "Work moves with an objective and a visible state.",
+                "body": "Jobs carry the expected result, requirements and completion criteria into a durable queue. Teams can see what is waiting, running and complete.",
+                "path": [
+                  "Objective",
+                  "Queue",
+                  "Result"
+                ],
+                "signal": "Work stays inspectable",
+                "icon": "jobs"
+              },
+              {
+                "id": "governance",
+                "title": "Governance",
+                "subtitle": "Policy, risk, approvals",
+                "headline": "Authority is checked at the action boundary.",
+                "body": "A connected tool is never permission on its own. Capabilities, risk and policy decide whether an action proceeds or waits for approval.",
+                "path": [
+                  "Request",
+                  "Policy",
+                  "Decision"
+                ],
+                "signal": "Authority is explicit",
+                "icon": "governance"
+              },
+              {
+                "id": "supervision",
+                "title": "Supervision",
+                "subtitle": "Escalations, incidents, audit",
+                "headline": "People see the moments that need them.",
+                "body": "Exceptional work is routed to a named person. The decision and its outcome stay together in an audit record.",
+                "path": [
+                  "Signal",
+                  "Person",
+                  "Record"
+                ],
+                "signal": "Human attention stays visible",
+                "icon": "supervision"
+              }
+            ]
+          },
+          "oversight": {
+            "kicker": "Human oversight",
+            "headline": "Autonomous where appropriate.",
+            "headlineDetail": "Human where it matters.",
+            "body": "Workers keep moving through routine work. Decisions that need judgment return to a person with the context to act.",
+            "figureLabel": "Where people step in",
+            "points": [
+              "Approval",
+              "Exception",
+              "Review"
+            ],
+            "image": {
+              "asset": "de5cb793-7e09-5703-8021-c31ecd15ab0c",
+              "alt": "Two colleagues reviewing a decision together at a table"
+            }
+          },
+          "controls": {
+            "kicker": "The boundaries in practice",
+            "headline": "Control is part of the architecture.",
+            "body": "The boundary around an action stays visible from identity through to the final record.",
+            "items": [
+              {
+                "id": "capabilities",
+                "title": "Capabilities",
+                "body": "Define the actions an AI worker may attempt.",
+                "icon": "capability"
+              },
+              {
+                "id": "policy",
+                "title": "Policy",
+                "body": "Make authorization deterministic instead of leaving it to model judgment.",
+                "icon": "policy"
+              },
+              {
+                "id": "approvals",
+                "title": "Approvals",
+                "body": "Require a person before sensitive work can continue.",
+                "icon": "approval"
+              },
+              {
+                "id": "supervision",
+                "title": "Supervision",
+                "body": "Route exceptional autonomous work to a named human.",
+                "icon": "supervision"
+              },
+              {
+                "id": "audit",
+                "title": "Audit",
+                "body": "Keep what happened, who acted and why a decision was made.",
+                "icon": "audit"
+              }
+            ],
+            "link": {
+              "label": "Read about security",
+              "href": "/security"
+            }
+          },
+          "connections": {
+            "kicker": "Connections",
+            "headline": "Works where your company already works.",
+            "body": "Each connection exposes a bounded set of operations. Every one still passes capability, policy and approval before it runs.",
+            "items": [
+              {
+                "id": "github",
+                "provider": "github",
+                "name": "GitHub",
+                "use": "Repository and issue workflows"
+              },
+              {
+                "id": "slack",
+                "provider": "slack",
+                "name": "Slack",
+                "use": "Team conversations"
+              },
+              {
+                "id": "gmail",
+                "provider": "gmail",
+                "name": "Gmail",
+                "use": "Mailbox context and recent messages"
+              },
+              {
+                "id": "google-drive",
+                "provider": "google-drive",
+                "name": "Google Drive",
+                "use": "Documents and files"
+              },
+              {
+                "id": "google-calendar",
+                "provider": "google-calendar",
+                "name": "Google Calendar",
+                "use": "Calendar context"
+              },
+              {
+                "id": "browser",
+                "provider": "browser",
+                "name": "Governed browser",
+                "use": "Approved site interactions"
+              }
+            ],
+            "boundary": {
+              "title": "Authority is checked before execution.",
+              "stages": [
+                "Capability",
+                "Policy",
+                "Approval"
+              ]
+            },
+            "note": "A connection is not a permission. It only makes an action possible; Audoryn decides whether it may happen."
+          },
+          "solutions": {
+            "kicker": "Solutions",
+            "headline": "Built for different kinds of work.",
+            "body": "Start with a defined responsibility. Give the worker room to move, with a person and a policy around the actions that matter.",
+            "items": [
+              {
+                "id": "operations",
+                "kicker": "Operations",
+                "title": "Keep recurring work moving. Keep exceptions visible.",
+                "body": "Scheduled work, connected tools and a clear handoff when conditions change.",
+                "link": {
+                  "label": "Explore operations",
+                  "href": "/solutions#operations"
+                },
+                "icon": "operations",
+                "image": {
+                  "asset": "262bf108-0e0b-58ab-835f-9bd73d8c353c",
+                  "alt": "A logistics operations floor with a supervisor overseeing the work"
+                }
+              },
+              {
+                "id": "research",
+                "kicker": "Research",
+                "title": "Turn open questions into work you can inspect.",
+                "body": "Collect and structure findings while people stay responsible for the result.",
+                "link": {
+                  "label": "Explore research",
+                  "href": "/solutions#research"
+                },
+                "icon": "research",
+                "image": {
+                  "asset": "a201f4ad-5d40-51eb-8948-a5c1b09319d1",
+                  "alt": "Research materials being reviewed at a worktable"
+                }
+              },
+              {
+                "id": "customer-support",
+                "kicker": "Customer support",
+                "title": "See what needs attention first.",
+                "body": "A prioritized view of the inbox, prepared for the team to act on.",
+                "link": {
+                  "label": "Explore customer support",
+                  "href": "/solutions#customer-support"
+                },
+                "icon": "support"
+              },
+              {
+                "id": "sales",
+                "kicker": "Sales",
+                "title": "Arrive prepared for the next meeting.",
+                "body": "Meeting context gathered ahead of time, with follow-up kept under supervision.",
+                "link": {
+                  "label": "Explore sales",
+                  "href": "/solutions#sales"
+                },
+                "icon": "sales"
+              },
+              {
+                "id": "marketing",
+                "kicker": "Marketing",
+                "title": "Make campaign context easier to use.",
+                "body": "Recent material summarized so the team knows what matters.",
+                "link": {
+                  "label": "Explore marketing",
+                  "href": "/solutions#marketing"
+                },
+                "icon": "marketing"
+              },
+              {
+                "id": "engineering",
+                "kicker": "Engineering",
+                "title": "Stay close to repository work.",
+                "body": "Issues and pull requests turned into a concise status brief.",
+                "link": {
+                  "label": "Explore engineering",
+                  "href": "/solutions#engineering"
+                },
+                "icon": "engineering"
+              }
+            ]
+          },
+          "closing": {
+            "kicker": "Audoryn",
+            "headline": "Give AI real work.",
+            "headlineDetail": "Keep authority explicit.",
+            "body": "Start with a small supervised workforce and grow from there.",
+            "primaryAction": {
+              "label": "Get started free",
+              "href": "/signup"
+            },
+            "secondaryAction": {
+              "label": "Explore the product",
+              "href": "/product"
+            }
+          }
+        }
+      },
+      "seo": {
+        "metaTitle": "Audoryn · AI workforce, under control",
+        "metaDescription": "Audoryn is an SOT product for creating, operating and governing an AI workforce with explicit human control."
+      }
+    },
+    {
+      "key": "product",
+      "slug": "/product",
+      "locale": "en",
+      "title": "Product",
+      "contentType": "page",
+      "document": {
+        "contract": "audoryn.public.v2",
+        "page": "product",
+        "sections": {
+          "hero": {
+            "kicker": "Product",
+            "headline": "Give work to AI.",
+            "headlineDetail": "Keep people in control.",
+            "body": "Build a supervised AI workforce for the work your organization already does. Define the role, assign the job, connect the tools and see every important decision.",
+            "primaryAction": {
+              "label": "Get started free",
+              "href": "/signup"
+            },
+            "secondaryAction": {
+              "label": "Explore the product",
+              "href": "/product#workspace"
+            }
+          },
+          "workspace": {
+            "kicker": "The workspace",
+            "headline": "People and AI, in one clear structure.",
+            "body": "Workers, their jobs and the decisions waiting for a person, side by side.",
+            "disclosure": "Illustrative workspace · example data",
+            "organization": "Northstar Operations",
+            "workers": [
+              {
+                "id": "research-analyst",
+                "name": "Research analyst",
+                "team": "Insights",
+                "supervisor": "Ada M.",
+                "status": "Active"
+              },
+              {
+                "id": "operations-coordinator",
+                "name": "Operations coordinator",
+                "team": "Operations",
+                "supervisor": "Daniel K.",
+                "status": "Active"
+              }
+            ],
+            "jobs": [
+              {
+                "id": "weekly-research-brief",
+                "title": "Compile weekly research brief",
+                "worker": "Research analyst",
+                "trigger": "Scheduled",
+                "status": "completed"
+              },
+              {
+                "id": "release-activity",
+                "title": "Review release activity",
+                "worker": "Operations coordinator",
+                "trigger": "Triggered",
+                "status": "running"
+              },
+              {
+                "id": "stakeholder-update",
+                "title": "Prepare stakeholder update",
+                "worker": "Operations coordinator",
+                "trigger": "Scheduled",
+                "status": "held"
+              }
+            ],
+            "approval": {
+              "title": "Post stakeholder update",
+              "body": "The operations coordinator asked to send a Slack message. The run is paused while a reviewer checks the request and its context.",
+              "requestedBy": "Operations coordinator",
+              "reviewer": "Daniel K."
+            }
+          },
+          "workforce": {
+            "kicker": "The workforce",
+            "headline": "Make the work clear before it begins.",
+            "body": "A useful AI worker needs more than a prompt. Give it a role, working hours and a named supervisor, and give each job an objective, requirements and a clear definition of done.",
+            "figureLabel": "Worker profile",
+            "disclosure": "Illustrative worker · example data",
+            "profile": {
+              "role": "Research analyst",
+              "team": "Insights",
+              "supervisor": "Ada M.",
+              "job": "Gather relevant sources, summarize findings and deliver a structured brief.",
+              "schedule": "Mon · 09:00",
+              "checkpoint": "Review before delivery",
+              "status": "Active",
+              "path": [
+                "Role",
+                "Job",
+                "Queue"
+              ]
+            },
+            "points": [
+              "Named roles and supervisors",
+              "Defined working hours",
+              "Scheduled and triggered jobs",
+              "A separate security identity for every worker"
+            ]
+          },
+          "runtime": {
+            "kicker": "The runtime",
+            "headline": "From assignment to a traceable result.",
+            "body": "Jobs enter a durable queue. Runs have steps, checkpoints, retries and a recorded outcome, so work can be followed instead of guessed at.",
+            "disclosure": "Illustrative run · example data",
+            "runTitle": "Weekly research brief",
+            "steps": [
+              {
+                "id": "read-context",
+                "title": "Read assigned context",
+                "detail": "Sources and job requirements loaded",
+                "state": "done"
+              },
+              {
+                "id": "plan",
+                "title": "Plan the work",
+                "detail": "Bounded AI planning",
+                "state": "done"
+              },
+              {
+                "id": "collect",
+                "title": "Collect observations",
+                "detail": "Connected tools, governed access",
+                "state": "active"
+              },
+              {
+                "id": "assess",
+                "title": "Assess completion",
+                "detail": "Compare the result with the job criteria",
+                "state": "waiting"
+              }
+            ],
+            "points": [
+              "Objective and completion criteria",
+              "Checkpoints and retries",
+              "Run history retained"
+            ]
+          },
+          "intelligence": {
+            "kicker": "AI models",
+            "headline": "Intelligence where it helps.",
+            "headlineDetail": "Authority where it belongs.",
+            "body": "Audoryn routes each kind of AI work to models suited to it. A model can reason about the task; Audoryn still controls what may happen outside it.",
+            "items": [
+              {
+                "id": "planning",
+                "title": "Planning and coordination",
+                "body": "Models help plan managed runs, prepare jobs and resolve which tools a task needs, within a fixed time and usage budget.",
+                "icon": "model"
+              },
+              {
+                "id": "conversation",
+                "title": "Working with your workers",
+                "body": "Talk to a worker about its job in plain language; the answer comes back in the same conversation.",
+                "icon": "workers"
+              },
+              {
+                "id": "vision",
+                "title": "Visual understanding",
+                "body": "Uploaded images can be analysed and the relevant findings returned for the task.",
+                "icon": "research"
+              },
+              {
+                "id": "no-authority",
+                "title": "Analysis, not authority",
+                "body": "Models never receive provider credentials or direct access to connected tools. Every action still passes capability, policy and approval.",
+                "icon": "lock"
+              }
+            ]
+          },
+          "supervision": {
+            "kicker": "Supervision",
+            "headline": "The moments that matter come back to a person.",
+            "body": "Policy can allow, deny or hold an action for review. A held run waits while a person sees the context, decides, and leaves a record.",
+            "figureLabel": "The decision path",
+            "points": [
+              "Request",
+              "Policy",
+              "Human review",
+              "Recorded outcome"
+            ],
+            "image": {
+              "asset": "de5cb793-7e09-5703-8021-c31ecd15ab0c",
+              "alt": "Colleagues reviewing a decision together"
+            },
+            "link": {
+              "label": "Explore the security model",
+              "href": "/security"
+            }
+          },
+          "integrations": {
+            "kicker": "Integrations",
+            "headline": "Work across the tools your team already uses.",
+            "body": "Connect workplace systems to Audoryn's governed action gateway. Each provider exposes defined capabilities.",
+            "items": [
+              {
+                "id": "github",
+                "provider": "github",
+                "name": "GitHub",
+                "use": "Repository and issue workflows"
+              },
+              {
+                "id": "gmail",
+                "provider": "gmail",
+                "name": "Gmail",
+                "use": "Mailbox context and recent messages"
+              },
+              {
+                "id": "google-drive",
+                "provider": "google-drive",
+                "name": "Google Drive",
+                "use": "Documents and files"
+              },
+              {
+                "id": "slack",
+                "provider": "slack",
+                "name": "Slack",
+                "use": "Team conversations"
+              },
+              {
+                "id": "google-calendar",
+                "provider": "google-calendar",
+                "name": "Google Calendar",
+                "use": "Calendar context"
+              },
+              {
+                "id": "browser",
+                "provider": "browser",
+                "name": "Governed browser",
+                "use": "Approved site interactions"
+              },
+              {
+                "id": "web-research",
+                "provider": "web-research",
+                "name": "Web research",
+                "use": "Read-only research from configured sources"
+              }
+            ],
+            "boundary": {
+              "title": "Authority is checked before execution.",
+              "stages": [
+                "Capability",
+                "Policy",
+                "Approval"
+              ]
+            },
+            "note": "A connection alone never gives a worker permission to act. Available operations depend on provider setup, declared capabilities and policy."
+          },
+          "closing": {
+            "kicker": "Start with a defined worker",
+            "headline": "Bring AI into the workflow.",
+            "headlineDetail": "Keep the organization in charge.",
+            "body": "Start small, make authority explicit and grow the workforce as the work proves useful.",
+            "primaryAction": {
+              "label": "Get started free",
+              "href": "/signup"
+            },
+            "secondaryAction": {
+              "label": "See the control model",
+              "href": "/security"
+            }
+          }
+        }
+      },
+      "seo": {
+        "metaTitle": "Product · Audoryn",
+        "metaDescription": "Audoryn is an SOT product for creating, operating and governing an AI workforce with explicit human control."
+      }
+    },
+    {
+      "key": "solutions",
+      "slug": "/solutions",
+      "locale": "en",
+      "title": "Solutions",
+      "contentType": "page",
+      "document": {
+        "contract": "audoryn.public.v2",
+        "page": "solutions",
+        "sections": {
+          "hero": {
+            "kicker": "Solutions",
+            "headline": "Work that already needs doing.",
+            "body": "Start with a defined responsibility. Give an AI worker the right context, a clear job and a person to answer to.",
+            "primaryAction": {
+              "label": "Choose where to start",
+              "href": "/solutions#solutions"
+            },
+            "secondaryAction": {
+              "label": "Get started free",
+              "href": "/signup"
+            }
+          },
+          "solutions": {
+            "kicker": "Where to start",
+            "headline": "Choose a responsibility.",
+            "headlineDetail": "Start with a clear job.",
+            "body": "Six practical starting points, based on Audoryn's workforce templates.",
+            "items": [
+              {
+                "id": "operations",
+                "area": "Operations",
+                "title": "Keep the daily picture current.",
+                "body": "Review connected work context and prepare a concise internal update, with exceptions surfaced for a person.",
+                "worker": "Operations assistant",
+                "job": "Daily operations brief",
+                "tools": [
+                  "Google Drive",
+                  "Google Calendar"
+                ],
+                "deliverable": "A daily brief ready for review",
+                "icon": "operations",
+                "image": {
+                  "asset": "262bf108-0e0b-58ab-835f-9bd73d8c353c",
+                  "alt": "A logistics operations floor with a supervisor overseeing the work"
+                }
+              },
+              {
+                "id": "research",
+                "area": "Research",
+                "title": "Turn source material into a clear brief.",
+                "body": "Read issues and pull requests, separate observed facts from inference and assemble a technical change brief.",
+                "worker": "Research assistant",
+                "job": "Repository research brief",
+                "tools": [
+                  "GitHub"
+                ],
+                "deliverable": "A structured research brief",
+                "icon": "research",
+                "image": {
+                  "asset": "a201f4ad-5d40-51eb-8948-a5c1b09319d1",
+                  "alt": "Research materials being reviewed at a worktable"
+                }
+              },
+              {
+                "id": "customer-support",
+                "area": "Customer support",
+                "title": "See what needs attention first.",
+                "body": "Review recent messages and prepare a prioritized triage brief for the support team.",
+                "worker": "Customer support assistant",
+                "job": "Inbox triage",
+                "tools": [
+                  "Gmail"
+                ],
+                "deliverable": "A prioritized triage brief",
+                "icon": "support"
+              },
+              {
+                "id": "sales",
+                "area": "Sales",
+                "title": "Arrive prepared for the next meeting.",
+                "body": "Review upcoming meetings and relevant prospect context to prepare supervised follow-up.",
+                "worker": "Sales assistant",
+                "job": "Upcoming meeting brief",
+                "tools": [
+                  "Google Calendar",
+                  "Gmail"
+                ],
+                "deliverable": "An upcoming meeting brief",
+                "icon": "sales"
+              },
+              {
+                "id": "marketing",
+                "area": "Marketing",
+                "title": "Make campaign context easier to use.",
+                "body": "Review recent campaign material and summarize what the team needs to know.",
+                "worker": "Marketing coordinator",
+                "job": "Campaign asset review",
+                "tools": [
+                  "Google Drive"
+                ],
+                "deliverable": "A campaign material summary",
+                "icon": "marketing"
+              },
+              {
+                "id": "engineering",
+                "area": "Engineering",
+                "title": "Stay close to repository work.",
+                "body": "Review repository issues and pull requests to prepare a concise engineering status brief.",
+                "worker": "Developer assistant",
+                "job": "Engineering change review",
+                "tools": [
+                  "GitHub"
+                ],
+                "deliverable": "An engineering status brief",
+                "icon": "engineering"
+              }
+            ],
+            "note": "Templates create draft roles and jobs. Connections, capabilities, policy and activation remain explicit setup steps."
+          },
+          "closing": {
+            "kicker": "Your first worker",
+            "headline": "Start with one useful responsibility.",
+            "body": "See how the workforce runs, or set up a supervised worker in Audoryn.",
+            "primaryAction": {
+              "label": "Get started free",
+              "href": "/signup"
+            },
+            "secondaryAction": {
+              "label": "See the product",
+              "href": "/product"
+            }
+          }
+        }
+      },
+      "seo": {
+        "metaTitle": "Solutions · Audoryn",
+        "metaDescription": "Audoryn is an SOT product for creating, operating and governing an AI workforce with explicit human control."
+      }
+    },
+    {
+      "key": "security",
+      "slug": "/security",
+      "locale": "en",
+      "title": "Security",
+      "contentType": "page",
+      "document": {
+        "contract": "audoryn.public.v2",
+        "page": "security",
+        "sections": {
+          "hero": {
+            "kicker": "Security",
+            "headline": "Every action has a boundary.",
+            "body": "AI can plan the work. Audoryn decides whether an external action is allowed, must wait for a person, or must stop.",
+            "primaryAction": {
+              "label": "Follow the control path",
+              "href": "/security#control-path"
+            },
+            "secondaryAction": {
+              "label": "Get started free",
+              "href": "/signup"
+            }
+          },
+          "decision": {
+            "kicker": "Deterministic authority, human oversight",
+            "headline": "Three possible answers. None of them decided by the model.",
+            "body": "Choose a decision to see what happens to the same request.",
+            "demo": {
+              "disclosure": "Illustrative example · not live data",
+              "worker": "Developer assistant",
+              "action": "Create an issue",
+              "target": "GitHub · product repository",
+              "checks": [
+                {
+                  "id": "identity",
+                  "label": "Agent identity",
+                  "detail": "The worker and its organization are confirmed"
+                },
+                {
+                  "id": "capability",
+                  "label": "Declared capability",
+                  "detail": "The operation matches a granted scope"
+                },
+                {
+                  "id": "policy",
+                  "label": "Risk and current policy",
+                  "detail": "Current conditions and the deterministic rule"
+                }
+              ],
+              "outcomes": {
+                "allow": {
+                  "label": "Allow",
+                  "title": "The action may proceed.",
+                  "body": "A permitted request reaches the provider only after the current identity, capability, risk and policy checks pass.",
+                  "note": "Only an allowed request can call the provider."
+                },
+                "review": {
+                  "label": "Require approval",
+                  "title": "The action waits for a person.",
+                  "body": "The run pauses and an authorized reviewer receives the request. Before an approved action resumes, Audoryn checks its authority again.",
+                  "note": "Approval is bound to the exact requested action."
+                },
+                "deny": {
+                  "label": "Deny",
+                  "title": "The action stops here.",
+                  "body": "A denied request is blocked at the gateway. The connected provider is never called for that action.",
+                  "note": "Missing or uncertain authority fails closed."
+                }
+              },
+              "record": {
+                "reference": "REC-3117",
+                "summary": "The request, each check, the decision and the result share one correlation reference."
+              }
+            }
+          },
+          "controlPath": {
+            "kicker": "The control path",
+            "headline": "A connected tool does not grant permission to use it.",
+            "body": "Each request passes explicit checks before it reaches an external system. AI instructions and memory give context; they never become authority.",
+            "steps": [
+              {
+                "id": "identity",
+                "label": "Who",
+                "title": "Identity",
+                "body": "Confirm the worker and its organization."
+              },
+              {
+                "id": "capability",
+                "label": "What",
+                "title": "Capability",
+                "body": "Match the requested operation to a declared scope."
+              },
+              {
+                "id": "policy",
+                "label": "Now",
+                "title": "Risk and policy",
+                "body": "Evaluate current conditions against the deterministic rule."
+              },
+              {
+                "id": "outcome",
+                "label": "Outcome",
+                "title": "Act, wait or stop",
+                "body": "Allow, require human approval, or deny."
+              }
+            ]
+          },
+          "safeguards": {
+            "kicker": "Operational safeguards",
+            "headline": "Control continues after a decision.",
+            "body": "Authority can change while work is underway. Audoryn keeps the relevant checks and the human response in the execution path.",
+            "items": [
+              {
+                "id": "identities",
+                "title": "Distinct identities",
+                "body": "A person's session cannot act as an AI worker. Every managed worker has its own agent identity, and organization boundaries are checked.",
+                "icon": "identity"
+              },
+              {
+                "id": "credentials",
+                "title": "Protected credentials",
+                "body": "Connected provider credentials stay inside the backend credential boundary. Models never receive provider tokens or direct provider tools.",
+                "icon": "credentials"
+              },
+              {
+                "id": "intervention",
+                "title": "Human intervention",
+                "body": "Sensitive actions can wait for review. An organization, worker or integration can be suspended without deleting its configuration.",
+                "icon": "pause"
+              },
+              {
+                "id": "record",
+                "title": "A record to inspect",
+                "body": "Requests, decisions, approvals and provider outcomes carry correlation context, so operators can follow what happened.",
+                "icon": "record"
+              }
+            ]
+          },
+          "record": {
+            "kicker": "The record",
+            "headline": "What happened, who acted and why.",
+            "body": "Every decision leaves an entry that connects the request, the rule that applied and the result.",
+            "disclosure": "Illustrative records · example data",
+            "records": [
+              {
+                "id": "rec-3115",
+                "reference": "REC-3115",
+                "actor": "Research analyst",
+                "action": "Read issues in the product repository",
+                "policy": "Read access to approved repositories",
+                "decision": "allow",
+                "outcome": "Completed · 14 issues read",
+                "time": "09:12"
+              },
+              {
+                "id": "rec-3116",
+                "reference": "REC-3116",
+                "actor": "Operations coordinator",
+                "action": "Post an update to #leadership",
+                "policy": "Leadership channels need a reviewer",
+                "decision": "review",
+                "outcome": "Approved by Daniel K. · posted",
+                "time": "09:31"
+              },
+              {
+                "id": "rec-3117",
+                "reference": "REC-3117",
+                "actor": "Developer assistant",
+                "action": "Delete a branch",
+                "policy": "Destructive repository actions are not granted",
+                "decision": "deny",
+                "outcome": "Blocked · provider not called",
+                "time": "09:47"
+              }
+            ]
+          },
+          "closing": {
+            "kicker": "Security by design",
+            "headline": "Useful autonomy needs clear authority.",
+            "body": "See how these controls fit into the product, then start with a worker and a defined job.",
+            "primaryAction": {
+              "label": "Get started free",
+              "href": "/signup"
+            },
+            "secondaryAction": {
+              "label": "Explore the product",
+              "href": "/product"
+            }
+          }
+        }
+      },
+      "seo": {
+        "metaTitle": "Security · Audoryn",
+        "metaDescription": "Audoryn is an SOT product for creating, operating and governing an AI workforce with explicit human control."
+      }
+    },
+    {
+      "key": "pricing",
+      "slug": "/pricing",
+      "locale": "en",
+      "title": "Pricing",
+      "contentType": "page",
+      "document": {
+        "contract": "audoryn.public.v2",
+        "page": "pricing",
+        "sections": {
+          "hero": {
+            "kicker": "Pricing",
+            "headline": "Start free.",
+            "headlineDetail": "Grow with the work.",
+            "body": "Choose capacity for the number of AI workers you need. The same authority and oversight model applies at every size.",
+            "primaryAction": {
+              "label": "Start on Free",
+              "href": "/signup"
+            },
+            "secondaryAction": {
+              "label": "Compare plans",
+              "href": "/pricing#plans"
+            }
+          },
+          "plans": {
+            "kicker": "Plans",
+            "headline": "Capacity at a glance.",
+            "body": "Monthly prices in US dollars. Paid plans can't be bought yet.",
+            "plans": [
+              {
+                "key": "free",
+                "name": "Free",
+                "audience": "Start with a small supervised workforce.",
+                "priceMinor": 0,
+                "currency": "USD",
+                "period": "month",
+                "workerLimit": 3,
+                "availability": "free-signup",
+                "status": "Available now",
+                "features": [
+                  "The full control model",
+                  "Connected tools and inspectable results"
+                ],
+                "action": {
+                  "label": "Get started free",
+                  "href": "/signup"
+                }
+              },
+              {
+                "key": "team",
+                "name": "Team",
+                "audience": "Coordinate a growing workforce across a team.",
+                "priceMinor": 4900,
+                "currency": "USD",
+                "period": "month",
+                "workerLimit": 15,
+                "availability": "unavailable",
+                "status": "Catalog plan",
+                "features": [
+                  "The full control model"
+                ]
+              },
+              {
+                "key": "business",
+                "name": "Business",
+                "audience": "Run more workers across recurring company work.",
+                "priceMinor": 19900,
+                "currency": "USD",
+                "period": "month",
+                "workerLimit": 75,
+                "availability": "unavailable",
+                "status": "Catalog plan",
+                "features": [
+                  "The full control model"
+                ]
+              },
+              {
+                "key": "scale",
+                "name": "Scale",
+                "audience": "Plan for a larger governed workforce.",
+                "priceMinor": 49900,
+                "currency": "USD",
+                "period": "month",
+                "workerLimit": 250,
+                "availability": "unavailable",
+                "status": "Catalog plan",
+                "features": [
+                  "The full control model"
+                ]
+              }
+            ],
+            "notice": {
+              "title": "Paid plans aren't open yet",
+              "body": "New organizations start on Free. Team, Business and Scale describe the product catalog; checkout is not connected yet, so they are not a live offer."
+            }
+          },
+          "sameModel": {
+            "kicker": "The same control model",
+            "headline": "Capacity changes.",
+            "headlineDetail": "Authority does not.",
+            "items": [
+              {
+                "id": "checks",
+                "title": "Capability and policy checks",
+                "body": "Every external action is checked, on every plan.",
+                "icon": "policy"
+              },
+              {
+                "id": "approval",
+                "title": "Human approval",
+                "body": "Actions wait for a person whenever the rule requires it.",
+                "icon": "approval"
+              },
+              {
+                "id": "results",
+                "title": "Connected tools, inspectable results",
+                "body": "Work runs through the same gateway and leaves the same record.",
+                "icon": "record"
+              }
+            ]
+          },
+          "questions": {
+            "kicker": "Common questions",
+            "headline": "Before you begin.",
+            "items": [
+              {
+                "id": "start-free",
+                "question": "Can I start without a paid plan?",
+                "answer": "Yes. New organizations start on Free, which supports up to three managed workers."
+              },
+              {
+                "id": "buy-today",
+                "question": "Can I buy Team, Business or Scale today?",
+                "answer": "Not yet. The paid plans are in the product catalog, but a billing provider and checkout are not connected."
+              },
+              {
+                "id": "more-authority",
+                "question": "Does a larger plan give workers more authority?",
+                "answer": "No. Plan capacity is separate from identity, capability, risk, policy, approvals and incident controls."
+              }
+            ]
+          },
+          "closing": {
+            "kicker": "Start with Audoryn",
+            "headline": "Put the first worker to work.",
+            "body": "Begin on Free and define a clear role, job and supervisor.",
+            "primaryAction": {
+              "label": "Get started free",
+              "href": "/signup"
+            },
+            "secondaryAction": {
+              "label": "Explore the product",
+              "href": "/product"
+            }
+          }
+        }
+      },
+      "seo": {
+        "metaTitle": "Pricing · Audoryn",
+        "metaDescription": "Audoryn is an SOT product for creating, operating and governing an AI workforce with explicit human control."
+      }
+    },
+    {
+      "key": "resources",
+      "slug": "/resources",
+      "locale": "en",
+      "title": "Resources",
+      "contentType": "page",
+      "document": {
+        "contract": "audoryn.public.v2",
+        "page": "resources",
+        "sections": {
+          "hero": {
+            "kicker": "Resources",
+            "headline": "Know the system.",
+            "headlineDetail": "Then put it to work.",
+            "body": "Clear starting points for understanding the product, finding a use case and seeing how autonomous work stays controlled.",
+            "primaryAction": {
+              "label": "Start with the product",
+              "href": "/product"
+            },
+            "secondaryAction": {
+              "label": "Understand security",
+              "href": "/security"
+            }
+          },
+          "guides": {
+            "kicker": "Field guide",
+            "headline": "Four ways in.",
+            "body": "Start with what you need to know.",
+            "items": [
+              {
+                "id": "product",
+                "kicker": "The platform",
+                "title": "Explore the product",
+                "body": "See how workers, jobs, runtime, supervision and connected tools fit together.",
+                "link": {
+                  "label": "Explore the product",
+                  "href": "/product"
+                },
+                "icon": "boxes"
+              },
+              {
+                "id": "solutions",
+                "kicker": "Where it fits",
+                "title": "Find a starting point",
+                "body": "Browse practical responsibilities supported by Audoryn's workforce templates.",
+                "link": {
+                  "label": "Find a starting point",
+                  "href": "/solutions"
+                },
+                "icon": "compass"
+              },
+              {
+                "id": "security",
+                "kicker": "The control model",
+                "title": "Understand security",
+                "body": "Follow an action through identity, capability, policy and human review.",
+                "link": {
+                  "label": "Understand security",
+                  "href": "/security"
+                },
+                "icon": "lock"
+              },
+              {
+                "id": "pricing",
+                "kicker": "Capacity",
+                "title": "Review plan structure",
+                "body": "Compare worker capacity and see current plan availability.",
+                "link": {
+                  "label": "Review plans",
+                  "href": "/pricing"
+                },
+                "icon": "scale"
+              }
+            ]
+          },
+          "library": {
+            "kicker": "Library",
+            "headline": "Articles and guides.",
+            "body": "Published writing from the Audoryn team."
+          },
+          "operators": {
+            "kicker": "For operators",
+            "headline": "Guidance lives with the work.",
+            "paragraphs": [
+              "Signed-in teams find operational guidance inside the workspace, next to runtime, authorization and incident controls."
+            ],
+            "link": {
+              "label": "Open the workspace",
+              "href": "/app"
+            }
+          }
+        }
+      },
+      "seo": {
+        "metaTitle": "Resources · Audoryn",
+        "metaDescription": "Audoryn is an SOT product for creating, operating and governing an AI workforce with explicit human control."
+      }
+    },
+    {
+      "key": "company",
+      "slug": "/company",
+      "locale": "en",
+      "title": "Company",
+      "contentType": "page",
+      "document": {
+        "contract": "audoryn.public.v2",
+        "page": "company",
+        "sections": {
+          "hero": {
+            "kicker": "Company",
+            "headline": "Built by SOT.",
+            "headlineDetail": "Made for real work.",
+            "body": "Audoryn is an SOT product. It brings AI workers into practical workflows while keeping authority, review and responsibility visible to people.",
+            "primaryAction": {
+              "label": "Meet the company",
+              "href": "/company#about"
+            },
+            "secondaryAction": {
+              "label": "Explore Audoryn",
+              "href": "/product"
+            }
+          },
+          "about": {
+            "kicker": "About SOT",
+            "headline": "A practice of turning ideas into working software.",
+            "paragraphs": [
+              "SOT is the product brand founded by Divine Ogadinma Destiny in Nigeria. Its public portfolio spans web products, data analytics and intelligent automation.",
+              "Audoryn extends that work into autonomous software: a place to define what AI workers can do, supervise what they are doing and keep consequential decisions accountable."
+            ],
+            "link": {
+              "label": "Visit SOT Brand",
+              "href": "https://sot-org.onrender.com/sot-brand"
+            }
+          },
+          "portfolio": {
+            "kicker": "Public portfolio",
+            "headline": "More than one product.",
+            "headlineDetail": "One way of building.",
+            "body": "Three projects from SOT's public site show the range of work behind the brand.",
+            "items": [
+              {
+                "id": "sot-cm",
+                "kicker": "Content operations",
+                "title": "SOT CM",
+                "body": "Publishing workflows and administrative control for websites.",
+                "link": {
+                  "label": "View SOT CM",
+                  "href": "https://sot-org.onrender.com/products/sot-cms"
+                },
+                "icon": "document"
+              },
+              {
+                "id": "sot-track",
+                "kicker": "Delivery visibility",
+                "title": "SOT Track",
+                "body": "Planning, tracking and visibility into delivery.",
+                "link": {
+                  "label": "View SOT Track",
+                  "href": "https://sot-org.onrender.com/products/sot-track"
+                },
+                "icon": "check"
+              },
+              {
+                "id": "sot-browser",
+                "kicker": "Desktop software",
+                "title": "SOT Browser",
+                "body": "A native browser with smart handoff and installer distribution.",
+                "link": {
+                  "label": "View SOT Browser",
+                  "href": "https://sot-org.onrender.com/products/sot-browser"
+                },
+                "icon": "browser"
+              }
+            ]
+          },
+          "why": {
+            "kicker": "Why Audoryn",
+            "headline": "When software can act,",
+            "headlineDetail": "who stays in control?",
+            "paragraphs": [
+              "Audoryn is SOT's answer to a practical product question: give AI workers clear responsibilities and useful tools, then make their boundaries, approvals and activity understandable to the people operating them."
+            ],
+            "link": {
+              "label": "Explore Audoryn",
+              "href": "/product"
+            }
+          },
+          "founder": {
+            "kicker": "The founder",
+            "headline": "Building across software, data and automation.",
+            "name": "Divine Ogadinma Destiny",
+            "role": "Founder of SOT",
+            "location": "Nigeria",
+            "paragraphs": [
+              "Full-stack developer and technology entrepreneur. SOT's public portfolio documents the products and projects behind that work."
+            ],
+            "link": {
+              "label": "Explore the SOT portfolio",
+              "href": "https://sot-org.onrender.com/"
+            }
+          },
+          "closing": {
+            "kicker": "Start with the product",
+            "headline": "See the work.",
+            "headlineDetail": "Keep the control.",
+            "primaryAction": {
+              "label": "Get started free",
+              "href": "/signup"
+            },
+            "secondaryAction": {
+              "label": "Explore the product",
+              "href": "/product"
+            }
+          }
+        }
+      },
+      "seo": {
+        "metaTitle": "Company · Audoryn",
+        "metaDescription": "Audoryn is an SOT product for creating, operating and governing an AI workforce with explicit human control."
+      }
+    },
+    {
+      "key": "privacy",
+      "slug": "/privacy",
+      "locale": "en",
+      "title": "Privacy",
+      "contentType": "page",
+      "document": {
+        "contract": "audoryn.public.v2",
+        "page": "privacy",
+        "sections": {
+          "document": {
+            "title": "Your work. Your data. Clear boundaries.",
+            "summary": "How Audoryn handles account, workspace and operational information as the product runs.",
+            "effectiveDate": "2026-10-11",
+            "version": "2026-10-11",
+            "scopeNote": "This overview describes the Audoryn product. An organization-specific agreement or an applicable legal notice may give further detail, including legal bases and jurisdiction-specific rights.",
+            "clauses": [
+              {
+                "id": "information",
+                "heading": "Information Audoryn handles",
+                "paragraphs": [
+                  "Creating an account provides an email address, an optional display name and a password. If you sign in with GitHub, Audoryn receives the account details GitHub shares for sign-in instead of a password. Within a workspace, Audoryn stores organization membership, worker and job settings, policies, approvals, incidents, conversations, memories, results, artifacts and audit records as those features are used."
+                ],
+                "points": [
+                  "Account and membership details identify the people who can enter a workspace.",
+                  "Work content can include instructions, prompts, files, connected tool data and generated output.",
+                  "Operational records include action decisions, usage, failures and security events."
+                ]
+              },
+              {
+                "id": "use",
+                "heading": "Why it is used",
+                "paragraphs": [
+                  "Audoryn uses this information to authenticate users, run and supervise configured work, apply capability and policy checks, request human approvals, show results, enforce plan limits, and investigate reliability or security issues. Workspace content is available according to organization membership and product permissions."
+                ],
+                "points": []
+              },
+              {
+                "id": "ai-and-services",
+                "heading": "AI models and connected services",
+                "paragraphs": [
+                  "When AI features are used, the relevant task context can be sent to the AI model providers the service is configured to use, such as NVIDIA, Groq, Hugging Face or OpenRouter, for planning, conversation or image analysis. A connected integration can send an authorized action and the payload it needs to the selected provider, such as GitHub, Slack, Gmail, Google Drive or Google Calendar. Those providers process information under their own terms and practices."
+                ],
+                "points": [
+                  "Model requests are limited to the context assembled for the task; they never grant provider authority.",
+                  "Provider calls remain subject to Audoryn's capability, policy, risk, approval and incident controls."
+                ]
+              },
+              {
+                "id": "credentials-and-storage",
+                "heading": "Credentials and browser storage",
+                "paragraphs": [
+                  "Account passwords are stored as salted hashes, not readable passwords. Connected service credentials are encrypted in the backend. After sign-in, the web app keeps an access token in browser local storage so it can make authenticated requests. Short-lived values, such as a pending invitation code or a GitHub sign-in step, may be kept in session storage while you finish. Signing out revokes the server session and removes the local token."
+                ],
+                "points": []
+              },
+              {
+                "id": "retention",
+                "heading": "Retention and deletion",
+                "paragraphs": [
+                  "Sessions expire or can be revoked. Operational history, audit records, results and artifacts can remain available for governance and investigation. An expiry date on a memory entry limits its use as future AI context; it does not by itself mean the underlying record or file has been deleted. Audoryn does not currently offer a single self-service control for deleting an entire account or workspace and all associated history."
+                ],
+                "points": []
+              },
+              {
+                "id": "requests",
+                "heading": "Access and requests",
+                "paragraphs": [
+                  "Workspace administrators can manage membership, workers, jobs and integrations within their permissions. Some records and connections can be removed individually in the product. For broader access, correction or deletion requests, use your organization's existing SOT support or business contact. Requests may need to be handled alongside audit obligations and any applicable agreement."
+                ],
+                "points": []
+              }
+            ],
+            "related": {
+              "label": "Read the terms of use",
+              "href": "/terms"
+            }
+          }
+        }
+      },
+      "seo": {
+        "metaTitle": "Privacy · Audoryn",
+        "metaDescription": "Audoryn is an SOT product for creating, operating and governing an AI workforce with explicit human control."
+      }
+    },
+    {
+      "key": "terms",
+      "slug": "/terms",
+      "locale": "en",
+      "title": "Terms",
+      "contentType": "page",
+      "document": {
+        "contract": "audoryn.public.v2",
+        "page": "terms",
+        "sections": {
+          "document": {
+            "title": "Clear terms for controlled work.",
+            "summary": "How accounts, connected systems and AI workers are expected to be used in Audoryn.",
+            "effectiveDate": "2026-10-11",
+            "version": "2026-10-11",
+            "scopeNote": "These product-use terms describe the current Audoryn service. A signed agreement with SOT, where one exists, may set additional or different commercial and legal terms.",
+            "clauses": [
+              {
+                "id": "accounts",
+                "heading": "Accounts and workspace authority",
+                "paragraphs": [
+                  "Use Audoryn through an account you control, and only for an organization you are authorized to represent. Workspace owners and administrators manage human membership and roles. Keep credentials and invitation links private, and remove access when a person or integration no longer needs it."
+                ],
+                "points": []
+              },
+              {
+                "id": "permitted-use",
+                "heading": "Permitted use",
+                "paragraphs": [
+                  "Configure workers, jobs and connected systems only where you have permission to access the underlying data and take the requested actions. Do not use Audoryn to bypass another service's access controls, collect data without authority, or interfere with Audoryn's identity, policy, approval, audit or incident controls."
+                ],
+                "points": []
+              },
+              {
+                "id": "ai-work",
+                "heading": "AI work and human decisions",
+                "paragraphs": [
+                  "Audoryn can plan work and prepare or carry out actions within configured capabilities and policy. A policy may allow, deny or require human approval for an action. Organizations remain responsible for the workers, instructions, policies, integrations and review practices they configure, including checking generated output before relying on it for consequential decisions."
+                ],
+                "points": [
+                  "A template creates draft records; it does not connect tools or authorize execution.",
+                  "Human approval applies when the configured policy requires it. It is not a blanket approval step for every action."
+                ]
+              },
+              {
+                "id": "providers",
+                "heading": "Connected providers",
+                "paragraphs": [
+                  "If you connect a third-party service, you authorize Audoryn to use the credentials and permissions you provide for the operations you configure and permit. The connected provider controls its own account, availability, permissions and terms. Disconnect integrations that should no longer be used."
+                ],
+                "points": []
+              },
+              {
+                "id": "plans",
+                "heading": "Plans and limits",
+                "paragraphs": [
+                  "The Free workspace is the current self-service starting point. Team, Business and Scale appear in the product catalog, but there is no connected checkout or self-service paid upgrade yet. Worker capacity and usage limits are enforced according to the plan assigned to the organization; a displayed catalog price does not by itself activate a paid subscription."
+                ],
+                "points": []
+              },
+              {
+                "id": "changes",
+                "heading": "Service changes and records",
+                "paragraphs": [
+                  "Audoryn uses versioned APIs and may change available features, model configuration, providers or limits as the service develops. Work can pause or fail when a provider is unavailable, a session expires, a limit is reached, or a security control blocks execution. Audit and operational records may remain after an individual worker, job or integration is removed."
+                ],
+                "points": []
+              }
+            ],
+            "related": {
+              "label": "Read the privacy overview",
+              "href": "/privacy"
+            }
+          }
+        }
+      },
+      "seo": {
+        "metaTitle": "Terms · Audoryn",
+        "metaDescription": "Audoryn is an SOT product for creating, operating and governing an AI workforce with explicit human control."
+      }
+    }
+  ],
+  "media": [
+    {
+      "id": "de5cb793-7e09-5703-8021-c31ecd15ab0c",
+      "path": "src/site/assets/human-oversight.webp",
+      "filename": "human-oversight.webp",
+      "mediaType": "image/webp",
+      "width": 1774,
+      "height": 887,
+      "sizeBytes": 104250,
+      "checksumSha256": "47d452f894acdfdc7146a1df5994cdd1cc22a1a8f9a9be0b50433a59f706c4be",
+      "altText": "Two colleagues reviewing a decision together at a table"
+    },
+    {
+      "id": "262bf108-0e0b-58ab-835f-9bd73d8c353c",
+      "path": "src/site/assets/operations-work.webp",
+      "filename": "operations-work.webp",
+      "mediaType": "image/webp",
+      "width": 1672,
+      "height": 941,
+      "sizeBytes": 248982,
+      "checksumSha256": "6cf8c76ee72ac6970f2830dc9a55cc89084a43324c07da48d62279b5db5b43b7",
+      "altText": "A logistics operations floor with a supervisor overseeing the work"
+    },
+    {
+      "id": "a201f4ad-5d40-51eb-8948-a5c1b09319d1",
+      "path": "src/site/assets/research-work.webp",
+      "filename": "research-work.webp",
+      "mediaType": "image/webp",
+      "width": 1774,
+      "height": 887,
+      "sizeBytes": 134388,
+      "checksumSha256": "cc30a047bdc4a45b950da33d0317204fe67463a65975fb8ea599816d257d2855",
+      "altText": "Research materials being reviewed at a worktable"
+    }
+  ],
+  "globals": [
+    {
+      "key": "public-site",
+      "locale": "en",
+      "value": {
+        "contract": "audoryn.public.v2",
+        "page": "site",
+        "brand": {
+          "name": "Audoryn",
+          "owner": "An SOT product",
+          "tagline": "Controlled infrastructure for an autonomous AI workforce.",
+          "legal": "© 2026 SOT"
+        },
+        "actions": {
+          "signIn": {
+            "label": "Sign in",
+            "href": "/login"
+          },
+          "getStarted": {
+            "label": "Get started",
+            "href": "/signup"
+          }
+        },
+        "navigation": {
+          "header": [
+            {
+              "id": "product",
+              "label": "Product",
+              "href": "/product",
+              "intro": "One place for AI workers, their work and the authority around it.",
+              "children": [
+                {
+                  "id": "overview",
+                  "label": "Overview",
+                  "href": "/product",
+                  "description": "See the complete operating layer."
+                },
+                {
+                  "id": "workforce",
+                  "label": "Workforce",
+                  "href": "/product#workforce",
+                  "description": "Define roles, jobs and supervisors."
+                },
+                {
+                  "id": "governance",
+                  "label": "Governance",
+                  "href": "/security#control-path",
+                  "description": "Follow the path every action takes."
+                },
+                {
+                  "id": "integrations",
+                  "label": "Integrations",
+                  "href": "/product#integrations",
+                  "description": "Connect work to the tools you use."
+                }
+              ]
+            },
+            {
+              "id": "solutions",
+              "label": "Solutions",
+              "href": "/solutions",
+              "intro": "Start with a responsibility that already matters.",
+              "children": [
+                {
+                  "id": "support",
+                  "label": "Customer support",
+                  "href": "/solutions#customer-support",
+                  "description": "Know what needs attention first."
+                },
+                {
+                  "id": "research",
+                  "label": "Research",
+                  "href": "/solutions#research",
+                  "description": "Turn sources into a clear brief."
+                },
+                {
+                  "id": "operations",
+                  "label": "Operations",
+                  "href": "/solutions#operations",
+                  "description": "Keep the daily picture current."
+                },
+                {
+                  "id": "engineering",
+                  "label": "Engineering",
+                  "href": "/solutions#engineering",
+                  "description": "Stay close to repository work."
+                }
+              ]
+            },
+            {
+              "id": "security",
+              "label": "Security",
+              "href": "/security",
+              "children": []
+            },
+            {
+              "id": "resources",
+              "label": "Resources",
+              "href": "/resources",
+              "intro": "Everything you need to evaluate Audoryn.",
+              "children": [
+                {
+                  "id": "how-it-works",
+                  "label": "How it works",
+                  "href": "/product",
+                  "description": "Workers, jobs, runtime and supervision."
+                },
+                {
+                  "id": "control-model",
+                  "label": "Control model",
+                  "href": "/security",
+                  "description": "What decides every action."
+                },
+                {
+                  "id": "plans",
+                  "label": "Plans",
+                  "href": "/pricing",
+                  "description": "Capacity and availability."
+                }
+              ]
+            },
+            {
+              "id": "pricing",
+              "label": "Pricing",
+              "href": "/pricing",
+              "children": []
+            },
+            {
+              "id": "company",
+              "label": "Company",
+              "href": "/company",
+              "intro": "Who builds Audoryn, and the notices that govern it.",
+              "children": [
+                {
+                  "id": "about",
+                  "label": "About",
+                  "href": "/company",
+                  "description": "Why SOT is building Audoryn."
+                },
+                {
+                  "id": "privacy",
+                  "label": "Privacy",
+                  "href": "/privacy",
+                  "description": "How product data is handled."
+                },
+                {
+                  "id": "terms",
+                  "label": "Terms",
+                  "href": "/terms",
+                  "description": "How Audoryn may be used."
+                }
+              ]
+            }
+          ],
+          "footer": [
+            {
+              "id": "product",
+              "label": "Product",
+              "children": [
+                {
+                  "id": "overview",
+                  "label": "Overview",
+                  "href": "/product"
+                },
+                {
+                  "id": "workforce",
+                  "label": "Workforce",
+                  "href": "/product#workforce"
+                },
+                {
+                  "id": "governance",
+                  "label": "Governance",
+                  "href": "/security#control-path"
+                },
+                {
+                  "id": "integrations",
+                  "label": "Integrations",
+                  "href": "/product#integrations"
+                }
+              ]
+            },
+            {
+              "id": "solutions",
+              "label": "Solutions",
+              "children": [
+                {
+                  "id": "support",
+                  "label": "Customer support",
+                  "href": "/solutions#customer-support"
+                },
+                {
+                  "id": "research",
+                  "label": "Research",
+                  "href": "/solutions#research"
+                },
+                {
+                  "id": "operations",
+                  "label": "Operations",
+                  "href": "/solutions#operations"
+                },
+                {
+                  "id": "engineering",
+                  "label": "Engineering",
+                  "href": "/solutions#engineering"
+                }
+              ]
+            },
+            {
+              "id": "resources",
+              "label": "Resources",
+              "children": [
+                {
+                  "id": "resources",
+                  "label": "All resources",
+                  "href": "/resources"
+                },
+                {
+                  "id": "security",
+                  "label": "Security",
+                  "href": "/security"
+                },
+                {
+                  "id": "pricing",
+                  "label": "Pricing",
+                  "href": "/pricing"
+                }
+              ]
+            },
+            {
+              "id": "company",
+              "label": "Company",
+              "children": [
+                {
+                  "id": "about",
+                  "label": "About",
+                  "href": "/company"
+                },
+                {
+                  "id": "privacy",
+                  "label": "Privacy",
+                  "href": "/privacy"
+                },
+                {
+                  "id": "terms",
+                  "label": "Terms",
+                  "href": "/terms"
+                }
+              ]
+            }
+          ]
+        },
+        "labels": {
+          "home": "Audoryn home",
+          "mainNavigation": "Main navigation",
+          "footerNavigation": "Footer navigation",
+          "openMenu": "Menu",
+          "closeMenu": "Close",
+          "skipToContent": "Skip to content",
+          "illustrative": "Illustrative",
+          "onThisPage": "On this page",
+          "exploreMenu": "Explore {label}"
+        },
+        "vocabulary": {
+          "worker": "Worker",
+          "team": "Team",
+          "supervisor": "Supervisor",
+          "status": "Status",
+          "trigger": "Trigger",
+          "job": "Job",
+          "exampleJob": "Example job",
+          "connectedTools": "Connected tools",
+          "deliverable": "Deliverable",
+          "requestedBy": "Requested by",
+          "reviewer": "Reviewer",
+          "reference": "Reference",
+          "actor": "Actor",
+          "action": "Action",
+          "policy": "Policy",
+          "decision": "Decision",
+          "outcome": "Outcome",
+          "time": "Time",
+          "target": "Target",
+          "checks": "Checks",
+          "schedule": "Schedule",
+          "assignedJob": "Assigned job",
+          "recordedAs": "Recorded as",
+          "worksWith": "Works with",
+          "proposedBy": "Proposed by the model",
+          "gateway": "Action gateway",
+          "jobStatus": {
+            "queued": "Queued",
+            "running": "Running",
+            "completed": "Completed",
+            "held": "Held for review"
+          },
+          "decisions": {
+            "allow": "Allowed",
+            "review": "Held for review",
+            "deny": "Denied"
+          },
+          "stepState": {
+            "done": "Done",
+            "active": "In progress",
+            "waiting": "Waiting"
+          },
+          "perMonth": "per month",
+          "perYear": "per year",
+          "workerLimit": "Up to {count} managed workers",
+          "chooseDecision": "Choose a decision",
+          "chooseLayer": "Choose a layer of the operating model",
+          "chooseSolution": "Choose a solution area",
+          "ownerLogo": "SOT logo",
+          "published": "Published",
+          "by": "By",
+          "readArticle": "Read article",
+          "effective": "Effective",
+          "version": "Version",
+          "backToResources": "All resources"
+        },
+        "notFound": {
+          "headline": "This page isn't here.",
+          "body": "It may have moved or been removed. Everything else is still where you left it.",
+          "action": {
+            "label": "Back to Audoryn",
+            "href": "/"
+          }
+        },
+        "unavailable": {
+          "headline": "This content is briefly unavailable.",
+          "body": "Please try again in a moment."
+        }
+      }
+    }
+  ],
+  "navigations": [
+    {
+      "key": "header",
+      "name": "Public header",
+      "locale": "en",
+      "items": [
+        {
+          "id": "9aa0198a-313a-5442-8e15-7fa55aaf4f35",
+          "parentId": null,
+          "position": 0,
+          "label": "Product",
+          "destinationKind": "page",
+          "destination": "seed:page/product",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "One place for AI workers, their work and the authority around it."
+          }
+        },
+        {
+          "id": "50fccd67-4572-5142-82f3-0d926b523bdd",
+          "parentId": "9aa0198a-313a-5442-8e15-7fa55aaf4f35",
+          "position": 0,
+          "label": "Overview",
+          "destinationKind": "page",
+          "destination": "seed:page/product",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "See the complete operating layer."
+          }
+        },
+        {
+          "id": "b34ae84f-1207-5310-86ad-b11127669a32",
+          "parentId": "9aa0198a-313a-5442-8e15-7fa55aaf4f35",
+          "position": 1,
+          "label": "Workforce",
+          "destinationKind": "page",
+          "destination": "seed:page/product",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Define roles, jobs and supervisors.",
+            "sectionId": "workforce"
+          }
+        },
+        {
+          "id": "64e22419-6c22-5469-8a7c-2d12dd123df4",
+          "parentId": "9aa0198a-313a-5442-8e15-7fa55aaf4f35",
+          "position": 2,
+          "label": "Governance",
+          "destinationKind": "page",
+          "destination": "seed:page/security",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Follow the path every action takes.",
+            "sectionId": "control-path"
+          }
+        },
+        {
+          "id": "de373cee-ecdd-59c1-8ac3-20822e60e4e6",
+          "parentId": "9aa0198a-313a-5442-8e15-7fa55aaf4f35",
+          "position": 3,
+          "label": "Integrations",
+          "destinationKind": "page",
+          "destination": "seed:page/product",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Connect work to the tools you use.",
+            "sectionId": "integrations"
+          }
+        },
+        {
+          "id": "a08647b7-6679-5e66-806b-bd61f28b9382",
+          "parentId": null,
+          "position": 1,
+          "label": "Solutions",
+          "destinationKind": "page",
+          "destination": "seed:page/solutions",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Start with a responsibility that already matters."
+          }
+        },
+        {
+          "id": "56b74a8a-c107-5a2a-8bd0-9468e214a5a1",
+          "parentId": "a08647b7-6679-5e66-806b-bd61f28b9382",
+          "position": 0,
+          "label": "Customer support",
+          "destinationKind": "page",
+          "destination": "seed:page/solutions",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Know what needs attention first.",
+            "sectionId": "customer-support"
+          }
+        },
+        {
+          "id": "c27ae609-da5b-5ba1-82ee-4ab43c6dae9a",
+          "parentId": "a08647b7-6679-5e66-806b-bd61f28b9382",
+          "position": 1,
+          "label": "Research",
+          "destinationKind": "page",
+          "destination": "seed:page/solutions",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Turn sources into a clear brief.",
+            "sectionId": "research"
+          }
+        },
+        {
+          "id": "dc3e6a35-2747-51c9-891c-e8cf82af5f4a",
+          "parentId": "a08647b7-6679-5e66-806b-bd61f28b9382",
+          "position": 2,
+          "label": "Operations",
+          "destinationKind": "page",
+          "destination": "seed:page/solutions",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Keep the daily picture current.",
+            "sectionId": "operations"
+          }
+        },
+        {
+          "id": "b1b632c3-9c91-5154-8368-57cb81bc1d5e",
+          "parentId": "a08647b7-6679-5e66-806b-bd61f28b9382",
+          "position": 3,
+          "label": "Engineering",
+          "destinationKind": "page",
+          "destination": "seed:page/solutions",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Stay close to repository work.",
+            "sectionId": "engineering"
+          }
+        },
+        {
+          "id": "444e331d-ec24-5415-8df3-bf7e4799a836",
+          "parentId": null,
+          "position": 2,
+          "label": "Security",
+          "destinationKind": "page",
+          "destination": "seed:page/security",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {}
+        },
+        {
+          "id": "d0d41002-30df-5e35-8b58-6c3b5cd60a25",
+          "parentId": null,
+          "position": 3,
+          "label": "Resources",
+          "destinationKind": "page",
+          "destination": "seed:page/resources",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Everything you need to evaluate Audoryn."
+          }
+        },
+        {
+          "id": "6b6db1f8-e046-5f34-879d-dfb98603b1d2",
+          "parentId": "d0d41002-30df-5e35-8b58-6c3b5cd60a25",
+          "position": 0,
+          "label": "How it works",
+          "destinationKind": "page",
+          "destination": "seed:page/product",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Workers, jobs, runtime and supervision."
+          }
+        },
+        {
+          "id": "5ac1895f-f26b-5881-853b-534e4833201e",
+          "parentId": "d0d41002-30df-5e35-8b58-6c3b5cd60a25",
+          "position": 1,
+          "label": "Control model",
+          "destinationKind": "page",
+          "destination": "seed:page/security",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "What decides every action."
+          }
+        },
+        {
+          "id": "83f879af-8549-5b60-8363-54a3cc6ab038",
+          "parentId": "d0d41002-30df-5e35-8b58-6c3b5cd60a25",
+          "position": 2,
+          "label": "Plans",
+          "destinationKind": "page",
+          "destination": "seed:page/pricing",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Capacity and availability."
+          }
+        },
+        {
+          "id": "8c267b9c-0650-5dae-82f4-0451f2b162d2",
+          "parentId": null,
+          "position": 4,
+          "label": "Pricing",
+          "destinationKind": "page",
+          "destination": "seed:page/pricing",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {}
+        },
+        {
+          "id": "97219e0a-390d-5757-8cd6-cb2f354ddbc2",
+          "parentId": null,
+          "position": 5,
+          "label": "Company",
+          "destinationKind": "page",
+          "destination": "seed:page/company",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Who builds Audoryn, and the notices that govern it."
+          }
+        },
+        {
+          "id": "0d9cfb4e-13b8-5b9e-8372-5f0b632eca39",
+          "parentId": "97219e0a-390d-5757-8cd6-cb2f354ddbc2",
+          "position": 0,
+          "label": "About",
+          "destinationKind": "page",
+          "destination": "seed:page/company",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "Why SOT is building Audoryn."
+          }
+        },
+        {
+          "id": "edd79fc0-b32b-5105-81a1-69ed65bf24e7",
+          "parentId": "97219e0a-390d-5757-8cd6-cb2f354ddbc2",
+          "position": 1,
+          "label": "Privacy",
+          "destinationKind": "page",
+          "destination": "seed:page/privacy",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "How product data is handled."
+          }
+        },
+        {
+          "id": "86c592ff-952a-55ec-8c40-f3be763211d2",
+          "parentId": "97219e0a-390d-5757-8cd6-cb2f354ddbc2",
+          "position": 2,
+          "label": "Terms",
+          "destinationKind": "page",
+          "destination": "seed:page/terms",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "description": "How Audoryn may be used."
+          }
+        }
+      ]
+    },
+    {
+      "key": "footer",
+      "name": "Public footer",
+      "locale": "en",
+      "items": [
+        {
+          "id": "13cbe052-a3d9-5365-8a2e-9b36d0f6ce33",
+          "parentId": null,
+          "position": 0,
+          "label": "Product",
+          "destinationKind": "page",
+          "destination": "seed:page/product",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {}
+        },
+        {
+          "id": "101defa8-5de6-595d-8787-5afc80729d8a",
+          "parentId": "13cbe052-a3d9-5365-8a2e-9b36d0f6ce33",
+          "position": 0,
+          "label": "Overview",
+          "destinationKind": "page",
+          "destination": "seed:page/product",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {}
+        },
+        {
+          "id": "62d2fc22-70cf-5307-8461-77b2b9fd7875",
+          "parentId": "13cbe052-a3d9-5365-8a2e-9b36d0f6ce33",
+          "position": 1,
+          "label": "Workforce",
+          "destinationKind": "page",
+          "destination": "seed:page/product",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "sectionId": "workforce"
+          }
+        },
+        {
+          "id": "91f0a27a-85c1-5ad3-8cb1-a4e0031f8c1f",
+          "parentId": "13cbe052-a3d9-5365-8a2e-9b36d0f6ce33",
+          "position": 2,
+          "label": "Governance",
+          "destinationKind": "page",
+          "destination": "seed:page/security",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "sectionId": "control-path"
+          }
+        },
+        {
+          "id": "ff602601-7e43-5630-8009-c1f297c06767",
+          "parentId": "13cbe052-a3d9-5365-8a2e-9b36d0f6ce33",
+          "position": 3,
+          "label": "Integrations",
+          "destinationKind": "page",
+          "destination": "seed:page/product",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "sectionId": "integrations"
+          }
+        },
+        {
+          "id": "e27014d1-3fb5-588b-88e9-da650875b841",
+          "parentId": null,
+          "position": 1,
+          "label": "Solutions",
+          "destinationKind": "page",
+          "destination": "seed:page/solutions",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "sectionId": "customer-support"
+          }
+        },
+        {
+          "id": "03a273eb-fd46-5665-848a-174123b3cd1c",
+          "parentId": "e27014d1-3fb5-588b-88e9-da650875b841",
+          "position": 0,
+          "label": "Customer support",
+          "destinationKind": "page",
+          "destination": "seed:page/solutions",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "sectionId": "customer-support"
+          }
+        },
+        {
+          "id": "229c12eb-2294-5df9-8566-8708b8d77195",
+          "parentId": "e27014d1-3fb5-588b-88e9-da650875b841",
+          "position": 1,
+          "label": "Research",
+          "destinationKind": "page",
+          "destination": "seed:page/solutions",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "sectionId": "research"
+          }
+        },
+        {
+          "id": "49f67aa1-b6c1-57ed-8bb9-933688c6bb70",
+          "parentId": "e27014d1-3fb5-588b-88e9-da650875b841",
+          "position": 2,
+          "label": "Operations",
+          "destinationKind": "page",
+          "destination": "seed:page/solutions",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "sectionId": "operations"
+          }
+        },
+        {
+          "id": "62b6840a-513f-5f44-8031-669310f50434",
+          "parentId": "e27014d1-3fb5-588b-88e9-da650875b841",
+          "position": 3,
+          "label": "Engineering",
+          "destinationKind": "page",
+          "destination": "seed:page/solutions",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {
+            "sectionId": "engineering"
+          }
+        },
+        {
+          "id": "6017f7b6-5677-546d-82df-02e32f3949cc",
+          "parentId": null,
+          "position": 2,
+          "label": "Resources",
+          "destinationKind": "page",
+          "destination": "seed:page/resources",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {}
+        },
+        {
+          "id": "f8f1d8a4-78f1-5cd2-86d8-1f1520471ef3",
+          "parentId": "6017f7b6-5677-546d-82df-02e32f3949cc",
+          "position": 0,
+          "label": "All resources",
+          "destinationKind": "page",
+          "destination": "seed:page/resources",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {}
+        },
+        {
+          "id": "d3f6821d-8a94-591a-87d0-619dd8fa8e76",
+          "parentId": "6017f7b6-5677-546d-82df-02e32f3949cc",
+          "position": 1,
+          "label": "Security",
+          "destinationKind": "page",
+          "destination": "seed:page/security",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {}
+        },
+        {
+          "id": "dee30864-2217-57b0-86c5-f6763cdcc204",
+          "parentId": "6017f7b6-5677-546d-82df-02e32f3949cc",
+          "position": 2,
+          "label": "Pricing",
+          "destinationKind": "page",
+          "destination": "seed:page/pricing",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {}
+        },
+        {
+          "id": "21736917-db26-537e-8b07-5e899b1c1ec4",
+          "parentId": null,
+          "position": 3,
+          "label": "Company",
+          "destinationKind": "page",
+          "destination": "seed:page/company",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {}
+        },
+        {
+          "id": "e968a045-7566-535b-87a9-9279aac18e4e",
+          "parentId": "21736917-db26-537e-8b07-5e899b1c1ec4",
+          "position": 0,
+          "label": "About",
+          "destinationKind": "page",
+          "destination": "seed:page/company",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {}
+        },
+        {
+          "id": "e1a533f6-06b3-5e06-8acd-072e56822038",
+          "parentId": "21736917-db26-537e-8b07-5e899b1c1ec4",
+          "position": 1,
+          "label": "Privacy",
+          "destinationKind": "page",
+          "destination": "seed:page/privacy",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {}
+        },
+        {
+          "id": "b999da6c-4807-55a2-8411-739d1141c922",
+          "parentId": "21736917-db26-537e-8b07-5e899b1c1ec4",
+          "position": 2,
+          "label": "Terms",
+          "destinationKind": "page",
+          "destination": "seed:page/terms",
+          "visible": true,
+          "openInNewTab": false,
+          "metadata": {}
+        }
+      ]
+    }
+  ],
+  "checksum": "e67d973b8937755698032f0a22c3f128a6d7c427e8cf0d96c9da8b3672fe4367"
+}

@@ -1,0 +1,519 @@
+{
+  "description": "Each case starts from a built-in page, sets one value (path segments, null deletes), and must be rejected with the expected error. Console must reject the same cases.",
+  "cases": [
+    {
+      "name": "line break in text",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "hero",
+          "headline"
+        ],
+        "Put AI\nworkers to work."
+      ],
+      "expect": {
+        "path": "sections.hero.headline",
+        "code": "invalid_format"
+      }
+    },
+    {
+      "name": "markup in text",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "hero",
+          "headline"
+        ],
+        "Put <b>AI</b> to work."
+      ],
+      "expect": {
+        "path": "sections.hero.headline",
+        "code": "invalid_format"
+      }
+    },
+    {
+      "name": "trailing space",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "hero",
+          "headline"
+        ],
+        "Get started "
+      ],
+      "expect": {
+        "path": "sections.hero.headline",
+        "code": "invalid_format"
+      }
+    },
+    {
+      "name": "empty required text",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "hero",
+          "headline"
+        ],
+        ""
+      ],
+      "expect": {
+        "path": "sections.hero.headline",
+        "code": "empty"
+      }
+    },
+    {
+      "name": "text too long",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "hero",
+          "headline"
+        ],
+        "x"
+      ],
+      "repeat": 141,
+      "expect": {
+        "path": "sections.hero.headline",
+        "code": "too_long"
+      }
+    },
+    {
+      "name": "missing section",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "closing"
+        ],
+        null
+      ],
+      "expect": {
+        "path": "sections.closing",
+        "code": "required"
+      }
+    },
+    {
+      "name": "unknown section",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "banner"
+        ],
+        {
+          "headline": "x"
+        }
+      ],
+      "expect": {
+        "path": "sections.banner",
+        "code": "unknown_field"
+      }
+    },
+    {
+      "name": "unknown field",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "hero",
+          "html"
+        ],
+        "x"
+      ],
+      "expect": {
+        "path": "sections.hero.html",
+        "code": "unknown_field"
+      }
+    },
+    {
+      "name": "script link",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "hero",
+          "primaryAction",
+          "href"
+        ],
+        "javascript:alert(1)"
+      ],
+      "expect": {
+        "path": "sections.hero.primaryAction.href",
+        "code": "invalid_format"
+      }
+    },
+    {
+      "name": "protocol-relative link",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "hero",
+          "primaryAction",
+          "href"
+        ],
+        "//example.com"
+      ],
+      "expect": {
+        "path": "sections.hero.primaryAction.href",
+        "code": "invalid_format"
+      }
+    },
+    {
+      "name": "plain http link",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "hero",
+          "primaryAction",
+          "href"
+        ],
+        "http://example.com"
+      ],
+      "expect": {
+        "path": "sections.hero.primaryAction.href",
+        "code": "invalid_format"
+      }
+    },
+    {
+      "name": "credentials in link",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "hero",
+          "primaryAction",
+          "href"
+        ],
+        "https://user:secret@example.com"
+      ],
+      "expect": {
+        "path": "sections.hero.primaryAction.href",
+        "code": "unsafe_link"
+      }
+    },
+    {
+      "name": "unknown decision",
+      "page": "security",
+      "set": [
+        [
+          "sections",
+          "record",
+          "records",
+          0,
+          "decision"
+        ],
+        "maybe"
+      ],
+      "expect": {
+        "path": "sections.record.records[0].decision",
+        "code": "not_allowed"
+      }
+    },
+    {
+      "name": "duplicate key",
+      "page": "solutions",
+      "set": [
+        [
+          "sections",
+          "solutions",
+          "items",
+          1,
+          "id"
+        ],
+        "operations"
+      ],
+      "expect": {
+        "path": "sections.solutions.items[1]",
+        "code": "duplicate_key"
+      }
+    },
+    {
+      "name": "invalid key",
+      "page": "solutions",
+      "set": [
+        [
+          "sections",
+          "solutions",
+          "items",
+          0,
+          "id"
+        ],
+        "Operations Team"
+      ],
+      "expect": {
+        "path": "sections.solutions.items[0].id",
+        "code": "invalid_format"
+      }
+    },
+    {
+      "name": "wrong layer count",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "operatingModel",
+          "layers",
+          3
+        ],
+        null
+      ],
+      "expect": {
+        "path": "sections.operatingModel.layers",
+        "code": "too_few_items"
+      }
+    },
+    {
+      "name": "image without alt text",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "oversight",
+          "image",
+          "alt"
+        ],
+        null
+      ],
+      "expect": {
+        "path": "sections.oversight.image.alt",
+        "code": "required"
+      }
+    },
+    {
+      "name": "invalid image id",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "oversight",
+          "image",
+          "asset"
+        ],
+        "human-oversight.webp"
+      ],
+      "expect": {
+        "path": "sections.oversight.image.asset",
+        "code": "invalid_format"
+      }
+    },
+    {
+      "name": "contact plan without link",
+      "page": "pricing",
+      "set": [
+        [
+          "sections",
+          "plans",
+          "plans",
+          1,
+          "availability"
+        ],
+        "contact"
+      ],
+      "expect": {
+        "path": "sections.plans.plans[1].action",
+        "code": "contact_requires_link"
+      }
+    },
+    {
+      "name": "priced free plan",
+      "page": "pricing",
+      "set": [
+        [
+          "sections",
+          "plans",
+          "plans",
+          0,
+          "priceMinor"
+        ],
+        100
+      ],
+      "expect": {
+        "path": "sections.plans.plans[0].priceMinor",
+        "code": "free_plan_must_be_free"
+      }
+    },
+    {
+      "name": "fractional price",
+      "page": "pricing",
+      "set": [
+        [
+          "sections",
+          "plans",
+          "plans",
+          1,
+          "priceMinor"
+        ],
+        49.5
+      ],
+      "expect": {
+        "path": "sections.plans.plans[1].priceMinor",
+        "code": "expected_number"
+      }
+    },
+    {
+      "name": "impossible date",
+      "page": "privacy",
+      "set": [
+        [
+          "sections",
+          "document",
+          "effectiveDate"
+        ],
+        "2026-02-30"
+      ],
+      "expect": {
+        "path": "sections.document.effectiveDate",
+        "code": "invalid_date"
+      }
+    },
+    {
+      "name": "missing disclosure",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "decision",
+          "demo",
+          "disclosure"
+        ],
+        null
+      ],
+      "expect": {
+        "path": "sections.decision.demo.disclosure",
+        "code": "required"
+      }
+    },
+    {
+      "name": "worker limit without placeholder",
+      "page": "site",
+      "set": [
+        [
+          "vocabulary",
+          "workerLimit"
+        ],
+        "Up to 3 managed workers"
+      ],
+      "expect": {
+        "path": "vocabulary.workerLimit",
+        "code": "invalid_format"
+      }
+    },
+    {
+      "name": "missing integration boundary",
+      "page": "product",
+      "set": [
+        [
+          "sections",
+          "integrations",
+          "boundary"
+        ],
+        null
+      ],
+      "expect": {
+        "path": "sections.integrations.boundary",
+        "code": "required"
+      }
+    },
+    {
+      "name": "v1 contract",
+      "page": "home",
+      "set": [
+        [
+          "contract"
+        ],
+        "audoryn.public.v1"
+      ],
+      "expect": {
+        "path": "contract",
+        "code": "unsupported_contract"
+      }
+    },
+    {
+      "name": "unknown page",
+      "page": "home",
+      "set": [
+        [
+          "page"
+        ],
+        "blog"
+      ],
+      "expect": {
+        "path": "page",
+        "code": "unknown_page"
+      }
+    },
+    {
+      "name": "solution id repeats a section anchor",
+      "page": "solutions",
+      "set": [
+        [
+          "sections",
+          "solutions",
+          "items",
+          0,
+          "id"
+        ],
+        "closing"
+      ],
+      "expect": {
+        "path": "sections.solutions.items[0].id",
+        "code": "duplicate_anchor"
+      }
+    },
+    {
+      "name": "legal clause id repeats a section anchor",
+      "page": "privacy",
+      "set": [
+        [
+          "sections",
+          "document",
+          "clauses",
+          0,
+          "id"
+        ],
+        "document"
+      ],
+      "expect": {
+        "path": "sections.document.clauses[0].id",
+        "code": "duplicate_anchor"
+      }
+    },
+    {
+      "name": "unknown field named like a built-in",
+      "page": "home",
+      "set": [
+        [
+          "sections",
+          "hero",
+          "constructor"
+        ],
+        "x"
+      ],
+      "expect": {
+        "path": "sections.hero.constructor",
+        "code": "unknown_field"
+      }
+    },
+    {
+      "name": "empty page name",
+      "page": "home",
+      "set": [
+        [
+          "page"
+        ],
+        ""
+      ],
+      "expect": {
+        "path": "page",
+        "code": "unknown_page"
+      }
+    }
+  ]
+}

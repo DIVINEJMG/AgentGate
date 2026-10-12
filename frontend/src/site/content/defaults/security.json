@@ -1,0 +1,75 @@
+{
+  "contract": "audoryn.public.v2",
+  "page": "security",
+  "sections": {
+    "hero": {
+      "kicker": "Security",
+      "headline": "Every action has a boundary.",
+      "body": "AI can plan the work. Audoryn decides whether an external action is allowed, must wait for a person, or must stop.",
+      "primaryAction": {"label": "Follow the control path", "href": "/security#control-path"},
+      "secondaryAction": {"label": "Get started free", "href": "/signup"}
+    },
+    "decision": {
+      "kicker": "Deterministic authority, human oversight",
+      "headline": "Three possible answers. None of them decided by the model.",
+      "body": "Choose a decision to see what happens to the same request.",
+      "demo": {
+        "disclosure": "Illustrative example · not live data",
+        "worker": "Developer assistant",
+        "action": "Create an issue",
+        "target": "GitHub · product repository",
+        "checks": [
+          {"id": "identity", "label": "Agent identity", "detail": "The worker and its organization are confirmed"},
+          {"id": "capability", "label": "Declared capability", "detail": "The operation matches a granted scope"},
+          {"id": "policy", "label": "Risk and current policy", "detail": "Current conditions and the deterministic rule"}
+        ],
+        "outcomes": {
+          "allow": {"label": "Allow", "title": "The action may proceed.", "body": "A permitted request reaches the provider only after the current identity, capability, risk and policy checks pass.", "note": "Only an allowed request can call the provider."},
+          "review": {"label": "Require approval", "title": "The action waits for a person.", "body": "The run pauses and an authorized reviewer receives the request. Before an approved action resumes, Audoryn checks its authority again.", "note": "Approval is bound to the exact requested action."},
+          "deny": {"label": "Deny", "title": "The action stops here.", "body": "A denied request is blocked at the gateway. The connected provider is never called for that action.", "note": "Missing or uncertain authority fails closed."}
+        },
+        "record": {"reference": "REC-3117", "summary": "The request, each check, the decision and the result share one correlation reference."}
+      }
+    },
+    "controlPath": {
+      "kicker": "The control path",
+      "headline": "A connected tool does not grant permission to use it.",
+      "body": "Each request passes explicit checks before it reaches an external system. AI instructions and memory give context; they never become authority.",
+      "steps": [
+        {"id": "identity", "label": "Who", "title": "Identity", "body": "Confirm the worker and its organization."},
+        {"id": "capability", "label": "What", "title": "Capability", "body": "Match the requested operation to a declared scope."},
+        {"id": "policy", "label": "Now", "title": "Risk and policy", "body": "Evaluate current conditions against the deterministic rule."},
+        {"id": "outcome", "label": "Outcome", "title": "Act, wait or stop", "body": "Allow, require human approval, or deny."}
+      ]
+    },
+    "safeguards": {
+      "kicker": "Operational safeguards",
+      "headline": "Control continues after a decision.",
+      "body": "Authority can change while work is underway. Audoryn keeps the relevant checks and the human response in the execution path.",
+      "items": [
+        {"id": "identities", "title": "Distinct identities", "body": "A person's session cannot act as an AI worker. Every managed worker has its own agent identity, and organization boundaries are checked.", "icon": "identity"},
+        {"id": "credentials", "title": "Protected credentials", "body": "Connected provider credentials stay inside the backend credential boundary. Models never receive provider tokens or direct provider tools.", "icon": "credentials"},
+        {"id": "intervention", "title": "Human intervention", "body": "Sensitive actions can wait for review. An organization, worker or integration can be suspended without deleting its configuration.", "icon": "pause"},
+        {"id": "record", "title": "A record to inspect", "body": "Requests, decisions, approvals and provider outcomes carry correlation context, so operators can follow what happened.", "icon": "record"}
+      ]
+    },
+    "record": {
+      "kicker": "The record",
+      "headline": "What happened, who acted and why.",
+      "body": "Every decision leaves an entry that connects the request, the rule that applied and the result.",
+      "disclosure": "Illustrative records · example data",
+      "records": [
+        {"id": "rec-3115", "reference": "REC-3115", "actor": "Research analyst", "action": "Read issues in the product repository", "policy": "Read access to approved repositories", "decision": "allow", "outcome": "Completed · 14 issues read", "time": "09:12"},
+        {"id": "rec-3116", "reference": "REC-3116", "actor": "Operations coordinator", "action": "Post an update to #leadership", "policy": "Leadership channels need a reviewer", "decision": "review", "outcome": "Approved by Daniel K. · posted", "time": "09:31"},
+        {"id": "rec-3117", "reference": "REC-3117", "actor": "Developer assistant", "action": "Delete a branch", "policy": "Destructive repository actions are not granted", "decision": "deny", "outcome": "Blocked · provider not called", "time": "09:47"}
+      ]
+    },
+    "closing": {
+      "kicker": "Security by design",
+      "headline": "Useful autonomy needs clear authority.",
+      "body": "See how these controls fit into the product, then start with a worker and a defined job.",
+      "primaryAction": {"label": "Get started free", "href": "/signup"},
+      "secondaryAction": {"label": "Explore the product", "href": "/product"}
+    }
+  }
+}

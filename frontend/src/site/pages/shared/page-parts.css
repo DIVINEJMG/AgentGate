@@ -1,0 +1,36 @@
+/* Inner page hero */
+.page-hero .site-frame { padding-block: clamp(4rem, 2.5rem + 5vw, 7.5rem) clamp(3.5rem, 2.5rem + 4vw, 6rem); }
+.page-hero-grid { display: grid; gap: clamp(2.5rem, 1.5rem + 4vw, 5rem); }
+.page-hero.has-aside .page-hero-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; }
+.page-hero-copy .site-headline { max-width: 13ch; }
+.page-hero-lead { margin-top: 1.5rem; }
+.page-hero.is-center .page-hero-copy { display: grid; justify-items: center; max-width: 60rem; margin: 0 auto; text-align: center; }
+.page-hero.is-center .page-hero-lead { margin-inline: auto; }
+.page-hero.is-center .site-actions { justify-content: center; }
+@media (max-width: 64rem) { .page-hero.has-aside .page-hero-grid { grid-template-columns: 1fr; } }
+
+/* Check list */
+.page-checks { display: grid; gap: .625rem; margin-top: 1.75rem; }
+.page-checks li { display: flex; gap: .625rem; align-items: flex-start; font-size: .9375rem; }
+.page-checks svg { flex: none; margin-top: .25rem; color: var(--signal-ink); }
+.is-night .page-checks svg, .is-forest .page-checks svg { color: var(--signal); }
+
+/* Tool chip */
+.page-tool { display: inline-flex; align-items: center; gap: .5rem; font-size: .8125rem; }
+.page-tool .home-mark { width: 1.5rem; height: 1.5rem; border-radius: 6px; }
+.page-tool .home-mark img { width: 14px; height: 14px; }
+
+/* Small night card used inside light sections (worker profile, run, approvals) */
+.page-card { border: 1px solid var(--night-line); border-radius: 12px; background: var(--night-raised); color: var(--on-night); box-shadow: 0 2rem 4rem -2rem rgba(14, 23, 18, .45); overflow: hidden; }
+.page-card-bar { display: flex; align-items: center; gap: .625rem; height: 2.5rem; padding: 0 1rem; border-bottom: 1px solid var(--night-line); background: var(--night); color: var(--on-night-muted); font-family: var(--font-mono); font-size: .6875rem; letter-spacing: .06em; text-transform: uppercase; }
+.page-card-bar .cp-dot { flex: none; }
+.page-card-bar > :last-child { margin-left: auto; }
+.page-card-body { padding: 1.25rem; }
+.page-label { color: var(--on-night-muted); font-family: var(--font-mono); font-size: .6875rem; letter-spacing: .08em; text-transform: uppercase; }
+
+/* Two-column text + visual layout used across pages */
+.page-split { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(2.5rem, 1.5rem + 4vw, 5.5rem); align-items: center; }
+.page-split.is-reversed > :first-child { order: 2; }
+.page-split .site-section-header { margin-bottom: 0; }
+@media (max-width: 64rem) { .page-split { grid-template-columns: 1fr; } .page-split.is-reversed > :first-child { order: 0; } }
+.page-split .site-action.is-text { margin-top: 1.75rem; }

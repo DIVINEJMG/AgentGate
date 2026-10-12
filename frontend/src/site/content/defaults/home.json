@@ -1,0 +1,554 @@
+{
+  "contract": "audoryn.public.v2",
+  "page": "home",
+  "sections": {
+    "hero": {
+      "kicker": "AI workforce control plane",
+      "headline": "Put AI workers to work.",
+      "body": "Audoryn gives your organization one place to define AI workers, assign them real jobs, connect your tools and decide exactly what they may do.",
+      "primaryAction": {
+        "label": "Get started free",
+        "href": "/signup"
+      },
+      "secondaryAction": {
+        "label": "See how control works",
+        "href": "/security"
+      },
+      "typing": {
+        "template": "Every action in {place} is checked before it runs.",
+        "places": [
+          "GitHub",
+          "Slack",
+          "Gmail",
+          "Google Drive",
+          "Google Calendar",
+          "the browser"
+        ]
+      }
+    },
+    "activity": {
+      "kicker": "The record, as it happens",
+      "headline": "Every action leaves a trace.",
+      "body": "Requests, decisions and results arrive in one stream your team can inspect.",
+      "disclosure": "Illustrative event stream · example data",
+      "records": [
+        {
+          "id": "rec-2041",
+          "reference": "REC-2041",
+          "actor": "Research analyst",
+          "action": "Read open issues in product-repo",
+          "policy": "Read access to approved repositories",
+          "decision": "allow",
+          "outcome": "Completed",
+          "time": "09:38:12"
+        },
+        {
+          "id": "rec-2042",
+          "reference": "REC-2042",
+          "actor": "Support assistant",
+          "action": "Summarize 18 new messages",
+          "policy": "Mailbox read for triage",
+          "decision": "allow",
+          "outcome": "Brief ready for review",
+          "time": "09:39:47"
+        },
+        {
+          "id": "rec-2043",
+          "reference": "REC-2043",
+          "actor": "Operations coordinator",
+          "action": "Post an update to #leadership",
+          "policy": "Leadership channels need a reviewer",
+          "decision": "review",
+          "outcome": "Waiting for Daniel K.",
+          "time": "09:40:05"
+        },
+        {
+          "id": "rec-2044",
+          "reference": "REC-2044",
+          "actor": "Developer assistant",
+          "action": "Delete branch release/2.3",
+          "policy": "Destructive repository actions are not granted",
+          "decision": "deny",
+          "outcome": "Blocked · provider not called",
+          "time": "09:40:31"
+        },
+        {
+          "id": "rec-2045",
+          "reference": "REC-2045",
+          "actor": "Sales assistant",
+          "action": "Read tomorrow's meetings",
+          "policy": "Calendar read for meeting briefs",
+          "decision": "allow",
+          "outcome": "Completed",
+          "time": "09:41:02"
+        },
+        {
+          "id": "rec-2046",
+          "reference": "REC-2046",
+          "actor": "Operations coordinator",
+          "action": "Post an update to #leadership",
+          "policy": "Approved by Daniel K.",
+          "decision": "allow",
+          "outcome": "Posted",
+          "time": "09:41:36"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "decisions",
+          "label": "Decisions today",
+          "value": "1,284"
+        },
+        {
+          "id": "allowed",
+          "label": "Allowed automatically",
+          "value": "1,121"
+        },
+        {
+          "id": "held",
+          "label": "Held for a person",
+          "value": "142"
+        },
+        {
+          "id": "denied",
+          "label": "Denied at the gateway",
+          "value": "21"
+        }
+      ]
+    },
+    "decision": {
+      "kicker": "One action, three possible answers",
+      "headline": "AI can propose. Audoryn decides what happens next.",
+      "body": "Before an AI worker touches an external system, its request meets checks the model cannot rewrite.",
+      "demo": {
+        "disclosure": "Illustrative example · not live data",
+        "worker": "Operations coordinator",
+        "action": "Post a stakeholder update",
+        "target": "Slack · #leadership",
+        "checks": [
+          {
+            "id": "identity",
+            "label": "Agent identity confirmed",
+            "detail": "A separate identity, inside the right organization"
+          },
+          {
+            "id": "capability",
+            "label": "Capability declared",
+            "detail": "Post a message to an approved channel"
+          },
+          {
+            "id": "policy",
+            "label": "Policy evaluated",
+            "detail": "Messages to leadership need a reviewer"
+          }
+        ],
+        "outcomes": {
+          "allow": {
+            "label": "Allow",
+            "title": "The action proceeds.",
+            "body": "Identity, capability, risk and policy all pass, so the request reaches the provider.",
+            "note": "Only an allowed request can call the provider."
+          },
+          "review": {
+            "label": "Hold for review",
+            "title": "The action waits for a person.",
+            "body": "The run pauses. A named reviewer sees the request and its context, then approves or declines.",
+            "note": "Approval covers this exact action only."
+          },
+          "deny": {
+            "label": "Deny",
+            "title": "The action stops here.",
+            "body": "The request is blocked at the gateway and the provider is never called.",
+            "note": "Missing or uncertain authority fails closed."
+          }
+        },
+        "record": {
+          "reference": "REC-2048",
+          "summary": "Request, checks, decision, reviewer and result kept together in one record."
+        }
+      }
+    },
+    "product": {
+      "kicker": "The product",
+      "headline": "An operating system for your AI workforce.",
+      "body": "Create workers, give them real jobs, connect your tools and supervise the moments where human judgment matters.",
+      "items": [
+        {
+          "id": "create-workers",
+          "title": "Create workers",
+          "body": "Give each AI worker a role, responsibilities, working hours and a named human supervisor.",
+          "icon": "workers"
+        },
+        {
+          "id": "assign-work",
+          "title": "Assign work",
+          "body": "Turn business objectives into durable jobs that can be scheduled, queued and inspected.",
+          "icon": "jobs"
+        },
+        {
+          "id": "stay-in-control",
+          "title": "Stay in control",
+          "body": "Capabilities, policy, approvals and incident controls stay separate from AI reasoning.",
+          "icon": "governance"
+        }
+      ]
+    },
+    "controlPath": {
+      "kicker": "How controlled work moves",
+      "headline": "Autonomy with a visible boundary.",
+      "body": "From the first instruction to the final action, a worker can keep moving without ever becoming its own authority.",
+      "steps": [
+        {
+          "id": "defined",
+          "label": "Work",
+          "title": "Each worker gets a clear job.",
+          "body": "The objective, expected result and limits are defined before the work enters the queue."
+        },
+        {
+          "id": "policy",
+          "label": "Policy",
+          "title": "Authority is explicit.",
+          "body": "Connected tools expose what is possible. Capabilities, risk and policy decide what the worker may actually do."
+        },
+        {
+          "id": "approval",
+          "label": "Approval",
+          "title": "Judgment returns to a person.",
+          "body": "A sensitive action waits for a reviewer, and is checked against current authority again before it continues."
+        },
+        {
+          "id": "recorded",
+          "label": "Record",
+          "title": "The result and the reasons stay together.",
+          "body": "The request, decision and outcome remain connected in a record your team can inspect."
+        }
+      ]
+    },
+    "policy": {
+      "kicker": "Policy as code",
+      "headline": "The model proposes.",
+      "headlineDetail": "The rule decides.",
+      "body": "Authority lives in explicit, versioned rules outside the model. The same request always meets the same rule, and every decision is written to the record.",
+      "disclosure": "Illustrative example · simplified",
+      "tabs": [
+        {
+          "id": "policy",
+          "label": "Policy",
+          "language": "yaml",
+          "lines": [
+            "policy: leadership-channels",
+            "applies_to:",
+            "  worker: operations-coordinator",
+            "  capability: slack.post_message",
+            "when:",
+            "  channel: \"#leadership\"",
+            "decide: require_approval",
+            "approver: role:operations-lead",
+            "record: always"
+          ]
+        },
+        {
+          "id": "capability",
+          "label": "Capability",
+          "language": "yaml",
+          "lines": [
+            "capability: slack.post_message",
+            "provider: slack",
+            "scope: channels:write",
+            "granted_to:",
+            "  - operations-coordinator",
+            "risk: medium"
+          ]
+        },
+        {
+          "id": "record",
+          "label": "Record",
+          "language": "json",
+          "lines": [
+            "{",
+            "  \"record\": \"REC-2048\",",
+            "  \"worker\": \"operations-coordinator\",",
+            "  \"action\": \"slack.post_message\",",
+            "  \"policy\": \"leadership-channels\",",
+            "  \"decision\": \"held_for_review\",",
+            "  \"reviewer\": \"Daniel K.\",",
+            "  \"outcome\": \"approved, posted\"",
+            "}"
+          ]
+        }
+      ],
+      "proposal": "Post the weekly stakeholder update to #leadership.",
+      "decision": {
+        "decision": "review",
+        "text": "Held for an operations lead. The approval covers this exact message and is checked again before it is sent."
+      }
+    },
+    "operatingModel": {
+      "kicker": "The operating model",
+      "headline": "One place to understand what your AI workforce is doing.",
+      "body": "See workers, queued jobs, governance decisions and the moments that need human attention.",
+      "layers": [
+        {
+          "id": "workers",
+          "title": "Workers",
+          "subtitle": "Roles, identity, schedules",
+          "headline": "Every worker has a defined place in the workforce.",
+          "body": "A worker starts with a role, a responsibility, a schedule and a human supervisor. Its identity stays separate from the people who oversee it.",
+          "path": [
+            "Role",
+            "Identity",
+            "Supervisor"
+          ],
+          "signal": "Defined before work begins",
+          "icon": "workers"
+        },
+        {
+          "id": "jobs",
+          "title": "Jobs",
+          "subtitle": "Objectives, queue, runtime",
+          "headline": "Work moves with an objective and a visible state.",
+          "body": "Jobs carry the expected result, requirements and completion criteria into a durable queue. Teams can see what is waiting, running and complete.",
+          "path": [
+            "Objective",
+            "Queue",
+            "Result"
+          ],
+          "signal": "Work stays inspectable",
+          "icon": "jobs"
+        },
+        {
+          "id": "governance",
+          "title": "Governance",
+          "subtitle": "Policy, risk, approvals",
+          "headline": "Authority is checked at the action boundary.",
+          "body": "A connected tool is never permission on its own. Capabilities, risk and policy decide whether an action proceeds or waits for approval.",
+          "path": [
+            "Request",
+            "Policy",
+            "Decision"
+          ],
+          "signal": "Authority is explicit",
+          "icon": "governance"
+        },
+        {
+          "id": "supervision",
+          "title": "Supervision",
+          "subtitle": "Escalations, incidents, audit",
+          "headline": "People see the moments that need them.",
+          "body": "Exceptional work is routed to a named person. The decision and its outcome stay together in an audit record.",
+          "path": [
+            "Signal",
+            "Person",
+            "Record"
+          ],
+          "signal": "Human attention stays visible",
+          "icon": "supervision"
+        }
+      ]
+    },
+    "oversight": {
+      "kicker": "Human oversight",
+      "headline": "Autonomous where appropriate.",
+      "headlineDetail": "Human where it matters.",
+      "body": "Workers keep moving through routine work. Decisions that need judgment return to a person with the context to act.",
+      "figureLabel": "Where people step in",
+      "points": [
+        "Approval",
+        "Exception",
+        "Review"
+      ],
+      "image": {
+        "asset": "de5cb793-7e09-5703-8021-c31ecd15ab0c",
+        "alt": "Two colleagues reviewing a decision together at a table"
+      }
+    },
+    "controls": {
+      "kicker": "The boundaries in practice",
+      "headline": "Control is part of the architecture.",
+      "body": "The boundary around an action stays visible from identity through to the final record.",
+      "items": [
+        {
+          "id": "capabilities",
+          "title": "Capabilities",
+          "body": "Define the actions an AI worker may attempt.",
+          "icon": "capability"
+        },
+        {
+          "id": "policy",
+          "title": "Policy",
+          "body": "Make authorization deterministic instead of leaving it to model judgment.",
+          "icon": "policy"
+        },
+        {
+          "id": "approvals",
+          "title": "Approvals",
+          "body": "Require a person before sensitive work can continue.",
+          "icon": "approval"
+        },
+        {
+          "id": "supervision",
+          "title": "Supervision",
+          "body": "Route exceptional autonomous work to a named human.",
+          "icon": "supervision"
+        },
+        {
+          "id": "audit",
+          "title": "Audit",
+          "body": "Keep what happened, who acted and why a decision was made.",
+          "icon": "audit"
+        }
+      ],
+      "link": {
+        "label": "Read about security",
+        "href": "/security"
+      }
+    },
+    "connections": {
+      "kicker": "Connections",
+      "headline": "Works where your company already works.",
+      "body": "Each connection exposes a bounded set of operations. Every one still passes capability, policy and approval before it runs.",
+      "items": [
+        {
+          "id": "github",
+          "provider": "github",
+          "name": "GitHub",
+          "use": "Repository and issue workflows"
+        },
+        {
+          "id": "slack",
+          "provider": "slack",
+          "name": "Slack",
+          "use": "Team conversations"
+        },
+        {
+          "id": "gmail",
+          "provider": "gmail",
+          "name": "Gmail",
+          "use": "Mailbox context and recent messages"
+        },
+        {
+          "id": "google-drive",
+          "provider": "google-drive",
+          "name": "Google Drive",
+          "use": "Documents and files"
+        },
+        {
+          "id": "google-calendar",
+          "provider": "google-calendar",
+          "name": "Google Calendar",
+          "use": "Calendar context"
+        },
+        {
+          "id": "browser",
+          "provider": "browser",
+          "name": "Governed browser",
+          "use": "Approved site interactions"
+        }
+      ],
+      "boundary": {
+        "title": "Authority is checked before execution.",
+        "stages": [
+          "Capability",
+          "Policy",
+          "Approval"
+        ]
+      },
+      "note": "A connection is not a permission. It only makes an action possible; Audoryn decides whether it may happen."
+    },
+    "solutions": {
+      "kicker": "Solutions",
+      "headline": "Built for different kinds of work.",
+      "body": "Start with a defined responsibility. Give the worker room to move, with a person and a policy around the actions that matter.",
+      "items": [
+        {
+          "id": "operations",
+          "kicker": "Operations",
+          "title": "Keep recurring work moving. Keep exceptions visible.",
+          "body": "Scheduled work, connected tools and a clear handoff when conditions change.",
+          "link": {
+            "label": "Explore operations",
+            "href": "/solutions#operations"
+          },
+          "icon": "operations",
+          "image": {
+            "asset": "262bf108-0e0b-58ab-835f-9bd73d8c353c",
+            "alt": "A logistics operations floor with a supervisor overseeing the work"
+          }
+        },
+        {
+          "id": "research",
+          "kicker": "Research",
+          "title": "Turn open questions into work you can inspect.",
+          "body": "Collect and structure findings while people stay responsible for the result.",
+          "link": {
+            "label": "Explore research",
+            "href": "/solutions#research"
+          },
+          "icon": "research",
+          "image": {
+            "asset": "a201f4ad-5d40-51eb-8948-a5c1b09319d1",
+            "alt": "Research materials being reviewed at a worktable"
+          }
+        },
+        {
+          "id": "customer-support",
+          "kicker": "Customer support",
+          "title": "See what needs attention first.",
+          "body": "A prioritized view of the inbox, prepared for the team to act on.",
+          "link": {
+            "label": "Explore customer support",
+            "href": "/solutions#customer-support"
+          },
+          "icon": "support"
+        },
+        {
+          "id": "sales",
+          "kicker": "Sales",
+          "title": "Arrive prepared for the next meeting.",
+          "body": "Meeting context gathered ahead of time, with follow-up kept under supervision.",
+          "link": {
+            "label": "Explore sales",
+            "href": "/solutions#sales"
+          },
+          "icon": "sales"
+        },
+        {
+          "id": "marketing",
+          "kicker": "Marketing",
+          "title": "Make campaign context easier to use.",
+          "body": "Recent material summarized so the team knows what matters.",
+          "link": {
+            "label": "Explore marketing",
+            "href": "/solutions#marketing"
+          },
+          "icon": "marketing"
+        },
+        {
+          "id": "engineering",
+          "kicker": "Engineering",
+          "title": "Stay close to repository work.",
+          "body": "Issues and pull requests turned into a concise status brief.",
+          "link": {
+            "label": "Explore engineering",
+            "href": "/solutions#engineering"
+          },
+          "icon": "engineering"
+        }
+      ]
+    },
+    "closing": {
+      "kicker": "Audoryn",
+      "headline": "Give AI real work.",
+      "headlineDetail": "Keep authority explicit.",
+      "body": "Start with a small supervised workforce and grow from there.",
+      "primaryAction": {
+        "label": "Get started free",
+        "href": "/signup"
+      },
+      "secondaryAction": {
+        "label": "Explore the product",
+        "href": "/product"
+      }
+    }
+  }
+}

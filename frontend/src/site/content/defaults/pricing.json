@@ -1,0 +1,151 @@
+{
+  "contract": "audoryn.public.v2",
+  "page": "pricing",
+  "sections": {
+    "hero": {
+      "kicker": "Pricing",
+      "headline": "Start free.",
+      "headlineDetail": "Grow with the work.",
+      "body": "Choose capacity for the number of AI workers you need. The same authority and oversight model applies at every size.",
+      "primaryAction": {
+        "label": "Start on Free",
+        "href": "/signup"
+      },
+      "secondaryAction": {
+        "label": "Compare plans",
+        "href": "/pricing#plans"
+      }
+    },
+    "plans": {
+      "kicker": "Plans",
+      "headline": "Capacity at a glance.",
+      "body": "Monthly prices in US dollars. Paid plans can't be bought yet.",
+      "plans": [
+        {
+          "key": "free",
+          "name": "Free",
+          "audience": "Start with a small supervised workforce.",
+          "priceMinor": 0,
+          "currency": "USD",
+          "period": "month",
+          "workerLimit": 3,
+          "availability": "free-signup",
+          "status": "Available now",
+          "features": [
+            "The full control model",
+            "Connected tools and inspectable results"
+          ],
+          "action": {
+            "label": "Get started free",
+            "href": "/signup"
+          }
+        },
+        {
+          "key": "team",
+          "name": "Team",
+          "audience": "Coordinate a growing workforce across a team.",
+          "priceMinor": 4900,
+          "currency": "USD",
+          "period": "month",
+          "workerLimit": 15,
+          "availability": "unavailable",
+          "status": "Catalog plan",
+          "features": [
+            "The full control model"
+          ]
+        },
+        {
+          "key": "business",
+          "name": "Business",
+          "audience": "Run more workers across recurring company work.",
+          "priceMinor": 19900,
+          "currency": "USD",
+          "period": "month",
+          "workerLimit": 75,
+          "availability": "unavailable",
+          "status": "Catalog plan",
+          "features": [
+            "The full control model"
+          ]
+        },
+        {
+          "key": "scale",
+          "name": "Scale",
+          "audience": "Plan for a larger governed workforce.",
+          "priceMinor": 49900,
+          "currency": "USD",
+          "period": "month",
+          "workerLimit": 250,
+          "availability": "unavailable",
+          "status": "Catalog plan",
+          "features": [
+            "The full control model"
+          ]
+        }
+      ],
+      "notice": {
+        "title": "Paid plans aren't open yet",
+        "body": "New organizations start on Free. Team, Business and Scale describe the product catalog; checkout is not connected yet, so they are not a live offer."
+      }
+    },
+    "sameModel": {
+      "kicker": "The same control model",
+      "headline": "Capacity changes.",
+      "headlineDetail": "Authority does not.",
+      "items": [
+        {
+          "id": "checks",
+          "title": "Capability and policy checks",
+          "body": "Every external action is checked, on every plan.",
+          "icon": "policy"
+        },
+        {
+          "id": "approval",
+          "title": "Human approval",
+          "body": "Actions wait for a person whenever the rule requires it.",
+          "icon": "approval"
+        },
+        {
+          "id": "results",
+          "title": "Connected tools, inspectable results",
+          "body": "Work runs through the same gateway and leaves the same record.",
+          "icon": "record"
+        }
+      ]
+    },
+    "questions": {
+      "kicker": "Common questions",
+      "headline": "Before you begin.",
+      "items": [
+        {
+          "id": "start-free",
+          "question": "Can I start without a paid plan?",
+          "answer": "Yes. New organizations start on Free, which supports up to three managed workers."
+        },
+        {
+          "id": "buy-today",
+          "question": "Can I buy Team, Business or Scale today?",
+          "answer": "Not yet. The paid plans are in the product catalog, but a billing provider and checkout are not connected."
+        },
+        {
+          "id": "more-authority",
+          "question": "Does a larger plan give workers more authority?",
+          "answer": "No. Plan capacity is separate from identity, capability, risk, policy, approvals and incident controls."
+        }
+      ]
+    },
+    "closing": {
+      "kicker": "Start with Audoryn",
+      "headline": "Put the first worker to work.",
+      "body": "Begin on Free and define a clear role, job and supervisor.",
+      "primaryAction": {
+        "label": "Get started free",
+        "href": "/signup"
+      },
+      "secondaryAction": {
+        "label": "Explore the product",
+        "href": "/product"
+      }
+    }
+  }
+}

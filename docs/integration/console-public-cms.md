@@ -1,5 +1,11 @@
 # AgentGate public content integration
 
+> **Superseded on 12 October 2026 (public site Phase 11).** This describes the previous public
+> content model (`audoryn.public.v1`) and its renderer, seed and scripts, which have been removed.
+> The current site and its Console contract are in `docs/public-site/` (start with
+> `implementation-plan.md` and `console-cms-v2-handover.md`). Kept as a historical record.
+
+
 ## Ownership and execution
 
 Console owns content, revisions, media verification and editorial publication. AgentGate's frontend owns rendering, layout, animation, icons and interaction rules. The customer backend has no CMS database connection or delivery job. No Docker is needed.

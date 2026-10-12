@@ -1,0 +1,67 @@
+{
+  "contract": "audoryn.public.v2",
+  "page": "terms",
+  "sections": {
+    "document": {
+      "title": "Clear terms for controlled work.",
+      "summary": "How accounts, connected systems and AI workers are expected to be used in Audoryn.",
+      "effectiveDate": "2026-10-11",
+      "version": "2026-10-11",
+      "scopeNote": "These product-use terms describe the current Audoryn service. A signed agreement with SOT, where one exists, may set additional or different commercial and legal terms.",
+      "clauses": [
+        {
+          "id": "accounts",
+          "heading": "Accounts and workspace authority",
+          "paragraphs": [
+            "Use Audoryn through an account you control, and only for an organization you are authorized to represent. Workspace owners and administrators manage human membership and roles. Keep credentials and invitation links private, and remove access when a person or integration no longer needs it."
+          ],
+          "points": []
+        },
+        {
+          "id": "permitted-use",
+          "heading": "Permitted use",
+          "paragraphs": [
+            "Configure workers, jobs and connected systems only where you have permission to access the underlying data and take the requested actions. Do not use Audoryn to bypass another service's access controls, collect data without authority, or interfere with Audoryn's identity, policy, approval, audit or incident controls."
+          ],
+          "points": []
+        },
+        {
+          "id": "ai-work",
+          "heading": "AI work and human decisions",
+          "paragraphs": [
+            "Audoryn can plan work and prepare or carry out actions within configured capabilities and policy. A policy may allow, deny or require human approval for an action. Organizations remain responsible for the workers, instructions, policies, integrations and review practices they configure, including checking generated output before relying on it for consequential decisions."
+          ],
+          "points": [
+            "A template creates draft records; it does not connect tools or authorize execution.",
+            "Human approval applies when the configured policy requires it. It is not a blanket approval step for every action."
+          ]
+        },
+        {
+          "id": "providers",
+          "heading": "Connected providers",
+          "paragraphs": [
+            "If you connect a third-party service, you authorize Audoryn to use the credentials and permissions you provide for the operations you configure and permit. The connected provider controls its own account, availability, permissions and terms. Disconnect integrations that should no longer be used."
+          ],
+          "points": []
+        },
+        {
+          "id": "plans",
+          "heading": "Plans and limits",
+          "paragraphs": [
+            "The Free workspace is the current self-service starting point. Team, Business and Scale appear in the product catalog, but there is no connected checkout or self-service paid upgrade yet. Worker capacity and usage limits are enforced according to the plan assigned to the organization; a displayed catalog price does not by itself activate a paid subscription."
+          ],
+          "points": []
+        },
+        {
+          "id": "changes",
+          "heading": "Service changes and records",
+          "paragraphs": [
+            "Audoryn uses versioned APIs and may change available features, model configuration, providers or limits as the service develops. Work can pause or fail when a provider is unavailable, a session expires, a limit is reached, or a security control blocks execution. Audit and operational records may remain after an individual worker, job or integration is removed."
+          ],
+          "points": []
+        }
+      ],
+      "related": {"label": "Read the privacy overview", "href": "/privacy"}
+    }
+  }
+}

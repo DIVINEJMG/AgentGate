@@ -1,0 +1,26 @@
+.site-footer { background: var(--forest); color: var(--on-night); }
+.site-footer-frame { width: min(100% - 2 * var(--gutter), var(--container)); margin-inline: auto; padding-inline: var(--inset); border-inline: 1px solid #3a5245; }
+.site-footer-grid { display: grid; grid-template-columns: minmax(14rem, 1.2fr) minmax(0, 2.8fr); gap: 3rem; padding-block: clamp(3.5rem, 2.5rem + 3vw, 5rem); }
+.site-footer .site-wordmark { color: var(--on-night); }
+.site-footer .site-wordmark img { filter: brightness(0) invert(1); opacity: .92; }
+.site-footer-brand p { max-width: 20rem; margin-top: 1rem; color: var(--on-night-muted); font-size: var(--text-small); }
+/* The footer keeps its height as Console adds content:
+   - more groups narrow the columns and the space between them (2rem down to 1rem); a group moves
+     to a new row only when its column would fall below 6rem;
+   - more links tighten each row, from 2rem down to 1.5rem (still a comfortable tap target), so
+     five links take the same height as four;
+   - titles share one row (subgrid), so every list starts on the same line. */
+.site-footer-nav { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(6rem, 100%), 1fr)); column-gap: clamp(1rem, calc(8rem / var(--footer-groups, 4)), 2rem); row-gap: 2rem; }
+.site-footer-nav > div { display: grid; grid-row: span 2; grid-template-rows: subgrid; row-gap: 0; }
+.site-footer-nav a { overflow-wrap: anywhere; }
+.site-footer-nav h2 { margin-bottom: 1rem; color: var(--on-night-muted); font-family: var(--font-mono); font-size: .6875rem; font-weight: 400; letter-spacing: .08em; text-transform: uppercase; }
+.site-footer-nav ul { display: grid; align-content: start; gap: .125rem; }
+.site-footer-nav a { display: inline-flex; min-height: clamp(1.5rem, calc(8.5rem / var(--footer-links, 4)), 2rem); align-items: center; color: var(--on-night); font-size: var(--text-small); opacity: .86; }
+.site-footer-nav a:hover { opacity: 1; color: var(--signal); }
+.site-footer-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 2rem; padding-block: 1.25rem 2rem; border-top: 1px solid #3a5245; color: var(--on-night-muted); font-family: var(--font-mono); font-size: .75rem; }
+.site-footer :focus-visible { outline-color: var(--signal); }
+@media (max-width: 62rem) { .site-footer-grid { grid-template-columns: 1fr; } }
+@media (max-width: 40rem) {
+  .site-footer-frame { border-inline: 0; padding-inline: 0; }
+  .site-footer-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 2.5rem; }
+}

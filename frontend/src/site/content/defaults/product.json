@@ -1,0 +1,261 @@
+{
+  "contract": "audoryn.public.v2",
+  "page": "product",
+  "sections": {
+    "hero": {
+      "kicker": "Product",
+      "headline": "Give work to AI.",
+      "headlineDetail": "Keep people in control.",
+      "body": "Build a supervised AI workforce for the work your organization already does. Define the role, assign the job, connect the tools and see every important decision.",
+      "primaryAction": {
+        "label": "Get started free",
+        "href": "/signup"
+      },
+      "secondaryAction": {
+        "label": "Explore the product",
+        "href": "/product#workspace"
+      }
+    },
+    "workspace": {
+      "kicker": "The workspace",
+      "headline": "People and AI, in one clear structure.",
+      "body": "Workers, their jobs and the decisions waiting for a person, side by side.",
+      "disclosure": "Illustrative workspace · example data",
+      "organization": "Northstar Operations",
+      "workers": [
+        {
+          "id": "research-analyst",
+          "name": "Research analyst",
+          "team": "Insights",
+          "supervisor": "Ada M.",
+          "status": "Active"
+        },
+        {
+          "id": "operations-coordinator",
+          "name": "Operations coordinator",
+          "team": "Operations",
+          "supervisor": "Daniel K.",
+          "status": "Active"
+        }
+      ],
+      "jobs": [
+        {
+          "id": "weekly-research-brief",
+          "title": "Compile weekly research brief",
+          "worker": "Research analyst",
+          "trigger": "Scheduled",
+          "status": "completed"
+        },
+        {
+          "id": "release-activity",
+          "title": "Review release activity",
+          "worker": "Operations coordinator",
+          "trigger": "Triggered",
+          "status": "running"
+        },
+        {
+          "id": "stakeholder-update",
+          "title": "Prepare stakeholder update",
+          "worker": "Operations coordinator",
+          "trigger": "Scheduled",
+          "status": "held"
+        }
+      ],
+      "approval": {
+        "title": "Post stakeholder update",
+        "body": "The operations coordinator asked to send a Slack message. The run is paused while a reviewer checks the request and its context.",
+        "requestedBy": "Operations coordinator",
+        "reviewer": "Daniel K."
+      }
+    },
+    "workforce": {
+      "kicker": "The workforce",
+      "headline": "Make the work clear before it begins.",
+      "body": "A useful AI worker needs more than a prompt. Give it a role, working hours and a named supervisor, and give each job an objective, requirements and a clear definition of done.",
+      "figureLabel": "Worker profile",
+      "disclosure": "Illustrative worker · example data",
+      "profile": {
+        "role": "Research analyst",
+        "team": "Insights",
+        "supervisor": "Ada M.",
+        "job": "Gather relevant sources, summarize findings and deliver a structured brief.",
+        "schedule": "Mon · 09:00",
+        "checkpoint": "Review before delivery",
+        "status": "Active",
+        "path": [
+          "Role",
+          "Job",
+          "Queue"
+        ]
+      },
+      "points": [
+        "Named roles and supervisors",
+        "Defined working hours",
+        "Scheduled and triggered jobs",
+        "A separate security identity for every worker"
+      ]
+    },
+    "runtime": {
+      "kicker": "The runtime",
+      "headline": "From assignment to a traceable result.",
+      "body": "Jobs enter a durable queue. Runs have steps, checkpoints, retries and a recorded outcome, so work can be followed instead of guessed at.",
+      "disclosure": "Illustrative run · example data",
+      "runTitle": "Weekly research brief",
+      "steps": [
+        {
+          "id": "read-context",
+          "title": "Read assigned context",
+          "detail": "Sources and job requirements loaded",
+          "state": "done"
+        },
+        {
+          "id": "plan",
+          "title": "Plan the work",
+          "detail": "Bounded AI planning",
+          "state": "done"
+        },
+        {
+          "id": "collect",
+          "title": "Collect observations",
+          "detail": "Connected tools, governed access",
+          "state": "active"
+        },
+        {
+          "id": "assess",
+          "title": "Assess completion",
+          "detail": "Compare the result with the job criteria",
+          "state": "waiting"
+        }
+      ],
+      "points": [
+        "Objective and completion criteria",
+        "Checkpoints and retries",
+        "Run history retained"
+      ]
+    },
+    "intelligence": {
+      "kicker": "AI models",
+      "headline": "Intelligence where it helps.",
+      "headlineDetail": "Authority where it belongs.",
+      "body": "Audoryn routes each kind of AI work to models suited to it. A model can reason about the task; Audoryn still controls what may happen outside it.",
+      "items": [
+        {
+          "id": "planning",
+          "title": "Planning and coordination",
+          "body": "Models help plan managed runs, prepare jobs and resolve which tools a task needs, within a fixed time and usage budget.",
+          "icon": "model"
+        },
+        {
+          "id": "conversation",
+          "title": "Working with your workers",
+          "body": "Talk to a worker about its job in plain language; the answer comes back in the same conversation.",
+          "icon": "workers"
+        },
+        {
+          "id": "vision",
+          "title": "Visual understanding",
+          "body": "Uploaded images can be analysed and the relevant findings returned for the task.",
+          "icon": "research"
+        },
+        {
+          "id": "no-authority",
+          "title": "Analysis, not authority",
+          "body": "Models never receive provider credentials or direct access to connected tools. Every action still passes capability, policy and approval.",
+          "icon": "lock"
+        }
+      ]
+    },
+    "supervision": {
+      "kicker": "Supervision",
+      "headline": "The moments that matter come back to a person.",
+      "body": "Policy can allow, deny or hold an action for review. A held run waits while a person sees the context, decides, and leaves a record.",
+      "figureLabel": "The decision path",
+      "points": [
+        "Request",
+        "Policy",
+        "Human review",
+        "Recorded outcome"
+      ],
+      "image": {
+        "asset": "de5cb793-7e09-5703-8021-c31ecd15ab0c",
+        "alt": "Colleagues reviewing a decision together"
+      },
+      "link": {
+        "label": "Explore the security model",
+        "href": "/security"
+      }
+    },
+    "integrations": {
+      "kicker": "Integrations",
+      "headline": "Work across the tools your team already uses.",
+      "body": "Connect workplace systems to Audoryn's governed action gateway. Each provider exposes defined capabilities.",
+      "items": [
+        {
+          "id": "github",
+          "provider": "github",
+          "name": "GitHub",
+          "use": "Repository and issue workflows"
+        },
+        {
+          "id": "gmail",
+          "provider": "gmail",
+          "name": "Gmail",
+          "use": "Mailbox context and recent messages"
+        },
+        {
+          "id": "google-drive",
+          "provider": "google-drive",
+          "name": "Google Drive",
+          "use": "Documents and files"
+        },
+        {
+          "id": "slack",
+          "provider": "slack",
+          "name": "Slack",
+          "use": "Team conversations"
+        },
+        {
+          "id": "google-calendar",
+          "provider": "google-calendar",
+          "name": "Google Calendar",
+          "use": "Calendar context"
+        },
+        {
+          "id": "browser",
+          "provider": "browser",
+          "name": "Governed browser",
+          "use": "Approved site interactions"
+        },
+        {
+          "id": "web-research",
+          "provider": "web-research",
+          "name": "Web research",
+          "use": "Read-only research from configured sources"
+        }
+      ],
+      "boundary": {
+        "title": "Authority is checked before execution.",
+        "stages": [
+          "Capability",
+          "Policy",
+          "Approval"
+        ]
+      },
+      "note": "A connection alone never gives a worker permission to act. Available operations depend on provider setup, declared capabilities and policy."
+    },
+    "closing": {
+      "kicker": "Start with a defined worker",
+      "headline": "Bring AI into the workflow.",
+      "headlineDetail": "Keep the organization in charge.",
+      "body": "Start small, make authority explicit and grow the workforce as the work proves useful.",
+      "primaryAction": {
+        "label": "Get started free",
+        "href": "/signup"
+      },
+      "secondaryAction": {
+        "label": "See the control model",
+        "href": "/security"
+      }
+    }
+  }
+}

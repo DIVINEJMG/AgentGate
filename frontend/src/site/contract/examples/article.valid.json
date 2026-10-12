@@ -1,0 +1,17 @@
+{
+  "contract": "audoryn.public.v2",
+  "page": "article",
+  "sections": {
+    "article": {
+      "kicker": "Guide",
+      "title": "Setting up your first supervised worker",
+      "summary": "A short walk-through from role to first approved action.",
+      "published": "2026-10-11",
+      "author": "Audoryn team",
+      "sections": [
+        {"id": "role", "heading": "Start with a role", "paragraphs": ["Name the responsibility and the person who supervises it."], "points": [], "links": []},
+        {"id": "job", "heading": "Give it one job", "paragraphs": ["Write the objective and what done looks like."], "points": ["Objective", "Completion criteria"], "links": [{"label": "See solutions", "href": "/solutions"}]}
+      ]
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "contract": "audoryn.public.v2",
+  "page": "resources",
+  "sections": {
+    "hero": {
+      "kicker": "Resources",
+      "headline": "Know the system.",
+      "headlineDetail": "Then put it to work.",
+      "body": "Clear starting points for understanding the product, finding a use case and seeing how autonomous work stays controlled.",
+      "primaryAction": {"label": "Start with the product", "href": "/product"},
+      "secondaryAction": {"label": "Understand security", "href": "/security"}
+    },
+    "guides": {
+      "kicker": "Field guide",
+      "headline": "Four ways in.",
+      "body": "Start with what you need to know.",
+      "items": [
+        {"id": "product", "kicker": "The platform", "title": "Explore the product", "body": "See how workers, jobs, runtime, supervision and connected tools fit together.", "link": {"label": "Explore the product", "href": "/product"}, "icon": "boxes"},
+        {"id": "solutions", "kicker": "Where it fits", "title": "Find a starting point", "body": "Browse practical responsibilities supported by Audoryn's workforce templates.", "link": {"label": "Find a starting point", "href": "/solutions"}, "icon": "compass"},
+        {"id": "security", "kicker": "The control model", "title": "Understand security", "body": "Follow an action through identity, capability, policy and human review.", "link": {"label": "Understand security", "href": "/security"}, "icon": "lock"},
+        {"id": "pricing", "kicker": "Capacity", "title": "Review plan structure", "body": "Compare worker capacity and see current plan availability.", "link": {"label": "Review plans", "href": "/pricing"}, "icon": "scale"}
+      ]
+    },
+    "library": {
+      "kicker": "Library",
+      "headline": "Articles and guides.",
+      "body": "Published writing from the Audoryn team."
+    },
+    "operators": {
+      "kicker": "For operators",
+      "headline": "Guidance lives with the work.",
+      "paragraphs": ["Signed-in teams find operational guidance inside the workspace, next to runtime, authorization and incident controls."],
+      "link": {"label": "Open the workspace", "href": "/app"}
+    }
+  }
+}

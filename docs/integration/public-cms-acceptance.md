@@ -1,5 +1,11 @@
 # Public CMS implementation acceptance
 
+> **Superseded on 12 October 2026 (public site Phase 11).** This describes the previous public
+> content model (`audoryn.public.v1`) and its renderer, seed and scripts, which have been removed.
+> The current site and its Console contract are in `docs/public-site/` (start with
+> `implementation-plan.md` and `console-cms-v2-handover.md`). Kept as a historical record.
+
+
 Verified locally on 10 October 2026. This report concerns AgentGate's public frontend only. Console remains the content owner; no customer-backend CMS work, database migration, cloud change, credential change, live import, publication or deployment was performed.
 
 ## Delivered files

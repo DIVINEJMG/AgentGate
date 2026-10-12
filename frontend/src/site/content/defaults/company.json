@@ -1,0 +1,57 @@
+{
+  "contract": "audoryn.public.v2",
+  "page": "company",
+  "sections": {
+    "hero": {
+      "kicker": "Company",
+      "headline": "Built by SOT.",
+      "headlineDetail": "Made for real work.",
+      "body": "Audoryn is an SOT product. It brings AI workers into practical workflows while keeping authority, review and responsibility visible to people.",
+      "primaryAction": {"label": "Meet the company", "href": "/company#about"},
+      "secondaryAction": {"label": "Explore Audoryn", "href": "/product"}
+    },
+    "about": {
+      "kicker": "About SOT",
+      "headline": "A practice of turning ideas into working software.",
+      "paragraphs": [
+        "SOT is the product brand founded by Divine Ogadinma Destiny in Nigeria. Its public portfolio spans web products, data analytics and intelligent automation.",
+        "Audoryn extends that work into autonomous software: a place to define what AI workers can do, supervise what they are doing and keep consequential decisions accountable."
+      ],
+      "link": {"label": "Visit SOT Brand", "href": "https://sot-org.onrender.com/sot-brand"}
+    },
+    "portfolio": {
+      "kicker": "Public portfolio",
+      "headline": "More than one product.",
+      "headlineDetail": "One way of building.",
+      "body": "Three projects from SOT's public site show the range of work behind the brand.",
+      "items": [
+        {"id": "sot-cm", "kicker": "Content operations", "title": "SOT CM", "body": "Publishing workflows and administrative control for websites.", "link": {"label": "View SOT CM", "href": "https://sot-org.onrender.com/products/sot-cms"}, "icon": "document"},
+        {"id": "sot-track", "kicker": "Delivery visibility", "title": "SOT Track", "body": "Planning, tracking and visibility into delivery.", "link": {"label": "View SOT Track", "href": "https://sot-org.onrender.com/products/sot-track"}, "icon": "check"},
+        {"id": "sot-browser", "kicker": "Desktop software", "title": "SOT Browser", "body": "A native browser with smart handoff and installer distribution.", "link": {"label": "View SOT Browser", "href": "https://sot-org.onrender.com/products/sot-browser"}, "icon": "browser"}
+      ]
+    },
+    "why": {
+      "kicker": "Why Audoryn",
+      "headline": "When software can act,",
+      "headlineDetail": "who stays in control?",
+      "paragraphs": ["Audoryn is SOT's answer to a practical product question: give AI workers clear responsibilities and useful tools, then make their boundaries, approvals and activity understandable to the people operating them."],
+      "link": {"label": "Explore Audoryn", "href": "/product"}
+    },
+    "founder": {
+      "kicker": "The founder",
+      "headline": "Building across software, data and automation.",
+      "name": "Divine Ogadinma Destiny",
+      "role": "Founder of SOT",
+      "location": "Nigeria",
+      "paragraphs": ["Full-stack developer and technology entrepreneur. SOT's public portfolio documents the products and projects behind that work."],
+      "link": {"label": "Explore the SOT portfolio", "href": "https://sot-org.onrender.com/"}
+    },
+    "closing": {
+      "kicker": "Start with the product",
+      "headline": "See the work.",
+      "headlineDetail": "Keep the control.",
+      "primaryAction": {"label": "Get started free", "href": "/signup"},
+      "secondaryAction": {"label": "Explore the product", "href": "/product"}
+    }
+  }
+}

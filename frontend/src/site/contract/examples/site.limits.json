@@ -1,0 +1,741 @@
+{
+  "contract": "audoryn.public.v2",
+  "page": "site",
+  "brand": {
+    "name": "Audoryn",
+    "owner": "An SOT product",
+    "tagline": "Controlled infrastructure for an autonomous AI workforce.",
+    "legal": "© 2026 SOT"
+  },
+  "actions": {
+    "signIn": {
+      "label": "Sign in",
+      "href": "/login"
+    },
+    "getStarted": {
+      "label": "Get started",
+      "href": "/signup"
+    }
+  },
+  "navigation": {
+    "header": [
+      {
+        "id": "m0",
+        "label": "Product",
+        "href": "/product",
+        "intro": "Everything about product, with the controls that keep AI work accountable.",
+        "children": [
+          {
+            "id": "c0",
+            "label": "Overview",
+            "href": "/product",
+            "description": "A longer description that explains what overview covers in this part of the product."
+          },
+          {
+            "id": "c1",
+            "label": "Workforce",
+            "href": "/product",
+            "description": "A longer description that explains what workforce covers in this part of the product."
+          },
+          {
+            "id": "c2",
+            "label": "Governance",
+            "href": "/product",
+            "description": "A longer description that explains what governance covers in this part of the product."
+          },
+          {
+            "id": "c3",
+            "label": "Integrations",
+            "href": "/product",
+            "description": "A longer description that explains what integrations covers in this part of the product."
+          },
+          {
+            "id": "c4",
+            "label": "Approvals and reviews",
+            "href": "/product",
+            "description": "A longer description that explains what approvals and reviews covers in this part of the product."
+          },
+          {
+            "id": "c5",
+            "label": "Audit records",
+            "href": "/product",
+            "description": "A longer description that explains what audit records covers in this part of the product."
+          }
+        ]
+      },
+      {
+        "id": "m1",
+        "label": "Solutions",
+        "href": "/solutions",
+        "intro": "Everything about solutions, with the controls that keep AI work accountable.",
+        "children": [
+          {
+            "id": "c0",
+            "label": "Overview",
+            "href": "/solutions",
+            "description": "A longer description that explains what overview covers in this part of the product."
+          },
+          {
+            "id": "c1",
+            "label": "Workforce",
+            "href": "/solutions",
+            "description": "A longer description that explains what workforce covers in this part of the product."
+          },
+          {
+            "id": "c2",
+            "label": "Governance",
+            "href": "/solutions",
+            "description": "A longer description that explains what governance covers in this part of the product."
+          },
+          {
+            "id": "c3",
+            "label": "Integrations",
+            "href": "/solutions",
+            "description": "A longer description that explains what integrations covers in this part of the product."
+          },
+          {
+            "id": "c4",
+            "label": "Approvals and reviews",
+            "href": "/solutions",
+            "description": "A longer description that explains what approvals and reviews covers in this part of the product."
+          },
+          {
+            "id": "c5",
+            "label": "Audit records",
+            "href": "/solutions",
+            "description": "A longer description that explains what audit records covers in this part of the product."
+          }
+        ]
+      },
+      {
+        "id": "m2",
+        "label": "Security",
+        "href": "/security",
+        "intro": "Everything about security, with the controls that keep AI work accountable.",
+        "children": [
+          {
+            "id": "c0",
+            "label": "Overview",
+            "href": "/security",
+            "description": "A longer description that explains what overview covers in this part of the product."
+          },
+          {
+            "id": "c1",
+            "label": "Workforce",
+            "href": "/security",
+            "description": "A longer description that explains what workforce covers in this part of the product."
+          },
+          {
+            "id": "c2",
+            "label": "Governance",
+            "href": "/security",
+            "description": "A longer description that explains what governance covers in this part of the product."
+          },
+          {
+            "id": "c3",
+            "label": "Integrations",
+            "href": "/security",
+            "description": "A longer description that explains what integrations covers in this part of the product."
+          },
+          {
+            "id": "c4",
+            "label": "Approvals and reviews",
+            "href": "/security",
+            "description": "A longer description that explains what approvals and reviews covers in this part of the product."
+          },
+          {
+            "id": "c5",
+            "label": "Audit records",
+            "href": "/security",
+            "description": "A longer description that explains what audit records covers in this part of the product."
+          }
+        ]
+      },
+      {
+        "id": "m3",
+        "label": "Resources",
+        "href": "/resources",
+        "intro": "Everything about resources, with the controls that keep AI work accountable.",
+        "children": [
+          {
+            "id": "c0",
+            "label": "Overview",
+            "href": "/resources",
+            "description": "A longer description that explains what overview covers in this part of the product."
+          },
+          {
+            "id": "c1",
+            "label": "Workforce",
+            "href": "/resources",
+            "description": "A longer description that explains what workforce covers in this part of the product."
+          },
+          {
+            "id": "c2",
+            "label": "Governance",
+            "href": "/resources",
+            "description": "A longer description that explains what governance covers in this part of the product."
+          },
+          {
+            "id": "c3",
+            "label": "Integrations",
+            "href": "/resources",
+            "description": "A longer description that explains what integrations covers in this part of the product."
+          },
+          {
+            "id": "c4",
+            "label": "Approvals and reviews",
+            "href": "/resources",
+            "description": "A longer description that explains what approvals and reviews covers in this part of the product."
+          },
+          {
+            "id": "c5",
+            "label": "Audit records",
+            "href": "/resources",
+            "description": "A longer description that explains what audit records covers in this part of the product."
+          }
+        ]
+      },
+      {
+        "id": "m4",
+        "label": "Pricing",
+        "href": "/pricing",
+        "intro": "Everything about pricing, with the controls that keep AI work accountable.",
+        "children": [
+          {
+            "id": "c0",
+            "label": "Overview",
+            "href": "/pricing",
+            "description": "A longer description that explains what overview covers in this part of the product."
+          },
+          {
+            "id": "c1",
+            "label": "Workforce",
+            "href": "/pricing",
+            "description": "A longer description that explains what workforce covers in this part of the product."
+          },
+          {
+            "id": "c2",
+            "label": "Governance",
+            "href": "/pricing",
+            "description": "A longer description that explains what governance covers in this part of the product."
+          },
+          {
+            "id": "c3",
+            "label": "Integrations",
+            "href": "/pricing",
+            "description": "A longer description that explains what integrations covers in this part of the product."
+          },
+          {
+            "id": "c4",
+            "label": "Approvals and reviews",
+            "href": "/pricing",
+            "description": "A longer description that explains what approvals and reviews covers in this part of the product."
+          },
+          {
+            "id": "c5",
+            "label": "Audit records",
+            "href": "/pricing",
+            "description": "A longer description that explains what audit records covers in this part of the product."
+          }
+        ]
+      },
+      {
+        "id": "m5",
+        "label": "Company",
+        "href": "/company",
+        "intro": "Everything about company, with the controls that keep AI work accountable.",
+        "children": [
+          {
+            "id": "c0",
+            "label": "Overview",
+            "href": "/company",
+            "description": "A longer description that explains what overview covers in this part of the product."
+          },
+          {
+            "id": "c1",
+            "label": "Workforce",
+            "href": "/company",
+            "description": "A longer description that explains what workforce covers in this part of the product."
+          },
+          {
+            "id": "c2",
+            "label": "Governance",
+            "href": "/company",
+            "description": "A longer description that explains what governance covers in this part of the product."
+          },
+          {
+            "id": "c3",
+            "label": "Integrations",
+            "href": "/company",
+            "description": "A longer description that explains what integrations covers in this part of the product."
+          },
+          {
+            "id": "c4",
+            "label": "Approvals and reviews",
+            "href": "/company",
+            "description": "A longer description that explains what approvals and reviews covers in this part of the product."
+          },
+          {
+            "id": "c5",
+            "label": "Audit records",
+            "href": "/company",
+            "description": "A longer description that explains what audit records covers in this part of the product."
+          }
+        ]
+      },
+      {
+        "id": "m6",
+        "label": "Customer stories",
+        "href": "/resources",
+        "intro": "Everything about customer stories, with the controls that keep AI work accountable.",
+        "children": [
+          {
+            "id": "c0",
+            "label": "Overview",
+            "href": "/resources",
+            "description": "A longer description that explains what overview covers in this part of the product."
+          },
+          {
+            "id": "c1",
+            "label": "Workforce",
+            "href": "/resources",
+            "description": "A longer description that explains what workforce covers in this part of the product."
+          },
+          {
+            "id": "c2",
+            "label": "Governance",
+            "href": "/resources",
+            "description": "A longer description that explains what governance covers in this part of the product."
+          },
+          {
+            "id": "c3",
+            "label": "Integrations",
+            "href": "/resources",
+            "description": "A longer description that explains what integrations covers in this part of the product."
+          },
+          {
+            "id": "c4",
+            "label": "Approvals and reviews",
+            "href": "/resources",
+            "description": "A longer description that explains what approvals and reviews covers in this part of the product."
+          },
+          {
+            "id": "c5",
+            "label": "Audit records",
+            "href": "/resources",
+            "description": "A longer description that explains what audit records covers in this part of the product."
+          }
+        ]
+      },
+      {
+        "id": "m7",
+        "label": "Integrations and partners",
+        "href": "/product",
+        "intro": "Everything about integrations and partners, with the controls that keep AI work accountable.",
+        "children": [
+          {
+            "id": "c0",
+            "label": "Overview",
+            "href": "/product",
+            "description": "A longer description that explains what overview covers in this part of the product."
+          },
+          {
+            "id": "c1",
+            "label": "Workforce",
+            "href": "/product",
+            "description": "A longer description that explains what workforce covers in this part of the product."
+          },
+          {
+            "id": "c2",
+            "label": "Governance",
+            "href": "/product",
+            "description": "A longer description that explains what governance covers in this part of the product."
+          },
+          {
+            "id": "c3",
+            "label": "Integrations",
+            "href": "/product",
+            "description": "A longer description that explains what integrations covers in this part of the product."
+          },
+          {
+            "id": "c4",
+            "label": "Approvals and reviews",
+            "href": "/product",
+            "description": "A longer description that explains what approvals and reviews covers in this part of the product."
+          },
+          {
+            "id": "c5",
+            "label": "Audit records",
+            "href": "/product",
+            "description": "A longer description that explains what audit records covers in this part of the product."
+          }
+        ]
+      }
+    ],
+    "footer": [
+      {
+        "id": "f0",
+        "label": "Product",
+        "children": [
+          {
+            "id": "l0",
+            "label": "Overview",
+            "href": "/product"
+          },
+          {
+            "id": "l1",
+            "label": "Workforce",
+            "href": "/solutions"
+          },
+          {
+            "id": "l2",
+            "label": "Customer support",
+            "href": "/security"
+          },
+          {
+            "id": "l3",
+            "label": "Integrations",
+            "href": "/resources"
+          },
+          {
+            "id": "l4",
+            "label": "Security model",
+            "href": "/pricing"
+          },
+          {
+            "id": "l5",
+            "label": "Pricing",
+            "href": "/company"
+          },
+          {
+            "id": "l6",
+            "label": "Changelog",
+            "href": "/resources"
+          },
+          {
+            "id": "l7",
+            "label": "Status page",
+            "href": "/product"
+          }
+        ]
+      },
+      {
+        "id": "f1",
+        "label": "Solutions",
+        "children": [
+          {
+            "id": "l0",
+            "label": "Overview",
+            "href": "/product"
+          },
+          {
+            "id": "l1",
+            "label": "Workforce",
+            "href": "/solutions"
+          },
+          {
+            "id": "l2",
+            "label": "Customer support",
+            "href": "/security"
+          },
+          {
+            "id": "l3",
+            "label": "Integrations",
+            "href": "/resources"
+          },
+          {
+            "id": "l4",
+            "label": "Security model",
+            "href": "/pricing"
+          },
+          {
+            "id": "l5",
+            "label": "Pricing",
+            "href": "/company"
+          },
+          {
+            "id": "l6",
+            "label": "Changelog",
+            "href": "/resources"
+          },
+          {
+            "id": "l7",
+            "label": "Status page",
+            "href": "/product"
+          }
+        ]
+      },
+      {
+        "id": "f2",
+        "label": "Resources",
+        "children": [
+          {
+            "id": "l0",
+            "label": "Overview",
+            "href": "/product"
+          },
+          {
+            "id": "l1",
+            "label": "Workforce",
+            "href": "/solutions"
+          },
+          {
+            "id": "l2",
+            "label": "Customer support",
+            "href": "/security"
+          },
+          {
+            "id": "l3",
+            "label": "Integrations",
+            "href": "/resources"
+          },
+          {
+            "id": "l4",
+            "label": "Security model",
+            "href": "/pricing"
+          },
+          {
+            "id": "l5",
+            "label": "Pricing",
+            "href": "/company"
+          },
+          {
+            "id": "l6",
+            "label": "Changelog",
+            "href": "/resources"
+          },
+          {
+            "id": "l7",
+            "label": "Status page",
+            "href": "/product"
+          }
+        ]
+      },
+      {
+        "id": "f3",
+        "label": "Company",
+        "children": [
+          {
+            "id": "l0",
+            "label": "Overview",
+            "href": "/product"
+          },
+          {
+            "id": "l1",
+            "label": "Workforce",
+            "href": "/solutions"
+          },
+          {
+            "id": "l2",
+            "label": "Customer support",
+            "href": "/security"
+          },
+          {
+            "id": "l3",
+            "label": "Integrations",
+            "href": "/resources"
+          },
+          {
+            "id": "l4",
+            "label": "Security model",
+            "href": "/pricing"
+          },
+          {
+            "id": "l5",
+            "label": "Pricing",
+            "href": "/company"
+          },
+          {
+            "id": "l6",
+            "label": "Changelog",
+            "href": "/resources"
+          },
+          {
+            "id": "l7",
+            "label": "Status page",
+            "href": "/product"
+          }
+        ]
+      },
+      {
+        "id": "f4",
+        "label": "Legal and trust",
+        "children": [
+          {
+            "id": "l0",
+            "label": "Overview",
+            "href": "/product"
+          },
+          {
+            "id": "l1",
+            "label": "Workforce",
+            "href": "/solutions"
+          },
+          {
+            "id": "l2",
+            "label": "Customer support",
+            "href": "/security"
+          },
+          {
+            "id": "l3",
+            "label": "Integrations",
+            "href": "/resources"
+          },
+          {
+            "id": "l4",
+            "label": "Security model",
+            "href": "/pricing"
+          },
+          {
+            "id": "l5",
+            "label": "Pricing",
+            "href": "/company"
+          },
+          {
+            "id": "l6",
+            "label": "Changelog",
+            "href": "/resources"
+          },
+          {
+            "id": "l7",
+            "label": "Status page",
+            "href": "/product"
+          }
+        ]
+      },
+      {
+        "id": "f5",
+        "label": "Developers",
+        "children": [
+          {
+            "id": "l0",
+            "label": "Overview",
+            "href": "/product"
+          },
+          {
+            "id": "l1",
+            "label": "Workforce",
+            "href": "/solutions"
+          },
+          {
+            "id": "l2",
+            "label": "Customer support",
+            "href": "/security"
+          },
+          {
+            "id": "l3",
+            "label": "Integrations",
+            "href": "/resources"
+          },
+          {
+            "id": "l4",
+            "label": "Security model",
+            "href": "/pricing"
+          },
+          {
+            "id": "l5",
+            "label": "Pricing",
+            "href": "/company"
+          },
+          {
+            "id": "l6",
+            "label": "Changelog",
+            "href": "/resources"
+          },
+          {
+            "id": "l7",
+            "label": "Status page",
+            "href": "/product"
+          }
+        ]
+      }
+    ]
+  },
+  "labels": {
+    "home": "Audoryn home",
+    "mainNavigation": "Main navigation",
+    "footerNavigation": "Footer navigation",
+    "openMenu": "Menu",
+    "closeMenu": "Close",
+    "skipToContent": "Skip to content",
+    "illustrative": "Illustrative",
+    "onThisPage": "On this page",
+    "exploreMenu": "Explore {label}"
+  },
+  "vocabulary": {
+    "worker": "Worker",
+    "team": "Team",
+    "supervisor": "Supervisor",
+    "status": "Status",
+    "trigger": "Trigger",
+    "job": "Job",
+    "exampleJob": "Example job",
+    "connectedTools": "Connected tools",
+    "deliverable": "Deliverable",
+    "requestedBy": "Requested by",
+    "reviewer": "Reviewer",
+    "reference": "Reference",
+    "actor": "Actor",
+    "action": "Action",
+    "policy": "Policy",
+    "decision": "Decision",
+    "outcome": "Outcome",
+    "time": "Time",
+    "target": "Target",
+    "checks": "Checks",
+    "schedule": "Schedule",
+    "assignedJob": "Assigned job",
+    "recordedAs": "Recorded as",
+    "worksWith": "Works with",
+    "proposedBy": "Proposed by the model",
+    "gateway": "Action gateway",
+    "jobStatus": {
+      "queued": "Queued",
+      "running": "Running",
+      "completed": "Completed",
+      "held": "Held for review"
+    },
+    "decisions": {
+      "allow": "Allowed",
+      "review": "Held for review",
+      "deny": "Denied"
+    },
+    "stepState": {
+      "done": "Done",
+      "active": "In progress",
+      "waiting": "Waiting"
+    },
+    "perMonth": "per month",
+    "perYear": "per year",
+    "workerLimit": "Up to {count} managed workers",
+    "chooseDecision": "Choose a decision",
+    "chooseLayer": "Choose a layer of the operating model",
+    "chooseSolution": "Choose a solution area",
+    "ownerLogo": "SOT logo",
+    "published": "Published",
+    "by": "By",
+    "readArticle": "Read article",
+    "effective": "Effective",
+    "version": "Version",
+    "backToResources": "All resources"
+  },
+  "notFound": {
+    "headline": "This page isn't here.",
+    "body": "It may have moved or been removed. Everything else is still where you left it.",
+    "action": {
+      "label": "Back to Audoryn",
+      "href": "/"
+    }
+  },
+  "unavailable": {
+    "headline": "This content is briefly unavailable.",
+    "body": "Please try again in a moment."
+  },
+  "announcement": {
+    "text": "Audoryn is in early access. Plans and availability may change before general release.",
+    "link": {
+      "label": "Read the plans",
+      "href": "/pricing"
+    }
+  }
+}
