@@ -1,0 +1,42 @@
+/* Area index under the hero */
+.sol-index { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; margin-top: 2.5rem; }
+.sol-index a { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.5rem; padding: 0 .875rem; border: 1px solid var(--line); border-radius: 999px; background: var(--cream-raised); color: var(--ink); font-size: .875rem; transition: border-color var(--duration) var(--ease); }
+.sol-index a:hover { border-color: var(--brand); }
+.sol-index a svg { color: var(--brand); }
+.sol-index a svg:last-child { color: var(--ink-muted); }
+.sol-index-number { color: var(--ink-muted); font-family: var(--font-mono); font-size: .6875rem; }
+
+/* Solutions */
+.sol-list { display: grid; }
+.sol-row { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: clamp(2rem, 1rem + 4vw, 5rem); align-items: center; padding-block: clamp(3rem, 2rem + 3vw, 5rem); border-top: 1px solid var(--line); scroll-margin-top: calc(var(--header-height) + 1rem); }
+.sol-row.is-reversed > .sol-copy { order: 2; }
+.sol-count { margin-bottom: 1.5rem; color: var(--ink-muted); font-family: var(--font-mono); font-size: .75rem; }
+.sol-copy h3 { max-width: 18ch; font-size: clamp(1.75rem, 1.3rem + 1.6vw, 2.5rem); font-weight: 500; letter-spacing: -.035em; line-height: 1.08; }
+.sol-body { max-width: 30rem; margin-top: 1rem; color: var(--ink-muted); font-size: 1.0625rem; }
+.sol-visual { position: relative; }
+.sol-image { aspect-ratio: 16 / 9; border-radius: 12px; }
+.sol-card.is-over-image { position: relative; width: min(100%, 30rem); margin: -6rem 0 0 auto; margin-right: 1.25rem; }
+.sol-row.is-reversed .sol-card.is-over-image { margin-left: 1.25rem; margin-right: auto; }
+.sol-facts { display: grid; gap: .875rem; }
+.sol-facts > div { display: grid; grid-template-columns: 8.5rem 1fr; gap: 1rem; align-items: baseline; }
+.sol-facts dt { color: var(--on-night-muted); font-family: var(--font-mono); font-size: .6875rem; letter-spacing: .08em; text-transform: uppercase; }
+.sol-facts dd { margin: 0; font-size: .9375rem; }
+.sol-tools { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
+.sol-deliverable { color: var(--signal); }
+.sol-path { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--night-line); }
+.sol-path li { position: relative; padding: .5rem .625rem; border: 1px solid var(--night-line); border-radius: 6px; color: var(--on-night-muted); font-family: var(--font-mono); font-size: .6875rem; line-height: 1.4; text-align: center; display: grid; place-items: center; }
+.sol-path li + li::before { content: ''; position: absolute; top: 50%; right: 100%; width: .5rem; height: 1px; background: var(--signal); }
+.sol-path li.is-end { border-color: var(--signal); color: var(--signal); }
+.sol-note { display: flex; gap: .75rem; align-items: flex-start; max-width: 46rem; margin-top: 2rem; padding: 1rem 1.25rem; border: 1px solid var(--line); border-radius: 10px; background: var(--cream-raised); color: var(--ink-muted); font-size: .9375rem; }
+.sol-note svg { flex: none; margin-top: .2rem; color: var(--brand); }
+
+@media (max-width: 64rem) {
+  .sol-row { grid-template-columns: 1fr; }
+  .sol-row.is-reversed > .sol-copy { order: 0; }
+  .sol-card.is-over-image, .sol-row.is-reversed .sol-card.is-over-image { width: 100%; margin: -2rem 0 0; }
+}
+@media (max-width: 40rem) {
+  .sol-facts > div { grid-template-columns: 1fr; gap: .25rem; }
+  .sol-path { grid-template-columns: 1fr; }
+  .sol-path li + li::before { display: none; }
+}

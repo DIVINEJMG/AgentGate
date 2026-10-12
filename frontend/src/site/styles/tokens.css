@@ -1,0 +1,72 @@
+/* Audoryn public site tokens (design direction, 11 October 2026).
+   Base: the owner's cream and forest green. Signal colours appear only on system (night)
+   surfaces and only for live or decided things. AI is violet; authority is green.
+   Contrast pairs are enforced by tests/siteDesign.test.mjs. */
+.site {
+  /* Light "explain" surfaces */
+  --cream: #f7f7f3;
+  --cream-raised: #fcfcf9;
+  --sage: #eef3ec;
+  --line: #d8e1d7;
+  --line-strong: #bfcdbf;
+  --ink: #171715;
+  --ink-muted: #5f625c;
+
+  /* Brand */
+  --brand: #284d35;
+  --brand-hover: #1f3d2a;
+  --forest: #26382f;
+  --on-brand: #ffffff;
+
+  /* Dark "system" surfaces */
+  --night: #0e1712;
+  --night-raised: #142019;
+  --night-line: #24372b;
+  --on-night: #e9efea;
+  --on-night-muted: #9db0a3;
+
+  /* Signal colours on night */
+  --signal: #3ddc97;
+  --hold: #f5b83d;
+  --deny: #ff8a73;
+  --model: #a99bff;
+
+  /* Their text versions on light */
+  --signal-ink: #1a7a4c;
+  --hold-ink: #8a5a00;
+  --deny-ink: #a63a2b;
+  --model-ink: #5b4fd1;
+  --signal-tint: #e3f2e9;
+  --hold-tint: #f8edd5;
+  --deny-tint: #f8e4df;
+
+  /* Focus */
+  --focus: #284d35;
+  --focus-on-night: #3ddc97;
+
+  /* Type */
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-serif: 'Newsreader Variable', 'Iowan Old Style', Georgia, serif;
+
+  --text-hero: clamp(2.75rem, 1.5rem + 5vw, 5.5rem);
+  --text-h2: clamp(2rem, 1.35rem + 2.6vw, 3.5rem);
+  --text-statement: clamp(2.5rem, 1.4rem + 4.6vw, 5.75rem);
+  --text-h3: 1.25rem;
+  --text-lead: clamp(1.0625rem, 1rem + .3vw, 1.25rem);
+  --text-small: .875rem;
+  --text-label: .75rem;
+
+  /* Layout */
+  --gutter: clamp(1rem, .4rem + 2.6vw, 3rem);
+  --container: 82rem;
+  --inset: clamp(1.25rem, .5rem + 2.4vw, 3rem);
+  --section-space: clamp(5rem, 3rem + 6vw, 9rem);
+  --header-height: 4.375rem;
+  --radius: 8px;
+  --radius-small: 5px;
+
+  /* Motion */
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --duration: .22s;
+}

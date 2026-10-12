@@ -1,0 +1,63 @@
+/* Base styles, scoped to the public site so the authenticated workspace is never affected.
+   Resets use :where() (no specificity) so any component class overrides them. */
+.site {
+  min-height: 100dvh;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+:where(.site) *, :where(.site) *::before, :where(.site) *::after { box-sizing: border-box; }
+:where(.site) :where(h1, h2, h3, h4, p, ul, ol, figure, blockquote, dl, dd, pre) { margin: 0; }
+:where(.site) :where(ul, ol) { padding: 0; list-style: none; }
+:where(.site) :where(img, svg) { display: block; max-width: 100%; }
+:where(.site img) { height: auto; }
+:where(.site) :where(button, input) { font: inherit; color: inherit; }
+:where(.site button) { cursor: pointer; }
+:where(.site a) { color: inherit; text-decoration: none; }
+.site :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px; }
+.site .is-night :focus-visible { outline-color: var(--focus-on-night); }
+.site ::selection { background: var(--signal-tint); color: var(--ink); }
+
+/* Sections and the blueprint frame.
+   Every section's content sits in a frame: hairline columns on both sides, a hairline on top,
+   and a small + where the lines cross. Light sections use sage lines, night sections night lines. */
+.site-section { --frame: var(--line); position: relative; scroll-margin-top: var(--header-height); }
+.site-section.is-sage { background: var(--sage); }
+.site-section.is-night { --frame: var(--night-line); background: var(--night); color: var(--on-night); }
+.site-section.is-forest { --frame: #3a5245; background: var(--forest); color: var(--on-night); }
+.site-frame { position: relative; width: min(100% - 2 * var(--gutter), var(--container)); margin-inline: auto; padding: var(--section-space) var(--inset); border-inline: 1px solid var(--frame); }
+.site-section + .site-section .site-frame::before { content: ''; position: absolute; top: 0; left: calc(-1 * (100vw - 100%) / 2); width: 100vw; height: 1px; background: var(--frame); }
+.site-cross { position: absolute; top: 0; width: 11px; height: 11px; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; }
+.site-cross.is-left { left: 0; }
+.site-cross.is-right { left: 100%; }
+.site-cross::before, .site-cross::after { content: ''; position: absolute; background: var(--line-strong); }
+.is-night .site-cross::before, .is-night .site-cross::after, .is-forest .site-cross::before, .is-forest .site-cross::after { background: var(--on-night-muted); }
+.site-cross::before { top: 5px; left: 0; width: 11px; height: 1px; }
+.site-cross::after { left: 5px; top: 0; width: 1px; height: 11px; }
+.site-main { overflow-x: clip; }
+
+/* Not found */
+.site-not-found .site-frame { display: grid; justify-items: center; min-height: 70vh; align-content: center; text-align: center; }
+.site-not-found .site-headline { max-width: 16ch; }
+.site-not-found .site-lead { margin-top: 1.25rem; }
+.site-not-found .site-actions { justify-content: center; }
+.site-not-found-line { width: 1px; height: 5rem; margin-bottom: 2.5rem; background: linear-gradient(transparent, var(--deny)); }
+
+/* Skip link */
+.site-skip { position: absolute; z-index: 200; top: .75rem; left: .75rem; padding: .625rem 1rem; border-radius: var(--radius-small); background: var(--ink); color: var(--cream); font-size: var(--text-small); transform: translateY(-200%); }
+.site-skip:focus { transform: none; }
+
+/* Visually hidden, still read by assistive technology */
+.site-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 40rem) {
+  .site-frame { border-inline: 0; padding-inline: 0; }
+  .site-cross { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site *, .site *::before, .site *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

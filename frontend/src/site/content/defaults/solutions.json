@@ -1,0 +1,35 @@
+{
+  "contract": "audoryn.public.v2",
+  "page": "solutions",
+  "sections": {
+    "hero": {
+      "kicker": "Solutions",
+      "headline": "Work that already needs doing.",
+      "body": "Start with a defined responsibility. Give an AI worker the right context, a clear job and a person to answer to.",
+      "primaryAction": {"label": "Choose where to start", "href": "/solutions#solutions"},
+      "secondaryAction": {"label": "Get started free", "href": "/signup"}
+    },
+    "solutions": {
+      "kicker": "Where to start",
+      "headline": "Choose a responsibility.",
+      "headlineDetail": "Start with a clear job.",
+      "body": "Six practical starting points, based on Audoryn's workforce templates.",
+      "items": [
+        {"id": "operations", "area": "Operations", "title": "Keep the daily picture current.", "body": "Review connected work context and prepare a concise internal update, with exceptions surfaced for a person.", "worker": "Operations assistant", "job": "Daily operations brief", "tools": ["Google Drive", "Google Calendar"], "deliverable": "A daily brief ready for review", "icon": "operations", "image": {"asset": "262bf108-0e0b-58ab-835f-9bd73d8c353c", "alt": "A logistics operations floor with a supervisor overseeing the work"}},
+        {"id": "research", "area": "Research", "title": "Turn source material into a clear brief.", "body": "Read issues and pull requests, separate observed facts from inference and assemble a technical change brief.", "worker": "Research assistant", "job": "Repository research brief", "tools": ["GitHub"], "deliverable": "A structured research brief", "icon": "research", "image": {"asset": "a201f4ad-5d40-51eb-8948-a5c1b09319d1", "alt": "Research materials being reviewed at a worktable"}},
+        {"id": "customer-support", "area": "Customer support", "title": "See what needs attention first.", "body": "Review recent messages and prepare a prioritized triage brief for the support team.", "worker": "Customer support assistant", "job": "Inbox triage", "tools": ["Gmail"], "deliverable": "A prioritized triage brief", "icon": "support"},
+        {"id": "sales", "area": "Sales", "title": "Arrive prepared for the next meeting.", "body": "Review upcoming meetings and relevant prospect context to prepare supervised follow-up.", "worker": "Sales assistant", "job": "Upcoming meeting brief", "tools": ["Google Calendar", "Gmail"], "deliverable": "An upcoming meeting brief", "icon": "sales"},
+        {"id": "marketing", "area": "Marketing", "title": "Make campaign context easier to use.", "body": "Review recent campaign material and summarize what the team needs to know.", "worker": "Marketing coordinator", "job": "Campaign asset review", "tools": ["Google Drive"], "deliverable": "A campaign material summary", "icon": "marketing"},
+        {"id": "engineering", "area": "Engineering", "title": "Stay close to repository work.", "body": "Review repository issues and pull requests to prepare a concise engineering status brief.", "worker": "Developer assistant", "job": "Engineering change review", "tools": ["GitHub"], "deliverable": "An engineering status brief", "icon": "engineering"}
+      ],
+      "note": "Templates create draft roles and jobs. Connections, capabilities, policy and activation remain explicit setup steps."
+    },
+    "closing": {
+      "kicker": "Your first worker",
+      "headline": "Start with one useful responsibility.",
+      "body": "See how the workforce runs, or set up a supervised worker in Audoryn.",
+      "primaryAction": {"label": "Get started free", "href": "/signup"},
+      "secondaryAction": {"label": "See the product", "href": "/product"}
+    }
+  }
+}

@@ -1,5 +1,11 @@
 # Active local public-content configuration
 
+> **Superseded on 12 October 2026 (public site Phase 11).** This describes the previous public
+> content model (`audoryn.public.v1`) and its renderer, seed and scripts, which have been removed.
+> The current site and its Console contract are in `docs/public-site/` (start with
+> `implementation-plan.md` and `console-cms-v2-handover.md`). Kept as a historical record.
+
+
 Verified on 2026-10-10. Console owns content; AgentGate's frontend host reads
 published artifacts directly. No CDN or customer-backend CMS jobs are used.
 

@@ -1,0 +1,4558 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://audoryn.app/contracts/audoryn.public.v2.json",
+  "title": "Audoryn public website content",
+  "description": "Content contract audoryn.public.v2. Each document is one page (or the shared site document). Plain text only; layout, styling and motion belong to the website.",
+  "x-contract": "audoryn.public.v2",
+  "x-pages": {
+    "home": [
+      "hero",
+      "activity",
+      "decision",
+      "product",
+      "controlPath",
+      "policy",
+      "operatingModel",
+      "oversight",
+      "controls",
+      "connections",
+      "solutions",
+      "closing"
+    ],
+    "product": [
+      "hero",
+      "workspace",
+      "workforce",
+      "runtime",
+      "intelligence",
+      "supervision",
+      "integrations",
+      "closing"
+    ],
+    "solutions": [
+      "hero",
+      "solutions",
+      "closing"
+    ],
+    "security": [
+      "hero",
+      "decision",
+      "controlPath",
+      "safeguards",
+      "record",
+      "closing"
+    ],
+    "pricing": [
+      "hero",
+      "plans",
+      "sameModel",
+      "questions",
+      "closing"
+    ],
+    "resources": [
+      "hero",
+      "guides",
+      "library",
+      "operators"
+    ],
+    "company": [
+      "hero",
+      "about",
+      "portfolio",
+      "why",
+      "founder",
+      "closing"
+    ],
+    "privacy": [
+      "document"
+    ],
+    "terms": [
+      "document"
+    ],
+    "article": [
+      "article"
+    ]
+  },
+  "x-optional-sections": {
+    "resources": [
+      "library"
+    ]
+  },
+  "x-anchors": {
+    "sections": "Each present section is a link anchor named after its key in kebab case, for example controlPath becomes control-path. Exception: the resources library section is shown, with its anchor, only while articles are published.",
+    "items": {
+      "solutions": {
+        "solutions": "items"
+      },
+      "privacy": {
+        "document": "clauses"
+      },
+      "terms": {
+        "document": "clauses"
+      },
+      "article": {
+        "article": "sections"
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Site"
+    },
+    {
+      "$ref": "#/$defs/HomePage",
+      "description": [
+        "HomePage",
+        "ProductPage",
+        "SolutionsPage",
+        "SecurityPage",
+        "PricingPage",
+        "ResourcesPage",
+        "CompanyPage",
+        "PrivacyPage",
+        "TermsPage",
+        "ArticlePage"
+      ]
+    },
+    {
+      "$ref": "#/$defs/ProductPage",
+      "title": 1,
+      "description": [
+        "HomePage",
+        "ProductPage",
+        "SolutionsPage",
+        "SecurityPage",
+        "PricingPage",
+        "ResourcesPage",
+        "CompanyPage",
+        "PrivacyPage",
+        "TermsPage",
+        "ArticlePage"
+      ]
+    },
+    {
+      "$ref": "#/$defs/SolutionsPage",
+      "title": 2,
+      "description": [
+        "HomePage",
+        "ProductPage",
+        "SolutionsPage",
+        "SecurityPage",
+        "PricingPage",
+        "ResourcesPage",
+        "CompanyPage",
+        "PrivacyPage",
+        "TermsPage",
+        "ArticlePage"
+      ]
+    },
+    {
+      "$ref": "#/$defs/SecurityPage",
+      "title": 3,
+      "description": [
+        "HomePage",
+        "ProductPage",
+        "SolutionsPage",
+        "SecurityPage",
+        "PricingPage",
+        "ResourcesPage",
+        "CompanyPage",
+        "PrivacyPage",
+        "TermsPage",
+        "ArticlePage"
+      ]
+    },
+    {
+      "$ref": "#/$defs/PricingPage",
+      "title": 4,
+      "description": [
+        "HomePage",
+        "ProductPage",
+        "SolutionsPage",
+        "SecurityPage",
+        "PricingPage",
+        "ResourcesPage",
+        "CompanyPage",
+        "PrivacyPage",
+        "TermsPage",
+        "ArticlePage"
+      ]
+    },
+    {
+      "$ref": "#/$defs/ResourcesPage",
+      "title": 5,
+      "description": [
+        "HomePage",
+        "ProductPage",
+        "SolutionsPage",
+        "SecurityPage",
+        "PricingPage",
+        "ResourcesPage",
+        "CompanyPage",
+        "PrivacyPage",
+        "TermsPage",
+        "ArticlePage"
+      ]
+    },
+    {
+      "$ref": "#/$defs/CompanyPage",
+      "title": 6,
+      "description": [
+        "HomePage",
+        "ProductPage",
+        "SolutionsPage",
+        "SecurityPage",
+        "PricingPage",
+        "ResourcesPage",
+        "CompanyPage",
+        "PrivacyPage",
+        "TermsPage",
+        "ArticlePage"
+      ]
+    },
+    {
+      "$ref": "#/$defs/PrivacyPage",
+      "title": 7,
+      "description": [
+        "HomePage",
+        "ProductPage",
+        "SolutionsPage",
+        "SecurityPage",
+        "PricingPage",
+        "ResourcesPage",
+        "CompanyPage",
+        "PrivacyPage",
+        "TermsPage",
+        "ArticlePage"
+      ]
+    },
+    {
+      "$ref": "#/$defs/TermsPage",
+      "title": 8,
+      "description": [
+        "HomePage",
+        "ProductPage",
+        "SolutionsPage",
+        "SecurityPage",
+        "PricingPage",
+        "ResourcesPage",
+        "CompanyPage",
+        "PrivacyPage",
+        "TermsPage",
+        "ArticlePage"
+      ]
+    },
+    {
+      "$ref": "#/$defs/ArticlePage",
+      "title": 9,
+      "description": [
+        "HomePage",
+        "ProductPage",
+        "SolutionsPage",
+        "SecurityPage",
+        "PricingPage",
+        "ResourcesPage",
+        "CompanyPage",
+        "PrivacyPage",
+        "TermsPage",
+        "ArticlePage"
+      ]
+    }
+  ],
+  "$defs": {
+    "Link": {
+      "type": "object",
+      "title": "Link",
+      "description": "A labelled link. Use a site path such as /pricing or a full https:// address.",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Label",
+          "description": "The words people click."
+        },
+        "href": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "pattern": "^(?:/(?!/)[^\\s\\\\<>\\u0000-\\u001f]*|https://[^\\s\\\\<>\\u0000-\\u001f]+)$",
+          "title": "Destination",
+          "description": "A site path starting with / (for example /security#control-path) or an https:// address."
+        }
+      },
+      "required": [
+        "label",
+        "href"
+      ]
+    },
+    "Image": {
+      "type": "object",
+      "title": "Image",
+      "description": "An image from the Console media library.",
+      "additionalProperties": false,
+      "properties": {
+        "asset": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Image",
+          "description": "Choose a verified image from the media library."
+        },
+        "alt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Alternative text",
+          "description": "Describe what the image shows for people who cannot see it."
+        }
+      },
+      "required": [
+        "asset",
+        "alt"
+      ]
+    },
+    "Heading": {
+      "type": "object",
+      "title": "Section heading",
+      "description": "The text that opens a section.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        }
+      },
+      "required": [
+        "headline"
+      ]
+    },
+    "Feature": {
+      "type": "object",
+      "title": "Feature",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Key",
+          "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Title"
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Description"
+        },
+        "icon": {
+          "type": "string",
+          "enum": [
+            "workers",
+            "jobs",
+            "governance",
+            "supervision",
+            "operations",
+            "research",
+            "support",
+            "sales",
+            "marketing",
+            "engineering",
+            "identity",
+            "credentials",
+            "pause",
+            "record",
+            "capability",
+            "policy",
+            "approval",
+            "audit",
+            "connection",
+            "browser",
+            "document",
+            "shield",
+            "check",
+            "clock",
+            "compass",
+            "scale",
+            "boxes",
+            "lock",
+            "queue",
+            "model"
+          ],
+          "title": "Icon",
+          "description": "Optional symbol shown with the feature."
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "body"
+      ]
+    },
+    "Step": {
+      "type": "object",
+      "title": "Step",
+      "description": "One stage of a sequence.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Key",
+          "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Stage label",
+          "description": "Short name for the stage, for example \"Policy\"."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Title"
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Description"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "title",
+        "body"
+      ]
+    },
+    "Card": {
+      "type": "object",
+      "title": "Card",
+      "description": "A linked item.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Key",
+          "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+        },
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Title"
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Description"
+        },
+        "link": {
+          "$ref": "#/$defs/Link",
+          "title": "Link"
+        },
+        "icon": {
+          "type": "string",
+          "enum": [
+            "workers",
+            "jobs",
+            "governance",
+            "supervision",
+            "operations",
+            "research",
+            "support",
+            "sales",
+            "marketing",
+            "engineering",
+            "identity",
+            "credentials",
+            "pause",
+            "record",
+            "capability",
+            "policy",
+            "approval",
+            "audit",
+            "connection",
+            "browser",
+            "document",
+            "shield",
+            "check",
+            "clock",
+            "compass",
+            "scale",
+            "boxes",
+            "lock",
+            "queue",
+            "model"
+          ],
+          "title": "Icon"
+        },
+        "image": {
+          "$ref": "#/$defs/Image",
+          "title": "Image"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "body",
+        "link"
+      ]
+    },
+    "Faq": {
+      "type": "object",
+      "title": "Question",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Key",
+          "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Question"
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Answer"
+        }
+      },
+      "required": [
+        "id",
+        "question",
+        "answer"
+      ]
+    },
+    "Outcome": {
+      "type": "object",
+      "title": "Decision outcome",
+      "description": "What happens for one policy decision.",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Decision label",
+          "description": "For example \"Allow\", \"Hold for review\" or \"Deny\"."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Title"
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Explanation"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Guarantee",
+          "description": "Optional one-line guarantee, for example \"The provider is never called.\""
+        }
+      },
+      "required": [
+        "label",
+        "title",
+        "body"
+      ]
+    },
+    "Check": {
+      "type": "object",
+      "title": "Check",
+      "description": "One check the action passes through.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Key",
+          "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Check"
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Detail"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ]
+    },
+    "DecisionDemo": {
+      "type": "object",
+      "title": "Decision demonstration",
+      "description": "An illustrative action request that resolves to allow, hold for review or deny. Always labelled as illustrative.",
+      "additionalProperties": false,
+      "properties": {
+        "disclosure": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Disclosure",
+          "description": "Required notice that this is an example, for example \"Illustrative example · not live data\"."
+        },
+        "worker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Worker",
+          "description": "The AI worker making the request."
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Requested action"
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Target system",
+          "description": "Where the action would happen, for example \"Slack · #leadership\"."
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "minItems": 2,
+          "maxItems": 6,
+          "title": "Checks",
+          "description": "The checks the request passes through, in order."
+        },
+        "outcomes": {
+          "type": "object",
+          "title": "Outcomes",
+          "description": "Text for each of the three decisions.",
+          "additionalProperties": false,
+          "properties": {
+            "allow": {
+              "$ref": "#/$defs/Outcome"
+            },
+            "review": {
+              "$ref": "#/$defs/Outcome"
+            },
+            "deny": {
+              "$ref": "#/$defs/Outcome"
+            }
+          },
+          "required": [
+            "allow",
+            "review",
+            "deny"
+          ]
+        },
+        "record": {
+          "type": "object",
+          "title": "Record",
+          "description": "The record kept after the decision.",
+          "additionalProperties": false,
+          "properties": {
+            "reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Record reference",
+              "description": "An example reference, for example \"REC-2048\"."
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Record summary"
+            }
+          },
+          "required": [
+            "reference",
+            "summary"
+          ]
+        }
+      },
+      "required": [
+        "disclosure",
+        "worker",
+        "action",
+        "target",
+        "checks",
+        "outcomes",
+        "record"
+      ]
+    },
+    "Record": {
+      "type": "object",
+      "title": "Record entry",
+      "description": "An illustrative audit record.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Key",
+          "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Reference"
+        },
+        "actor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Actor",
+          "description": "Who or what acted."
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Action"
+        },
+        "policy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Policy applied"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "review",
+            "deny"
+          ],
+          "title": "Decision"
+        },
+        "outcome": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Outcome"
+        },
+        "time": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Time label",
+          "description": "For example \"09:42\" or \"2 min ago\"."
+        }
+      },
+      "required": [
+        "id",
+        "reference",
+        "actor",
+        "action",
+        "policy",
+        "decision",
+        "outcome",
+        "time"
+      ]
+    },
+    "Integration": {
+      "type": "object",
+      "title": "Integration",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Key",
+          "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "github",
+            "gmail",
+            "google-drive",
+            "slack",
+            "google-calendar",
+            "browser",
+            "web-research",
+            "rest-mcp"
+          ],
+          "title": "Provider",
+          "description": "Decides the mark shown next to the name."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Name"
+        },
+        "use": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "What it is used for"
+        }
+      },
+      "required": [
+        "id",
+        "provider",
+        "name",
+        "use"
+      ]
+    },
+    "Layer": {
+      "type": "object",
+      "title": "Operating layer",
+      "description": "One layer of the operating model.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Key",
+          "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Title"
+        },
+        "subtitle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Subtitle"
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline"
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Description"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30,
+            "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+            "title": "Stage"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "title": "Path",
+          "description": "Exactly three short stage names, for example Request, Policy, Decision."
+        },
+        "signal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Signal",
+          "description": "One short closing statement."
+        },
+        "icon": {
+          "type": "string",
+          "enum": [
+            "workers",
+            "jobs",
+            "governance",
+            "supervision",
+            "operations",
+            "research",
+            "support",
+            "sales",
+            "marketing",
+            "engineering",
+            "identity",
+            "credentials",
+            "pause",
+            "record",
+            "capability",
+            "policy",
+            "approval",
+            "audit",
+            "connection",
+            "browser",
+            "document",
+            "shield",
+            "check",
+            "clock",
+            "compass",
+            "scale",
+            "boxes",
+            "lock",
+            "queue",
+            "model"
+          ],
+          "title": "Icon"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "subtitle",
+        "headline",
+        "body",
+        "path",
+        "signal",
+        "icon"
+      ]
+    },
+    "Solution": {
+      "type": "object",
+      "title": "Solution",
+      "description": "One starting point for an AI worker.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Key",
+          "description": "Stable identifier used in links such as /solutions#support. Do not change it once published."
+        },
+        "area": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Area",
+          "description": "For example \"Customer support\"."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Title"
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Description"
+        },
+        "worker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Worker",
+          "description": "The example worker role."
+        },
+        "job": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Example job"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+            "title": "Tool"
+          },
+          "minItems": 1,
+          "maxItems": 6,
+          "title": "Connected tools"
+        },
+        "deliverable": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Deliverable"
+        },
+        "icon": {
+          "type": "string",
+          "enum": [
+            "workers",
+            "jobs",
+            "governance",
+            "supervision",
+            "operations",
+            "research",
+            "support",
+            "sales",
+            "marketing",
+            "engineering",
+            "identity",
+            "credentials",
+            "pause",
+            "record",
+            "capability",
+            "policy",
+            "approval",
+            "audit",
+            "connection",
+            "browser",
+            "document",
+            "shield",
+            "check",
+            "clock",
+            "compass",
+            "scale",
+            "boxes",
+            "lock",
+            "queue",
+            "model"
+          ],
+          "title": "Icon"
+        },
+        "image": {
+          "$ref": "#/$defs/Image",
+          "title": "Image"
+        }
+      },
+      "required": [
+        "id",
+        "area",
+        "title",
+        "body",
+        "worker",
+        "job",
+        "tools",
+        "deliverable",
+        "icon"
+      ]
+    },
+    "Plan": {
+      "type": "object",
+      "title": "Plan",
+      "description": "Plans are informational. Nothing here changes what an organization is entitled to.",
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Plan key",
+          "description": "Stable plan identifier, for example \"free\". Must match the product plan."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Name"
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Who it is for"
+        },
+        "priceMinor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000000,
+          "title": "Price",
+          "description": "Price in the smallest currency unit, for example 4900 for $49.00."
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "title": "Currency",
+          "description": "Three-letter code, for example USD."
+        },
+        "period": {
+          "type": "string",
+          "enum": [
+            "month",
+            "year"
+          ],
+          "title": "Billing period"
+        },
+        "workerLimit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000,
+          "title": "Managed workers",
+          "description": "Maximum managed workers shown for the plan."
+        },
+        "availability": {
+          "type": "string",
+          "enum": [
+            "free-signup",
+            "unavailable",
+            "contact"
+          ],
+          "title": "Availability",
+          "description": "free-signup links to sign-up; unavailable shows the notice; contact requires an action link."
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Status label",
+          "description": "For example \"Available now\" or \"Catalog plan\"."
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+            "title": "Feature"
+          },
+          "minItems": 0,
+          "maxItems": 8,
+          "title": "Included"
+        },
+        "action": {
+          "$ref": "#/$defs/Link",
+          "title": "Button",
+          "description": "Required when availability is contact."
+        }
+      },
+      "required": [
+        "key",
+        "name",
+        "audience",
+        "priceMinor",
+        "currency",
+        "period",
+        "workerLimit",
+        "availability",
+        "status",
+        "features"
+      ]
+    },
+    "Clause": {
+      "type": "object",
+      "title": "Clause",
+      "description": "One numbered part of a legal document.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Key",
+          "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+        },
+        "heading": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Heading"
+        },
+        "paragraphs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+            "title": "Paragraph"
+          },
+          "minItems": 1,
+          "maxItems": 12,
+          "title": "Paragraphs"
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+            "title": "Point"
+          },
+          "minItems": 0,
+          "maxItems": 12,
+          "title": "Points"
+        }
+      },
+      "required": [
+        "id",
+        "heading",
+        "paragraphs",
+        "points"
+      ]
+    },
+    "ArticleBlock": {
+      "type": "object",
+      "title": "Article section",
+      "description": "One headed part of an article.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Key",
+          "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+        },
+        "heading": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Heading"
+        },
+        "paragraphs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 3000,
+            "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+            "title": "Paragraph"
+          },
+          "minItems": 0,
+          "maxItems": 30,
+          "title": "Paragraphs"
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+            "title": "Point"
+          },
+          "minItems": 0,
+          "maxItems": 30,
+          "title": "Points"
+        },
+        "image": {
+          "$ref": "#/$defs/Image",
+          "title": "Image"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "minItems": 0,
+          "maxItems": 10,
+          "title": "Links"
+        }
+      },
+      "required": [
+        "id",
+        "heading",
+        "paragraphs",
+        "points",
+        "links"
+      ]
+    },
+    "Announcement": {
+      "type": "object",
+      "title": "Announcement",
+      "description": "Optional bar above the navigation.",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Text"
+        },
+        "link": {
+          "$ref": "#/$defs/Link",
+          "title": "Link"
+        }
+      },
+      "required": [
+        "text"
+      ]
+    },
+    "HeroSection": {
+      "type": "object",
+      "title": "Hero",
+      "description": "The first screen of the page.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One or two sentences under the headline."
+        },
+        "primaryAction": {
+          "$ref": "#/$defs/Link",
+          "title": "Main button"
+        },
+        "secondaryAction": {
+          "$ref": "#/$defs/Link",
+          "title": "Second button"
+        },
+        "typing": {
+          "type": "object",
+          "title": "Typing line",
+          "description": "Optional line under the headline where one word cycles, for example the places work happens.",
+          "additionalProperties": false,
+          "properties": {
+            "template": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^(?=.*\\{place\\})[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Sentence",
+              "description": "Must contain {place}, for example \"Every action in {place} is checked before it runs.\""
+            },
+            "places": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Place"
+              },
+              "minItems": 2,
+              "maxItems": 8,
+              "title": "Places",
+              "description": "The words that cycle into {place}. The first one is shown when motion is off."
+            }
+          },
+          "required": [
+            "template",
+            "places"
+          ]
+        }
+      },
+      "required": [
+        "headline",
+        "body",
+        "primaryAction"
+      ]
+    },
+    "HeadingSection": {
+      "type": "object",
+      "title": "Statement",
+      "description": "A heading with an optional paragraph.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        }
+      },
+      "required": [
+        "headline"
+      ]
+    },
+    "ProseSection": {
+      "type": "object",
+      "title": "Text section",
+      "description": "A heading followed by paragraphs.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "paragraphs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1200,
+            "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+            "title": "Paragraph"
+          },
+          "minItems": 1,
+          "maxItems": 6,
+          "title": "Paragraphs"
+        },
+        "link": {
+          "$ref": "#/$defs/Link",
+          "title": "Link"
+        }
+      },
+      "required": [
+        "headline",
+        "paragraphs"
+      ]
+    },
+    "FeatureSection": {
+      "type": "object",
+      "title": "Feature list",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Feature"
+          },
+          "minItems": 1,
+          "maxItems": 8,
+          "title": "Features"
+        },
+        "link": {
+          "$ref": "#/$defs/Link",
+          "title": "Link"
+        }
+      },
+      "required": [
+        "headline",
+        "items"
+      ]
+    },
+    "StepSection": {
+      "type": "object",
+      "title": "Sequence",
+      "description": "Ordered stages, shown as a path.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Step"
+          },
+          "minItems": 2,
+          "maxItems": 6,
+          "title": "Stages"
+        }
+      },
+      "required": [
+        "headline",
+        "steps"
+      ]
+    },
+    "CardSection": {
+      "type": "object",
+      "title": "Linked cards",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Card"
+          },
+          "minItems": 1,
+          "maxItems": 8,
+          "title": "Cards"
+        }
+      },
+      "required": [
+        "headline",
+        "items"
+      ]
+    },
+    "FigureSection": {
+      "type": "object",
+      "title": "Figure section",
+      "description": "A heading, a labelled figure drawn by the site, and short points.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "figureLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Figure label",
+          "description": "Short caption above the figure, for example \"Worker profile\"."
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+            "title": "Point"
+          },
+          "minItems": 0,
+          "maxItems": 6,
+          "title": "Points"
+        },
+        "image": {
+          "$ref": "#/$defs/Image",
+          "title": "Image"
+        },
+        "link": {
+          "$ref": "#/$defs/Link",
+          "title": "Link"
+        }
+      },
+      "required": [
+        "headline",
+        "figureLabel",
+        "points"
+      ]
+    },
+    "DecisionSection": {
+      "type": "object",
+      "title": "Decision section",
+      "description": "A heading and the illustrative decision demonstration.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "demo": {
+          "$ref": "#/$defs/DecisionDemo",
+          "title": "Demonstration"
+        }
+      },
+      "required": [
+        "headline",
+        "demo"
+      ]
+    },
+    "RecordSection": {
+      "type": "object",
+      "title": "Record section",
+      "description": "A heading and illustrative audit records.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "disclosure": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Disclosure",
+          "description": "Required notice that the records are examples."
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Record"
+          },
+          "minItems": 1,
+          "maxItems": 8,
+          "title": "Records"
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "title": "Metric",
+            "description": "An illustrative number shown above the records.",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,62}$",
+                "title": "Key",
+                "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Label"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 20,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Value",
+                "description": "Shown as written, for example \"1,284\"."
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "value"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 4,
+          "title": "Metrics",
+          "description": "Optional illustrative counters. Covered by the disclosure."
+        }
+      },
+      "required": [
+        "headline",
+        "disclosure",
+        "records"
+      ]
+    },
+    "CodeSection": {
+      "type": "object",
+      "title": "Code section",
+      "description": "A heading and an illustrative code window with tabs, showing what the AI proposed and what Audoryn decided.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "disclosure": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Disclosure",
+          "description": "Required notice that the code is a simplified example."
+        },
+        "tabs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "title": "Code tab",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,62}$",
+                "title": "Key",
+                "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 30,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Tab label",
+                "description": "For example \"Policy\" or \"Record\"."
+              },
+              "language": {
+                "type": "string",
+                "enum": [
+                  "yaml",
+                  "json",
+                  "text"
+                ],
+                "title": "Language",
+                "description": "Used for colouring."
+              },
+              "lines": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 160,
+                  "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$",
+                  "title": "Line",
+                  "description": "One line of code. Leading spaces are kept for indentation."
+                },
+                "minItems": 1,
+                "maxItems": 40,
+                "title": "Lines"
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "language",
+              "lines"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 4,
+          "title": "Tabs"
+        },
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "AI proposal",
+          "description": "What the model asked to do, shown in the AI colour."
+        },
+        "decision": {
+          "type": "object",
+          "title": "Decision",
+          "description": "What Audoryn decided.",
+          "additionalProperties": false,
+          "properties": {
+            "decision": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "review",
+                "deny"
+              ],
+              "title": "Decision"
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 240,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Explanation"
+            }
+          },
+          "required": [
+            "decision",
+            "text"
+          ]
+        }
+      },
+      "required": [
+        "headline",
+        "disclosure",
+        "tabs",
+        "proposal",
+        "decision"
+      ]
+    },
+    "IntegrationSection": {
+      "type": "object",
+      "title": "Integrations",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Integration"
+          },
+          "minItems": 1,
+          "maxItems": 12,
+          "title": "Integrations"
+        },
+        "boundary": {
+          "type": "object",
+          "title": "Boundary",
+          "description": "The path every connected action passes before it runs.",
+          "additionalProperties": false,
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Boundary statement",
+              "description": "For example \"Authority is checked before execution.\""
+            },
+            "stages": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 30,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Stage"
+              },
+              "minItems": 3,
+              "maxItems": 3,
+              "title": "Stages",
+              "description": "Exactly three stage names, for example Capability, Policy, Approval."
+            }
+          },
+          "required": [
+            "title",
+            "stages"
+          ]
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Boundary note",
+          "description": "Explains that a connection is not permission."
+        }
+      },
+      "required": [
+        "headline",
+        "items",
+        "boundary",
+        "note"
+      ]
+    },
+    "WorkerProfileSection": {
+      "type": "object",
+      "title": "Worker profile",
+      "description": "A heading and an illustrative worker profile card.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "figureLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Figure label",
+          "description": "Short caption above the card, for example \"Worker profile\"."
+        },
+        "disclosure": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Disclosure"
+        },
+        "profile": {
+          "type": "object",
+          "title": "Example worker",
+          "additionalProperties": false,
+          "properties": {
+            "role": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Role"
+            },
+            "team": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Team"
+            },
+            "supervisor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Supervisor"
+            },
+            "job": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Assigned job"
+            },
+            "schedule": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Schedule",
+              "description": "For example \"Mon · 09:00\"."
+            },
+            "checkpoint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Checkpoint",
+              "description": "For example \"Review before delivery\"."
+            },
+            "status": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Status"
+            },
+            "path": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 30,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Stage"
+              },
+              "minItems": 3,
+              "maxItems": 3,
+              "title": "Path",
+              "description": "Three stages, for example Role, Job, Queue."
+            }
+          },
+          "required": [
+            "role",
+            "team",
+            "supervisor",
+            "job",
+            "schedule",
+            "checkpoint",
+            "status",
+            "path"
+          ]
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+            "title": "Point"
+          },
+          "minItems": 0,
+          "maxItems": 6,
+          "title": "Points"
+        }
+      },
+      "required": [
+        "headline",
+        "figureLabel",
+        "disclosure",
+        "profile",
+        "points"
+      ]
+    },
+    "LayerSection": {
+      "type": "object",
+      "title": "Operating model",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Layer"
+          },
+          "minItems": 4,
+          "maxItems": 4,
+          "title": "Layers",
+          "description": "Exactly four layers: workers, jobs, governance and supervision."
+        }
+      },
+      "required": [
+        "headline",
+        "layers"
+      ]
+    },
+    "SolutionSection": {
+      "type": "object",
+      "title": "Solutions",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Solution"
+          },
+          "minItems": 1,
+          "maxItems": 12,
+          "title": "Solutions"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Template note",
+          "description": "Explains what a template does and does not set up."
+        }
+      },
+      "required": [
+        "headline",
+        "items",
+        "note"
+      ]
+    },
+    "PlanSection": {
+      "type": "object",
+      "title": "Plans",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "plans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Plan"
+          },
+          "minItems": 1,
+          "maxItems": 8,
+          "title": "Plans"
+        },
+        "notice": {
+          "type": "object",
+          "title": "Availability notice",
+          "description": "Shown with the plans while paid plans cannot be bought.",
+          "additionalProperties": false,
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Title"
+            },
+            "body": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Text"
+            }
+          },
+          "required": [
+            "title",
+            "body"
+          ]
+        }
+      },
+      "required": [
+        "headline",
+        "plans",
+        "notice"
+      ]
+    },
+    "FaqSection": {
+      "type": "object",
+      "title": "Questions",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Faq"
+          },
+          "minItems": 1,
+          "maxItems": 20,
+          "title": "Questions"
+        }
+      },
+      "required": [
+        "headline",
+        "items"
+      ]
+    },
+    "WorkspaceDemoSection": {
+      "type": "object",
+      "title": "Workspace demonstration",
+      "description": "An illustrative view of the Audoryn workspace. Always labelled as illustrative.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "disclosure": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Disclosure"
+        },
+        "organization": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Example organization"
+        },
+        "workers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "title": "Example worker",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,62}$",
+                "title": "Key",
+                "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Role"
+              },
+              "team": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Team"
+              },
+              "supervisor": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Supervisor"
+              },
+              "status": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 30,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Status"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "team",
+              "supervisor",
+              "status"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 4,
+          "title": "Workers"
+        },
+        "jobs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "title": "Example job",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,62}$",
+                "title": "Key",
+                "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Job"
+              },
+              "worker": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Worker"
+              },
+              "trigger": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Trigger"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "running",
+                  "completed",
+                  "held"
+                ],
+                "title": "Status"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "worker",
+              "trigger",
+              "status"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "title": "Jobs"
+        },
+        "approval": {
+          "type": "object",
+          "title": "Example approval",
+          "additionalProperties": false,
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Action held"
+            },
+            "body": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Context"
+            },
+            "requestedBy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Requested by"
+            },
+            "reviewer": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Reviewer"
+            }
+          },
+          "required": [
+            "title",
+            "body",
+            "requestedBy",
+            "reviewer"
+          ]
+        }
+      },
+      "required": [
+        "headline",
+        "disclosure",
+        "organization",
+        "workers",
+        "jobs",
+        "approval"
+      ]
+    },
+    "RunSection": {
+      "type": "object",
+      "title": "Run timeline",
+      "description": "A heading and an illustrative run with its steps.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "disclosure": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Disclosure"
+        },
+        "runTitle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Run title"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "title": "Run step",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,62}$",
+                "title": "Key",
+                "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Step"
+              },
+              "detail": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                "title": "Detail"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "done",
+                  "active",
+                  "waiting"
+                ],
+                "title": "State"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "detail",
+              "state"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 8,
+          "title": "Steps"
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+            "title": "Point"
+          },
+          "minItems": 0,
+          "maxItems": 6,
+          "title": "Points"
+        }
+      },
+      "required": [
+        "headline",
+        "disclosure",
+        "runTitle",
+        "steps",
+        "points"
+      ]
+    },
+    "ProfileSection": {
+      "type": "object",
+      "title": "Profile",
+      "description": "A person or organization profile.",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Name"
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Role"
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Location"
+        },
+        "paragraphs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1200,
+            "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+            "title": "Paragraph"
+          },
+          "minItems": 1,
+          "maxItems": 4,
+          "title": "Paragraphs"
+        },
+        "link": {
+          "$ref": "#/$defs/Link",
+          "title": "Link"
+        }
+      },
+      "required": [
+        "headline",
+        "name",
+        "role",
+        "paragraphs"
+      ]
+    },
+    "ClosingSection": {
+      "type": "object",
+      "title": "Closing call to action",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker",
+          "description": "Short label above the headline, for example \"Human oversight\". Shown in small capitals."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline",
+          "description": "One sentence. Keep it short; the design decides line breaks."
+        },
+        "headlineDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Headline detail",
+          "description": "Optional second clause shown in a quieter colour after the headline."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Introduction",
+          "description": "One short paragraph under the headline."
+        },
+        "primaryAction": {
+          "$ref": "#/$defs/Link",
+          "title": "Main button"
+        },
+        "secondaryAction": {
+          "$ref": "#/$defs/Link",
+          "title": "Second button"
+        }
+      },
+      "required": [
+        "headline",
+        "primaryAction"
+      ]
+    },
+    "LegalSection": {
+      "type": "object",
+      "title": "Legal document",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Title"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Summary"
+        },
+        "effectiveDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "title": "Effective date",
+          "description": "YYYY-MM-DD"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Version"
+        },
+        "scopeNote": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Scope note",
+          "description": "How this document relates to any signed agreement."
+        },
+        "clauses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Clause"
+          },
+          "minItems": 1,
+          "maxItems": 30,
+          "title": "Clauses"
+        },
+        "related": {
+          "$ref": "#/$defs/Link",
+          "title": "Related document",
+          "description": "Link to the companion legal document."
+        }
+      },
+      "required": [
+        "title",
+        "summary",
+        "effectiveDate",
+        "version",
+        "scopeNote",
+        "clauses",
+        "related"
+      ]
+    },
+    "ArticleSection": {
+      "type": "object",
+      "title": "Article",
+      "additionalProperties": false,
+      "properties": {
+        "kicker": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Kicker"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Title"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Summary"
+        },
+        "published": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "title": "Published",
+          "description": "YYYY-MM-DD"
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+          "title": "Author"
+        },
+        "image": {
+          "$ref": "#/$defs/Image",
+          "title": "Image"
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArticleBlock"
+          },
+          "minItems": 1,
+          "maxItems": 40,
+          "title": "Sections"
+        }
+      },
+      "required": [
+        "title",
+        "summary",
+        "sections"
+      ]
+    },
+    "Site": {
+      "type": "object",
+      "title": "Site",
+      "description": "Text used on every page: brand, actions, navigation and interface labels.",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "type": "string",
+          "const": "audoryn.public.v2",
+          "title": "Contract"
+        },
+        "page": {
+          "type": "string",
+          "const": "site",
+          "title": "Page"
+        },
+        "brand": {
+          "type": "object",
+          "title": "Brand",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Product name"
+            },
+            "owner": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Owner line",
+              "description": "For example \"An SOT product\"."
+            },
+            "tagline": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Tagline",
+              "description": "Shown in the footer."
+            },
+            "legal": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Legal line",
+              "description": "For example \"© 2026 SOT\"."
+            }
+          },
+          "required": [
+            "name",
+            "owner",
+            "tagline",
+            "legal"
+          ]
+        },
+        "actions": {
+          "type": "object",
+          "title": "Actions",
+          "description": "The sign-in and get-started actions in the navigation.",
+          "additionalProperties": false,
+          "properties": {
+            "signIn": {
+              "$ref": "#/$defs/Link",
+              "title": "Sign-in link"
+            },
+            "getStarted": {
+              "$ref": "#/$defs/Link",
+              "title": "Get-started button"
+            }
+          },
+          "required": [
+            "signIn",
+            "getStarted"
+          ]
+        },
+        "announcement": {
+          "$ref": "#/$defs/Announcement",
+          "title": "Announcement bar"
+        },
+        "navigation": {
+          "type": "object",
+          "title": "Navigation",
+          "description": "Built-in navigation, used when Console has not published navigation.",
+          "additionalProperties": false,
+          "properties": {
+            "header": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "title": "Menu",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,62}$",
+                    "title": "Key",
+                    "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                    "title": "Label"
+                  },
+                  "href": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500,
+                    "pattern": "^(?:/(?!/)[^\\s\\\\<>\\u0000-\\u001f]*|https://[^\\s\\\\<>\\u0000-\\u001f]+)$",
+                    "title": "Destination",
+                    "description": "A site path starting with / (for example /security#control-path) or an https:// address."
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                    "title": "Description",
+                    "description": "Shown under the label in dropdown menus."
+                  },
+                  "newTab": {
+                    "type": "boolean",
+                    "title": "Open in a new tab"
+                  },
+                  "intro": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                    "title": "Menu introduction"
+                  },
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "title": "Navigation item",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+                          "title": "Key",
+                          "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40,
+                          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                          "title": "Label"
+                        },
+                        "href": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "pattern": "^(?:/(?!/)[^\\s\\\\<>\\u0000-\\u001f]*|https://[^\\s\\\\<>\\u0000-\\u001f]+)$",
+                          "title": "Destination",
+                          "description": "A site path starting with / (for example /security#control-path) or an https:// address."
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                          "title": "Description",
+                          "description": "Shown under the label in dropdown menus."
+                        },
+                        "newTab": {
+                          "type": "boolean",
+                          "title": "Open in a new tab"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label",
+                        "href"
+                      ]
+                    },
+                    "minItems": 0,
+                    "maxItems": 6,
+                    "title": "Links"
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "href",
+                  "children"
+                ]
+              },
+              "minItems": 1,
+              "maxItems": 8,
+              "title": "Header menus"
+            },
+            "footer": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "title": "Footer group",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,62}$",
+                    "title": "Key",
+                    "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                    "title": "Group title"
+                  },
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "title": "Navigation item",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+                          "title": "Key",
+                          "description": "Stable identifier used for links and anchors. Lowercase letters, numbers and hyphens. Do not change it once published."
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40,
+                          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                          "title": "Label"
+                        },
+                        "href": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "pattern": "^(?:/(?!/)[^\\s\\\\<>\\u0000-\\u001f]*|https://[^\\s\\\\<>\\u0000-\\u001f]+)$",
+                          "title": "Destination",
+                          "description": "A site path starting with / (for example /security#control-path) or an https:// address."
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                          "title": "Description",
+                          "description": "Shown under the label in dropdown menus."
+                        },
+                        "newTab": {
+                          "type": "boolean",
+                          "title": "Open in a new tab"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label",
+                        "href"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "title": "Links"
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "children"
+                ]
+              },
+              "minItems": 1,
+              "maxItems": 6,
+              "title": "Footer groups"
+            }
+          },
+          "required": [
+            "header",
+            "footer"
+          ]
+        },
+        "labels": {
+          "type": "object",
+          "title": "Interface labels",
+          "description": "Short labels for navigation and accessibility.",
+          "additionalProperties": false,
+          "properties": {
+            "home": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Home link label",
+              "description": "Read by screen readers on the logo link."
+            },
+            "mainNavigation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Main navigation label"
+            },
+            "footerNavigation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Footer navigation label"
+            },
+            "openMenu": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Open menu"
+            },
+            "closeMenu": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Close menu"
+            },
+            "skipToContent": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Skip to content"
+            },
+            "illustrative": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Illustrative badge",
+              "description": "Badge shown on demonstrations."
+            },
+            "onThisPage": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "On this page",
+              "description": "Heading for the legal page contents."
+            },
+            "exploreMenu": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^(?=.*\\{label\\})[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Explore link in menus",
+              "description": "Must contain {label}, for example \"Explore {label}\"."
+            }
+          },
+          "required": [
+            "home",
+            "mainNavigation",
+            "footerNavigation",
+            "openMenu",
+            "closeMenu",
+            "skipToContent",
+            "illustrative",
+            "onThisPage",
+            "exploreMenu"
+          ]
+        },
+        "vocabulary": {
+          "type": "object",
+          "title": "Vocabulary",
+          "description": "Small labels used inside demonstrations, plans and records. \"{count}\" is replaced with a number.",
+          "additionalProperties": false,
+          "properties": {
+            "worker": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Worker"
+            },
+            "team": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Team"
+            },
+            "supervisor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Supervisor"
+            },
+            "status": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Status"
+            },
+            "trigger": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Trigger"
+            },
+            "job": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Job"
+            },
+            "exampleJob": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Example job"
+            },
+            "connectedTools": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Connected tools"
+            },
+            "deliverable": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Deliverable"
+            },
+            "requestedBy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Requested by"
+            },
+            "reviewer": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Reviewer"
+            },
+            "reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Reference"
+            },
+            "actor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Actor"
+            },
+            "action": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Action"
+            },
+            "policy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Policy"
+            },
+            "decision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Decision"
+            },
+            "outcome": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Outcome"
+            },
+            "time": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Time"
+            },
+            "target": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Target"
+            },
+            "checks": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Checks"
+            },
+            "schedule": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Schedule"
+            },
+            "assignedJob": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Assigned job"
+            },
+            "recordedAs": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Recorded as"
+            },
+            "worksWith": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Works with label",
+              "description": "Label in front of the provider marks, for example \"Works with\"."
+            },
+            "proposedBy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Proposed by label",
+              "description": "For example \"Proposed by the model\"."
+            },
+            "gateway": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Gateway name",
+              "description": "Shown in the title bar of the hero demonstration, for example \"Action gateway\"."
+            },
+            "jobStatus": {
+              "type": "object",
+              "title": "Job status names",
+              "additionalProperties": false,
+              "properties": {
+                "queued": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30,
+                  "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                  "title": "Queued"
+                },
+                "running": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30,
+                  "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                  "title": "Running"
+                },
+                "completed": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30,
+                  "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                  "title": "Completed"
+                },
+                "held": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30,
+                  "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                  "title": "Held for review"
+                }
+              },
+              "required": [
+                "queued",
+                "running",
+                "completed",
+                "held"
+              ]
+            },
+            "decisions": {
+              "type": "object",
+              "title": "Decision names",
+              "description": "Shown on records and badges.",
+              "additionalProperties": false,
+              "properties": {
+                "allow": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30,
+                  "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                  "title": "Allowed"
+                },
+                "review": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30,
+                  "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                  "title": "Held for review"
+                },
+                "deny": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30,
+                  "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                  "title": "Denied"
+                }
+              },
+              "required": [
+                "allow",
+                "review",
+                "deny"
+              ]
+            },
+            "stepState": {
+              "type": "object",
+              "title": "Run step states",
+              "additionalProperties": false,
+              "properties": {
+                "done": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30,
+                  "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                  "title": "Done"
+                },
+                "active": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30,
+                  "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                  "title": "In progress"
+                },
+                "waiting": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30,
+                  "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+                  "title": "Waiting"
+                }
+              },
+              "required": [
+                "done",
+                "active",
+                "waiting"
+              ]
+            },
+            "perMonth": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Per month",
+              "description": "Shown after a monthly price."
+            },
+            "perYear": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Per year",
+              "description": "Shown after a yearly price."
+            },
+            "workerLimit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^(?=.*\\{count\\})[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Worker limit",
+              "description": "Must contain {count}, for example \"Up to {count} managed workers\"."
+            },
+            "chooseDecision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Decision chooser label",
+              "description": "Read by screen readers on the decision buttons."
+            },
+            "chooseLayer": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Layer chooser label"
+            },
+            "chooseSolution": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Solution chooser label"
+            },
+            "ownerLogo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Owner logo description",
+              "description": "Alternative text for the SOT logo."
+            },
+            "published": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Published"
+            },
+            "by": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "By"
+            },
+            "readArticle": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Read article"
+            },
+            "effective": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Effective",
+              "description": "Label before the effective date of a legal document."
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Version"
+            },
+            "backToResources": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Back to resources",
+              "description": "Link at the top of an article."
+            }
+          },
+          "required": [
+            "worker",
+            "team",
+            "supervisor",
+            "status",
+            "trigger",
+            "job",
+            "exampleJob",
+            "connectedTools",
+            "deliverable",
+            "requestedBy",
+            "reviewer",
+            "reference",
+            "actor",
+            "action",
+            "policy",
+            "decision",
+            "outcome",
+            "time",
+            "target",
+            "checks",
+            "schedule",
+            "assignedJob",
+            "recordedAs",
+            "worksWith",
+            "proposedBy",
+            "gateway",
+            "jobStatus",
+            "decisions",
+            "stepState",
+            "perMonth",
+            "perYear",
+            "workerLimit",
+            "chooseDecision",
+            "chooseLayer",
+            "chooseSolution",
+            "ownerLogo",
+            "published",
+            "by",
+            "readArticle",
+            "effective",
+            "version",
+            "backToResources"
+          ]
+        },
+        "notFound": {
+          "type": "object",
+          "title": "Page not found",
+          "additionalProperties": false,
+          "properties": {
+            "headline": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Headline"
+            },
+            "body": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Text"
+            },
+            "action": {
+              "$ref": "#/$defs/Link",
+              "title": "Button"
+            }
+          },
+          "required": [
+            "headline",
+            "body",
+            "action"
+          ]
+        },
+        "unavailable": {
+          "type": "object",
+          "title": "Content unavailable",
+          "description": "Shown when content cannot be loaded.",
+          "additionalProperties": false,
+          "properties": {
+            "headline": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Headline"
+            },
+            "body": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300,
+              "pattern": "^[^\\s<>\\u0000-\\u001f\\u007f](?:[^<>\\u0000-\\u001f\\u007f]*[^\\s<>\\u0000-\\u001f\\u007f])?$",
+              "title": "Text"
+            }
+          },
+          "required": [
+            "headline",
+            "body"
+          ]
+        }
+      },
+      "required": [
+        "contract",
+        "page",
+        "brand",
+        "actions",
+        "navigation",
+        "labels",
+        "vocabulary",
+        "notFound",
+        "unavailable"
+      ]
+    },
+    "HomePage": {
+      "type": "object",
+      "title": "Home page",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "type": "string",
+          "const": "audoryn.public.v2",
+          "title": "Contract"
+        },
+        "page": {
+          "type": "string",
+          "const": "home",
+          "title": "Page"
+        },
+        "sections": {
+          "type": "object",
+          "title": "Sections",
+          "additionalProperties": false,
+          "properties": {
+            "hero": {
+              "$ref": "#/$defs/HeroSection"
+            },
+            "activity": {
+              "$ref": "#/$defs/RecordSection"
+            },
+            "decision": {
+              "$ref": "#/$defs/DecisionSection"
+            },
+            "product": {
+              "$ref": "#/$defs/FeatureSection"
+            },
+            "controlPath": {
+              "$ref": "#/$defs/StepSection"
+            },
+            "policy": {
+              "$ref": "#/$defs/CodeSection"
+            },
+            "operatingModel": {
+              "$ref": "#/$defs/LayerSection"
+            },
+            "oversight": {
+              "$ref": "#/$defs/FigureSection"
+            },
+            "controls": {
+              "$ref": "#/$defs/FeatureSection"
+            },
+            "connections": {
+              "$ref": "#/$defs/IntegrationSection"
+            },
+            "solutions": {
+              "$ref": "#/$defs/CardSection"
+            },
+            "closing": {
+              "$ref": "#/$defs/ClosingSection"
+            }
+          },
+          "required": [
+            "hero",
+            "activity",
+            "decision",
+            "product",
+            "controlPath",
+            "policy",
+            "operatingModel",
+            "oversight",
+            "controls",
+            "connections",
+            "solutions",
+            "closing"
+          ]
+        }
+      },
+      "required": [
+        "contract",
+        "page",
+        "sections"
+      ]
+    },
+    "ProductPage": {
+      "type": "object",
+      "title": "Product page",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "type": "string",
+          "const": "audoryn.public.v2",
+          "title": "Contract"
+        },
+        "page": {
+          "type": "string",
+          "const": "product",
+          "title": "Page"
+        },
+        "sections": {
+          "type": "object",
+          "title": "Sections",
+          "additionalProperties": false,
+          "properties": {
+            "hero": {
+              "$ref": "#/$defs/HeroSection"
+            },
+            "workspace": {
+              "$ref": "#/$defs/WorkspaceDemoSection"
+            },
+            "workforce": {
+              "$ref": "#/$defs/WorkerProfileSection"
+            },
+            "runtime": {
+              "$ref": "#/$defs/RunSection"
+            },
+            "intelligence": {
+              "$ref": "#/$defs/FeatureSection"
+            },
+            "supervision": {
+              "$ref": "#/$defs/FigureSection"
+            },
+            "integrations": {
+              "$ref": "#/$defs/IntegrationSection"
+            },
+            "closing": {
+              "$ref": "#/$defs/ClosingSection"
+            }
+          },
+          "required": [
+            "hero",
+            "workspace",
+            "workforce",
+            "runtime",
+            "intelligence",
+            "supervision",
+            "integrations",
+            "closing"
+          ]
+        }
+      },
+      "required": [
+        "contract",
+        "page",
+        "sections"
+      ]
+    },
+    "SolutionsPage": {
+      "type": "object",
+      "title": "Solutions page",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "type": "string",
+          "const": "audoryn.public.v2",
+          "title": "Contract"
+        },
+        "page": {
+          "type": "string",
+          "const": "solutions",
+          "title": "Page"
+        },
+        "sections": {
+          "type": "object",
+          "title": "Sections",
+          "additionalProperties": false,
+          "properties": {
+            "hero": {
+              "$ref": "#/$defs/HeroSection"
+            },
+            "solutions": {
+              "$ref": "#/$defs/SolutionSection"
+            },
+            "closing": {
+              "$ref": "#/$defs/ClosingSection"
+            }
+          },
+          "required": [
+            "hero",
+            "solutions",
+            "closing"
+          ]
+        }
+      },
+      "required": [
+        "contract",
+        "page",
+        "sections"
+      ]
+    },
+    "SecurityPage": {
+      "type": "object",
+      "title": "Security page",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "type": "string",
+          "const": "audoryn.public.v2",
+          "title": "Contract"
+        },
+        "page": {
+          "type": "string",
+          "const": "security",
+          "title": "Page"
+        },
+        "sections": {
+          "type": "object",
+          "title": "Sections",
+          "additionalProperties": false,
+          "properties": {
+            "hero": {
+              "$ref": "#/$defs/HeroSection"
+            },
+            "decision": {
+              "$ref": "#/$defs/DecisionSection"
+            },
+            "controlPath": {
+              "$ref": "#/$defs/StepSection"
+            },
+            "safeguards": {
+              "$ref": "#/$defs/FeatureSection"
+            },
+            "record": {
+              "$ref": "#/$defs/RecordSection"
+            },
+            "closing": {
+              "$ref": "#/$defs/ClosingSection"
+            }
+          },
+          "required": [
+            "hero",
+            "decision",
+            "controlPath",
+            "safeguards",
+            "record",
+            "closing"
+          ]
+        }
+      },
+      "required": [
+        "contract",
+        "page",
+        "sections"
+      ]
+    },
+    "PricingPage": {
+      "type": "object",
+      "title": "Pricing page",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "type": "string",
+          "const": "audoryn.public.v2",
+          "title": "Contract"
+        },
+        "page": {
+          "type": "string",
+          "const": "pricing",
+          "title": "Page"
+        },
+        "sections": {
+          "type": "object",
+          "title": "Sections",
+          "additionalProperties": false,
+          "properties": {
+            "hero": {
+              "$ref": "#/$defs/HeroSection"
+            },
+            "plans": {
+              "$ref": "#/$defs/PlanSection"
+            },
+            "sameModel": {
+              "$ref": "#/$defs/FeatureSection"
+            },
+            "questions": {
+              "$ref": "#/$defs/FaqSection"
+            },
+            "closing": {
+              "$ref": "#/$defs/ClosingSection"
+            }
+          },
+          "required": [
+            "hero",
+            "plans",
+            "sameModel",
+            "questions",
+            "closing"
+          ]
+        }
+      },
+      "required": [
+        "contract",
+        "page",
+        "sections"
+      ]
+    },
+    "ResourcesPage": {
+      "type": "object",
+      "title": "Resources page",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "type": "string",
+          "const": "audoryn.public.v2",
+          "title": "Contract"
+        },
+        "page": {
+          "type": "string",
+          "const": "resources",
+          "title": "Page"
+        },
+        "sections": {
+          "type": "object",
+          "title": "Sections",
+          "additionalProperties": false,
+          "properties": {
+            "hero": {
+              "$ref": "#/$defs/HeroSection"
+            },
+            "guides": {
+              "$ref": "#/$defs/CardSection"
+            },
+            "library": {
+              "$ref": "#/$defs/HeadingSection"
+            },
+            "operators": {
+              "$ref": "#/$defs/ProseSection"
+            }
+          },
+          "required": [
+            "hero",
+            "guides",
+            "operators"
+          ]
+        }
+      },
+      "required": [
+        "contract",
+        "page",
+        "sections"
+      ]
+    },
+    "CompanyPage": {
+      "type": "object",
+      "title": "Company page",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "type": "string",
+          "const": "audoryn.public.v2",
+          "title": "Contract"
+        },
+        "page": {
+          "type": "string",
+          "const": "company",
+          "title": "Page"
+        },
+        "sections": {
+          "type": "object",
+          "title": "Sections",
+          "additionalProperties": false,
+          "properties": {
+            "hero": {
+              "$ref": "#/$defs/HeroSection"
+            },
+            "about": {
+              "$ref": "#/$defs/ProseSection"
+            },
+            "portfolio": {
+              "$ref": "#/$defs/CardSection"
+            },
+            "why": {
+              "$ref": "#/$defs/ProseSection"
+            },
+            "founder": {
+              "$ref": "#/$defs/ProfileSection"
+            },
+            "closing": {
+              "$ref": "#/$defs/ClosingSection"
+            }
+          },
+          "required": [
+            "hero",
+            "about",
+            "portfolio",
+            "why",
+            "founder",
+            "closing"
+          ]
+        }
+      },
+      "required": [
+        "contract",
+        "page",
+        "sections"
+      ]
+    },
+    "PrivacyPage": {
+      "type": "object",
+      "title": "Privacy page",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "type": "string",
+          "const": "audoryn.public.v2",
+          "title": "Contract"
+        },
+        "page": {
+          "type": "string",
+          "const": "privacy",
+          "title": "Page"
+        },
+        "sections": {
+          "type": "object",
+          "title": "Sections",
+          "additionalProperties": false,
+          "properties": {
+            "document": {
+              "$ref": "#/$defs/LegalSection"
+            }
+          },
+          "required": [
+            "document"
+          ]
+        }
+      },
+      "required": [
+        "contract",
+        "page",
+        "sections"
+      ]
+    },
+    "TermsPage": {
+      "type": "object",
+      "title": "Terms page",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "type": "string",
+          "const": "audoryn.public.v2",
+          "title": "Contract"
+        },
+        "page": {
+          "type": "string",
+          "const": "terms",
+          "title": "Page"
+        },
+        "sections": {
+          "type": "object",
+          "title": "Sections",
+          "additionalProperties": false,
+          "properties": {
+            "document": {
+              "$ref": "#/$defs/LegalSection"
+            }
+          },
+          "required": [
+            "document"
+          ]
+        }
+      },
+      "required": [
+        "contract",
+        "page",
+        "sections"
+      ]
+    },
+    "ArticlePage": {
+      "type": "object",
+      "title": "Article page",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "type": "string",
+          "const": "audoryn.public.v2",
+          "title": "Contract"
+        },
+        "page": {
+          "type": "string",
+          "const": "article",
+          "title": "Page"
+        },
+        "sections": {
+          "type": "object",
+          "title": "Sections",
+          "additionalProperties": false,
+          "properties": {
+            "article": {
+              "$ref": "#/$defs/ArticleSection"
+            }
+          },
+          "required": [
+            "article"
+          ]
+        }
+      },
+      "required": [
+        "contract",
+        "page",
+        "sections"
+      ]
+    }
+  }
+}

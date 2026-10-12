@@ -1,0 +1,328 @@
+{
+  "contract": "audoryn.public.v2",
+  "page": "site",
+  "brand": {
+    "name": "Audoryn",
+    "owner": "An SOT product",
+    "tagline": "Controlled infrastructure for an autonomous AI workforce.",
+    "legal": "© 2026 SOT"
+  },
+  "actions": {
+    "signIn": {
+      "label": "Sign in",
+      "href": "/login"
+    },
+    "getStarted": {
+      "label": "Get started",
+      "href": "/signup"
+    }
+  },
+  "navigation": {
+    "header": [
+      {
+        "id": "product",
+        "label": "Product",
+        "href": "/product",
+        "intro": "One place for AI workers, their work and the authority around it.",
+        "children": [
+          {
+            "id": "overview",
+            "label": "Overview",
+            "href": "/product",
+            "description": "See the complete operating layer."
+          },
+          {
+            "id": "workforce",
+            "label": "Workforce",
+            "href": "/product#workforce",
+            "description": "Define roles, jobs and supervisors."
+          },
+          {
+            "id": "governance",
+            "label": "Governance",
+            "href": "/security#control-path",
+            "description": "Follow the path every action takes."
+          },
+          {
+            "id": "integrations",
+            "label": "Integrations",
+            "href": "/product#integrations",
+            "description": "Connect work to the tools you use."
+          }
+        ]
+      },
+      {
+        "id": "solutions",
+        "label": "Solutions",
+        "href": "/solutions",
+        "intro": "Start with a responsibility that already matters.",
+        "children": [
+          {
+            "id": "support",
+            "label": "Customer support",
+            "href": "/solutions#customer-support",
+            "description": "Know what needs attention first."
+          },
+          {
+            "id": "research",
+            "label": "Research",
+            "href": "/solutions#research",
+            "description": "Turn sources into a clear brief."
+          },
+          {
+            "id": "operations",
+            "label": "Operations",
+            "href": "/solutions#operations",
+            "description": "Keep the daily picture current."
+          },
+          {
+            "id": "engineering",
+            "label": "Engineering",
+            "href": "/solutions#engineering",
+            "description": "Stay close to repository work."
+          }
+        ]
+      },
+      {
+        "id": "security",
+        "label": "Security",
+        "href": "/security",
+        "children": []
+      },
+      {
+        "id": "resources",
+        "label": "Resources",
+        "href": "/resources",
+        "intro": "Everything you need to evaluate Audoryn.",
+        "children": [
+          {
+            "id": "how-it-works",
+            "label": "How it works",
+            "href": "/product",
+            "description": "Workers, jobs, runtime and supervision."
+          },
+          {
+            "id": "control-model",
+            "label": "Control model",
+            "href": "/security",
+            "description": "What decides every action."
+          },
+          {
+            "id": "plans",
+            "label": "Plans",
+            "href": "/pricing",
+            "description": "Capacity and availability."
+          }
+        ]
+      },
+      {
+        "id": "pricing",
+        "label": "Pricing",
+        "href": "/pricing",
+        "children": []
+      },
+      {
+        "id": "company",
+        "label": "Company",
+        "href": "/company",
+        "intro": "Who builds Audoryn, and the notices that govern it.",
+        "children": [
+          {
+            "id": "about",
+            "label": "About",
+            "href": "/company",
+            "description": "Why SOT is building Audoryn."
+          },
+          {
+            "id": "privacy",
+            "label": "Privacy",
+            "href": "/privacy",
+            "description": "How product data is handled."
+          },
+          {
+            "id": "terms",
+            "label": "Terms",
+            "href": "/terms",
+            "description": "How Audoryn may be used."
+          }
+        ]
+      }
+    ],
+    "footer": [
+      {
+        "id": "product",
+        "label": "Product",
+        "children": [
+          {
+            "id": "overview",
+            "label": "Overview",
+            "href": "/product"
+          },
+          {
+            "id": "workforce",
+            "label": "Workforce",
+            "href": "/product#workforce"
+          },
+          {
+            "id": "governance",
+            "label": "Governance",
+            "href": "/security#control-path"
+          },
+          {
+            "id": "integrations",
+            "label": "Integrations",
+            "href": "/product#integrations"
+          }
+        ]
+      },
+      {
+        "id": "solutions",
+        "label": "Solutions",
+        "children": [
+          {
+            "id": "support",
+            "label": "Customer support",
+            "href": "/solutions#customer-support"
+          },
+          {
+            "id": "research",
+            "label": "Research",
+            "href": "/solutions#research"
+          },
+          {
+            "id": "operations",
+            "label": "Operations",
+            "href": "/solutions#operations"
+          },
+          {
+            "id": "engineering",
+            "label": "Engineering",
+            "href": "/solutions#engineering"
+          }
+        ]
+      },
+      {
+        "id": "resources",
+        "label": "Resources",
+        "children": [
+          {
+            "id": "resources",
+            "label": "All resources",
+            "href": "/resources"
+          },
+          {
+            "id": "security",
+            "label": "Security",
+            "href": "/security"
+          },
+          {
+            "id": "pricing",
+            "label": "Pricing",
+            "href": "/pricing"
+          }
+        ]
+      },
+      {
+        "id": "company",
+        "label": "Company",
+        "children": [
+          {
+            "id": "about",
+            "label": "About",
+            "href": "/company"
+          },
+          {
+            "id": "privacy",
+            "label": "Privacy",
+            "href": "/privacy"
+          },
+          {
+            "id": "terms",
+            "label": "Terms",
+            "href": "/terms"
+          }
+        ]
+      }
+    ]
+  },
+  "labels": {
+    "home": "Audoryn home",
+    "mainNavigation": "Main navigation",
+    "footerNavigation": "Footer navigation",
+    "openMenu": "Menu",
+    "closeMenu": "Close",
+    "skipToContent": "Skip to content",
+    "illustrative": "Illustrative",
+    "onThisPage": "On this page",
+    "exploreMenu": "Explore {label}"
+  },
+  "vocabulary": {
+    "worker": "Worker",
+    "team": "Team",
+    "supervisor": "Supervisor",
+    "status": "Status",
+    "trigger": "Trigger",
+    "job": "Job",
+    "exampleJob": "Example job",
+    "connectedTools": "Connected tools",
+    "deliverable": "Deliverable",
+    "requestedBy": "Requested by",
+    "reviewer": "Reviewer",
+    "reference": "Reference",
+    "actor": "Actor",
+    "action": "Action",
+    "policy": "Policy",
+    "decision": "Decision",
+    "outcome": "Outcome",
+    "time": "Time",
+    "target": "Target",
+    "checks": "Checks",
+    "schedule": "Schedule",
+    "assignedJob": "Assigned job",
+    "recordedAs": "Recorded as",
+    "worksWith": "Works with",
+    "proposedBy": "Proposed by the model",
+    "gateway": "Action gateway",
+    "jobStatus": {
+      "queued": "Queued",
+      "running": "Running",
+      "completed": "Completed",
+      "held": "Held for review"
+    },
+    "decisions": {
+      "allow": "Allowed",
+      "review": "Held for review",
+      "deny": "Denied"
+    },
+    "stepState": {
+      "done": "Done",
+      "active": "In progress",
+      "waiting": "Waiting"
+    },
+    "perMonth": "per month",
+    "perYear": "per year",
+    "workerLimit": "Up to {count} managed workers",
+    "chooseDecision": "Choose a decision",
+    "chooseLayer": "Choose a layer of the operating model",
+    "chooseSolution": "Choose a solution area",
+    "ownerLogo": "SOT logo",
+    "published": "Published",
+    "by": "By",
+    "readArticle": "Read article",
+    "effective": "Effective",
+    "version": "Version",
+    "backToResources": "All resources"
+  },
+  "notFound": {
+    "headline": "This page isn't here.",
+    "body": "It may have moved or been removed. Everything else is still where you left it.",
+    "action": {
+      "label": "Back to Audoryn",
+      "href": "/"
+    }
+  },
+  "unavailable": {
+    "headline": "This content is briefly unavailable.",
+    "body": "Please try again in a moment."
+  }
+}

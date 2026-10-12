@@ -9,11 +9,18 @@
     "preview": "node scripts/preview-public-site.mjs",
     "test": "node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
+    "site:contract": "node scripts/site-contract.mjs",
+    "site:copy": "node scripts/site-copy-report.mjs",
+    "site:seed": "node scripts/build-site-seed.mjs",
+    "site:import": "node scripts/import-site-seed.mjs",
+    "check:budget": "node scripts/check-site-budget.mjs",
+    "verify:site": "node scripts/verify-site-browser.mjs",
     "verify:workspace": "node scripts/verify-workspace-browser.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "5.3.0",
     "@fontsource-variable/geist-mono": "5.3.0",
+    "@fontsource-variable/newsreader": "5.3.0",
     "docx": "^9.5.1",
     "jspdf": "4.2.1",
     "lucide-react": "^0.469.0",
