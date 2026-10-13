@@ -120,10 +120,11 @@ export async function sendConversationMessage(
   threadId: string,
   content: string,
   artifactReferences: Array<Record<string, unknown>> = [],
+  options: { operation?: 'worker.create'; resumeCommandId?: string } = {},
 ): Promise<ConversationTurn> {
   const response = await api.post(
     `/api/${version}/organizations/${organizationId}/conversations/${threadId}/messages`,
-    { content, artifactReferences },
+    { content, artifactReferences, ...options },
   );
   return normalizeTurn(version, response);
 }

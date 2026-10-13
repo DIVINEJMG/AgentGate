@@ -142,12 +142,13 @@ def test_status_facts_identify_each_task_and_run():
         "activeJobs": [{"id": "job", "name": "Timezone check"}],
         "currentWork": [{"id": "work", "jobId": "job"}],
         "recentRuns": [
-            {"id": "one", "workItemId": "work", "status": "completed"},
-            {"id": "two", "workItemId": "work", "status": "completed"},
+            {"id": "one", "workItemId": "work", "status": "completed", "createdAt": "2026-10-13T09:00:00+00:00"},
+            {"id": "two", "workItemId": "work", "status": "completed", "createdAt": "2026-10-14T09:00:00+00:00"},
         ],
     })
-    assert "Timezone check (run one)" in facts["run:one:status"]
-    assert facts["run:one:status"] != facts["run:two:status"]
+    # One plain sentence per run, told apart by when it started, without internal identifiers.
+    assert facts["run:one:status"] == "The task “Timezone check” started 13 Oct at 09:00 UTC finished."
+    assert facts["run:one:status"] != facts["run:two:status"] and "(run" not in facts["run:one:status"]
 
 
 @pytest.mark.asyncio
@@ -173,7 +174,7 @@ async def test_duplicate_rendered_facts_are_deduplicated():
     answer = await grounded_reply(gateway, message="What is the status?",
         context={"recentRuns": [{"id": "one", "status": "completed"}]},
         invocation_context=AIInvocationContext())
-    assert answer.count("recorded task status") == 1
+    assert answer.count("An earlier task finished.") == 1
 
 
 @pytest.mark.asyncio
@@ -184,7 +185,7 @@ async def test_fact_relevance_is_selected_by_model_from_followup_context():
         context={"recentRuns": [{"id": "old", "status": "completed"}],
                  "thread": {"messages": [{"content": "What was the outcome of my last task?"}]}},
         invocation_context=AIInvocationContext())
-    assert "recorded task status is completed" in answer and len(calls) == 1
+    assert "An earlier task finished." in answer and len(calls) == 1
 
 
 @pytest.mark.asyncio
@@ -271,7 +272,7 @@ async def test_saved_work_is_rendered_only_from_completed_action_records():
     }
     response = {
         "answer": "Here is the recorded status.",
-        "factIds": ["run:run1:saved", "run:run1:status"],
+        "factIds": ["run:run1:status"],
     }
     answer = await grounded_reply(
         selector({"first": [response, response]}, []),
@@ -279,8 +280,9 @@ async def test_saved_work_is_rendered_only_from_completed_action_records():
         context=context,
         invocation_context=AIInvocationContext(),
     )
-    assert "Previously completed action records remain saved." in answer
-    assert "recorded task status is failed" in answer
+    # A finished run has one fact, its outcome; "saved steps" is only for a run still going.
+    assert answer.endswith("An earlier task stopped with an error.")
+    assert set(reply_facts(context)) == {"run:run1:status"}
     assert (
         reply_facts(
             {

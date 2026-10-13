@@ -130,7 +130,11 @@ function Resources({ data, id, organization, apiVersion, onRefresh }: { data: Co
   const resourceIds = resources.map((resource) => resource.id);
   async function rediscover() {
     setBusy(true);
-    try { await discoverConnectionResources(apiVersion, organization.id, id); await onRefresh(); notify({ key: 'discover', tone: 'ok', title: 'Resources rediscovered' }); }
+    try {
+      const found = await discoverConnectionResources(apiVersion, organization.id, id); await onRefresh();
+      const body = `${found.count} available${found.unavailable ? `; ${found.unavailable} no longer available (deleted or access removed)` : ''}.`;
+      notify({ key: 'discover', tone: found.unavailable ? 'warn' : 'ok', title: 'Resources rediscovered', body });
+    }
     catch (caught) { notify({ key: 'discover', tone: 'danger', title: 'Discovery failed', body: errorText(caught) }); }
     finally { setBusy(false); }
   }

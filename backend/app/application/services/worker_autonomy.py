@@ -33,6 +33,7 @@ from app.application.services.capability_autoresolver import (
     CapabilityResolution,
     SemanticCapabilityResolver,
 )
+from app.application.services.grounding import grounded_in
 from app.application.services.schedule_inference import (
     CompiledSchedule,
     compile_schedule,
@@ -119,6 +120,8 @@ class WorkerAutonomyService:
     ) -> WorkerAutonomyResult:
         require_permission(principal, "workforce.manage")
         require_permission(principal, "jobs.manage")
+        # The whole request, including any answer to a question about it.
+        self._request_text = instruction
         invocation = AIInvocationContext(
             organization_id=organization_id,
             thread_id=source_thread_id,
@@ -205,8 +208,9 @@ class WorkerAutonomyService:
                 native_preparations[index] = preparation
         draft = draft.model_copy(update={"initial_jobs": normalized_jobs})
         excerpt = (extracted_sites.public_web_request_excerpt or "").strip()
-        if excerpt and excerpt.casefold() not in instruction.casefold():
-            raise ValueError("The proposed open-web authority is not present in your request.")
+        if excerpt and not grounded_in(excerpt, instruction):
+            # Not the human's words: no open-web authority. Jobs that need it ask below.
+            excerpt = ""
         draft = draft.model_copy(update={"public_web_request_excerpt": excerpt or None})
         public_web_research = bool(excerpt)
         if any(job.public_web_research for job in draft.initial_jobs) and not public_web_research:
@@ -724,6 +728,10 @@ class WorkerAutonomyService:
         if autonomy.get("integrationFoundation"):
             provision_scopes = [s for s in provision_scopes if s.startswith(("browser.", "web."))]
         if provision_scopes:
+            # Irreversible actions run without asking only when the request asked for them.
+            request_text = getattr(self, "_request_text", "")
+            asked = {_provider_id(need.provider) for need in draft.capability_needs
+                     if grounded_in(need.request_excerpt, request_text)}
             await _provision_managed_job_authority(
                 self._session,
                 organization_id,
@@ -731,6 +739,7 @@ class WorkerAutonomyService:
                 principal,
                 provision_scopes,
                 standing_approval=True,
+                explicit_irreversible={scope for scope in provision_scopes if scope.split(".", 1)[0] in asked},
             )
 
         if foundation_bindings is not None:

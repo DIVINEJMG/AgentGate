@@ -28,7 +28,7 @@ async def test_task_schema_binds_provider_to_available_scopes_and_constraint_nam
     await service.interpret(cast(AIGateway, gateway), organization_id=uuid4(), user_id=uuid4(), instruction="Read repository")
     schema = gateway.generate_structured.call_args.kwargs["schema"]
     good = {"objective": "Read repository", "completion_criteria": ["Report"],
-        "runtime_requirements": [],
+        "runtime_requirements": [], "event_trigger": None,
         "needs": [{"provider": "github", "scopes": ["github.repository.metadata.read"],
             "constraints": {"allowedPaths": ["backend/scripts/check_timezone_data.py"]}}]}
     validate(good, schema)

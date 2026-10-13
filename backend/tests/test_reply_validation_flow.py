@@ -136,7 +136,7 @@ async def test_rejected_reply_does_not_leave_accepted_command():
     with pytest.raises(AIProviderError):
         await compiler.compile_and_execute(organization_id=org, principal=cast(HumanPrincipal, SimpleNamespace(organization_id=org, user_id=uuid4())),
             thread=cast(ConversationThread, SimpleNamespace(organization_id=org, id=uuid4(), worker_id=uuid4())),
-            source_message=cast(ConversationMessage, SimpleNamespace(id=uuid4())), intent=WorkerCommandIntent(family="conversation.answer"),
+            source_message=cast(ConversationMessage, SimpleNamespace(id=uuid4(), content="Discuss")), intent=WorkerCommandIntent(family="conversation.answer"),
             authoritative_context={})
     assert commands[0].status == "unavailable"
     assert commands[0].payload["aiFailure"]["validationRule"] == "execution_assertion"

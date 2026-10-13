@@ -23,6 +23,7 @@ from app.domain.ai.providers import (
     AITextRequest,
 )
 from app.domain.ai.registry import ModelRegistry
+from app.observability.usage import count_ai_call
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -42,12 +43,15 @@ async def observe_inference(operation, *, role, model, provider, context, heartb
     try:
         result = await operation()
         outcome = "response_received"
+        count_ai_call(model=model, usage=getattr(result, "usage", None), success=True)
         return result
     except AIProviderError as exc:
         outcome = exc.category
         logger.warning("AI inference failed role=%s model=%s connection=%s correlation=%s category=%s http_status=%s reason=%s", role, model, provider, correlation, exc.category, exc.status_code, exc.rejection_reason)
         raise
     finally:
+        if outcome != "response_received":
+            count_ai_call(model=model, usage=None, success=False)
         pulse.cancel()
         with suppress(asyncio.CancelledError):
             await pulse
@@ -397,6 +401,11 @@ class ProviderAIGateway(AIGateway):
             retryable=False,
         )
 
+    # Judgement checks on the AI's choice: the AI is told why once; if it still disagrees, its
+    # answer stands. Contract checks (schema, missing fields, unknown references) stay strict.
+    ADVISORY_RULES = frozenset({"chat_capability_claim", "chat_account_state", "job_needs_integration",
+                                "chat_event_request"})
+
     async def generate_validated_structured(self, *, proposal_validator, **kwargs):
         """Accept valid proposals directly; correct only an actual validation failure."""
         feedback = ""
@@ -404,6 +413,7 @@ class ProviderAIGateway(AIGateway):
             "Repair the proposal for this same schema and stage. Preserve the original objective, "
             "authority, evidence and output contract; do not execute actions or invent outcomes."))
         _, model = self._provider_for(kwargs["role"])
+        proposal = None
         for call in range(2):
             try:
                 proposal = await self.generate_structured(
@@ -422,10 +432,15 @@ class ProviderAIGateway(AIGateway):
                 kwargs["role"], model, kwargs["schema_name"], call + 1, failure.category,
                 failure.rejection_reason, failure.validation_rule, failure.model_called)
             if call == 1:
+                if failure.validation_rule in self.ADVISORY_RULES and proposal is not None:
+                    logger.info("AI kept its choice after an advisory correction role=%s rule=%s",
+                                kwargs["role"], failure.validation_rule)
+                    return proposal
                 raise failure
             feedback = ("\n\nCORRECTION_REQUIRED:\nReason: "
                 + (failure.rejection_reason or "proposal_validation")
                 + "; rule: " + (failure.validation_rule or "contract_validation")
+                + "\nWhy: " + str(failure)[:600]
                 + "\n" + correction_instruction
                 + "\nReturn one corrected object matching the original schema. A rejected response is not evidence.")
         raise AssertionError("Unreachable correction loop")

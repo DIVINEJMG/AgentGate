@@ -32,6 +32,7 @@ def _uuid(value: object) -> UUID | None:
 
 
 async def _publish_realtime(
+    bus: RedisRealtimeBus,
     topic: str,
     payload: dict[str, object],
     *,
@@ -43,9 +44,7 @@ async def _publish_realtime(
     if organization_id is None:
         return
 
-    bus = RedisRealtimeBus.from_settings()
-    try:
-        await bus.emit(
+    await bus.emit(
             RealtimeEvent(
                 event_type=topic,  # type: ignore[arg-type]
                 event_id=event_id,
@@ -66,8 +65,6 @@ async def _publish_realtime(
                 payload=payload,
             )
         )
-    finally:
-        await bus.close()
 
 
 async def drain_outbox_batch(*, limit: int = 100) -> int:
@@ -75,14 +72,10 @@ async def drain_outbox_batch(*, limit: int = 100) -> int:
 
     The caller must invoke this only after business transactions have committed.
     Duplicate delivery is safe because RedisRealtimeBus deduplicates on event_id.
+    Maintenance runs on the runtime sweep (run_periodic_maintenance), not on every drain.
     """
 
-    if settings.coding_execution_enabled:
-        try:
-            from app.execution.coding.service import maintain_coding_sessions
-            await maintain_coding_sessions()
-        except Exception:
-            logger.exception("Coding retention maintenance is unavailable; other providers continue.")
+    bus: RedisRealtimeBus | None = None
     async with session_factory() as session:
         outbox = TransactionalOutbox(session)
         events = await outbox.unpublished(limit=limit)
@@ -112,9 +105,12 @@ async def drain_outbox_batch(*, limit: int = 100) -> int:
                         flow_control_key=f"audoryn-web-research-{settings.environment}",
                         parallelism=2,
                     )
+                # Runtime steps send their own wake-up once their lease is released
+                # ("wakeup": "runtime"); waking them here too only produced busy or
+                # idle deliveries. Other sources rely on this event to start the runtime.
                 if event.topic == "run.progress" and payload.get("continuation_phase") in {
                     "plan", "execute"
-                }:
+                } and payload.get("wakeup") != "runtime":
                     organization_id = _uuid(payload.get("organization_id"))
                     work_item_id = _uuid(payload.get("work_item_id"))
                     if organization_id is None or work_item_id is None:
@@ -143,11 +139,9 @@ async def drain_outbox_batch(*, limit: int = 100) -> int:
                         )
                 # Redis broadcasts are advisory to the UI. They must not gate
                 # the next runtime action when Redis is unavailable.
-                await _publish_realtime(
-                    event.topic,
-                    payload,
-                    event_id=str(event.id),
-                )
+                if event.topic in REALTIME_EVENT_TYPES:
+                    bus = bus or RedisRealtimeBus.from_settings()  # one connection per drain
+                    await _publish_realtime(bus, event.topic, payload, event_id=str(event.id))
             except Exception:
                 # External delivery failures leave only this row pending. A
                 # different Work Item can still publish its continuation.
@@ -161,8 +155,31 @@ async def drain_outbox_batch(*, limit: int = 100) -> int:
             await outbox.mark_published(event)
             published += 1
 
-        await session.commit()
+        try:
+            await session.commit()
+        finally:
+            if bus is not None:
+                await bus.close()
+        return published
 
+
+async def run_periodic_maintenance() -> None:
+    """Housekeeping that used to run on every outbox drain; the runtime sweep runs it on its
+    own schedule. Each part fails alone."""
+    if settings.coding_execution_enabled:
+        try:
+            from app.execution.coding.service import maintain_coding_sessions
+            await maintain_coding_sessions()
+        except Exception:
+            logger.exception("Coding retention maintenance is unavailable; other providers continue.")
+    try:
+        await _recover_stale_web_research()
+    except Exception:
+        logger.exception("Stale web research recovery is unavailable.")
+
+
+async def _recover_stale_web_research() -> None:
+    async with session_factory() as session:
         destination = web_research_destination()
         if destination and settings.qstash_url and settings.qstash_token:
             stale = list((await session.scalars(
@@ -189,5 +206,3 @@ async def drain_outbox_batch(*, limit: int = 100) -> int:
                     )
                 except Exception:
                     logger.exception("Web research recovery dispatch failed command=%s", command.id)
-
-        return published

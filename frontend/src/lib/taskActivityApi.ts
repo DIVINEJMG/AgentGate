@@ -9,6 +9,8 @@ export interface TaskActivity {
   isActive?: boolean; executionState?: 'running' | 'retry_scheduled' | 'inactive' | 'unknown';
   responseReceivedAt?: string | null; responseBytes?: number;
   completedActions: number; preservedWork: boolean;
+  /** The run's saved plan: steps done of total, and the step being worked on. */
+  plan?: {done: number; total: number; position: number | null; title: string | null; target: string | null} | null;
   events: {id: string; state: string; label: string; at: string; verified?: boolean}[];
   commands: {id: string; command: string; status: string; exitCode: number | null; stdout: string; stderr: string; observedAt: string}[];
   changedFiles: string[]; links: {title: string; url: string}[];

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Literal
 
@@ -20,6 +21,9 @@ class CapabilityNeed(BaseModel):
     provider: str = Field(min_length=1, max_length=64)
     need: str = Field(min_length=1, max_length=500)
     actions: list[str] = Field(default_factory=list, max_length=20)
+    # For an action that cannot be undone (submit, upload, publish, merge, delete, send): the exact
+    # words of the request asking for it. Without them, such actions need approval.
+    request_excerpt: str | None = Field(default=None, max_length=300)
 
 
 class ScheduleDraft(BaseModel):
@@ -35,6 +39,25 @@ class ScheduleDraft(BaseModel):
     human_readable: str = Field(default="", max_length=300)
     stop_after_next_run: bool = False
 
+    @field_validator("local_time", mode="before")
+    @classmethod
+    def _clock(cls, value: object) -> object:
+        """Read common ways of writing a time ("9:00", "9am", "9:30 pm", "21.15") as HH:MM; anything
+        else is left for validation to reject."""
+        if not isinstance(value, str):
+            return value
+        match = re.fullmatch(r"\s*(\d{1,2})(?:[:.](\d{2}))?\s*([ap])?\.?\s*m?\.?\s*", value.lower())
+        if not match:
+            return value
+        hour, minute = int(match.group(1)), int(match.group(2) or 0)
+        if match.group(3) == "p" and hour < 12:
+            hour += 12
+        if match.group(3) == "a" and hour == 12:
+            hour = 0
+        if match.group(3) is None and match.group(2) is None:
+            return value  # a bare number is not a clear time
+        return f"{hour:02d}:{minute:02d}" if hour < 24 and minute < 60 else value
+
 
 class ApprovalBoundaryDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -43,6 +66,8 @@ class ApprovalBoundaryDraft(BaseModel):
     provider: str | None = Field(default=None, max_length=64)
     reason: str = Field(default="", max_length=500)
     allowed_origins: list[str] = Field(default_factory=list, max_length=50)
+    # The human's own words asking to be consulted, quoted from the request.
+    request_excerpt: str | None = Field(default=None, max_length=300)
 
 
 class IntegrationRequirementDraft(BaseModel):

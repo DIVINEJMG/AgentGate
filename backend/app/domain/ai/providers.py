@@ -109,6 +109,7 @@ class AIProviderError(RuntimeError):
         self.validation_rule = validation_rule if validation_rule in {
             "execution_assertion", "outcome_assertion", "preservation_assertion",
             "capability_assertion", "absence_assertion", "chat_action_payload",
+            "chat_capability_claim", "chat_account_state", "job_needs_integration", "chat_event_request",
         } else None
         self.validation_exhausted = False
         # Logs accept fixed diagnostic codes, never provider bodies or model prose.

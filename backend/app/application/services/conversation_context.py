@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import desc, or_, select
+from sqlalchemy import desc, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database.models import (
@@ -58,6 +58,28 @@ def _ids(values: Iterable[UUID]) -> list[UUID]:
     return list(dict.fromkeys(values))
 
 
+# The parts of a job definition the context uses: read by JSON path, never the whole document.
+_DEFINITION_PARTS = ("objective", "instructions", "completionCriteria", "requiredCapabilities",
+                     "integrationRequirements", "autonomy", "triggerConfig")
+_STEPS_PER_RUN = 12
+
+
+def _job_runs(definition: dict[str, Any]) -> str:
+    """How a job actually starts: on its schedule, each time a connected-account event happens,
+    or only when someone asks."""
+    autonomy = definition.get("autonomy") if isinstance(definition.get("autonomy"), dict) else {}
+    trigger = autonomy.get("eventTrigger") if isinstance(autonomy, dict) else None
+    if isinstance(trigger, dict) and trigger.get("event"):
+        return f"each time the {trigger.get('provider', 'connected')} event {trigger['event']} happens"
+    config = definition.get("triggerConfig") if isinstance(definition.get("triggerConfig"), dict) else {}
+    schedule = config.get("schedule") if isinstance(config, dict) else None
+    if isinstance(schedule, dict) and schedule.get("enabled"):
+        return "on its schedule"
+    if isinstance(config, dict) and config.get("internalEventKeys"):
+        return "when its internal event is emitted"
+    return "only when someone asks; no schedule or event trigger is set up"
+
+
 class ConversationContextAssembler:
     """Build bounded model context strictly from canonical organization state."""
 
@@ -88,6 +110,10 @@ class ConversationContextAssembler:
         results = await self._results(organization_id, scoped_worker)
         messages = await self._messages(organization_id, thread.id)
         artifact_ids = self._artifact_ids(messages)
+        # Each list below is read in a fixed number of queries, whatever its length.
+        self._definitions = await self._job_definitions(jobs)
+        self._run_steps = await self._steps_by_run(runs)
+        self._result_summaries = await self._latest_result_summaries(results)
 
         return {
             "scope": {
@@ -106,6 +132,7 @@ class ConversationContextAssembler:
             ],
             "connectedIntegrations": await self._integrations(organization_id, user_id),
             "pendingIntegrationTasks": await self._pending_integration_tasks(organization_id, thread.id, user_id),
+            "pendingClarifications": await self._pending_clarifications(organization_id, thread.id, user_id),
             "allowedCapabilities": await self._capabilities(organization_id, scoped_worker),
             "policiesAndApprovalBoundaries": await self._policies(organization_id),
             "pendingApprovals": await self._pending_approvals(organization_id, scoped_worker, thread.id),
@@ -276,17 +303,52 @@ class ConversationContextAssembler:
             "status": worker.status,
         }
 
-    async def _revision(self, job: Job) -> JobRevision | None:
-        return await self._session.scalar(
-            select(JobRevision).where(
-                JobRevision.job_id == job.id,
-                JobRevision.revision == job.current_revision,
-            )
+    async def _job_definitions(self, jobs: list[Job]) -> dict[UUID, dict[str, Any]]:
+        """The used parts of each job's current revision. A job whose revision is missing has no
+        entry; an absent or null part is left out, so dict.get defaults apply as before."""
+        if not jobs:
+            return {}
+        rows = await self._session.execute(
+            select(JobRevision.job_id, *[JobRevision.definition[part].label(part) for part in _DEFINITION_PARTS])
+            .where(tuple_(JobRevision.job_id, JobRevision.revision).in_([(job.id, job.current_revision) for job in jobs]))
         )
+        return {
+            row.job_id: {part: getattr(row, part) for part in _DEFINITION_PARTS if getattr(row, part) is not None}
+            for row in rows
+        }
+
+    async def _steps_by_run(self, runs: list[Run]) -> dict[UUID, list[Any]]:
+        """Each run's first steps, with only the output parts the summary uses."""
+        if not runs:
+            return {}
+        position = func.row_number().over(partition_by=RunStep.run_id, order_by=RunStep.step_index).label("position")
+        numbered = (
+            select(RunStep.run_id, RunStep.step_index, RunStep.kind, RunStep.status,
+                   RunStep.output["summary"].label("summary"), RunStep.output["output"].label("output"),
+                   RunStep.output["error"].label("error"), position)
+            .where(RunStep.run_id.in_([run.id for run in runs]))
+            .subquery()
+        )
+        steps: dict[UUID, list[Any]] = {}
+        for row in await self._session.execute(
+            select(numbered).where(numbered.c.position <= _STEPS_PER_RUN)
+            .order_by(numbered.c.run_id, numbered.c.step_index)
+        ):
+            steps.setdefault(row.run_id, []).append(row)
+        return steps
+
+    async def _latest_result_summaries(self, results: list[Result]) -> dict[UUID, Any]:
+        if not results:
+            return {}
+        rows = await self._session.execute(
+            select(ResultVersion.result_id, ResultVersion.body["summary"].label("summary"))
+            .where(tuple_(ResultVersion.result_id, ResultVersion.version).in_(
+                [(result.id, result.latest_version) for result in results]))
+        )
+        return {row.result_id: row.summary for row in rows}
 
     async def _job_context(self, job: Job) -> dict[str, Any]:
-        revision = await self._revision(job)
-        definition = dict(revision.definition or {}) if revision is not None else {}
+        definition = self._definitions.get(job.id, {})
         return {
             "id": str(job.id),
             "workerId": str(job.worker_id),
@@ -303,6 +365,9 @@ class ConversationContextAssembler:
             "integrationRequirements": [
                 str(item) for item in list(definition.get("integrationRequirements", []))[:20]
             ],
+            # What is actually set up, from the backend. autonomy.humanSchedule is only the timing
+            # described when the job was created, and may not have been set up.
+            "runs": _job_runs(definition) if job.status == "active" else f"does not run: the job is {job.status}",
             "autonomy": (
                 {
                     key: value
@@ -322,10 +387,9 @@ class ConversationContextAssembler:
         }
 
     async def _schedule_context(self, job: Job) -> dict[str, Any] | None:
-        revision = await self._revision(job)
-        if revision is None:
+        definition = self._definitions.get(job.id)
+        if definition is None:
             return None
-        definition = dict(revision.definition or {})
         raw = definition.get("triggerConfig")
         if not isinstance(raw, dict):
             return None
@@ -373,6 +437,23 @@ class ConversationContextAssembler:
             ConversationCommand.created_by == user_id, ConversationCommand.family == "integration.execute",
             ConversationCommand.status.in_(["waiting_integration", "clarification_required", "waiting_ai", "policy_denied"])).limit(10))).all()
         return [{"id": str(c.id), "status": c.status, "requirement": c.receipt.get("message", "")} for c in commands]
+
+    async def _pending_clarifications(self, organization_id, thread_id, user_id):
+        """Questions this thread asked the human that are still unanswered, with the request they
+        belong to, so an answer continues that request."""
+        if user_id is None:
+            return []
+        rows = await self._session.execute(
+            select(ConversationCommand.id, ConversationCommand.family, ConversationCommand.receipt["message"].label("question"),
+                   ConversationCommand.payload["request"].label("request"), ConversationMessage.content)
+            .join(ConversationMessage, ConversationMessage.id == ConversationCommand.source_message_id)
+            .where(ConversationCommand.organization_id == organization_id, ConversationCommand.thread_id == thread_id,
+                   ConversationCommand.created_by == user_id, ConversationCommand.status == "clarification_required",
+                   ConversationCommand.created_at >= datetime.now(UTC) - timedelta(days=7))
+            .order_by(desc(ConversationCommand.created_at)).limit(3)
+        )
+        return [{"id": str(row.id), "family": row.family, "question": _clip(row.question, 600),
+                 "request": _clip(row.request or row.content, 1500)} for row in rows]
 
     async def _integrations(self, organization_id: UUID, user_id: UUID | None = None) -> list[dict[str, Any]]:
         rows = await self._session.scalars(
@@ -431,14 +512,16 @@ class ConversationContextAssembler:
                 )
             ).all()
         )
+        revisions = {
+            revision.policy_id: revision
+            for revision in (await self._session.scalars(
+                select(PolicyRevision).where(tuple_(PolicyRevision.policy_id, PolicyRevision.revision).in_(
+                    [(policy.id, policy.current_revision) for policy in policies]))
+            )).all()
+        } if policies else {}
         result: list[dict[str, Any]] = []
         for policy in policies:
-            revision = await self._session.scalar(
-                select(PolicyRevision).where(
-                    PolicyRevision.policy_id == policy.id,
-                    PolicyRevision.revision == policy.current_revision,
-                )
-            )
+            revision = revisions.get(policy.id)
             if revision is None:
                 continue
             selectors = dict(revision.selectors or {})
@@ -477,9 +560,10 @@ class ConversationContextAssembler:
             statement = statement.where(Action.agent_id == worker.agent_identity_id)
         rows = (await self._session.execute(statement)).all()
         if thread_id is not None:
-            from app.application.services.approval_conversation import approval_conversation_id
+            from app.application.services.approval_conversation import approval_conversation_ids
+            conversations = await approval_conversation_ids(self._session, [action for _, action in rows])
             rows = [(approval, action) for approval, action in rows
-                    if await approval_conversation_id(self._session, action) == str(thread_id)]
+                    if conversations.get(action.id) == str(thread_id)]
         return [
             {
                 "approvalId": str(approval.id),
@@ -501,28 +585,14 @@ class ConversationContextAssembler:
         }
 
     async def _run_context(self, run: Run) -> dict[str, Any]:
-        steps = list(
-            (
-                await self._session.scalars(
-                    select(RunStep)
-                    .where(RunStep.run_id == run.id)
-                    .order_by(RunStep.step_index)
-                    .limit(12)
-                )
-            ).all()
-        )
         evidence: list[dict[str, Any]] = []
-        for step in steps:
-            output = dict(step.output or {})
+        for step in self._run_steps.get(run.id, []):
             evidence.append(
                 {
                     "index": step.step_index,
                     "kind": step.kind,
                     "status": step.status,
-                    "summary": _clip(
-                        output.get("summary") or output.get("output") or output.get("error"),
-                        700,
-                    ),
+                    "summary": _clip(step.summary or step.output or step.error, 700),
                 }
             )
         return {
@@ -535,20 +605,13 @@ class ConversationContextAssembler:
         }
 
     async def _result_context(self, result: Result) -> dict[str, Any]:
-        version = await self._session.scalar(
-            select(ResultVersion).where(
-                ResultVersion.result_id == result.id,
-                ResultVersion.version == result.latest_version,
-            )
-        )
-        body = dict(version.body or {}) if version is not None else {}
         return {
             "id": str(result.id),
             "workerId": str(result.worker_id),
             "jobId": str(result.job_id),
             "status": result.status,
             "title": result.title,
-            "summary": _clip(body.get("summary"), 1200),
+            "summary": _clip(self._result_summaries.get(result.id), 1200),
             "createdAt": result.created_at.isoformat(),
         }
 

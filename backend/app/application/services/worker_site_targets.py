@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.application.services.browser_origin_authority import explicit_http_origins
+from app.application.services.grounding import grounded_in
 from app.application.services.web_research import configured_sources, search_site_candidates
 from app.domain.ai.providers import AIGateway, AIInvocationContext, AIProviderError
 from app.domain.workforce.drafts import CapabilityNeed, JobDraft, SiteTargetDraft
@@ -156,7 +157,7 @@ def _validate_tool_selection(parsed: dict, providers: list[str], instruction: st
             raise AmbiguousSiteTarget("Please clarify which integration each worker job should use.")
     if result.public_web_requested and (
         not result.public_web_request_excerpt
-        or result.public_web_request_excerpt.casefold() not in instruction.casefold()
+        or not grounded_in(result.public_web_request_excerpt, instruction)
     ):
         raise AmbiguousSiteTarget(
             "I could not verify the request for public web research. Please clarify "
@@ -167,7 +168,7 @@ def _validate_tool_selection(parsed: dict, providers: list[str], instruction: st
     for target in result.targets:
         if result.job_providers and "browser" not in result.job_providers.get(str(target.job_index), []):
             raise AmbiguousSiteTarget("AI selected a website without browser tools for that job. Retry worker preparation.")
-        if target.job_index >= job_count or target.mention.casefold() not in instruction.casefold():
+        if target.job_index >= job_count or not grounded_in(target.mention, instruction):
             raise AmbiguousSiteTarget(
                 "I could not reliably assign a named website to the worker’s jobs. "
                 "Please clarify the site and task."
@@ -183,7 +184,7 @@ async def resolve_site_targets(
     resolved: list[str] = []
     for target in targets:
         mention = target.mention.strip()
-        if mention.casefold() not in instruction.casefold():
+        if not grounded_in(mention, instruction):
             raise AmbiguousSiteTarget(
                 "I could not locate one of the proposed site names in your request. "
                 "Please identify the website more clearly."

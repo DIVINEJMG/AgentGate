@@ -2,20 +2,24 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
 from sqlalchemy import select
 
+from app.application.services.grounding import grounded_in
 from app.application.services.integration_foundation import (
     IntegrationFoundation,
     IntegrationRequirementError,
     notify_integration_work,
+    provider_label,
 )
 from app.bootstrap.settings import settings
 from app.domain.ai.providers import AIProviderError
 from app.domain.identity.permissions import permissions_for_role
 from app.domain.integrations.foundation import IntegrationTaskDraft
+from app.execution.bootstrap import execution_provider_registry
 from app.infrastructure.ai.provider import ai_gateway_from_settings
 from app.infrastructure.database.models import (
     ConversationCommand,
@@ -41,6 +45,45 @@ async def report_preparation_wait(session, command, *, status, message, category
     session.add(ConversationMessage(organization_id=command.organization_id, thread_id=command.thread_id,
         role="worker", content=message, command_references=[{"type": "command", "id": str(command.id),
             "family": "integration.execute", "status": status}]))
+    await session.flush()
+    await TransactionalOutbox(session).enqueue(topic="conversation.response.created", aggregate_type="conversation_command",
+        aggregate_id=str(command.id), payload={"organization_id": str(command.organization_id), "thread_id": str(command.thread_id)})
+
+
+# GitHub's names for its "Subscribe to events" settings.
+_EVENT_SETTING = {"issues": "Issues", "issue_comment": "Issue comment", "pull_request": "Pull request",
+                  "pull_request_review": "Pull request review", "push": "Push", "release": "Release",
+                  "workflow_run": "Workflow run", "check_run": "Check run"}
+
+
+async def _set_up_event_trigger(session, command, task, draft, worker, job, revision, bindings, foundation) -> None:
+    """A task that runs each time an event happens: a standing job, its grants and one event
+    subscription per watched resource, with results posted to this conversation. Nothing runs now."""
+    from app.infrastructure.database.models import IntegrationEventSubscription, WorkerDirective
+    trigger = draft.event_trigger
+    revision.definition = {**revision.definition, "autonomy": {**revision.definition["autonomy"],
+        "eventTrigger": trigger.model_dump(mode="json")}}
+    await foundation.bind(revision=revision, worker=worker, user_id=command.created_by, bindings=bindings, standing=True)
+    watched = [binding for binding in bindings if binding["provider"] == trigger.provider]
+    for binding in watched:
+        session.add(IntegrationEventSubscription(organization_id=command.organization_id, job_revision_id=revision.id,
+            resource_id=UUID(binding["id"]), event_type=trigger.event, results_thread_id=command.thread_id, enabled=True))
+    session.add(WorkerDirective(organization_id=command.organization_id, worker_id=worker.id,
+        source_thread_id=command.thread_id, source_message_id=command.source_message_id,
+        text=task["instruction"], status="active", created_by=command.created_by))
+    words = getattr(execution_provider_registry().get(trigger.provider), "event_triggers", {}).get(trigger.event, trigger.event)
+    names = ", ".join(binding["name"] for binding in watched)
+    # The objective is quoted, not spliced into a sentence: it reads right however it was worded.
+    action = draft.objective.strip()[:300]
+    message = (f"Set up: every time {words} in {names}, I'll run this task: “{action}” Results will be posted "
+               "here; you can pause or stop it from the job.")
+    command.target_type, command.target_id = "job", str(job.id)
+    command.status = "completed"
+    command.receipt = {"status": "completed", "message": message, "command_id": str(command.id),
+                       "references": [{"type": "job", "id": str(job.id)}]}
+    session.add(ConversationMessage(organization_id=command.organization_id, thread_id=command.thread_id,
+        role="worker", content=message, command_references=[{"type": "command", "id": str(command.id),
+            "family": "integration.execute", "status": "completed"}]))
     await session.flush()
     await TransactionalOutbox(session).enqueue(topic="conversation.response.created", aggregate_type="conversation_command",
         aggregate_id=str(command.id), payload={"organization_id": str(command.organization_id), "thread_id": str(command.thread_id)})
@@ -125,11 +168,27 @@ async def prepare_integration_task(session, command_id: UUID) -> None:
             message="AI task preparation returned an invalid plan. Your request and context are saved; retry setup. No integration authority was granted.")
         return
     standing_excerpt = draft.standing_request_excerpt or ""
-    standing = bool(standing_excerpt)
-    if standing and standing_excerpt.casefold() not in task["instruction"].casefold():
-        await report_preparation_wait(session, command, status="clarification_required",
-            message="Please explicitly confirm the ongoing integration responsibility before it becomes permanent.")
-        return
+    trigger = draft.event_trigger
+    # Ongoing authority only from the person's own words; otherwise the task is one-off. An event
+    # trigger is ongoing by nature, and its words were checked when it was drafted.
+    standing = (bool(standing_excerpt) and grounded_in(standing_excerpt, task["instruction"])) or trigger is not None
+    if trigger is not None:
+        provider = execution_provider_registry().get(trigger.provider)
+        events_enabled = getattr(provider, "events_enabled", None)
+        if not callable(events_enabled) or not events_enabled():
+            await report_preparation_wait(session, command, status="waiting_integration",
+                message=f"I can't react to {provider_label(trigger.provider)} events yet: event delivery isn't turned on "
+                        "for this workspace's server. An administrator needs to enable it; nothing was set up.")
+            return
+        kind = trigger.event.split(".")[0]
+        events = await cast(Any, provider).subscribed_events() if hasattr(provider, "subscribed_events") else None
+        if events is not None and kind not in events:
+            setting = _EVENT_SETTING.get(kind, kind.replace("_", " ").capitalize())
+            await report_preparation_wait(session, command, status="waiting_integration",
+                message=f"{provider_label(trigger.provider)} isn't sending “{setting}” events to Audoryn yet, so I "
+                        f"can't react to them. In the GitHub App's settings, under Permissions & events, tick "
+                        f"“{setting}” in Subscribe to events, then ask me again. Nothing was set up.")
+            return
     if standing and not {"workforce.manage", "capabilities.manage", "policies.manage"}.issubset(permissions):
         await report_preparation_wait(session, command, status="policy_denied", category="policy_denial",
             message="Permanent integration responsibilities require permission to manage workers, capabilities and policies. This request has not granted standing authority.")
@@ -148,6 +207,9 @@ async def prepare_integration_task(session, command_id: UUID) -> None:
     await session.flush()
     session.add(revision)
     await session.flush()
+    if trigger is not None:
+        await _set_up_event_trigger(session, command, task, draft, worker, job, revision, bindings, foundation)
+        return
     item = WorkItem(id=uuid4(), organization_id=command.organization_id, job_id=job.id,
         job_revision_id=revision.id, status="queued", priority="normal", correlation_id=str(uuid4()),
         idempotency_key=f"integration-command:{command.id}", scheduled_at=now,

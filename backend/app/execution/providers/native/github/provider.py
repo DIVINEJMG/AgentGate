@@ -20,7 +20,7 @@ from app.execution.providers.native.http import ProviderTransportError
 
 from .authentication import GitHubAuthentication
 from .catalog import assembled_catalog
-from .events import verify_event
+from .events import EVENT_TRIGGERS, verify_event
 from .resources import GitHubResources, allowed_actions
 from .safety import SECRET, TASK_CONSTRAINT_SCHEMA
 from .transport import GitHubHTTPClient, GitHubResponse, account_context
@@ -35,6 +35,29 @@ def operation_missing_content(operation, output):
 
 
 class ExpandedGitHubProvider(NativeProvider):
+    event_triggers = EVENT_TRIGGERS
+
+    @staticmethod
+    def events_enabled() -> bool:
+        return bool(settings.github_events_enabled and settings.github_webhook_secret)
+
+    @staticmethod
+    async def subscribed_events() -> set[str] | None:
+        """The events the GitHub App is set to send (its "Subscribe to events" settings), or None
+        when GitHub cannot be asked right now. Without a subscription GitHub sends nothing."""
+        import httpx
+
+        from .authentication import app_jwt
+
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get("https://api.github.com/app", headers={
+                    "Authorization": "Bearer " + app_jwt(), "Accept": "application/vnd.github+json"})
+            response.raise_for_status()
+            return set(response.json().get("events") or [])
+        except Exception:  # noqa: BLE001 - an unanswerable check never blocks setup
+            return None
+
     task_constraint_schema = TASK_CONSTRAINT_SCHEMA
     manifest = ProviderManifest(
         provider="github",

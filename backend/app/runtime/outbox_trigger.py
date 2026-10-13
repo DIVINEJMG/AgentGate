@@ -3,19 +3,30 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from contextlib import suppress
 from uuid import uuid4
+
+from redis.exceptions import RedisError
 
 from app.bootstrap.settings import settings
 from app.infrastructure.qstash.provider import UpstashQStashProvider
+from app.infrastructure.redis.coordination import RedisCoordinator
 
 logger = logging.getLogger(__name__)
 
+# Marks that a drain request is on its way. The drain clears it before it reads the outbox,
+# so every row committed while it was set is read by that drain: a commit that sees the marker
+# committed before the drain cleared it, and so before the drain read.
+DRAIN_PENDING = "outbox-drain-pending"
+COALESCED = "coalesced"
+
 
 async def request_outbox_drain(*, reason: str) -> str | None:
-    """Ask QStash to invoke the protected drain endpoint.
+    """Ask QStash to invoke the protected drain endpoint, unless a drain is already on its way.
 
-    Failure to enqueue is deliberately non-fatal for the committed business
-    transaction. The periodic QStash recovery schedule will drain any missed rows.
+    Returns the message id, COALESCED when an earlier request will read these rows, or None
+    when draining is not configured. Failure to enqueue is deliberately non-fatal for the
+    committed business transaction; the periodic recovery drain reads any missed rows.
     """
 
     if (
@@ -25,15 +36,43 @@ async def request_outbox_drain(*, reason: str) -> str | None:
     ):
         return None
 
-    provider = UpstashQStashProvider.from_settings()
-    message = await provider.publish(
-        destination=settings.qstash_outbox_drain_url,
-        body=json.dumps({"reason": reason}, separators=(",", ":")),
-        idempotency_key=f"outbox-drain:{uuid4()}",
-        retries=3,
-        timeout_seconds=20,
-    )
-    return message.id
+    coordinator = RedisCoordinator.from_settings()
+    try:
+        try:
+            if not await coordinator.claim_flag(DRAIN_PENDING, ttl_seconds=settings.outbox_drain_coalesce_seconds):
+                return COALESCED
+        except RedisError:
+            logger.warning("Outbox drain coalescing is unavailable; sending this drain request on its own.")
+        provider = UpstashQStashProvider.from_settings()
+        try:
+            message = await provider.publish(
+                destination=settings.qstash_outbox_drain_url,
+                body=json.dumps({"reason": reason}, separators=(",", ":")),
+                idempotency_key=f"outbox-drain:{uuid4()}",
+                retries=3,
+                timeout_seconds=20,
+            )
+        except Exception:
+            # Nothing is on its way after all; let the next commit ask again.
+            with suppress(RedisError):
+                await coordinator.clear_flag(DRAIN_PENDING)
+            raise
+        return message.id
+    finally:
+        with suppress(RedisError):
+            await coordinator.close()
+
+
+async def drain_started() -> None:
+    """Called by the drain before it reads: commits from now on ask for their own drain."""
+    coordinator = RedisCoordinator.from_settings()
+    try:
+        await coordinator.clear_flag(DRAIN_PENDING)
+    except RedisError:
+        logger.warning("Outbox drain marker could not be cleared; it expires on its own.")
+    finally:
+        with suppress(RedisError):
+            await coordinator.close()
 
 
 def request_outbox_drain_after_commit(*, reason: str) -> None:

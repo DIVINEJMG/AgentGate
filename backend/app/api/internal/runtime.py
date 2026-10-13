@@ -32,12 +32,15 @@ from app.infrastructure.database.models import (
     RunStep,
     WorkItem,
 )
+from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.database.session import session_factory
+from app.infrastructure.database.usage_records import metered_endpoint, record_usage
 from app.infrastructure.qstash.verifier import QStashSignatureVerifier
 from app.infrastructure.redis.coordination import Lease, RedisCoordinator
 from app.infrastructure.storage.provider import object_storage_from_settings
+from app.observability.usage import Usage, metered
 from app.runtime.admission import admit_due_item
-from app.runtime.managed import ManagedRuntimeExecutor
+from app.runtime.managed import ManagedRuntimeExecutor, RuntimeStepOutcome
 from app.runtime.qstash_trigger import request_runtime_execution
 
 router = APIRouter(prefix="/internal/v1/runtime", tags=["internal-runtime"])
@@ -62,6 +65,13 @@ def _verify_qstash(request: Request, raw: bytes, signature: str | None) -> None:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid QStash signature.",
         ) from exc
+
+
+def admission_wait_seconds(waits: int) -> int:
+    """How long a due item waits before asking again while other work is ahead of it: 5 s at
+    first, doubling every second wait up to 30 s. An item ahead is normally admitted within
+    seconds; the longer waits only apply when its delivery was lost, until the sweep recovers it."""
+    return min(30, 5 * 2 ** (max(0, waits) // 2))
 
 
 def _runtime_step(item: WorkItem) -> int:
@@ -122,6 +132,16 @@ class ExecutePayload(BaseModel):
     work_item_id: UUID
     expected_step: int = Field(default=0, ge=0)
     reason: str = Field(default="qstash", max_length=80)
+
+
+class ScheduleDuePayload(BaseModel):
+    organization_id: UUID
+    job_id: UUID
+    due: datetime
+
+
+# QStash delivers delayed messages to within a few seconds; a slightly early wake-up waits.
+SCHEDULE_EARLY_WAIT_SECONDS = 30
 
 
 class BrowserOriginReconcilePayload(BaseModel):
@@ -465,36 +485,60 @@ async def execute(
             detail=str(exc),
         ) from exc
 
-    coordinator = RedisCoordinator.from_settings()
-    lease = await coordinator.acquire_lock(
-        f"runtime:{message.work_item_id}:{message.expected_step}",
-        ttl_seconds=90,
-    )
+    # This delivery's usage. An accepted delivery continues counting in its background task;
+    # one turned away is recorded here, since duplicate wake-ups are part of the cost.
+    usage = Usage()
+    with metered(usage):
+        coordinator = RedisCoordinator.from_settings()
+        lease = await coordinator.acquire_lock(
+            f"runtime:{message.work_item_id}:{message.expected_step}",
+            ttl_seconds=90,
+        )
+        slot = None
+        if lease is None:
+            await coordinator.close()
+        else:
+            for index in range(max(1, settings.runtime_qstash_parallelism)):
+                slot = await coordinator.acquire_lock(f"runtime-slot:{settings.environment}:{index}", ttl_seconds=90)
+                if slot:
+                    break
+            if slot is None:
+                await coordinator.release_lock(lease)
+                await coordinator.close()
+    if lease is None or slot is None:
+        await record_usage(usage, kind="runtime.delivery", organization_id=message.organization_id,
+            work_item_id=message.work_item_id, step=message.expected_step,
+            outcome="busy" if lease is None else "capacity_full")
     if lease is None:
-        await coordinator.close()
         return {
             "status": "busy",
             "workItemId": str(message.work_item_id),
             "currentStep": message.expected_step,
         }
-
-    slot = None
-    for index in range(max(1, settings.runtime_qstash_parallelism)):
-        slot = await coordinator.acquire_lock(f"runtime-slot:{settings.environment}:{index}", ttl_seconds=90)
-        if slot:
-            break
     if slot is None:
-        await coordinator.release_lock(lease)
-        await coordinator.close()
         raise HTTPException(429, "Runtime execution capacity is full; retry delivery.")
     # Work items already exist durably. The sweep recovers an acknowledged task
     # after process loss; Redis leases prevent duplicate execution across processes.
-    background_tasks.add_task(_start_runtime_task, message, coordinator, lease, slot)
+    background_tasks.add_task(_start_runtime_task, message, coordinator, lease, slot, usage)
     return {"status": "accepted", "workItemId": str(message.work_item_id), "currentStep": message.expected_step}
 
 
-async def _start_runtime_task(message, coordinator, lease, slot):
-    task = asyncio.create_task(_execute_runtime_message(message, coordinator, lease, slot))
+async def _metered_runtime_message(message, coordinator, lease, slot, usage):
+    result = None
+    try:
+        with metered(usage):
+            result = await _execute_runtime_message(message, coordinator, lease, slot)
+        return result
+    finally:
+        outcome = "error" if result is None else str(result.get("state") or result.get("status"))
+        with suppress(Exception):
+            await record_usage(usage, kind="runtime.step", organization_id=message.organization_id,
+                work_item_id=message.work_item_id, run_id=usage.labels.get("run_id"),
+                step=message.expected_step, phase=usage.labels.get("phase"), outcome=outcome)
+
+
+async def _start_runtime_task(message, coordinator, lease, slot, usage=None):
+    task = asyncio.create_task(_metered_runtime_message(message, coordinator, lease, slot, usage or Usage()))
     _runtime_tasks.add(task)
 
     def finished(completed):
@@ -526,6 +570,24 @@ async def _renew_runtime_leases(coordinator, leases, owner):
         raise
     except Exception:  # noqa: BLE001 - failed coordination must not permit overlapping execution
         owner.cancel()
+
+
+async def _durable_continuation(message: ExecutePayload, outcome: RuntimeStepOutcome) -> None:
+    """The wake-up could not be sent: save it in the outbox, whose drain retries delivery (on
+    commit, then on its schedule). The sweep remains the last backstop."""
+    try:
+        async with session_factory() as session:
+            await TransactionalOutbox(session).enqueue(
+                topic="run.progress", aggregate_type="run", aggregate_id=str(outcome.run_id or message.work_item_id),
+                payload={"organization_id": str(message.organization_id), "work_item_id": str(message.work_item_id),
+                         "run_id": str(outcome.run_id) if outcome.run_id else None,
+                         "current_step": outcome.current_step, "continuation_phase": outcome.continuation_phase,
+                         **({"queue_partition": outcome.queue_partition} if outcome.queue_partition else {})},
+            )
+            await session.commit()
+    except Exception:
+        logger.exception("Runtime continuation could not be saved work_item=%s; the sweep will recover it",
+            message.work_item_id)
 
 
 async def _execute_runtime_message(message: ExecutePayload, coordinator: RedisCoordinator,
@@ -572,10 +634,13 @@ async def _execute_runtime_message(message: ExecutePayload, coordinator: RedisCo
                             "status": "noop", "workItemId": str(item.id),
                             "state": item.status, "currentStep": _runtime_step(item),
                         }
-                    retry_at = datetime.now(UTC) + timedelta(seconds=5)
-                    item.scheduled_at = retry_at
                     payload = dict(item.payload or {})
                     runtime = dict(payload.get("runtime") or {})
+                    waits = int(runtime.get("admissionWaits") or 0)
+                    wait_seconds = admission_wait_seconds(waits)
+                    retry_at = datetime.now(UTC) + timedelta(seconds=wait_seconds)
+                    item.scheduled_at = retry_at
+                    runtime["admissionWaits"] = waits + 1
                     runtime["queueState"] = "queued"
                     runtime["waitingReason"] = "Waiting for an earlier or higher-priority Work Item."
                     payload["runtime"] = runtime
@@ -585,8 +650,8 @@ async def _execute_runtime_message(message: ExecutePayload, coordinator: RedisCo
                         organization_id=item.organization_id,
                         work_item_id=item.id,
                         expected_step=message.expected_step,
-                        reason="admission-wait",
-                        delay_seconds=5,
+                        reason=f"admission-wait:{waits}",
+                        delay_seconds=wait_seconds,
                     )
                     return {
                         "status": "queued",
@@ -599,6 +664,7 @@ async def _execute_runtime_message(message: ExecutePayload, coordinator: RedisCo
                 runtime = dict(payload.get("runtime") or {})
                 runtime["queueState"] = "admitted"
                 runtime["waitingReason"] = None
+                runtime.pop("admissionWaits", None)
                 payload["runtime"] = runtime
                 item.payload = payload
                 await session.commit()
@@ -608,9 +674,9 @@ async def _execute_runtime_message(message: ExecutePayload, coordinator: RedisCo
                     expected_step=message.expected_step,
                 )
                 if outcome.state == "continue" and outcome.continuation_phase is not None:
-                    # The outbox may deliver its wake-up while this phase still
-                    # holds the lease. Use a distinct durable follow-up identity
-                    # after release rather than deduplicating against that wake-up.
+                    # This is the step's only wake-up, sent once the lease is released so
+                    # it cannot arrive while this phase still holds it. The step's outbox
+                    # event is marked "wakeup": "runtime" and only updates the workspace.
                     continuation_reason = f"continuation-{outcome.continuation_phase}:background:{outcome.run_id}"
                 if outcome.state == "continue" and item.scheduled_at > datetime.now(UTC):
                     continuation_delay_seconds = max(
@@ -855,7 +921,10 @@ async def _execute_runtime_message(message: ExecutePayload, coordinator: RedisCo
             delay_seconds=(
                 continuation_delay_seconds if continuation_delay_seconds > 0 else None
             ),
+            queue_partition=outcome.queue_partition,
         )
+        if continuation_id is None and outcome.continuation_phase is not None:
+            await _durable_continuation(message, outcome)
 
     return {
         "status": "ok",
@@ -868,13 +937,47 @@ async def _execute_runtime_message(message: ExecutePayload, coordinator: RedisCo
     }
 
 
+@router.post("/schedule-due")
+@metered_endpoint("runtime.schedule_due")
+async def schedule_due(
+    request: Request,
+    upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
+) -> dict[str, object]:
+    """An on-time schedule wake-up: queue the job's due run. If the job was changed, paused or
+    already queued, nothing happens; if QStash could not delay this far, wait again."""
+    raw = await request.body()
+    _verify_qstash(request, raw, upstash_signature)
+    try:
+        message = ScheduleDuePayload.model_validate(json.loads(raw))
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid schedule payload.") from exc
+    if not settings.runtime_execution_enabled:
+        return {"status": "disabled", "queued": 0}
+    due = message.due if message.due.tzinfo else message.due.replace(tzinfo=UTC)
+    early = (due - datetime.now(UTC)).total_seconds()
+    if early > SCHEDULE_EARLY_WAIT_SECONDS:
+        from app.runtime.schedule_wake import arm_schedule
+
+        await arm_schedule(organization_id=message.organization_id, job_id=message.job_id, due=due)
+        return {"status": "rearmed", "queued": 0}
+    if early > 0:
+        await asyncio.sleep(early)
+    async with session_factory() as session:
+        queued = await queue_due_schedules(session, now=datetime.now(UTC), limit=1, job_id=message.job_id)
+    return {"status": "ok", "queued": queued}
+
+
 @router.post("/sweep")
+@metered_endpoint("runtime.sweep")
 async def sweep(
     request: Request,
     upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
 ) -> dict[str, object]:
     raw = await request.body()
     _verify_qstash(request, raw, upstash_signature)
+    # Housekeeping that used to run on every outbox drain.
+    from app.runtime.outbox_publisher import run_periodic_maintenance
+    await run_periodic_maintenance()
     if not settings.runtime_execution_enabled:
         return {"status": "disabled", "scanned": 0, "queued": 0}
 
@@ -888,6 +991,11 @@ async def sweep(
 
     expired_browser_sessions = await browser_provider.reap_expired_sessions()
     now = datetime.now(UTC)
+    from app.application.services.approval_expiry import expire_and_remind, wake_expired
+
+    async with session_factory() as session:
+        expired_runs = await expire_and_remind(session, now=now)
+    await wake_expired(expired_runs)
     async with session_factory() as session:
         scheduled_queued = await queue_due_schedules(
             session,

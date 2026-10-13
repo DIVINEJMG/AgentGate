@@ -57,6 +57,26 @@ def _validate_timezone(value: str) -> str:
     return value
 
 
+_DAY_GROUPS = {
+    "weekdays": ("monday", "tuesday", "wednesday", "thursday", "friday"),
+    "weekends": ("saturday", "sunday"),
+    "everyday": ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"),
+}
+
+
+def _weekday_names(value: str) -> tuple[str, ...]:
+    """Full weekday names for however a day was written: Mon, tues, Thursdays, weekdays."""
+    word = "".join(ch for ch in value.strip().lower() if ch.isalpha())
+    if not word:
+        return ()
+    for group, days in _DAY_GROUPS.items():
+        if word in {group, group.rstrip("s")}:
+            return days
+    word = word.removesuffix("s") if word.endswith("days") else word
+    matches = [day for day in sorted(_WEEKDAYS) if len(word) >= 2 and day.startswith(word[:3])]
+    return (matches[0],) if len(matches) == 1 else (word,)
+
+
 def compile_schedule(draft: ScheduleDraft) -> CompiledSchedule:
     timezone = _validate_timezone(draft.timezone or "UTC")
     human = draft.human_readable.strip() or draft.kind.replace("_", " ")
@@ -103,7 +123,7 @@ def compile_schedule(draft: ScheduleDraft) -> CompiledSchedule:
         )
 
     local_time = draft.local_time or "09:00"
-    weekdays = [value.strip().lower() for value in draft.weekdays if value.strip()]
+    weekdays = list(dict.fromkeys(day for value in draft.weekdays for day in _weekday_names(value)))
     invalid_days = set(weekdays) - _WEEKDAYS
     if invalid_days:
         raise ValueError(f"Invalid schedule weekdays: {', '.join(sorted(invalid_days))}.")

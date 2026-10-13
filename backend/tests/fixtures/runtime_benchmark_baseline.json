@@ -1,0 +1,4615 @@
+[
+  {
+    "task": "single-read",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Record a was read.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        }
+      ],
+      "approvals": [],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        }
+      ],
+      "planInLaterPrompts": "1 of 1",
+      "plan": [
+        "1. Read a: done"
+      ],
+      "result": {
+        "status": "completed",
+        "summary": "Record a was read."
+      }
+    },
+    "compute": {
+      "qstash_messages": 5,
+      "db_statements": 168,
+      "db_rows": 153,
+      "redis_commands": 47,
+      "ai_calls": 2,
+      "ai_tokens_in": 7169,
+      "ai_tokens_out": 145,
+      "deliveries": 3,
+      "idleDeliveries": 0,
+      "drains": 3,
+      "byOutcome": {
+        "runtime.step:execute:continue": 1,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 1
+      },
+      "qstashTotal": 6,
+      "dbStatementsTotal": 184,
+      "dbRowsTotal": 98,
+      "dbBytesRead": 34533,
+      "redisTotal": 81,
+      "largestPromptChars": 15177
+    }
+  },
+  {
+    "task": "read-then-write",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Record b was updated from a.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.write",
+          "input": {
+            "key": "b",
+            "value": "from a"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        },
+        {
+          "operation": "bench.record.write",
+          "input": {
+            "key": "b",
+            "value": "from a"
+          }
+        }
+      ],
+      "approvals": [],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            },
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.write",
+              "operation": "bench.record.write",
+              "description": "Write a record in the bench store.",
+              "risk": "medium",
+              "sideEffect": true,
+              "approvalRecommendation": "recommended",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": []
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            },
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.write",
+              "operation": "bench.record.write",
+              "description": "Write a record in the bench store.",
+              "risk": "medium",
+              "sideEffect": true,
+              "approvalRecommendation": "recommended",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": []
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            },
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.write",
+              "operation": "bench.record.write",
+              "description": "Write a record in the bench store.",
+              "risk": "medium",
+              "sideEffect": true,
+              "approvalRecommendation": "recommended",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": []
+        }
+      ],
+      "planInLaterPrompts": "2 of 2",
+      "plan": [
+        "1. Read a: done",
+        "2. Write b: done"
+      ],
+      "result": {
+        "status": "completed",
+        "summary": "Record b was updated from a."
+      }
+    },
+    "compute": {
+      "qstash_messages": 9,
+      "db_statements": 257,
+      "db_rows": 259,
+      "redis_commands": 74,
+      "ai_calls": 3,
+      "ai_tokens_in": 11587,
+      "ai_tokens_out": 257,
+      "deliveries": 5,
+      "idleDeliveries": 0,
+      "drains": 5,
+      "byOutcome": {
+        "runtime.step:execute:continue": 2,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 2
+      },
+      "qstashTotal": 10,
+      "dbStatementsTotal": 281,
+      "dbRowsTotal": 180,
+      "dbBytesRead": 63770,
+      "redisTotal": 122,
+      "largestPromptChars": 16686
+    }
+  },
+  {
+    "task": "approved-write",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Record b was updated after approval.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.write",
+          "input": {
+            "key": "b",
+            "value": "approved"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.write",
+          "input": {
+            "key": "b",
+            "value": "approved"
+          }
+        }
+      ],
+      "approvals": [
+        "approved"
+      ],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            },
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.write",
+              "operation": "bench.record.write",
+              "description": "Write a record in the bench store.",
+              "risk": "medium",
+              "sideEffect": true,
+              "approvalRecommendation": "recommended",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": []
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            },
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.write",
+              "operation": "bench.record.write",
+              "description": "Write a record in the bench store.",
+              "risk": "medium",
+              "sideEffect": true,
+              "approvalRecommendation": "recommended",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": []
+        }
+      ],
+      "planInLaterPrompts": "1 of 1",
+      "plan": [
+        "1. Write b: done"
+      ],
+      "result": {
+        "status": "completed",
+        "summary": "Record b was updated after approval."
+      }
+    },
+    "compute": {
+      "qstash_messages": 5,
+      "db_statements": 191,
+      "db_rows": 184,
+      "redis_commands": 52,
+      "ai_calls": 2,
+      "ai_tokens_in": 7285,
+      "ai_tokens_out": 163,
+      "deliveries": 4,
+      "idleDeliveries": 0,
+      "drains": 4,
+      "byOutcome": {
+        "runtime.step:execute:waiting_approval": 1,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 1,
+        "runtime.step:resume:continue": 1
+      },
+      "qstashTotal": 8,
+      "dbStatementsTotal": 228,
+      "dbRowsTotal": 134,
+      "dbBytesRead": 46674,
+      "redisTotal": 101,
+      "largestPromptChars": 15218
+    }
+  },
+  {
+    "task": "denied-write",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Record a was read; writing is not permitted.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        }
+      ],
+      "approvals": [],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "Blocked by the policy \u201cdeny bench.record.write\u201d."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "Blocked by the policy \u201cdeny bench.record.write\u201d."
+            }
+          ]
+        }
+      ],
+      "planInLaterPrompts": "1 of 1",
+      "plan": [
+        "1. Read a: done"
+      ],
+      "result": {
+        "status": "attention",
+        "summary": "Record a was read; writing is not permitted."
+      }
+    },
+    "compute": {
+      "qstash_messages": 5,
+      "db_statements": 168,
+      "db_rows": 163,
+      "redis_commands": 47,
+      "ai_calls": 2,
+      "ai_tokens_in": 7141,
+      "ai_tokens_out": 152,
+      "deliveries": 3,
+      "idleDeliveries": 0,
+      "drains": 3,
+      "byOutcome": {
+        "runtime.step:execute:continue": 1,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 1
+      },
+      "qstashTotal": 6,
+      "dbStatementsTotal": 184,
+      "dbRowsTotal": 108,
+      "dbBytesRead": 36288,
+      "redisTotal": 81,
+      "largestPromptChars": 15120
+    }
+  },
+  {
+    "task": "long-run",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Eight records were read.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "0"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "1"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "2"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "3"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "4"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "5"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "6"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "7"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "0"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "1"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "2"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "3"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "4"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "5"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "6"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "7"
+          }
+        }
+      ],
+      "approvals": [],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        }
+      ],
+      "planInLaterPrompts": "8 of 8",
+      "plan": [
+        "1. Read 0: done",
+        "2. Read 1: done",
+        "3. Read 2: done",
+        "4. Read 3: done",
+        "5. Read 4: done",
+        "6. Read 5: done",
+        "7. Read 6: done",
+        "8. Read 7: done"
+      ],
+      "result": {
+        "status": "completed",
+        "summary": "Eight records were read."
+      }
+    },
+    "compute": {
+      "qstash_messages": 33,
+      "db_statements": 785,
+      "db_rows": 888,
+      "redis_commands": 236,
+      "ai_calls": 9,
+      "ai_tokens_in": 39440,
+      "ai_tokens_out": 831,
+      "deliveries": 17,
+      "idleDeliveries": 0,
+      "drains": 17,
+      "byOutcome": {
+        "runtime.step:execute:continue": 8,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 8
+      },
+      "qstashTotal": 34,
+      "dbStatementsTotal": 857,
+      "dbRowsTotal": 665,
+      "dbBytesRead": 246148,
+      "redisTotal": 368,
+      "largestPromptChars": 22219
+    }
+  },
+  {
+    "task": "wide-results",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Five large records were read.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "0"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "1"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "2"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "3"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "4"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "0"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "1"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "2"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "3"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "4"
+          }
+        }
+      ],
+      "approvals": [],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        }
+      ],
+      "planInLaterPrompts": "5 of 5",
+      "plan": [
+        "1. Read 0: done",
+        "2. Read 1: done",
+        "3. Read 2: done",
+        "4. Read 3: done",
+        "5. Read 4: done"
+      ],
+      "result": {
+        "status": "completed",
+        "summary": "Five large records were read."
+      }
+    },
+    "compute": {
+      "qstash_messages": 21,
+      "db_statements": 521,
+      "db_rows": 543,
+      "redis_commands": 155,
+      "ai_calls": 6,
+      "ai_tokens_in": 31049,
+      "ai_tokens_out": 539,
+      "deliveries": 11,
+      "idleDeliveries": 0,
+      "drains": 11,
+      "byOutcome": {
+        "runtime.step:execute:continue": 5,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 5
+      },
+      "qstashTotal": 22,
+      "dbStatementsTotal": 569,
+      "dbRowsTotal": 392,
+      "dbBytesRead": 424407,
+      "redisTotal": 245,
+      "largestPromptChars": 22604
+    }
+  },
+  {
+    "task": "scheduled-read",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Record a was read on schedule.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        }
+      ],
+      "approvals": [],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        }
+      ],
+      "planInLaterPrompts": "1 of 1",
+      "plan": [
+        "1. Read a: done"
+      ],
+      "schedule": {
+        "queuedRuns": 1,
+        "trigger": "schedule",
+        "nextDueIsTomorrowAtTheSameTime": true,
+        "nextWakeUpsArmed": 1
+      },
+      "result": {
+        "status": "completed",
+        "summary": "Record a was read on schedule."
+      }
+    },
+    "compute": {
+      "qstash_messages": 5,
+      "db_statements": 168,
+      "db_rows": 153,
+      "redis_commands": 47,
+      "ai_calls": 2,
+      "ai_tokens_in": 7343,
+      "ai_tokens_out": 148,
+      "deliveries": 3,
+      "idleDeliveries": 0,
+      "drains": 3,
+      "byOutcome": {
+        "runtime.step:execute:continue": 1,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 1
+      },
+      "qstashTotal": 8,
+      "dbStatementsTotal": 198,
+      "dbRowsTotal": 108,
+      "dbBytesRead": 45551,
+      "redisTotal": 81,
+      "largestPromptChars": 15524
+    }
+  },
+  {
+    "task": "approve-with-edit",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Record b was updated after review.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.write",
+          "input": {
+            "key": "b",
+            "value": "draft"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.write",
+          "input": {
+            "key": "b",
+            "value": "corrected"
+          }
+        }
+      ],
+      "approvals": [
+        "approved"
+      ],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            },
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.write",
+              "operation": "bench.record.write",
+              "description": "Write a record in the bench store.",
+              "risk": "medium",
+              "sideEffect": true,
+              "approvalRecommendation": "recommended",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": []
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            },
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.write",
+              "operation": "bench.record.write",
+              "description": "Write a record in the bench store.",
+              "risk": "medium",
+              "sideEffect": true,
+              "approvalRecommendation": "recommended",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": []
+        }
+      ],
+      "planInLaterPrompts": "1 of 1",
+      "plan": [
+        "1. Write b: done"
+      ],
+      "result": {
+        "status": "completed",
+        "summary": "Record b was updated after review."
+      }
+    },
+    "compute": {
+      "qstash_messages": 5,
+      "db_statements": 191,
+      "db_rows": 184,
+      "redis_commands": 52,
+      "ai_calls": 2,
+      "ai_tokens_in": 7301,
+      "ai_tokens_out": 160,
+      "deliveries": 4,
+      "idleDeliveries": 0,
+      "drains": 4,
+      "byOutcome": {
+        "runtime.step:execute:waiting_approval": 1,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 1,
+        "runtime.step:resume:continue": 1
+      },
+      "qstashTotal": 8,
+      "dbStatementsTotal": 230,
+      "dbRowsTotal": 134,
+      "dbBytesRead": 47327,
+      "redisTotal": 101,
+      "largestPromptChars": 15251
+    }
+  },
+  {
+    "task": "approval-expires",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "The approval expired before anyone decided, so this action was not performed.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "failed",
+          "scope": "bench.record.write",
+          "input": {
+            "key": "b",
+            "value": "late"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [],
+      "approvals": [
+        "expired"
+      ],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            },
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.write",
+              "operation": "bench.record.write",
+              "description": "Write a record in the bench store.",
+              "risk": "medium",
+              "sideEffect": true,
+              "approvalRecommendation": "recommended",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": []
+        }
+      ],
+      "planInLaterPrompts": "0 of 0",
+      "plan": [
+        "1. Write b: pending"
+      ],
+      "result": {
+        "status": "attention",
+        "summary": "The approval expired before anyone decided, so this action was not performed."
+      }
+    },
+    "compute": {
+      "qstash_messages": 3,
+      "db_statements": 127,
+      "db_rows": 119,
+      "redis_commands": 31,
+      "ai_calls": 1,
+      "ai_tokens_in": 3489,
+      "ai_tokens_out": 110,
+      "deliveries": 3,
+      "idleDeliveries": 0,
+      "drains": 3,
+      "byOutcome": {
+        "runtime.step:execute:waiting_approval": 1,
+        "runtime.step:plan:continue": 1,
+        "runtime.step:resume:completed": 1
+      },
+      "qstashTotal": 6,
+      "dbStatementsTotal": 156,
+      "dbRowsTotal": 86,
+      "dbBytesRead": 27921,
+      "redisTotal": 67,
+      "largestPromptChars": 13958
+    }
+  },
+  {
+    "task": "always-allow",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Records b and c were updated.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.write",
+          "input": {
+            "key": "b",
+            "value": "first"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.write",
+          "input": {
+            "key": "c",
+            "value": "second"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.write",
+          "input": {
+            "key": "b",
+            "value": "first"
+          }
+        },
+        {
+          "operation": "bench.record.write",
+          "input": {
+            "key": "c",
+            "value": "second"
+          }
+        }
+      ],
+      "approvals": [
+        "approved"
+      ],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            },
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.write",
+              "operation": "bench.record.write",
+              "description": "Write a record in the bench store.",
+              "risk": "medium",
+              "sideEffect": true,
+              "approvalRecommendation": "recommended",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": []
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            },
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.write",
+              "operation": "bench.record.write",
+              "description": "Write a record in the bench store.",
+              "risk": "medium",
+              "sideEffect": true,
+              "approvalRecommendation": "recommended",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": []
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            },
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.write",
+              "operation": "bench.record.write",
+              "description": "Write a record in the bench store.",
+              "risk": "medium",
+              "sideEffect": true,
+              "approvalRecommendation": "recommended",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": []
+        }
+      ],
+      "planInLaterPrompts": "2 of 2",
+      "plan": [
+        "1. Write b: done",
+        "2. Write c: done"
+      ],
+      "policiesCreated": [
+        "Always allow: Bench agent \u00b7 write on Bench store"
+      ],
+      "result": {
+        "status": "completed",
+        "summary": "Records b and c were updated."
+      }
+    },
+    "compute": {
+      "qstash_messages": 9,
+      "db_statements": 280,
+      "db_rows": 290,
+      "redis_commands": 79,
+      "ai_calls": 3,
+      "ai_tokens_in": 11426,
+      "ai_tokens_out": 268,
+      "deliveries": 6,
+      "idleDeliveries": 0,
+      "drains": 6,
+      "byOutcome": {
+        "runtime.step:execute:continue": 1,
+        "runtime.step:execute:waiting_approval": 1,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 2,
+        "runtime.step:resume:continue": 1
+      },
+      "qstashTotal": 12,
+      "dbStatementsTotal": 339,
+      "dbRowsTotal": 228,
+      "dbBytesRead": 80421,
+      "redisTotal": 142,
+      "largestPromptChars": 16343
+    }
+  },
+  {
+    "task": "criteria-proven",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Record a was read.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        }
+      ],
+      "approvals": [],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        }
+      ],
+      "planInLaterPrompts": "1 of 1",
+      "plan": [
+        "1. Read a: done"
+      ],
+      "result": {
+        "status": "completed",
+        "summary": "Record a was read.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1
+            ]
+          }
+        ]
+      }
+    },
+    "compute": {
+      "qstash_messages": 5,
+      "db_statements": 168,
+      "db_rows": 153,
+      "redis_commands": 47,
+      "ai_calls": 2,
+      "ai_tokens_in": 7191,
+      "ai_tokens_out": 172,
+      "deliveries": 3,
+      "idleDeliveries": 0,
+      "drains": 3,
+      "byOutcome": {
+        "runtime.step:execute:continue": 1,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 1
+      },
+      "qstashTotal": 6,
+      "dbStatementsTotal": 184,
+      "dbRowsTotal": 98,
+      "dbBytesRead": 34752,
+      "redisTotal": 81,
+      "largestPromptChars": 15222
+    }
+  },
+  {
+    "task": "criteria-unproven",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Record a was read.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        }
+      ],
+      "approvals": [],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        }
+      ],
+      "planInLaterPrompts": "1 of 1",
+      "plan": [
+        "1. Read a: done"
+      ],
+      "result": {
+        "status": "attention",
+        "summary": "Record a was read.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "not_verifiable",
+            "evidenceSteps": []
+          }
+        ]
+      }
+    },
+    "compute": {
+      "qstash_messages": 5,
+      "db_statements": 168,
+      "db_rows": 153,
+      "redis_commands": 47,
+      "ai_calls": 2,
+      "ai_tokens_in": 7199,
+      "ai_tokens_out": 172,
+      "deliveries": 3,
+      "idleDeliveries": 0,
+      "drains": 3,
+      "byOutcome": {
+        "runtime.step:execute:continue": 1,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 1
+      },
+      "qstashTotal": 6,
+      "dbStatementsTotal": 184,
+      "dbRowsTotal": 98,
+      "dbBytesRead": 34814,
+      "redisTotal": 81,
+      "largestPromptChars": 15236
+    }
+  },
+  {
+    "task": "planned-30-steps",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Thirty records were read.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "0"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "1"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "2"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "3"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "4"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "5"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "6"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "7"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "8"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "9"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "10"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "11"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "12"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "13"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "14"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "15"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "16"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "17"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "18"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "19"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "20"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "21"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "22"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "23"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "24"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "25"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "26"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "27"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "28"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "29"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "0"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "1"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "2"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "3"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "4"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "5"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "6"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "7"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "8"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "9"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "10"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "11"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "12"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "13"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "14"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "15"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "16"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "17"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "18"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "19"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "20"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "21"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "22"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "23"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "24"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "25"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "26"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "27"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "28"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "29"
+          }
+        }
+      ],
+      "approvals": [],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        }
+      ],
+      "planInLaterPrompts": "30 of 30",
+      "plan": [
+        "1. Read 0: done",
+        "2. Read 1: done",
+        "3. Read 2: done",
+        "4. Read 3: done",
+        "5. Read 4: done",
+        "6. Read 5: done",
+        "7. Read 6: done",
+        "8. Read 7: done",
+        "9. Read 8: done",
+        "10. Read 9: done",
+        "11. Read 10: done",
+        "12. Read 11: done",
+        "13. Read 12: done",
+        "14. Read 13: done",
+        "15. Read 14: done",
+        "16. Read 15: done",
+        "17. Read 16: done",
+        "18. Read 17: done",
+        "19. Read 18: done",
+        "20. Read 19: done",
+        "21. Read 20: done",
+        "22. Read 21: done",
+        "23. Read 22: done",
+        "24. Read 23: done",
+        "25. Read 24: done",
+        "26. Read 25: done",
+        "27. Read 26: done",
+        "28. Read 27: done",
+        "29. Read 28: done",
+        "30. Read 29: done"
+      ],
+      "result": {
+        "status": "completed",
+        "summary": "Thirty records were read."
+      }
+    },
+    "compute": {
+      "qstash_messages": 121,
+      "db_statements": 2721,
+      "db_rows": 4793,
+      "redis_commands": 830,
+      "ai_calls": 31,
+      "ai_tokens_in": 161217,
+      "ai_tokens_out": 3022,
+      "deliveries": 61,
+      "idleDeliveries": 0,
+      "drains": 61,
+      "byOutcome": {
+        "runtime.step:execute:continue": 30,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 30
+      },
+      "qstashTotal": 122,
+      "dbStatementsTotal": 2969,
+      "dbRowsTotal": 4042,
+      "dbBytesRead": 1216108,
+      "redisTotal": 1270,
+      "largestPromptChars": 29896
+    }
+  },
+  {
+    "task": "model-switch",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Five records were read.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "0"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "1"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "2"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "3"
+          }
+        },
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "4"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "0"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "1"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "2"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "3"
+          }
+        },
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "4"
+          }
+        }
+      ],
+      "approvals": [],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        }
+      ],
+      "planInLaterPrompts": "5 of 5",
+      "plan": [
+        "1. Read 0: done",
+        "2. Read 1: done",
+        "3. Read 2: done",
+        "4. Read 3: done",
+        "5. Read 4: done"
+      ],
+      "result": {
+        "status": "completed",
+        "summary": "Five records were read."
+      }
+    },
+    "compute": {
+      "qstash_messages": 21,
+      "db_statements": 532,
+      "db_rows": 554,
+      "redis_commands": 165,
+      "ai_calls": 7,
+      "ai_tokens_in": 25434,
+      "ai_tokens_out": 537,
+      "deliveries": 11,
+      "idleDeliveries": 0,
+      "drains": 11,
+      "byOutcome": {
+        "runtime.step:execute:continue": 5,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 5
+      },
+      "qstashTotal": 22,
+      "dbStatementsTotal": 580,
+      "dbRowsTotal": 397,
+      "dbBytesRead": 153797,
+      "redisTotal": 255,
+      "largestPromptChars": 21135
+    }
+  }
+]

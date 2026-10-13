@@ -5,6 +5,7 @@ import httpx
 
 from app.bootstrap.settings import settings
 from app.domain.queue.provider import QueueMessage, QueueProvider
+from app.observability.usage import count_qstash_message
 
 
 def _destination_path(destination: str) -> str:
@@ -126,6 +127,7 @@ class UpstashQStashProvider(QueueProvider):
         parallelism: int | None = None,
     ) -> QueueMessage:
         encoded = _destination_path(destination)
+        count_qstash_message()
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 f"{self._base_url}/v2/publish/{encoded}",

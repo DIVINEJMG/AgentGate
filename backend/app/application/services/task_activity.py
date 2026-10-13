@@ -177,6 +177,9 @@ def activity_for(item: Any, run: Any, steps: list[Any], now: datetime) -> dict[s
             }.get(meta["lastAIErrorCategory"], detail)
     elif meta.get("queueState") in {"retrying", "replanning"}:
         phase, detail = "recovery", "Recovering the pending step; completed work remains saved"
+        if meta.get("providerRetryCode") in {"rate_limited", "queued"} and meta.get("waitingReason"):
+            # Waiting for a provider's limit or a free slot: say so plainly.
+            detail = str(meta["waitingReason"]).rstrip(".") + ". It will continue automatically; completed work is saved."
     elif meta.get("plannerPhase") == "awaiting_ai" and meta.get("queueState") == "planning":
         phase, detail = "awaiting_planner", "Waiting for the planner response"
         if int(meta.get("plannerAttemptCount", 0)) > 1:
@@ -185,6 +188,11 @@ def activity_for(item: Any, run: Any, steps: list[Any], now: datetime) -> dict[s
         phase, detail = action_phase(str((pending.input or {}).get("scope", "")), (pending.input or {}).get("actionInput"))
         if meta.get("queueState") != "executing":
             detail = "Selected next action: " + detail.lower()
+    progress = meta.get("planProgress")
+    if phase not in {"completed", "attention", "recovery"} and isinstance(progress, dict) and progress.get("position"):
+        # A saved plan: say where the run is in it.
+        detail = (f"Step {progress['position']} of {progress['total']}: {progress['title']}"
+                  + (f" ({progress['target']})" if progress.get("target") else ""))
     timestamps: list[datetime] = [item.updated_at, *[s.updated_at for s in steps]]
     if run and getattr(run, "updated_at", None):
         timestamps.append(run.updated_at)
@@ -213,6 +221,7 @@ def activity_for(item: Any, run: Any, steps: list[Any], now: datetime) -> dict[s
         "responseState": "awaiting" if phase == "awaiting_planner" else None,
         "completedActions": len(completed),
         "preservedWork": bool(completed),
+        "plan": progress if isinstance(progress, dict) else None,
         "events": [
             {
                 "id": str(s.id),

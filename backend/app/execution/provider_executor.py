@@ -661,7 +661,9 @@ class UniversalProviderExecutor:
                 snapshot=snapshot,
             )
 
-        summary = verification.summary
+        # Say what was found, so the planner and the person can tell an empty answer from a
+        # failed one. The verification note stays in the data below.
+        summary = describe_output(result.output) or verification.summary
         from app.execution.integration_evidence import external_references
 
         return IntegrationExecutionResult(
@@ -701,3 +703,33 @@ class UniversalProviderExecutor:
         raise PermissionError(
             "Direct provider execution is disabled; execute through ActionGateway."
         )
+
+
+def describe_output(output: object) -> str | None:
+    """A short plain sentence about a read's result: how many items, and the first few names."""
+    rows = output
+    if isinstance(output, dict):
+        lists = [value for value in output.values() if isinstance(value, list)]
+        if len(lists) != 1:
+            # One object (an issue, a file, a pull request): name it.
+            name = output.get("title") or output.get("name") or output.get("path") or output.get("full_name")
+            if name is None:
+                return None
+            number = output.get("number")
+            return "Read " + (f"#{number} " if number is not None else "") + str(name)[:80] + "."
+        rows = lists[0]
+    if not isinstance(rows, list):
+        return None
+    if not rows:
+        return "Found nothing: the result is empty."
+    names = []
+    for row in rows[:3]:
+        if not isinstance(row, dict):
+            continue
+        number = row.get("number")
+        name = row.get("title") or row.get("name") or row.get("full_name") or row.get("path") or row.get("id")
+        if name is not None:
+            names.append((f"#{number} " if number is not None else "") + str(name)[:60])
+    count = f"Found {len(rows)} result{'s' if len(rows) != 1 else ''}"
+    return count + (": " + "; ".join(names) + ("; …" if len(rows) > 3 else "") if names else "") + "."
+

@@ -145,9 +145,13 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
   async function send(event: FormEvent) {
     event.preventDefault();
     if (!worker || (!draft.trim() && files.length === 0) || busy) return;
+    // A message right after a question from the worker is its answer: the request continues.
+    const answering = receipt?.status === 'clarification_required' && receipt.command_id && threadId ? receipt.command_id : undefined;
     setBusy(true); setError(null); setReceipt(null);
     setResponsePhase(!threadId || files.length > 0 ? 'preparing' : 'responding');
     let createdThreadId: string | null = null;
+    let pendingId: string | null = null;
+    const sentDraft = draft;
     try {
       let activeThreadId = threadId;
       if (!activeThreadId) {
@@ -163,7 +167,13 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
       }
       const content = draft.trim() || 'Review the attached file and explain what matters.';
       setResponsePhase('responding');
-      const turn = await sendConversationMessage(apiVersion, organization.id, activeThreadId, content, references);
+      // Show the sent message at once; the saved thread replaces it when the reply arrives.
+      pendingId = 'pending-' + Date.now();
+      const pending: ConversationMessage = { id: pendingId, organizationId: organization.id, threadId: activeThreadId, role: 'human', content, artifactReferences: references, commandReferences: [], resultReferences: [], createdAt: new Date().toISOString() };
+      setMessages((current) => [...current, pending]);
+      setDraft('');
+      const turn = await sendConversationMessage(apiVersion, organization.id, activeThreadId, content, references,
+        answering ? { resumeCommandId: answering } : {});
       const result = await getConversation(apiVersion, organization.id, activeThreadId);
       if (createdThreadId) { setThreadId(createdThreadId); navigate({ page: 'conversations', workerId: worker.id, threadId: createdThreadId }, { replace: true }); }
       setMessages(result.messages);
@@ -171,7 +181,11 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
       setThreads((current) => current.map((item) => item.id === activeThreadId ? result.thread : item));
       setDraft(''); setFiles([]);
       if (fileInput.current) fileInput.current.value = '';
-    } catch (caught) { if (createdThreadId) { setThreadId(createdThreadId); navigate({ page: 'conversations', workerId: worker.id, threadId: createdThreadId }, { replace: true }); } setError(errorText(caught)); } finally { setBusy(false); setResponsePhase(null); }
+    } catch (caught) {
+      // Not sent: take the message back out and return it to the composer.
+      if (pendingId) { const failed = pendingId; setMessages((current) => current.filter((item) => item.id !== failed)); setDraft(sentDraft); }
+      if (createdThreadId) { setThreadId(createdThreadId); navigate({ page: 'conversations', workerId: worker.id, threadId: createdThreadId }, { replace: true }); } setError(errorText(caught));
+    } finally { setBusy(false); setResponsePhase(null); }
   }
 
   async function confirm() {

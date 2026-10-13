@@ -49,6 +49,15 @@ def retry_after_seconds(value: str | None) -> float | None:
             return None
 
 
+_RATE_LIMIT_REASONS = ("ratelimitexceeded", "userratelimitexceeded", "quotaexceeded",
+                       "dailylimitexceeded", "resource_exhausted", "ratelimited")
+
+
+def _rate_limit_reason(body: str) -> bool:
+    lowered = body[:2000].lower()
+    return any(reason in lowered for reason in _RATE_LIMIT_REASONS)
+
+
 class ProviderHTTPClient:
     def __init__(
         self,
@@ -124,6 +133,16 @@ class ProviderHTTPClient:
                 safe_message=f"{provider} rejected the supplied credential.",
                 internal_details=response.text[:500],
             )
+        if response.status_code == 403 and _rate_limit_reason(response.text):
+            # Google reports rate limits and quotas as 403 with a reason; they are waits,
+            # not missing permissions.
+            raise ProviderTransportError(
+                code="rate_limited",
+                retryable=True,
+                safe_message=f"{provider} is limiting requests right now.",
+                retry_after_seconds=retry_after_seconds(response.headers.get("Retry-After")) or 60.0,
+                internal_details=response.text[:500],
+            )
         if response.status_code == 403:
             raise ProviderTransportError(
                 code="authorization_error",
@@ -142,8 +161,8 @@ class ProviderHTTPClient:
             raise ProviderTransportError(
                 code="rate_limited",
                 retryable=True,
-                safe_message=f"{provider} rate limit was reached.",
-                retry_after_seconds=retry_after_seconds(response.headers.get("Retry-After")),
+                safe_message=f"{provider} is limiting requests right now.",
+                retry_after_seconds=retry_after_seconds(response.headers.get("Retry-After")) or 60.0,
                 internal_details=response.text[:500],
             )
         if response.status_code in {408, 425, 500, 502, 503, 504}:

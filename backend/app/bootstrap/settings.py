@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     integration_connection_rate_per_minute: int = Field(default=20, ge=1, le=10000)
     integration_organization_concurrency: int = Field(default=4, ge=1, le=100)
     integration_connection_concurrency: int = Field(default=2, ge=1, le=50)
+    # Renew a token this long before it expires, so a run never meets an expired token midway.
+    integration_token_refresh_lead_seconds: int = Field(default=300, ge=30, le=3600)
+    # Waiting for a provider's rate limit or for capacity is not a failure: it has its own
+    # budget and does not use up the failure retries.
+    integration_rate_limit_max_waits: int = Field(default=12, ge=1, le=100)
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -58,6 +63,9 @@ class Settings(BaseSettings):
     runtime_execution_enabled: bool = False
     worker_poll_seconds: float = 2.0
     outbox_poll_seconds: float = 1.0
+    # One outbox drain request at a time: while one is on its way, later commits rely on it
+    # instead of sending their own. This bounds how long a lost request can hold others back.
+    outbox_drain_coalesce_seconds: int = Field(default=60, ge=5, le=900)
     worker_heartbeat_ttl_seconds: int = 60
     auth_session_ttl_seconds: int = 60 * 60 * 24 * 7
     auth_login_failure_window_seconds: int = 60 * 15
@@ -112,6 +120,22 @@ class Settings(BaseSettings):
     runtime_planner_timeout_seconds: int = Field(default=2000, ge=15)
     runtime_qstash_parallelism: int = 4
     runtime_sweep_limit: int = 50
+    # Seconds between preparation recovery passes when nothing is pending (15 s while work is
+    # active). Above five minutes, an idle backend lets the Neon compute scale to zero.
+    preparation_recovery_idle_seconds: int = Field(default=600, ge=15, le=3600)
+    # Save the compute used by each runtime step and chat message in `usage_records`
+    # (one small insert each). Usage is always logged.
+    usage_records_enabled: bool = True
+    # A streamed AI response may use the whole planning budget while it keeps sending output;
+    # a stream silent for this long is treated as a failed connection.
+    planner_stream_silence_seconds: int = Field(default=300, ge=30, le=3600)
+    # The longest delay QStash accepts on one message (7 days on the free plan). Schedules further
+    # ahead are reached in hops.
+    qstash_max_delay_seconds: int = Field(default=7 * 24 * 3600, ge=60)
+    # A pending approval is reminded about after this many hours, and expires (the action is
+    # cancelled and the task finishes as "needs attention") after the next.
+    approval_reminder_hours: int = Field(default=12, ge=1, le=720)
+    approval_expiry_hours: int = Field(default=24, ge=1, le=720)
     legacy_database_url: SecretStr | None = None
     migration_execution_enabled: bool = False
     database_migrate_on_startup: bool = False
@@ -191,6 +215,13 @@ class Settings(BaseSettings):
     web_research_provider_calls_per_minute: int = 30
     web_research_max_pages: int = 3
     runtime_max_action_steps: int = 20
+    # With a saved plan the action limit follows the plan: two actions per step (one retry or
+    # read each), at least runtime_max_action_steps and at most runtime_max_plan_actions.
+    runtime_max_plan_steps: int = Field(default=60, ge=1, le=200)
+    runtime_max_plan_actions: int = Field(default=120, ge=20, le=400)
+    runtime_max_plan_revisions: int = Field(default=3, ge=0, le=20)
+    # How long a task may wait in the coding-workspace queue before it needs attention.
+    coding_queue_max_wait_seconds: int = Field(default=7200, ge=60, le=86400)
     browser_idle_shutdown_seconds: int = 180
     browser_session_ttl_seconds: int = 900
     browser_max_active_sessions: int = 1

@@ -5,7 +5,8 @@ import { loadRuntime, type RuntimeRun } from '../lib/runtimeApi';
 import { listSupervision, type Escalation } from '../lib/supervisionApi';
 import type { ApiVersion } from '../lib/systemApi';
 import { loadWorkforce, type ManagedWorker, type WorkforceRole } from '../lib/workforceApi';
-import { subscribeOrganizationRealtime } from '../platform/realtimeClient';
+import { subscribeOrganizationRealtime, type RealtimeEvent } from '../platform/realtimeClient';
+import { ALL_LISTS, LIVE_BATCH_MS, listsFor, type LiveList } from './liveLists';
 import type { Liveness } from './ui';
 
 const WORKING = new Set(['planning', 'running']);
@@ -45,13 +46,15 @@ export function LiveProvider({ organization, apiVersion, children }: { organizat
   const [escalations, setEscalations] = useState<Escalation[]>([]);
   const [loaded, setLoaded] = useState(false);
   const pending = useRef<number | null>(null);
+  const dirty = useRef(new Set<LiveList>());
 
-  const load = useCallback(async () => {
+  // Each list loads on its own, so a live event reloads only the lists it can change.
+  const load = useCallback(async (lists: ReadonlySet<LiveList> = ALL_LISTS) => {
     const [workforce, runtime, approvalRows, supervision] = await Promise.all([
-      loadWorkforce(apiVersion, organization.id).catch(() => null),
-      loadRuntime(apiVersion, organization.id).catch(() => null),
-      canReview ? listApprovals(apiVersion, organization.id).catch(() => null) : Promise.resolve([] as ApprovalRecord[]),
-      listSupervision(apiVersion, organization.id).catch(() => null),
+      lists.has('workforce') ? loadWorkforce(apiVersion, organization.id).catch(() => null) : null,
+      lists.has('runs') ? loadRuntime(apiVersion, organization.id).catch(() => null) : null,
+      !lists.has('approvals') ? null : canReview ? listApprovals(apiVersion, organization.id).catch(() => null) : Promise.resolve([] as ApprovalRecord[]),
+      lists.has('escalations') ? listSupervision(apiVersion, organization.id).catch(() => null) : null,
     ]);
     if (workforce) { setWorkers(workforce.workers); setRoles(workforce.roles); }
     if (runtime) setRuns(runtime.runs);
@@ -60,19 +63,34 @@ export function LiveProvider({ organization, apiVersion, children }: { organizat
     setLoaded(true);
   }, [apiVersion, organization.id, canReview]);
 
-  // Realtime bursts (several step events per second) collapse into one refresh.
-  const refresh = useCallback(() => {
+  // Bursts of live events (several step events per second during a run) collapse into one
+  // reload of just the affected lists, at most once a second.
+  const flushSoon = useCallback(() => {
     if (pending.current !== null) return;
-    pending.current = window.setTimeout(() => { pending.current = null; void load(); }, 400);
+    pending.current = window.setTimeout(() => {
+      pending.current = null;
+      const lists = new Set(dirty.current);
+      dirty.current.clear();
+      if (lists.size) void load(lists);
+    }, LIVE_BATCH_MS);
   }, [load]);
+  const onEvent = useCallback((event: RealtimeEvent) => {
+    for (const list of listsFor(event.event_type)) dirty.current.add(list);
+    flushSoon();
+  }, [flushSoon]);
+  // Public refresh (after an action on the page): everything.
+  const refresh = useCallback(() => {
+    for (const list of ALL_LISTS) dirty.current.add(list);
+    flushSoon();
+  }, [flushSoon]);
 
   useEffect(() => { setLoaded(false); void load(); }, [load]);
   useEffect(() => subscribeOrganizationRealtime({
     organizationId: organization.id,
     eventTypes: ['run.created', 'run.started', 'run.progress', 'run.step.started', 'run.step.completed', 'run.waiting_approval', 'run.failed', 'run.completed', 'approval.created', 'approval.decided', 'worker.status.changed', 'incident.created', 'result.created'],
-    onEvent: refresh,
-    poll: load,
-  }), [organization.id, refresh, load]);
+    onEvent,
+    poll: () => load(),
+  }), [organization.id, onEvent, load]);
   useEffect(() => () => { if (pending.current !== null) window.clearTimeout(pending.current); }, []);
 
   const value = useMemo<WorkspaceLive>(() => {

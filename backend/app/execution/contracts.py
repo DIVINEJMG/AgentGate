@@ -20,6 +20,8 @@ ExecutionErrorCode = Literal[
     "authorization_error",
     "resource_not_found",
     "rate_limited",
+    # Waiting its turn for a shared resource (a coding workspace): bounded by time, not attempts.
+    "queued",
     "temporary_provider_error",
     "validation_error",
     "policy_blocked",

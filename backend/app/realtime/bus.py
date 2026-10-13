@@ -10,6 +10,7 @@ from redis.asyncio import Redis
 
 from app.bootstrap.settings import settings
 from app.observability.metrics import ExecutionMetrics
+from app.observability.usage import MeteredRedis
 from app.realtime.contracts import RealtimeEvent
 
 
@@ -25,7 +26,7 @@ class RedisRealtimeBus:
 
     @classmethod
     def from_settings(cls) -> RedisRealtimeBus:
-        return cls(Redis.from_url(settings.redis_dsn, decode_responses=True))
+        return cls(MeteredRedis.from_url(settings.redis_dsn, decode_responses=True))
 
     @staticmethod
     def organization_stream(organization_id: UUID | str) -> str:
@@ -51,10 +52,10 @@ class RedisRealtimeBus:
         dedupe_key = self.dedupe_key(event.organization_id, event.event_id)
         claimed = True
         if hasattr(self._client, "set") and hasattr(self._client, "get"):
-            claimed = await self._client.set(dedupe_key, "pending", nx=True, ex=86400)
+            claimed = await self._client.set(dedupe_key, "1", nx=True, ex=86400)
             if not claimed:
-                existing = await self._client.get(dedupe_key)
-                return str(existing or "duplicate")
+                # Already delivered (an outbox row re-drained after a crash): nothing to write.
+                return "duplicate"
 
         payload = event.as_dict()
         fields = {
@@ -80,23 +81,9 @@ class RedisRealtimeBus:
             if hasattr(self._client, "delete"):
                 await self._client.delete(dedupe_key)
             raise
-        if event.run_id is not None:
-            await self._client.xadd(
-                self.run_stream(event.run_id),
-                fields,
-                maxlen=2000,
-                approximate=True,
-            )
-        if event.worker_id is not None:
-            await self._client.xadd(
-                self.worker_stream(event.worker_id),
-                fields,
-                maxlen=2000,
-                approximate=True,
-            )
+        # Written once. Per-run and per-worker copies were never read; readers of one run or
+        # worker filter the organisation stream instead (read(run_id=..., worker_id=...)).
         payload["stream_id"] = str(stream_id)
-        if hasattr(self._client, "set"):
-            await self._client.set(dedupe_key, str(stream_id), ex=86400)
         await self._client.publish(
             self.organization_channel(event.organization_id),
             json.dumps(payload, separators=(",", ":"), default=str),
@@ -119,7 +106,26 @@ class RedisRealtimeBus:
         after: str = "0-0",
         count: int = 100,
         block_ms: int | None = None,
+        run_id: UUID | None = None,
+        worker_id: UUID | None = None,
     ) -> list[dict[str, object]]:
+        events, _ = await self.read_page(organization_id=organization_id, after=after, count=count,
+                                         block_ms=block_ms, run_id=run_id, worker_id=worker_id)
+        return events
+
+    async def read_page(
+        self,
+        *,
+        organization_id: UUID,
+        after: str = "0-0",
+        count: int = 100,
+        block_ms: int | None = None,
+        run_id: UUID | None = None,
+        worker_id: UUID | None = None,
+    ) -> tuple[list[dict[str, object]], str]:
+        """The matching events after a position, and the last position scanned. With a filter,
+        the position moves past events for other runs or workers, so a reader never stalls."""
+        last = after
         rows = await self._client.xread(
             {self.organization_stream(organization_id): after},
             count=count,
@@ -128,6 +134,11 @@ class RedisRealtimeBus:
         events: list[dict[str, object]] = []
         for _, messages in rows:
             for stream_id, fields in messages:
+                last = str(stream_id)
+                if run_id is not None and fields.get("run_id") != str(run_id):
+                    continue
+                if worker_id is not None and fields.get("worker_id") != str(worker_id):
+                    continue
                 payload_raw = fields.get("payload") or "{}"
                 try:
                     payload = json.loads(payload_raw)
@@ -148,7 +159,7 @@ class RedisRealtimeBus:
                         "payload": payload,
                     }
                 )
-        return events
+        return events, last
 
     async def subscribe(self, *, organization_id: UUID) -> AsyncIterator[dict[str, object]]:
         pubsub = self._client.pubsub()

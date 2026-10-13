@@ -13,6 +13,10 @@ export interface ScheduleDefinition {
   missedRunPolicy:'skip'|'queue_once';
   outsideWorkingHoursPolicy:'queue_anyway'|'next_open';
   nextDueAt:string|null;
+  /** The last run the scheduler queued: when it was due and when it could start. */
+  lastQueued?:{dueAt:string;startsAt:string;at:string}|null;
+  /** The last missed run skipped under the "skip" policy. */
+  lastSkipped?:{dueAt:string;at:string;reason:string}|null;
 }
 
 export interface TriggerConfig {

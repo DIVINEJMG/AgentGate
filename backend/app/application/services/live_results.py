@@ -152,10 +152,14 @@ async def append_live_result_message(
         from app.application.services.integration_foundation import notify_integration_work
         evidence = list((await session.scalars(select(RunStep).where(RunStep.run_id == run.id,
             RunStep.status == "completed", RunStep.kind == "action").order_by(RunStep.step_index))).all())
-        checks = [str((step.output or {}).get("data", {}).get("verification", {}).get("summary", "Verification limits were not reported.")) for step in evidence]
+        unconfirmed = [step for step in evidence
+                       if not (step.output or {}).get("data", {}).get("verification", {}).get("verified")]
         links = [str(ref["url"]) for step in evidence for ref in (step.output or {}).get("data", {}).get("externalReferences", []) if ref.get("url")]
-        content = summary[:10000] + "\n\nProvider verification: " + (
-            "; ".join(checks) if checks else "No provider actions were executed; the requested outcome is unverified.")
+        # Verification is mentioned only when it matters: nothing was checked, or something wasn't confirmed.
+        content = summary[:10000] + (
+            "\n\nNo actions were run with the connected account, so this answer is not confirmed by it." if not evidence
+            else f"\n\n{len(unconfirmed)} of {len(evidence)} actions could not be confirmed with the provider." if unconfirmed
+            else "")
         if links:
             content += "\nProvider references:\n" + "\n".join(links[:20])
         refs = [ref for step in evidence for ref in (step.output or {}).get("data", {}).get("externalReferences", [])]

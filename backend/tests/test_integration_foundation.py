@@ -189,6 +189,10 @@ class Coordination:
         return key if self.available else None
     async def release_lock(self, lease):
         self.released.append(lease)
+    async def cache_get(self, key):
+        return getattr(self, "cache", {}).get(key)
+    async def cache_set(self, key, value, **kw):
+        self.cache = {**getattr(self, "cache", {}), key: value}
 
 
 class DeterministicAdapter:

@@ -62,6 +62,16 @@ class EntityReference(BaseModel):
         return self
 
 
+class ChatReply(BaseModel):
+    """An ordinary reply written in the same call that chose conversation.answer. The backend checks
+    it with the same rules as a separate reply before using it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    answer: str = Field(min_length=1, max_length=12000)
+    factIds: list[str] = Field(default_factory=list, max_length=5)
+
+
 class WorkerCommandIntent(BaseModel):
     """Schema-validated interpretation of one human conversational turn.
 
@@ -80,6 +90,14 @@ class WorkerCommandIntent(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
     response_hint: str = Field(default="", max_length=600)
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    # Only with family conversation.answer: the reply itself, saving a second AI call.
+    reply: ChatReply | None = None
+    # When the request is unclear or misses an essential detail: one question for the human.
+    # Nothing runs until they answer; the answer then continues this request.
+    clarification_question: str | None = Field(default=None, max_length=400)
+    # How the human wants the requested work to start, as the model understood it: now, at set
+    # times, each time something happens (an event), or not stated. Checked against the family.
+    requested_start: Literal["now", "on_schedule", "on_event", "unspecified"] = "unspecified"
 
 
 class CommandReference(BaseModel):

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bell, CheckCircle2, FileText, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import type { AuthUser } from '../../platform/client';
-import { approvalExplanation, decideApproval, enableApprovalNotifications, type ApprovalRecord } from '../../lib/approvalApi';
+import { approvalExplanation, decideApproval, decideApprovals, enableApprovalNotifications, type ApprovalRecord } from '../../lib/approvalApi';
 import type { OrganizationAccess } from '../../lib/identityApi';
 import { loadResults, type ResultSummary } from '../../lib/resultsApi';
 import { addEscalationNote, interveneEscalation, listSupervision, reassignEscalation, setEscalationStatus, updateRule, type Escalation, type EscalationRule } from '../../lib/supervisionApi';
@@ -106,35 +106,93 @@ function Facts({ items }: { items: Array<[string, React.ReactNode]> }) {
   return <dl className='ws-facts'>{items.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
 }
 
+function fieldLabel(key: string) {
+  const words = key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function shownValue(value: unknown) {
+  if (value === null || value === undefined || value === '') return '—';
+  return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+}
+
+/** What the action will do, field by field; editable before approving when the tool allows it. */
+function ActionPreview({ input, schema, editing, draft, onDraft }: { input: Record<string, unknown>; schema: ApprovalRecord['inputSchema']; editing: boolean; draft: Record<string, unknown>; onDraft: (next: Record<string, unknown>) => void }) {
+  const properties = schema?.properties ?? {};
+  const keys = Array.from(new Set([...Object.keys(input), ...(editing ? Object.keys(properties) : [])]));
+  if (keys.length === 0) return null;
+  return <section className='ws-preview' aria-label='What will happen'>
+    <h3>What will happen</h3>
+    <dl className='ws-preview-fields'>{keys.map((key) => {
+      const kind = properties[key]?.type;
+      const value = editing ? draft[key] : input[key];
+      const editable = editing && (kind === 'string' || kind === 'number' || kind === 'integer' || kind === 'boolean');
+      return <div key={key}><dt>{fieldLabel(key)}</dt><dd>{!editable
+        ? <span className='ws-preview-value'>{shownValue(value)}</span>
+        : kind === 'boolean'
+          ? <input type='checkbox' checked={Boolean(value)} onChange={(event) => onDraft({ ...draft, [key]: event.target.checked })} aria-label={fieldLabel(key)} />
+          : kind === 'number' || kind === 'integer'
+            ? <input type='number' value={value === undefined ? '' : String(value)} onChange={(event) => onDraft({ ...draft, [key]: event.target.value === '' ? undefined : Number(event.target.value) })} aria-label={fieldLabel(key)} />
+            : <textarea rows={String(value ?? '').length > 80 ? 5 : 1} value={String(value ?? '')} onChange={(event) => onDraft({ ...draft, [key]: event.target.value })} aria-label={fieldLabel(key)} />}</dd></div>;
+    })}</dl>
+  </section>;
+}
+
 function ApprovalDetail({ approval, organization, apiVersion, canReview }: { approval: ApprovalRecord; organization: OrganizationAccess; apiVersion: ApiVersion; canReview: boolean }) {
   const live = useLive();
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Record<string, unknown>>(approval.request.input ?? {});
+  const [alwaysAllow, setAlwaysAllow] = useState(false);
+  const canAllowAlways = organization.permissions.includes('policies.manage');
+  const canEdit = Object.keys(approval.inputSchema?.properties ?? {}).length > 0;
+  const sameTask = approval.runId ? live.approvals.filter((item) => item.runId === approval.runId && item.status === 'pending') : [];
+  const request = approval.request;
+  const what = `${request.action || request.scope} on ${request.resourceName || request.resourceId}`;
   async function decide(decision: 'approve' | 'reject') {
     setBusy(true);
     live.replaceApproval({ ...approval, status: decision === 'approve' ? 'approved' : 'rejected' });
+    const changed = editing && JSON.stringify(draft) !== JSON.stringify(request.input ?? {});
     try {
-      live.replaceApproval(await decideApproval(apiVersion, organization.id, approval.id, decision, note));
-      setNote('');
-      notify({ key: 'decision-' + approval.id, tone: 'ok', title: decision === 'approve' ? 'Approved' : 'Declined', body: 'The worker continues with the current authority checks.' });
+      live.replaceApproval(await decideApproval(apiVersion, organization.id, approval.id, decision, note,
+        decision === 'approve' ? { ...(changed ? { input: draft } : {}), ...(alwaysAllow ? { alwaysAllow: true } : {}) } : {}));
+      setNote(''); setEditing(false);
+      notify({ key: 'decision-' + approval.id, tone: 'ok', title: decision === 'approve' ? (changed ? 'Approved with your changes' : 'Approved') : 'Declined',
+        body: alwaysAllow && decision === 'approve' ? `${approval.agentName} won't need to ask again for ${what}.` : 'The worker continues with the current authority checks.' });
     } catch (cause) {
       live.replaceApproval(approval);
       notify({ key: 'decision-' + approval.id, tone: 'danger', title: 'Decision not recorded', body: message(cause, 'Try again.') });
     } finally { setBusy(false); }
   }
-  const request = approval.request;
+  async function approveTask() {
+    setBusy(true);
+    try {
+      const result = await decideApprovals(apiVersion, organization.id, sameTask.map((item) => item.id), 'approve', note);
+      result.approvals.forEach((item) => live.replaceApproval(item));
+      notify({ key: 'decision-task-' + approval.runId, tone: result.failed.length ? 'warn' : 'ok', title: `Approved ${result.approvals.length} of ${sameTask.length}`,
+        body: result.failed.length ? result.failed.map((item) => item.reason).join(' ') : 'The worker continues with the current authority checks.' });
+    } catch (cause) {
+      notify({ key: 'decision-task-' + approval.runId, tone: 'danger', title: 'Decisions not recorded', body: message(cause, 'Try again.') });
+    } finally { setBusy(false); }
+  }
   return <article className='ws-detail'>
     <header className='ws-detail-head'>
       <Avatar name={approval.agentName} seed={approval.agentId} size={40} />
-      <div><p className='ws-eyebrow'>{approval.agentName} wants to</p><h2>{request.action || request.scope} on {request.resourceName}</h2><p className='ws-muted'>Requested <Ago value={approval.requestedAt} /></p></div>
+      <div><p className='ws-eyebrow'>{approval.agentName} wants to</p><h2>{what}</h2><p className='ws-muted'>Requested <Ago value={approval.requestedAt} />{approval.status === 'pending' && approval.expiresAt && <> · cancelled if nobody decides by {new Date(approval.expiresAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</>}{approval.notification.state === 'sent' && <> · reminder sent</>}{approval.edited && <> · edited before approval</>}</p></div>
     </header>
     <p className='ws-detail-why'>{approvalExplanation(approval)}</p>
+    <ActionPreview input={request.input ?? {}} schema={approval.inputSchema} editing={editing} draft={draft} onDraft={setDraft} />
     <Facts items={[['Target', request.target || '—'], ['Tool', request.providerOperation || request.integrationId], ['Risk', <State key='risk' value={request.risk} />], ['Policy', approval.policy.winningPolicy?.name ?? 'No matching rule']]} />
     {approval.status === 'pending' ? canReview ? <div className='ws-decision-box'>
+      {canEdit && <label className='ws-check'><input type='checkbox' checked={editing} onChange={(event) => { setEditing(event.target.checked); setDraft(request.input ?? {}); }} /><span>Edit before approving <small>— your edited version is what runs, and the change is recorded</small></span></label>}
+      {canAllowAlways && <label className='ws-check'><input type='checkbox' checked={alwaysAllow} onChange={(event) => setAlwaysAllow(event.target.checked)} /><span>Always allow {approval.agentName} to {what} without asking <small>— adds a policy only for this worker, this resource and this kind of action; you can remove it in Policies</small></span></label>}
       <label className='ws-field'><span>Note for the record <small>(optional)</small></span><textarea rows={2} value={note} onChange={(event) => setNote(event.target.value)} placeholder='Why you’re approving or declining' /></label>
-      <div className='ws-decision-actions'><span className='ws-muted'>Approval re-checks the worker’s identity, scope and current policy before anything runs.</span><button type='button' className='ws-button' disabled={busy} onClick={() => void decide('reject')}>Decline</button><button type='button' className='ws-button ws-button-primary' disabled={busy} onClick={() => void decide('approve')}>Approve</button></div>
+      <div className='ws-decision-actions'><span className='ws-muted'>Approval re-checks the worker’s identity, scope and current policy before anything runs.</span>
+        {sameTask.length > 1 && !editing && !alwaysAllow && <button type='button' className='ws-button' disabled={busy} onClick={() => void approveTask()}>Approve all {sameTask.length} for this task</button>}
+        <button type='button' className='ws-button' disabled={busy} onClick={() => void decide('reject')}>Decline</button><button type='button' className='ws-button ws-button-primary' disabled={busy} onClick={() => void decide('approve')}>{alwaysAllow ? 'Approve and always allow' : editing ? 'Approve with changes' : 'Approve'}</button></div>
     </div> : <p className='ws-muted'>Your role can see this request but not decide it.</p>
-      : <div className='ws-outcome'><State value={approval.status} /><span>{approval.decision ? <>by {approval.decision.decidedBy} · <Ago value={approval.decision.decidedAt} />{approval.decision.note && <> — “{approval.decision.note}”</>}</> : 'Decision recorded'}</span>{approval.execution.state !== 'not_started' && <span className='ws-muted'>Then: {humanize(approval.execution.state)}{approval.execution.summary ? ` · ${approval.execution.summary}` : ''}</span>}</div>}
+      : <div className='ws-outcome'><State value={approval.status} /><span>{approval.status === 'expired' ? 'Nobody decided in time, so the action was cancelled and nothing was performed.' : approval.decision ? <>by {approval.decision.decidedBy} · <Ago value={approval.decision.decidedAt} />{approval.decision.note && <> — “{approval.decision.note}”</>}</> : 'Decision recorded'}</span>{approval.execution.state !== 'not_started' && <span className='ws-muted'>Then: {humanize(approval.execution.state)}{approval.execution.summary ? ` · ${approval.execution.summary}` : ''}</span>}</div>}
     <details className='ws-technical'><summary>Technical detail</summary>
       <Facts items={[['Scope', <code key='s'>{request.scope}</code>], ['Resource', <code key='r'>{request.resourceId}</code>], ['Outcome', approval.policy.outcome], ['Reason', approval.policy.reason || '—'], ['Matched rules', approval.policy.matchedPolicies.map((rule) => `${rule.name} (P${rule.priority})`).join(', ') || '—'], ['Approval ID', <code key='id'>{approval.id}</code>], ['Action ID', <code key='a'>{approval.actionId}</code>]]} />
       {Object.keys(request.input ?? {}).length > 0 && <pre className='ws-code'>{JSON.stringify(request.input, null, 2)}</pre>}

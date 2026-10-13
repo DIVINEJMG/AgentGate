@@ -202,7 +202,11 @@ class GitHubHTTPClient:
                                 code=code,
                                 retryable=retryable,
                                 retry_after_seconds=delay,
-                                safe_message=f"GitHub request stopped: {code.replace('_', ' ')}.",
+                                safe_message=(
+                                    "GitHub is limiting requests right now."
+                                    if code == "rate_limited"
+                                    else f"GitHub request stopped: {code.replace('_', ' ')}."
+                                ),
                             )
                         await coordinator.cache_delete(key + ":failures")
                         decoded = {} if not raw or binary else json.loads(raw)

@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, desc, select
+from sqlalchemy import and_, delete, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_dependencies import organization_principal
@@ -37,6 +37,7 @@ from app.runtime.qstash_trigger import (
     get_runtime_dispatch_health,
     request_runtime_execution,
 )
+from app.runtime.schedule_wake import arm_schedule
 
 v1_router = APIRouter(tags=["jobs", "scheduler"])
 v2_router = APIRouter(tags=["jobs", "scheduler"])
@@ -224,27 +225,65 @@ def _next_worker_open(worker: Worker, when: datetime) -> datetime:
     return when
 
 
+def _schedule_due(config: dict[str, Any], job_updated_at: datetime) -> datetime | None:
+    """When the job's schedule is next due, or None when it has no enabled schedule."""
+    raw_schedule = config.get("schedule")
+    schedule = dict(raw_schedule) if isinstance(raw_schedule, dict) else {}
+    if not bool(schedule.get("enabled")):
+        return None
+    due = _parse_timestamp(schedule.get("nextDueAt"))
+    if due is None:
+        anchor_time = (
+            _parse_timestamp(config.get("updatedAt"))
+            or _parse_timestamp(config.get("createdAt"))
+            or job_updated_at
+        )
+        due = _next_schedule_occurrence(schedule, anchor_time)
+    return due
+
+
 async def queue_due_schedules(
     session: AsyncSession,
     *,
     now: datetime,
     limit: int = 50,
+    job_id: UUID | None = None,
 ) -> int:
-    jobs = list(
-        (
-            await session.scalars(
-                select(Job)
-                .where(Job.status == "active")
-                .order_by(Job.updated_at, Job.id)
-                .limit(max(limit * 4, 50))
-            )
-        ).all()
+    """Queue every due scheduled run (or only `job_id`'s), earliest first, and arm each job's
+    next on-time wake-up.
+
+    One query reads only the schedule settings of active jobs. Each due job is then locked and
+    re-read, so the sweep and an on-time wake-up never queue the same run twice.
+    """
+    query = (
+        select(Job.id, Job.updated_at, JobRevision.definition["triggerConfig"])
+        .join(JobRevision, and_(JobRevision.job_id == Job.id, JobRevision.revision == Job.current_revision))
+        .where(Job.status == "active")
     )
+    if job_id is not None:
+        query = query.where(Job.id == job_id)
+    candidates: list[tuple[datetime, UUID]] = []
+    for candidate_id, updated_at, raw_config in (await session.execute(query)).all():
+        due = _schedule_due(raw_config if isinstance(raw_config, dict) else {}, updated_at)
+        if due is not None and due <= now:
+            candidates.append((due, candidate_id))
+    candidates.sort()
+
     queued = 0
-    for job in jobs:
+    for _, candidate_id in candidates:
         if queued >= limit:
             break
-        revision = await current_revision(session, job)
+        job = await session.scalar(
+            select(Job).where(Job.id == candidate_id, Job.status == "active")
+            .with_for_update().execution_options(populate_existing=True)
+        )
+        revision = await session.scalar(
+            select(JobRevision).where(JobRevision.job_id == candidate_id, JobRevision.revision == job.current_revision)
+            .execution_options(populate_existing=True)
+        ) if job is not None else None
+        if job is None or revision is None:
+            await session.commit()
+            continue
         definition = (
             dict(revision.definition)
             if isinstance(revision.definition, dict)
@@ -254,18 +293,10 @@ async def queue_due_schedules(
         config = dict(raw_config) if isinstance(raw_config, dict) else {}
         raw_schedule = config.get("schedule")
         schedule = dict(raw_schedule) if isinstance(raw_schedule, dict) else {}
-        if not bool(schedule.get("enabled")):
-            continue
-
-        due = _parse_timestamp(schedule.get("nextDueAt"))
-        if due is None:
-            anchor_time = (
-                _parse_timestamp(config.get("updatedAt"))
-                or _parse_timestamp(config.get("createdAt"))
-                or job.updated_at
-            )
-            due = _next_schedule_occurrence(schedule, anchor_time)
-        if due > now:
+        due = _schedule_due(config, job.updated_at)
+        if due is None or due > now:
+            # Another sweep or wake-up queued it while this one waited for the lock.
+            await session.commit()
             continue
 
         next_due = _next_schedule_occurrence(schedule, due)
@@ -273,11 +304,16 @@ async def queue_due_schedules(
             while next_due <= now:
                 next_due = _next_schedule_occurrence(schedule, next_due)
             schedule["nextDueAt"] = next_due.isoformat()
+            schedule["lastSkipped"] = {"dueAt": due.isoformat(), "at": now.isoformat(), "reason": "missed_run_skipped"}
             config["schedule"] = schedule
             definition["triggerConfig"] = config
             revision.definition = definition
             await session.commit()
+            await arm_schedule(organization_id=job.organization_id, job_id=job.id, due=next_due, now=now)
             continue
+        # "Queue once": one run covers everything missed, then the schedule resumes from now.
+        while next_due <= now:
+            next_due = _next_schedule_occurrence(schedule, next_due)
 
         worker = await session.get(Worker, job.worker_id)
         scheduled_for = due
@@ -289,6 +325,7 @@ async def queue_due_schedules(
             scheduled_for = _next_worker_open(worker, due)
 
         schedule["nextDueAt"] = next_due.isoformat()
+        schedule["lastQueued"] = {"dueAt": due.isoformat(), "startsAt": scheduled_for.isoformat(), "at": now.isoformat()}
         config["schedule"] = schedule
         definition["triggerConfig"] = config
         revision.definition = definition
@@ -314,6 +351,7 @@ async def queue_due_schedules(
             trigger=trigger,
             scheduled_at=scheduled_for,
         )
+        await arm_schedule(organization_id=job.organization_id, job_id=job.id, due=next_due, now=now)
         queued += 1
     return queued
 
@@ -906,6 +944,9 @@ async def save_trigger_config(
     )
     job.updated_at = now
     await session.commit()
+    if next_due is not None and job.status == "active":
+        await arm_schedule(organization_id=organization_id, job_id=job.id,
+                           due=datetime.fromisoformat(next_due), now=now)
     return config
 
 
@@ -1612,6 +1653,17 @@ def _standing_scopes_from_managed_allow_revision(
     return {scope for scope in recorded_scopes if isinstance(scope, str)}
 
 
+def irreversible(capability: Any) -> bool:
+    """An action that cannot be undone: a side effect at high or critical risk."""
+    return bool(capability.side_effect) and capability.risk in {"high", "critical"}
+
+
+def needs_explicit_request(capability: Any) -> bool:
+    """Runs without approval only when the request asked for it: actions that cannot be undone, and
+    writes other people can see (a comment, issue, message or email)."""
+    return irreversible(capability) or (bool(capability.side_effect) and getattr(capability, "mode", "") == "write")
+
+
 async def _provision_managed_job_authority(
     session: AsyncSession,
     organization_id: UUID,
@@ -1620,7 +1672,11 @@ async def _provision_managed_job_authority(
     scopes: list[str],
     *,
     standing_approval: bool = False,
+    explicit_irreversible: set[str] | None = None,
 ) -> None:
+    """Allow the job's capabilities, with approval where they are risky. With
+    `explicit_irreversible` (worker creation), standing permission no longer covers actions that
+    cannot be undone unless the request explicitly asked for them (owner decision, phase 5)."""
     profile = worker.profile if isinstance(worker.profile, dict) else {}
     if profile.get("agentIdentityProvisioning") != "automatic":
         return
@@ -1768,6 +1824,9 @@ async def _provision_managed_job_authority(
             None,
         )
         explicitly_granted_now = standing_approval and scope in requested
+        if (explicit_irreversible is not None and capability is not None and needs_explicit_request(capability)
+                and scope not in explicit_irreversible):
+            explicitly_granted_now = False
         has_standing_grant = explicitly_granted_now or scope in prior_standing_scopes
         if capability is not None and (
             (has_standing_grant and capability.risk != "critical")

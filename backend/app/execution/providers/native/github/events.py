@@ -23,6 +23,25 @@ ALLOWED_EVENTS = {
 }
 
 
+# Events a task can be triggered by, as "event.action" (or "event" for any action), with the
+# plain words used when telling the person what the worker will react to.
+EVENT_TRIGGERS = {
+    "issues.opened": "a new issue is opened",
+    "issues.closed": "an issue is closed",
+    "issues.reopened": "an issue is reopened",
+    "issues.labeled": "an issue is labelled",
+    "issue_comment.created": "someone comments on an issue or pull request",
+    "pull_request.opened": "a pull request is opened",
+    "pull_request.closed": "a pull request is closed or merged",
+    "pull_request.ready_for_review": "a pull request is ready for review",
+    "pull_request_review.submitted": "a pull request review is submitted",
+    "push": "commits are pushed",
+    "release.published": "a release is published",
+    "workflow_run.completed": "a workflow run finishes",
+    "check_run.completed": "a check run finishes",
+}
+
+
 def verify_event(*, headers: dict, body: bytes) -> VerifiedEvent:
     if not settings.github_events_enabled or not settings.github_webhook_secret:
         raise PermissionError("GitHub event intake is disabled or unconfigured.")

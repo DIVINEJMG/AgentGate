@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
+from app.infrastructure.database.usage_records import metered_endpoint
 from app.infrastructure.qstash.verifier import QStashSignatureVerifier
 from app.runtime.outbox_publisher import drain_outbox_batch
-from app.runtime.outbox_trigger import request_outbox_drain
+from app.runtime.outbox_trigger import drain_started, request_outbox_drain
 
 router = APIRouter(prefix="/internal/v1/outbox", tags=["internal-outbox"])
 
@@ -29,6 +30,7 @@ def _verify_qstash(request: Request, body: bytes, signature: str | None) -> None
 
 
 @router.post("/drain")
+@metered_endpoint("outbox.drain")
 async def drain(
     request: Request,
     upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),
@@ -36,6 +38,7 @@ async def drain(
     body = await request.body()
     _verify_qstash(request, body, upstash_signature)
 
+    await drain_started()
     limit = 100
     published = await drain_outbox_batch(limit=limit)
 

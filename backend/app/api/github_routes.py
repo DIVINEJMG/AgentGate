@@ -393,8 +393,9 @@ async def callback(code: str, state: str, session: Session):
     await session.commit()
     # The redirect contains a non-secret session identity. The authenticated owner
     # must finish it; neither this identity nor a webhook confers account access.
+    # "#/app" opens the workspace (which continues the setup); "/" alone is the public site.
     return RedirectResponse(
-        settings.github_frontend_url.rstrip("/") + "/?" + urlencode({"github_setup": str(row.id)}),
+        settings.github_frontend_url.rstrip("/") + "/?" + urlencode({"github_setup": str(row.id)}) + "#/app",
         status_code=303,
     )
 
