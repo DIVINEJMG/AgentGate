@@ -49,8 +49,14 @@ def retry_after_seconds(value: str | None) -> float | None:
             return None
 
 
-_RATE_LIMIT_REASONS = ("ratelimitexceeded", "userratelimitexceeded", "quotaexceeded",
-                       "dailylimitexceeded", "resource_exhausted", "ratelimited")
+_RATE_LIMIT_REASONS = (
+    "ratelimitexceeded",
+    "userratelimitexceeded",
+    "quotaexceeded",
+    "dailylimitexceeded",
+    "resource_exhausted",
+    "ratelimited",
+)
 
 
 def _rate_limit_reason(body: str) -> bool:
@@ -140,7 +146,8 @@ class ProviderHTTPClient:
                 code="rate_limited",
                 retryable=True,
                 safe_message=f"{provider} is limiting requests right now.",
-                retry_after_seconds=retry_after_seconds(response.headers.get("Retry-After")) or 60.0,
+                retry_after_seconds=retry_after_seconds(response.headers.get("Retry-After"))
+                or 60.0,
                 internal_details=response.text[:500],
             )
         if response.status_code == 403:
@@ -162,7 +169,8 @@ class ProviderHTTPClient:
                 code="rate_limited",
                 retryable=True,
                 safe_message=f"{provider} is limiting requests right now.",
-                retry_after_seconds=retry_after_seconds(response.headers.get("Retry-After")) or 60.0,
+                retry_after_seconds=retry_after_seconds(response.headers.get("Retry-After"))
+                or 60.0,
                 internal_details=response.text[:500],
             )
         if response.status_code in {408, 425, 500, 502, 503, 504}:

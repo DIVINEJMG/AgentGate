@@ -56,8 +56,10 @@ async def run_helper(runtime, row, *args: str) -> dict:
         row.evidence = {**row.evidence, "helper": marker, "gitBaseline": initial["baseline"]}
         if args == ("init",):
             return initial
-    result = await runtime.run(row.sandbox_id, " ".join(
-        ["python3", HELPER_FILE, "/workspace", *(shlex.quote(arg) for arg in args)]))
+    result = await runtime.run(
+        row.sandbox_id,
+        " ".join(["python3", HELPER_FILE, "/workspace", *(shlex.quote(arg) for arg in args)]),
+    )
     try:
         data = json.loads(getattr(result, "stdout", "") or "{}")
     except ValueError as error:
@@ -82,8 +84,13 @@ async def save_file_checkpoint(runtime, row, request, result: dict) -> None:
             continue
         content = await runtime.read(row.sandbox_id, "/workspace/" + path)
         raw = content.encode("utf-8") if isinstance(content, str) else bytes(content)
-        files[path] = (await store_task_artifact(request, raw, "application/octet-stream"))["artifactId"]
-    entries = [*row.evidence.get("fileCheckpoints", []), {"commit": result["checkpoint"], "files": files}]
+        files[path] = (await store_task_artifact(request, raw, "application/octet-stream"))[
+            "artifactId"
+        ]
+    entries = [
+        *row.evidence.get("fileCheckpoints", []),
+        {"commit": result["checkpoint"], "files": files},
+    ]
     row.evidence = {**row.evidence, "fileCheckpoints": entries}
 
 
@@ -93,7 +100,9 @@ def rollback_target(evidence: dict, request_input: dict) -> tuple[str, list[dict
     baseline = str(evidence.get("gitBaseline") or "")
     wanted = str(request_input.get("checkpoint") or "")
     if wanted:
-        index = next((i for i, entry in enumerate(entries) if str(entry["commit"]).startswith(wanted)), None)
+        index = next(
+            (i for i, entry in enumerate(entries) if str(entry["commit"]).startswith(wanted)), None
+        )
         if index is None:
             if baseline.startswith(wanted):
                 return baseline, []
@@ -175,8 +184,10 @@ async def admit_capacity(session, request):
             CodingSession.organization_id == request.organization_id,
         )
     )
-    free = min(settings.coding_global_concurrency - global_count,
-               settings.coding_organization_concurrency - org_count)
+    free = min(
+        settings.coding_global_concurrency - global_count,
+        settings.coding_organization_concurrency - org_count,
+    )
     queue, member = f"coding:{request.organization_id}", str(request.work_item_id)
     coordinator = RedisCoordinator.from_settings()
     try:
@@ -195,8 +206,11 @@ async def admit_capacity(session, request):
             pass
     raise coding_error(
         request,
-        ("Waiting for a coding workspace: " + (f"{ahead} task{'s' if ahead != 1 else ''} ahead" if ahead
-                                              else "this task is next") + ". GitHub API actions remain available."),
+        (
+            "Waiting for a coding workspace: "
+            + (f"{ahead} task{'s' if ahead != 1 else ''} ahead" if ahead else "this task is next")
+            + ". GitHub API actions remain available."
+        ),
         "queued",
     )
 
@@ -571,16 +585,39 @@ async def execute_coding_action(provider, request, configuration, credential, ru
                 _stage.set("workspace_path_check")
                 path = safe_path(request.input["path"])
                 await assert_workspace_path(runtime, row.sandbox_id, path)
-                mode = request.input.get("mode") or ("replace" if request.input.get("replacements") else "write")
+                mode = request.input.get("mode") or (
+                    "replace" if request.input.get("replacements") else "write"
+                )
                 written = request.input.get("content") or "".join(
-                    str(pair.get("replace") or "") for pair in request.input.get("replacements") or [])
-                validate_changes([{"path": path, **({"delete": True} if mode == "delete" else {"content": written})}],
-                                 configuration.get("constraints", {}))
+                    str(pair.get("replace") or "")
+                    for pair in request.input.get("replacements") or []
+                )
+                validate_changes(
+                    [
+                        {
+                            "path": path,
+                            **({"delete": True} if mode == "delete" else {"content": written}),
+                        }
+                    ],
+                    configuration.get("constraints", {}),
+                )
                 await checkpoint()
                 _stage.set("workspace_edit")
-                await runtime.write(row.sandbox_id, "/tmp/audoryn-step.json", json.dumps(
-                    {**{key: request.input[key] for key in ("content", "offset", "replacements") if key in request.input},
-                     "path": path, "mode": mode}))
+                await runtime.write(
+                    row.sandbox_id,
+                    "/tmp/audoryn-step.json",
+                    json.dumps(
+                        {
+                            **{
+                                key: request.input[key]
+                                for key in ("content", "offset", "replacements")
+                                if key in request.input
+                            },
+                            "path": path,
+                            "mode": mode,
+                        }
+                    ),
+                )
                 output = await run_helper(runtime, row, "edit", "/tmp/audoryn-step.json")
                 _stage.set("workspace_checkpoint")
                 await save_file_checkpoint(runtime, row, request, output)
@@ -694,8 +731,13 @@ async def execute_coding_action(provider, request, configuration, credential, ru
         _stage.reset(stage_token)
     if lost:
         await rebuild_workspace(provider, request, configuration, credential, runtime)
-        raise coding_error(request, "The workspace sandbox was lost and has been rebuilt with every saved "
-                           "change; this step will run again.", "temporary_provider_error", True)
+        raise coding_error(
+            request,
+            "The workspace sandbox was lost and has been rebuilt with every saved "
+            "change; this step will run again.",
+            "temporary_provider_error",
+            True,
+        )
     raise RuntimeError("Coding action ended without a result.")
 
 
@@ -707,29 +749,52 @@ async def rebuild_workspace(provider, request, configuration, credential, runtim
     from .initialization import initialize
 
     async with session_factory() as session:
-        row = await session.scalar(select(CodingSession).where(
-            CodingSession.organization_id == request.organization_id,
-            CodingSession.work_item_id == request.work_item_id,
-            CodingSession.resource_id == UUID(request.resource.id)).with_for_update())
+        row = await session.scalar(
+            select(CodingSession)
+            .where(
+                CodingSession.organization_id == request.organization_id,
+                CodingSession.work_item_id == request.work_item_id,
+                CodingSession.resource_id == UUID(request.resource.id),
+            )
+            .with_for_update()
+        )
         if row is None:
             raise ValueError("Open an available pinned coding workspace first.")
         now = datetime.now(UTC)
         init = dict(row.evidence.get("initialization") or {})
-        row.evidence = {key: value for key, value in row.evidence.items() if key not in {"helper", "gitBaseline"}}
-        row.evidence = {**row.evidence, "lostSandboxes": [*row.evidence.get("lostSandboxes", []), row.sandbox_id],
-                        "initialization": {**init, "stage": "sandbox_creation", "confirmedBundles": [],
-                                           "createRequested": False, "legacy": False,
-                                           "deadline": (now + timedelta(seconds=settings.coding_initialization_seconds)).isoformat(),
-                                           "stageStartedAt": now.isoformat()}}
+        row.evidence = {
+            key: value
+            for key, value in row.evidence.items()
+            if key not in {"helper", "gitBaseline"}
+        }
+        row.evidence = {
+            **row.evidence,
+            "lostSandboxes": [*row.evidence.get("lostSandboxes", []), row.sandbox_id],
+            "initialization": {
+                **init,
+                "stage": "sandbox_creation",
+                "confirmedBundles": [],
+                "createRequested": False,
+                "legacy": False,
+                "deadline": (
+                    now + timedelta(seconds=settings.coding_initialization_seconds)
+                ).isoformat(),
+                "stageStartedAt": now.isoformat(),
+            },
+        }
         row.sandbox_id, row.status = None, "creating"
         expires = row.expires_at if row.expires_at.tzinfo else row.expires_at.replace(tzinfo=UTC)
         row.expires_at = max(expires, now + timedelta(seconds=settings.coding_retention_seconds))
         row.active_since = now
         await session.commit()
     logger.warning("Coding workspace rebuilt work_item=%s session=%s", request.work_item_id, row.id)
-    await initialize(provider, replace(request, input={"sha": row.base_sha}), configuration, credential, runtime)
+    await initialize(
+        provider, replace(request, input={"sha": row.base_sha}), configuration, credential, runtime
+    )
     async with session_factory() as session:
-        row = await session.scalar(select(CodingSession).where(CodingSession.id == row.id).with_for_update())
+        row = await session.scalar(
+            select(CodingSession).where(CodingSession.id == row.id).with_for_update()
+        )
         assert row is not None
         latest: dict[str, str | None] = {}
         for entry in row.evidence.get("fileCheckpoints", []):
@@ -739,10 +804,16 @@ async def rebuild_workspace(provider, request, configuration, credential, runtim
             if artifact_id is None:
                 await runtime.run(row.sandbox_id, "rm -f -- " + shlex.quote("/workspace/" + path))
             else:
-                await runtime.write(row.sandbox_id, "/workspace/" + path, await load_artifact(artifact_id, request))
+                await runtime.write(
+                    row.sandbox_id, "/workspace/" + path, await load_artifact(artifact_id, request)
+                )
         restored = await run_helper(runtime, row, "commit", "restored saved changes")
-        row.evidence = {**row.evidence, "fileCheckpoints": [{"commit": restored["checkpoint"], "files": latest}]
-                        if latest else []}
+        row.evidence = {
+            **row.evidence,
+            "fileCheckpoints": [{"commit": restored["checkpoint"], "files": latest}]
+            if latest
+            else [],
+        }
         await session.commit()
 
 

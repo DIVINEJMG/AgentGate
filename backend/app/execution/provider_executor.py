@@ -712,7 +712,12 @@ def describe_output(output: object) -> str | None:
         lists = [value for value in output.values() if isinstance(value, list)]
         if len(lists) != 1:
             # One object (an issue, a file, a pull request): name it.
-            name = output.get("title") or output.get("name") or output.get("path") or output.get("full_name")
+            name = (
+                output.get("title")
+                or output.get("name")
+                or output.get("path")
+                or output.get("full_name")
+            )
             if name is None:
                 return None
             number = output.get("number")
@@ -727,9 +732,16 @@ def describe_output(output: object) -> str | None:
         if not isinstance(row, dict):
             continue
         number = row.get("number")
-        name = row.get("title") or row.get("name") or row.get("full_name") or row.get("path") or row.get("id")
+        name = (
+            row.get("title")
+            or row.get("name")
+            or row.get("full_name")
+            or row.get("path")
+            or row.get("id")
+        )
         if name is not None:
             names.append((f"#{number} " if number is not None else "") + str(name)[:60])
     count = f"Found {len(rows)} result{'s' if len(rows) != 1 else ''}"
-    return count + (": " + "; ".join(names) + ("; …" if len(rows) > 3 else "") if names else "") + "."
-
+    return (
+        count + (": " + "; ".join(names) + ("; …" if len(rows) > 3 else "") if names else "") + "."
+    )

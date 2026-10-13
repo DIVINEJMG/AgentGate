@@ -43,10 +43,20 @@ ACTIONS = (
             "mode": {"type": "string", "enum": ["replace", "write", "append", "delete"]},
             "content": BODY,
             "offset": {"type": "integer", "minimum": 0},
-            "replacements": {"type": "array", "minItems": 1, "maxItems": 20, "items": {
-                "type": "object", "additionalProperties": False, "required": ["find", "replace"],
-                "properties": {"find": {"type": "string", "minLength": 1, "maxLength": 10000},
-                               "replace": {"type": "string", "maxLength": 10000}}}},
+            "replacements": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 20,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["find", "replace"],
+                    "properties": {
+                        "find": {"type": "string", "minLength": 1, "maxLength": 10000},
+                        "replace": {"type": "string", "maxLength": 10000},
+                    },
+                },
+            },
         },
         required=("path",),
         prerequisites=("github.repository.workspace.rollback",),
@@ -66,8 +76,10 @@ ACTIONS = (
         "(undo everything), or to a checkpoint returned by an earlier edit. Nothing is published.",
         "contents:read",
         execution_semantics="workspace_mutation",
-        fields={"to": {"type": "string", "enum": ["previous", "baseline"]},
-                "checkpoint": {"type": "string", "pattern": "^[a-fA-F0-9]{7,40}$"}},
+        fields={
+            "to": {"type": "string", "enum": ["previous", "baseline"]},
+            "checkpoint": {"type": "string", "pattern": "^[a-fA-F0-9]{7,40}$"},
+        },
     ),
     action(
         "repository.workspace.diff",

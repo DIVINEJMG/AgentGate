@@ -8,6 +8,7 @@ separate, approved GitHub action. Each command prints one JSON object; errors ex
     python3 helper.py ROOT rollback COMMIT
     python3 helper.py ROOT commit LABEL           (after files were written from outside, e.g. a restore)
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -16,8 +17,17 @@ import os
 import subprocess
 import sys
 
-GENERATED = (".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", ".venv", "__pycache__", "*.pyc",
-             ".coverage", ".coverage.*")
+GENERATED = (
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "node_modules",
+    ".venv",
+    "__pycache__",
+    "*.pyc",
+    ".coverage",
+    ".coverage.*",
+)
 PREVIEW_CHARS = 1500
 
 
@@ -26,10 +36,26 @@ class StepError(Exception):
 
 
 def _git(root: str, *args: str, check: bool = True) -> str:
-    result = subprocess.run(["git", "-c", "user.email=workspace@audoryn.local", "-c", "user.name=Audoryn",
-                             "-c", "core.autocrlf=false", *args], cwd=root, capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=workspace@audoryn.local",
+            "-c",
+            "user.name=Audoryn",
+            "-c",
+            "core.autocrlf=false",
+            *args,
+        ],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if check and result.returncode != 0:
-        raise StepError("git " + args[0] + " failed: " + (result.stderr or result.stdout).strip()[:300])
+        raise StepError(
+            "git " + args[0] + " failed: " + (result.stderr or result.stdout).strip()[:300]
+        )
     return result.stdout
 
 
@@ -47,7 +73,10 @@ def init(root: str) -> dict:
 
 def _safe(root: str, path: str) -> str:
     full = os.path.realpath(os.path.join(root, path))
-    if os.path.commonpath([full, os.path.realpath(root)]) != os.path.realpath(root) or "/.git" in "/" + path:
+    if (
+        os.path.commonpath([full, os.path.realpath(root)]) != os.path.realpath(root)
+        or "/.git" in "/" + path
+    ):
         raise StepError("Path is outside the workspace.")
     return full
 
@@ -81,8 +110,12 @@ def _commit(root: str, label: str) -> tuple[str, list[dict]]:
 def _summary(root: str, changed: list[dict]) -> dict:
     stat = _git(root, "diff", "--shortstat", "HEAD~1", "HEAD", check=False).strip()
     preview = _git(root, "diff", "--unified=2", "HEAD~1", "HEAD", check=False)
-    return {"diffStat": stat, "preview": preview[:PREVIEW_CHARS], "previewTruncated": len(preview) > PREVIEW_CHARS,
-            "changed": changed}
+    return {
+        "diffStat": stat,
+        "preview": preview[:PREVIEW_CHARS],
+        "previewTruncated": len(preview) > PREVIEW_CHARS,
+        "changed": changed,
+    }
 
 
 def edit(root: str, request: dict) -> dict:
@@ -109,8 +142,10 @@ def edit(root: str, request: dict) -> dict:
         elif len(existing) == offset + len(content) and existing.endswith(content):
             already = True
         else:
-            raise StepError(f"{path} is {len(existing)} characters long, not {offset}; read it and append at its "
-                            "current length.")
+            raise StepError(
+                f"{path} is {len(existing)} characters long, not {offset}; read it and append at its "
+                "current length."
+            )
     elif mode == "replace":
         if current is None:
             raise StepError(f"{path} does not exist; create it with mode write.")
@@ -125,18 +160,26 @@ def edit(root: str, request: dict) -> dict:
             count = updated.count(find)
             # Already applied: the replacement is there and every match of the find text is inside it
             # (the find text may be part of its own replacement, e.g. "a + b" -> "a + b + 0").
-            if replace and replace in updated and count == updated.count(replace) * replace.count(find):
+            if (
+                replace
+                and replace in updated
+                and count == updated.count(replace) * replace.count(find)
+            ):
                 continue
             if count == 1:
                 updated, applied = updated.replace(find, replace), applied + 1
             elif count > 1:
-                raise StepError(f"The text to replace appears {count} times in {path}; include more surrounding "
-                                "lines so it matches once.")
+                raise StepError(
+                    f"The text to replace appears {count} times in {path}; include more surrounding "
+                    "lines so it matches once."
+                )
             elif not replace or replace in updated:
                 continue  # already applied (or text to remove is already gone)
             else:
-                raise StepError(f"The text to replace was not found in {path}: {find[:80]!r}. Read the file "
-                                "and copy the exact current text.")
+                raise StepError(
+                    f"The text to replace was not found in {path}: {find[:80]!r}. Read the file "
+                    "and copy the exact current text."
+                )
         already = applied == 0
         if not already:
             _write(full, updated)
@@ -148,23 +191,52 @@ def edit(root: str, request: dict) -> dict:
         raise StepError("Unknown edit mode; use write, append, replace or delete.")
     checkpoint, changed = _commit(root, f"edit {path}")
     final = _read(full)
-    result = {"path": path, "mode": mode, "alreadyApplied": already, "checkpoint": checkpoint,
-              "size": len(final) if final is not None else 0, "exists": final is not None,
-              "sha256": hashlib.sha256(final.encode()).hexdigest() if final is not None else None}
-    return {**result, **(_summary(root, changed) if changed else {"diffStat": "", "preview": "", "changed": []})}
+    result = {
+        "path": path,
+        "mode": mode,
+        "alreadyApplied": already,
+        "checkpoint": checkpoint,
+        "size": len(final) if final is not None else 0,
+        "exists": final is not None,
+        "sha256": hashlib.sha256(final.encode()).hexdigest() if final is not None else None,
+    }
+    return {
+        **result,
+        **(_summary(root, changed) if changed else {"diffStat": "", "preview": "", "changed": []}),
+    }
 
 
 def patch(root: str, patch_file: str) -> dict:
     init(root)
-    if subprocess.run(["git", "apply", "--check", patch_file], cwd=root, capture_output=True, check=False).returncode == 0:
+    if (
+        subprocess.run(
+            ["git", "apply", "--check", patch_file], cwd=root, capture_output=True, check=False
+        ).returncode
+        == 0
+    ):
         _git(root, "apply", patch_file)
         checkpoint, changed = _commit(root, "patch")
         return {"alreadyApplied": False, "checkpoint": checkpoint, **_summary(root, changed)}
-    if subprocess.run(["git", "apply", "-R", "--check", patch_file], cwd=root, capture_output=True, check=False).returncode == 0:
-        return {"alreadyApplied": True, "checkpoint": _git(root, "rev-parse", "HEAD").strip(), "changed": [],
-                "diffStat": "", "preview": ""}
-    raise StepError("The patch does not apply to the current files; read them and send a patch against their "
-                    "current content.")
+    if (
+        subprocess.run(
+            ["git", "apply", "-R", "--check", patch_file],
+            cwd=root,
+            capture_output=True,
+            check=False,
+        ).returncode
+        == 0
+    ):
+        return {
+            "alreadyApplied": True,
+            "checkpoint": _git(root, "rev-parse", "HEAD").strip(),
+            "changed": [],
+            "diffStat": "",
+            "preview": "",
+        }
+    raise StepError(
+        "The patch does not apply to the current files; read them and send a patch against their "
+        "current content."
+    )
 
 
 def rollback(root: str, commit: str) -> dict:

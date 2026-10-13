@@ -51,8 +51,13 @@ class ExpandedGitHubProvider(NativeProvider):
 
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                response = await client.get("https://api.github.com/app", headers={
-                    "Authorization": "Bearer " + app_jwt(), "Accept": "application/vnd.github+json"})
+                response = await client.get(
+                    "https://api.github.com/app",
+                    headers={
+                        "Authorization": "Bearer " + app_jwt(),
+                        "Accept": "application/vnd.github+json",
+                    },
+                )
             response.raise_for_status()
             return set(response.json().get("events") or [])
         except Exception:  # noqa: BLE001 - an unanswerable check never blocks setup

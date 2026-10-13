@@ -43,7 +43,10 @@ if "AI_PROVIDER_API_KEY" not in render:
 if "ai_gateway_from_settings" not in managed:
     errors.append("Managed Runtime planner is not wired through AIGateway")
 if ("background_tasks.add_task(_start_runtime_task" not in internal
-    or "asyncio.create_task(_execute_runtime_message" not in internal
+    # The background task may wrap the runtime message to meter its usage (improvement plan, phase 0).
+    or not ("asyncio.create_task(_execute_runtime_message" in internal
+            or ("asyncio.create_task(_metered_runtime_message" in internal
+                and "await _execute_runtime_message(" in internal))
     or "asyncio.timeout(planner_timeout_seconds)" not in managed
     or "planner_timeout_seconds = settings.runtime_planner_timeout_seconds" not in managed):
     errors.append("Runtime lacks quick delivery acknowledgement and independently bounded durable planning")

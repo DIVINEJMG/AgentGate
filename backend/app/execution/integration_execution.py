@@ -131,7 +131,9 @@ async def execute_native_action(
         ]:
             slot = await coordination.acquire_slot(key, limit=limit, ttl_seconds=lease_seconds)
             if slot is None:
-                raise wait(f"Other {label} actions are running, so this one is waiting for a free slot")
+                raise wait(
+                    f"Other {label} actions are running, so this one is waiting for a free slot"
+                )
             slots.append(slot)
         if not await coordination.reserve_limit(
             f"integration-org:{org}:{partition}",
@@ -151,7 +153,9 @@ async def execute_native_action(
                 ttl_seconds=lease_seconds,
             )
             if lease is None:
-                raise wait("Another action is changing this resource, so this one is waiting for it to finish")
+                raise wait(
+                    "Another action is changing this resource, so this one is waiting for it to finish"
+                )
         try:
             validate(request.input, request.capability.input_schema)
             if before_dispatch is not None:
@@ -197,10 +201,15 @@ async def execute_native_action(
                 ) from error
             return result
         except ExecutionProviderError as error:
-            if (error.error.code == "rate_limited" and error.error.retry_after_seconds
-                    and request.capability.target != "workspace"):
+            if (
+                error.error.code == "rate_limited"
+                and error.error.retry_after_seconds
+                and request.capability.target != "workspace"
+            ):
                 pause = min(float(error.error.retry_after_seconds), 86400.0)
-                await coordination.cache_set(cooldown_key, str(time.time() + pause), ttl_seconds=max(1, int(pause) + 1))
+                await coordination.cache_set(
+                    cooldown_key, str(time.time() + pause), ttl_seconds=max(1, int(pause) + 1)
+                )
             uncertain = request.capability.side_effect and error.error.code in {
                 "timeout",
                 "provider_unavailable",

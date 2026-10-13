@@ -550,7 +550,9 @@ async def disconnect_v2(
 
 # A read snapshot of the capability catalog for one tool preparation: the same pass otherwise
 # reads it three times (execution catalog, policy resource, capability profile).
-_CATALOG_SNAPSHOT: ContextVar[dict[Any, Any] | None] = ContextVar("audoryn_catalog_snapshot", default=None)
+_CATALOG_SNAPSHOT: ContextVar[dict[Any, Any] | None] = ContextVar(
+    "audoryn_catalog_snapshot", default=None
+)
 
 
 @contextmanager
@@ -573,7 +575,9 @@ async def _catalog(session: AsyncSession, organization_id: UUID) -> dict[str, An
     return catalog
 
 
-async def _read_catalog(session: AsyncSession, organization_id: UUID) -> tuple[dict[str, Any], list[Integration]]:
+async def _read_catalog(
+    session: AsyncSession, organization_id: UUID
+) -> tuple[dict[str, Any], list[Integration]]:
     integrations = list(
         (
             await session.scalars(
@@ -587,11 +591,21 @@ async def _read_catalog(session: AsyncSession, organization_id: UUID) -> tuple[d
     resources: list[dict[str, Any]] = []
     all_scopes: set[str] = set()
     registry = execution_provider_registry()
-    credentialed = set((await session.scalars(
-        select(IntegrationCredential.integration_id).where(
-            IntegrationCredential.integration_id.in_([integration.id for integration in integrations])
+    credentialed = (
+        set(
+            (
+                await session.scalars(
+                    select(IntegrationCredential.integration_id).where(
+                        IntegrationCredential.integration_id.in_(
+                            [integration.id for integration in integrations]
+                        )
+                    )
+                )
+            ).all()
         )
-    )).all()) if integrations else set()
+        if integrations
+        else set()
+    )
     for integration in integrations:
         try:
             provider = registry.get(integration.provider)

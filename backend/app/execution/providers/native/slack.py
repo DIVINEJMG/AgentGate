@@ -73,10 +73,15 @@ CAPABILITIES = (
 )
 
 
-
 # Slack answers HTTP 200 with ok=false; these errors mean the account needs reconnecting or
 # Slack wants us to slow down, not that the request itself was wrong.
-_RECONNECT_ERRORS = {"invalid_auth", "not_authed", "token_expired", "token_revoked", "account_inactive"}
+_RECONNECT_ERRORS = {
+    "invalid_auth",
+    "not_authed",
+    "token_expired",
+    "token_revoked",
+    "account_inactive",
+}
 
 
 def _failure(payload: dict[str, object], default):
@@ -86,6 +91,7 @@ def _failure(payload: dict[str, object], default):
     if error == "ratelimited":
         return "rate_limited", True
     return default, False
+
 
 class SlackProvider(NativeProvider):
     manifest = ProviderManifest(

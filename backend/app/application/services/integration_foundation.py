@@ -69,6 +69,17 @@ def visible_write_scopes(provider_name: str, scopes) -> list[str]:
     return sorted(set(scopes) & writes)
 
 
+def available_event_triggers() -> dict[str, list[str]]:
+    """Per provider, the events a task can be set to react to (empty when event delivery is off)."""
+    events: dict[str, list[str]] = {}
+    for provider in execution_provider_registry().providers(kind="native_api"):
+        triggers = getattr(provider, "event_triggers", None)
+        enabled = getattr(provider, "events_enabled", None)
+        if triggers and callable(enabled) and enabled():
+            events[provider.manifest.provider] = sorted(triggers.values())
+    return events
+
+
 def provider_label(provider_name: str) -> str:
     try:
         return execution_provider_registry().get(provider_name).manifest.display_name

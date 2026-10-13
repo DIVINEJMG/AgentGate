@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -231,8 +231,8 @@ def test_the_new_queries_are_valid_postgresql() -> None:
         return original(statement, *args, **kwargs)
 
     db.session.execute = compiling  # type: ignore[method-assign]
-    run(_runs_public(session, seeded["runs"]))
-    run(_approvals_public(session, seeded["approvals"]))
+    run(_runs_public(cast(Any, session), seeded["runs"]))
+    run(_approvals_public(cast(Any, session), seeded["approvals"]))
     assert any("payload[" in statement for statement in compiled)
     assert any("definition[" in statement for statement in compiled)
 
@@ -249,5 +249,5 @@ def test_reference_helpers_match_the_live_single_record_paths() -> None:
     db = Database()
     seeded = seed(db, 2)
     session = AsyncAdapter(db.session)
-    assert run(_run_public(session, seeded["runs"][1])) == run(legacy_run_public(session, seeded["runs"][1]))
-    assert run(_approval_public(session, seeded["approvals"][1])) == run(legacy_approval_public(session, seeded["approvals"][1]))
+    assert run(_run_public(cast(Any, session), seeded["runs"][1])) == run(legacy_run_public(session, seeded["runs"][1]))
+    assert run(_approval_public(cast(Any, session), seeded["approvals"][1])) == run(legacy_approval_public(session, seeded["approvals"][1]))

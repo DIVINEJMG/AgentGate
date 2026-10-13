@@ -9,20 +9,9 @@ from app.application.services.conversation_semantics import (
     reply_facts,
     without_repeated_replies,
 )
+from app.application.services.integration_foundation import available_event_triggers
 from app.domain.ai.providers import AIGateway, AIInvocationContext
 from app.domain.conversation.intent import WorkerCommandIntent
-
-
-def available_event_triggers() -> dict[str, list[str]]:
-    """Per provider, the events a task can be set to react to (empty when event delivery is off)."""
-    from app.execution.bootstrap import execution_provider_registry
-    events: dict[str, list[str]] = {}
-    for provider in execution_provider_registry().providers(kind="native_api"):
-        triggers = getattr(provider, "event_triggers", None)
-        enabled = getattr(provider, "events_enabled", None)
-        if triggers and callable(enabled) and enabled():
-            events[provider.manifest.provider] = sorted(triggers.values())
-    return events
 
 
 class IntentInterpreter:
