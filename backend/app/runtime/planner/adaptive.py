@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass, field, replace
 from itertools import pairwise
 from typing import Literal
@@ -13,6 +14,8 @@ from app.bootstrap.settings import settings
 from app.domain.ai.providers import AIGateway, AIInvocationContext
 from app.execution.browser.policy import normalize_origin
 from app.runtime.evidence import planner_evidence
+
+logger = logging.getLogger("uvicorn.error")
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +66,12 @@ def normalize_plan(raw: object, *, scopes: set[str], first_position: int = 1) ->
                       "target": str(entry.get("target") or "").strip()[:500], "dependsOn": depends,
                       "check": str(entry.get("check") or "").strip()[:1000], "status": "pending"})
     return steps
+
+
+def rejection_reason(feedback: str) -> str:
+    """The first sentence of a rejection, bounded for the log."""
+    first = feedback.strip().split(". ")[0].split("\n")[0]
+    return first[:200]
 
 
 def current_plan_step(plan: list[dict[str, object]]) -> dict[str, object] | None:
@@ -584,6 +593,12 @@ class AdaptiveRuntimePlanner:
                         if planning else decision)
             except RuntimeError as exc:
                 validation_feedback = str(exc)
+                logger.warning(
+                    "Planner proposal rejected call=%s correlation=%s reason=%s",
+                    attempt + 1,
+                    getattr(invocation_context, "correlation_id", None),
+                    rejection_reason(validation_feedback),
+                )
                 if attempt == 1:
                     raw_input = parsed.get("input")
                     action_input = raw_input if isinstance(raw_input, dict) else {}
@@ -1188,6 +1203,10 @@ class AdaptiveRuntimePlanner:
         if decision.decision == "act":
             raw_step = raw.get("planStep")
             pending = {int(step["position"]) for step in active if step.get("status") == "pending"}  # type: ignore[call-overload]
+            current = current_plan_step(active) if raw_step is None else None
+            if current is not None:
+                # Left out: the action works on the current step (what the correction would accept).
+                raw_step = int(current["position"])  # type: ignore[call-overload]
             if not isinstance(raw_step, int) or isinstance(raw_step, bool) or raw_step not in pending:
                 raise RuntimeError("Set planStep to the number of the pending plan step this action works on. "
                                    f"Pending steps: {sorted(pending) or 'none'}.")

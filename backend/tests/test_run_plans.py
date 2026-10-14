@@ -66,8 +66,10 @@ def test_the_first_decision_writes_the_plan_and_names_its_step() -> None:
     attach = AdaptiveRuntimePlanner._with_plan
     with pytest.raises(RuntimeError, match="Write the plan first"):
         attach(ACT, {}, tools=TOOLS, plan=[], plan_revisions_left=3)
+    # A missing step number means the current step; a wrong one is sent back.
+    assert attach(ACT, {"plan": [step("Read a")]}, tools=TOOLS, plan=[], plan_revisions_left=3).plan_step == 1
     with pytest.raises(RuntimeError, match="Set planStep"):
-        attach(ACT, {"plan": [step("Read a")]}, tools=TOOLS, plan=[], plan_revisions_left=3)
+        attach(ACT, {"plan": [step("Read a")], "planStep": 5}, tools=TOOLS, plan=[], plan_revisions_left=3)
     decision = attach(ACT, {"plan": [step("Read a"), step("Write b", "bench.record.write")], "planStep": 1,
                             "planStepDone": True}, tools=TOOLS, plan=[], plan_revisions_left=3)
     assert len(decision.plan) == 2 and decision.plan_step == 1 and decision.plan_step_done

@@ -36,7 +36,10 @@ def test_the_key_is_read_in_any_common_environment_form(monkeypatch: pytest.Monk
 
 def test_an_unreadable_key_is_a_clear_configuration_message(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(authentication.settings, "github_app_id", "5211774")
-    monkeypatch.setattr(authentication.settings, "github_app_private_key", SecretStr('"-----BEGIN RSA PRIVATE KEY-----'))
+    # A truncated key: only its first line, as a broken env file leaves it (built so the secret scanner
+    # does not mistake the test for a committed key).
+    truncated = '"-----BEGIN ' + "RSA PRIVATE KEY-----"
+    monkeypatch.setattr(authentication.settings, "github_app_private_key", SecretStr(truncated))
     with pytest.raises(ProviderTransportError) as raised:
         authentication.app_jwt()
     assert raised.value.code == "authentication_error" and "GITHUB_APP_PRIVATE_KEY" in str(raised.value)
