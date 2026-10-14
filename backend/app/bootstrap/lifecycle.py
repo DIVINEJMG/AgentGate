@@ -29,9 +29,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     if settings.delivery_watchdog_seconds:
         from app.runtime.delivery_watchdog import delivery_watchdog_loop
         watchdog = asyncio.create_task(delivery_watchdog_loop())
+    from app.runtime import outbox_trigger
+    outbox_trigger.serving = True
     try:
         yield
     finally:
+        outbox_trigger.serving = False
         if watchdog:
             watchdog.cancel()
             await asyncio.gather(watchdog, return_exceptions=True)

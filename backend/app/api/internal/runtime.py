@@ -172,6 +172,7 @@ class DispatchPayload(BaseModel):
 
 
 @router.post("/heartbeat")
+@metered_endpoint("runtime.heartbeat")
 async def heartbeat(
     request: Request,
     upstash_signature: str | None = Header(default=None, alias="Upstash-Signature"),

@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     # One outbox drain request at a time: while one is on its way, later commits rely on it
     # instead of sending their own. This bounds how long a lost request can hold others back.
     outbox_drain_coalesce_seconds: int = Field(default=60, ge=5, le=900)
+    # A long-running server drains its own outbox after a commit instead of asking QStash to
+    # call it back (one QStash message per drain). The scheduled drain stays the backstop.
+    outbox_drain_local: bool = True
     worker_heartbeat_ttl_seconds: int = 60
     auth_session_ttl_seconds: int = 60 * 60 * 24 * 7
     auth_login_failure_window_seconds: int = 60 * 15

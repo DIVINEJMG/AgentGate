@@ -50,6 +50,21 @@ async def recover_lost_deliveries() -> bool:
     return stuck_outbox is not None or open_work is not None
 
 
+async def _measured_check() -> bool:
+    """One check, metered like the scheduled sweep, so wake-ups it re-sends are counted."""
+    from app.infrastructure.database.usage_records import record_usage
+    from app.observability.usage import Usage, metered
+
+    usage, outcome = Usage(), "error"
+    try:
+        with metered(usage):
+            still_open = await recover_lost_deliveries()
+        outcome = "ok"
+        return still_open
+    finally:
+        await record_usage(usage, kind="runtime.watchdog", organization_id=None, outcome=outcome)
+
+
 async def delivery_watchdog_loop() -> None:
     wake = outbox_trigger.watchdog_wake = asyncio.Event()
     wake.set()  # one check after start-up: deliveries may have been lost while it was down
@@ -61,7 +76,7 @@ async def delivery_watchdog_loop() -> None:
             wake.clear()  # activity during the wait arms the next check
             await asyncio.sleep(delay)
             try:
-                still_open = await recover_lost_deliveries()
+                still_open = await _measured_check()
             except asyncio.CancelledError:
                 raise
             except Exception:
