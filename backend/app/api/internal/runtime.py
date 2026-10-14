@@ -975,6 +975,11 @@ async def sweep(
 ) -> dict[str, object]:
     raw = await request.body()
     _verify_qstash(request, raw, upstash_signature)
+    return await run_sweep()
+
+
+async def run_sweep() -> dict[str, object]:
+    """Recovers due work: the scheduled sweep, and the backend's own delivery watchdog."""
     # Housekeeping that used to run on every outbox drain.
     from app.runtime.outbox_publisher import run_periodic_maintenance
     await run_periodic_maintenance()

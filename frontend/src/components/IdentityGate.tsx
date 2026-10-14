@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from 'lucide-react';
-import { auth, type AuthCredentials, type AuthUser } from '../platform/client';
-import type { ApiVersion } from '../lib/systemApi';
+import { auth, type AuthCredentials } from '../platform/client';
 import type { OrganizationAccess } from '../lib/identityApi';
-
-function Brand(){return <div className='identity-wordmark'><strong>Audoryn</strong><span>An SOT Product</span></div>}
 
 export function SignInGate({onAuthenticate,error,mode='signin',onBack,onModeChange,pendingInvitation=false}:{onAuthenticate:(credentials:AuthCredentials,mode:'signin'|'signup')=>Promise<void>;error:string|null;mode?:'signin'|'signup';onBack?:()=>void;onModeChange:(mode:'signin'|'signup')=>void;pendingInvitation?:boolean}){
   const [busy,setBusy]=useState(false);
@@ -83,12 +80,6 @@ export function SignInGate({onAuthenticate,error,mode='signin',onBack,onModeChan
       <div className='auth-entry-bottom'>{onBack&&<button type='button' onClick={onBack}><ArrowLeft size={15} aria-hidden='true'/> Back to website</button>}<span>Secure workspace access</span></div>
     </section>
   </main>
-}
-
-export function OrganizationOnboarding({user,apiVersion,onCreate}:{user:AuthUser;apiVersion:ApiVersion;onCreate:(name:string)=>Promise<void>}){
-  const[name,setName]=useState('');const[error,setError]=useState<string|null>(null);const[busy,setBusy]=useState(false);
-  async function submit(event:React.FormEvent){event.preventDefault();const trimmed=name.trim();if(trimmed.length<2){setError('Enter an organization name with at least 2 characters.');return}setBusy(true);setError(null);try{await onCreate(trimmed)}catch{setError('Audoryn could not create the organization.')}finally{setBusy(false)}}
-  return <main className='identity-screen'><div className='identity-shell'><section className='identity-intro'><Brand/><div className='identity-statement'><p>New workspace</p><h1>Start with the organization you want Audoryn to protect.</h1><span>Your workspace becomes the boundary for people, AI identities, workers, jobs, policies and audit history.</span></div></section><section className='identity-action'><p className='identity-action-label'>Organization setup</p><h2>Create workspace</h2><form onSubmit={submit} className='org-form'><label htmlFor='org-name'>Organization name</label><input id='org-name' value={name} onChange={event=>setName(event.target.value)} placeholder='Acme Operations' maxLength={80} autoComplete='organization'/><p className='field-help'>You will be the Owner. Membership and permissions remain organization-scoped.</p>{error&&<p className='form-error' role='alert'>{error}</p>}<button className='primary-button' type='submit' disabled={busy}>{busy?'Creating workspace…':'Create organization'}</button></form><div className='signed-in-as'><span>Signed in as</span><strong>{user.name||user.email||'Authenticated user'}</strong><span className='api-mini'>API {apiVersion}</span></div></section></div></main>
 }
 
 export function IdentityLoading(){return <main className='auth-loading-page' aria-busy='true'><div className='auth-loading-content' role='status'><div className='auth-loading-brand'><img src='/audoryn-mark.png' alt=''/>Audoryn</div><span className='auth-loading-line' aria-hidden='true'><span/></span><strong>Opening your workspace</strong><span>Verifying your account and access…</span></div></main>}

@@ -123,6 +123,9 @@ class Settings(BaseSettings):
     # Seconds between preparation recovery passes when nothing is pending (15 s while work is
     # active). Above five minutes, an idle backend lets the Neon compute scale to zero.
     preparation_recovery_idle_seconds: int = Field(default=600, ge=15, le=3600)
+    # After activity, the backend checks for work whose wake-up was lost and recovers it itself.
+    # 0 turns the check off (the scheduled QStash sweep remains the backstop).
+    delivery_watchdog_seconds: int = Field(default=180, ge=0, le=3600)
     # Save the compute used by each runtime step and chat message in `usage_records`
     # (one small insert each). Usage is always logged.
     usage_records_enabled: bool = True
@@ -190,6 +193,8 @@ class Settings(BaseSettings):
     ]
     openrouter_api_key: SecretStr | None = None
     groq_api_key: SecretStr | None = None
+    # Claude (Messages API), used by the "anthropic" text connection.
+    anthropic_api_key: SecretStr | None = None
     hf_token: SecretStr | None = None
     ai_text_connections: dict[str, TextConnection] = DEFAULT_CONNECTIONS
     ai_text_api_keys: dict[str, SecretStr] = {}

@@ -921,6 +921,25 @@ class ManagedRuntimeExecutor:
                            "Nothing has been done yet. Reconnect the account, then resume the task.")
                 return await self._wait_integration(item, run, None, replace(error.error, safe_message=message), 0,
                                                     saved_note=False)
+        # Authority that changed since this job was set up (for example, new permissions accepted)
+        # would leave the task without tools; wait for review instead of running without them.
+        from types import SimpleNamespace
+
+        from app.infrastructure.database.models import IntegrationConnectionState
+        changed = (await self._session.scalars(select(Integration.display_name).where(
+            Integration.id == IntegrationResource.connection_id,
+            IntegrationConnectionState.connection_id == IntegrationResource.connection_id,
+            IntegrationResource.id == IntegrationTaskGrant.resource_id,
+            IntegrationTaskGrant.organization_id == item.organization_id,
+            IntegrationTaskGrant.job_revision_id == item.job_revision_id,
+            IntegrationTaskGrant.active.is_(True),
+            IntegrationTaskGrant.authority_version != IntegrationConnectionState.authority_version,
+        ).distinct().order_by(Integration.display_name))).all()
+        if changed:
+            message = (f"Access to {', '.join(changed)} changed since this task was set up. Nothing has been "
+                       "done yet. Review its access (reconnect the account if asked), then resume the task.")
+            return await self._wait_integration(item, run, None,
+                SimpleNamespace(code="authentication_error", safe_message=message), 0, saved_note=False)
         _write_runtime_meta(item, integrationPreflightAt=utcnow().isoformat())
         return None
 

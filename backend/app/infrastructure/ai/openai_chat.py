@@ -74,6 +74,10 @@ class ConfiguredChatProvider:
         )
         self.planner_progress = None
 
+    def accepted_models(self, model, requested):
+        """Model names the endpoint may report back for this request."""
+        return {model, requested}
+
     def validate_request(self, *, model, request):
         if not self.connection.enabled or not self.connection.data_allowed:
             raise AIProviderError(
@@ -177,16 +181,13 @@ class ConfiguredChatProvider:
                     payload = await collect_response(
                         response,
                         model=requested,
-                        accepted_models={model, requested},
+                        accepted_models=self.accepted_models(model, requested),
                         progress=self.planner_progress,
                     )
                 else:
                     await response.aread()
                     payload = response.json()
-                if not isinstance(payload, dict) or payload.get("model") not in {
-                    model,
-                    requested,
-                }:
+                if not isinstance(payload, dict) or payload.get("model") not in self.accepted_models(model, requested):
                     raise AIProviderError(
                         "invalid_provider_response",
                         "Unexpected response model identity.",

@@ -151,32 +151,13 @@ async def _productization(
 ) -> dict[str, Any]:
     workspace = await _workspace_settings(session, organization_id)
     usage = await _usage(session, organization_id)
-    steps = [
-        {
-            "id": "agent",
-            "label": "Create an Agent Identity",
-            "complete": usage["registeredAgents"] > 0,
-            "destination": "/organization",
-        },
-        {
-            "id": "integration",
-            "label": "Connect an integration",
-            "complete": usage["connectedIntegrations"] > 0,
-            "destination": "/connections",
-        },
-        {
-            "id": "policy",
-            "label": "Enable a policy",
-            "complete": usage["enabledPolicies"] > 0,
-            "destination": "/governance",
-        },
-        {
-            "id": "worker",
-            "label": "Create a Worker",
-            "complete": usage["workers"] > 0,
-            "destination": "/workforce",
-        },
-    ]
+    # The same getting-started steps new workspaces see on their home page.
+    from app.application.services.onboarding import checklist
+    from app.infrastructure.database.models import OrganizationOnboarding
+
+    answers = await session.scalar(select(OrganizationOnboarding.answers).where(
+        OrganizationOnboarding.organization_id == organization_id))
+    steps = await checklist(session, organization_id, answers)
     complete = sum(step["complete"] for step in steps)
     return {
         "workspace": workspace,

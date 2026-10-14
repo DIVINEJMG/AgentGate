@@ -16,7 +16,7 @@ from uuid import UUID, uuid4
 import httpx
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
@@ -198,9 +198,11 @@ async def test_tokens_are_renewed_ahead_of_expiry(monkeypatch: pytest.MonkeyPatc
     assert (token == "fresh") is renewed and provider.renewed == int(renewed)
 
 
-def _executor(connections: list[Any]) -> tuple[ManagedRuntimeExecutor, Any, Any]:
+def _executor(connections: list[Any], changed: list[str] | None = None) -> tuple[ManagedRuntimeExecutor, Any, Any]:
     executor = object.__new__(ManagedRuntimeExecutor)
-    session = SimpleNamespace(scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: connections)), commit=AsyncMock())
+    # First read: the accounts the task uses; second: accounts whose authority changed since setup.
+    results = [SimpleNamespace(all=lambda: connections), SimpleNamespace(all=lambda: changed or [])]
+    session = SimpleNamespace(scalars=AsyncMock(side_effect=results), commit=AsyncMock())
     executor._session = cast(Any, session)
     executor._registry = cast(Any, SimpleNamespace(get=lambda name: object()))
     item = SimpleNamespace(id=uuid4(), organization_id=ORG, job_revision_id=uuid4(), correlation_id="c",
@@ -242,6 +244,79 @@ async def test_healthy_or_temporarily_busy_accounts_let_the_task_start_and_are_c
     executor, item, run = _executor([SimpleNamespace(provider="github", display_name="acme")])
     assert await executor._integration_preflight(item, run) is None
     assert item.payload["runtime"]["integrationPreflightAt"] and item.status == "running"
+
+
+@pytest.mark.asyncio
+async def test_a_task_whose_account_authority_changed_waits_for_review_instead_of_running_without_tools(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def resolve(self: Any, **kw: Any) -> str:
+        return "token"
+
+    monkeypatch.setattr(CredentialManager, "resolve", resolve)
+    told = AsyncMock()
+    monkeypatch.setattr(managed, "notify_integration_work", told)
+    executor, item, run = _executor([SimpleNamespace(provider="github", display_name="acme")], changed=["acme"])
+    outcome = await executor._integration_preflight(item, run)
+    assert outcome is not None and item.status == run.status == "waiting_reconnect"
+    assert told.await_args is not None
+    assert told.await_args.kwargs["content"].startswith("Access to acme changed since this task was set up. Nothing has been done yet.")
+    assert "integrationPreflightAt" not in item.payload["runtime"]
+
+
+# --- Reconnecting refreshes ongoing jobs' authority ------------------------------------------
+
+
+def _ongoing_job(accounts: Accounts, name: str, *, scopes: list[str], status: str = "active",
+                 connection: int = 0, standing: bool = True) -> Any:
+    worker = accounts.db.add(m.Worker, organization_id=ORG, name=f"{name} worker")
+    job = accounts.db.add(m.Job, organization_id=ORG, worker_id=worker.id, name=name, status=status, current_revision=1)
+    revision = accounts.db.add(m.JobRevision, job_id=job.id, revision=1, definition={}, created_by=accounts.user,
+                               created_at=datetime.now(UTC))
+    resource = accounts.db.session.scalars(select(m.IntegrationResource).where(
+        m.IntegrationResource.connection_id == accounts.connections[connection].id)).first()
+    return accounts.db.add(m.IntegrationTaskGrant, organization_id=ORG, job_revision_id=revision.id, worker_id=worker.id,
+                           initiating_user_id=accounts.user, resource_id=cast(Any, resource).id, scopes=scopes, destinations={},
+                           constraints={}, standing=standing, authority_version=1, active=True)
+
+
+@pytest.mark.asyncio
+async def test_reconnecting_refreshes_ongoing_jobs_that_pass_the_resume_checks_and_names_the_rest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    accounts = Accounts(monkeypatch)
+    mine = accounts.connections[0]
+    with accounts.db.engine.begin() as connection:
+        connection.execute(update(m.IntegrationConnectionState).values(authority_version=2))
+    fits = _ongoing_job(accounts, "Summarize New Issues", scopes=["bench.record.read"])
+    too_wide = _ongoing_job(accounts, "Delete Old Records", scopes=["bench.record.delete"])
+    paused = _ongoing_job(accounts, "Paused Job", scopes=["bench.record.read"], status="paused")
+    one_off = _ongoing_job(accounts, "One Request", scopes=["bench.record.read"], standing=False)
+    other_account = _ongoing_job(accounts, "Shared Account Job", scopes=["bench.record.read"], connection=1)
+    with _aware_sqlite_datetimes():
+        session = accounts.session()
+        review = await IntegrationFoundation(session).refresh_ongoing_grants(mine.id)
+        await session.commit()
+    assert review == ["Delete Old Records"]
+    versions = {row.id: row.authority_version for row in Session(accounts.db.engine).scalars(select(m.IntegrationTaskGrant))}
+    assert versions[fits.id] == 2  # follows the account's current authority
+    assert versions[too_wide.id] == versions[paused.id] == versions[one_off.id] == versions[other_account.id] == 1
+    assert integration_foundation.grants_review_message(review) == (
+        "These ongoing jobs need their access reviewed before they use this account again: “Delete Old Records”. "
+        "Their next run waits for you to review it.")
+    assert integration_foundation.grants_review_message([]) == ""
+
+
+@pytest.mark.asyncio
+async def test_an_account_still_needing_reconnection_refreshes_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    accounts = Accounts(monkeypatch)
+    waiting = accounts.connections[3]  # reconnect_required
+    with accounts.db.engine.begin() as connection:
+        connection.execute(update(m.IntegrationConnectionState).values(authority_version=2))
+    grant = _ongoing_job(accounts, "Waiting Job", scopes=["bench.record.read"], connection=3)
+    with _aware_sqlite_datetimes():
+        assert await IntegrationFoundation(accounts.session()).refresh_ongoing_grants(waiting.id) == []
+    assert cast(Any, Session(accounts.db.engine).get(m.IntegrationTaskGrant, grant.id)).authority_version == 1
 
 
 # --- Discovery -------------------------------------------------------------------------------

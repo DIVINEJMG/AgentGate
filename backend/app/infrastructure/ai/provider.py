@@ -65,7 +65,8 @@ def ai_gateway_from_settings(
     coordinator_key = _secret_value(config.ai_coordinator_api_key) or legacy_key
     vision_key = _secret_value(config.ai_vision_api_key) or legacy_key
     if not coordinator_key and not vision_key and not (config.smart_planner_enabled and
-            (config.openrouter_api_key or config.groq_api_key or config.hf_token or config.ai_text_api_keys)):
+            (config.openrouter_api_key or config.groq_api_key or config.hf_token or config.ai_text_api_keys
+             or config.anthropic_api_key)):
         return UnconfiguredAIGateway("AI provider credentials are not configured.")
     if config.ai_provider != "nvidia_nim":
         return UnconfiguredAIGateway(

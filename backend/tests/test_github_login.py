@@ -571,7 +571,7 @@ async def test_connector_reuses_exact_owned_installation_instead_of_creating_dup
         ),
         api=api,
     )
-    foundation = SimpleNamespace(discover=AsyncMock())
+    foundation = SimpleNamespace(discover=AsyncMock(), refresh_ongoing_grants=AsyncMock(return_value=[]))
     monkeypatch.setattr(connector, "ExpandedGitHubProvider", lambda: provider)
     monkeypatch.setattr(connector, "IntegrationFoundation", lambda session: foundation)
     monkeypatch.setattr(connector, "app_jwt", lambda: "signing-token")
@@ -591,6 +591,7 @@ async def test_connector_reuses_exact_owned_installation_instead_of_creating_dup
     session.add.assert_not_called()
     provider.auth.installation_bundle.assert_awaited_once_with("8", repositories=["900"])
     foundation.discover.assert_awaited_once()
+    foundation.refresh_ongoing_grants.assert_awaited_once()
 
 
 async def test_connector_rechecks_membership_after_oauth_before_token_mint(configured, monkeypatch):

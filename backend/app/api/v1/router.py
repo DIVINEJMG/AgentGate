@@ -9,6 +9,7 @@ from app.api.governance_routes import v1_router as governance_router
 from app.api.integration_capability_routes import v1_router as integration_router
 from app.api.integration_foundation_routes import router as integration_foundation_router
 from app.api.jobs_routes import v1_router as jobs_router
+from app.api.onboarding_routes import router as onboarding_router
 from app.api.organization_routes import v1_router as organization_router
 from app.api.product_ops_routes import v1_router as product_ops_router
 from app.api.runtime_result_routes import v1_router as runtime_result_router
@@ -24,6 +25,7 @@ router.include_router(jobs_router)
 router.include_router(template_router)
 router.include_router(integration_router)
 router.include_router(integration_foundation_router)
+router.include_router(onboarding_router)
 router.include_router(github_router)
 router.include_router(governance_router)
 router.include_router(runtime_result_router)

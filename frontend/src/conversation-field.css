@@ -225,7 +225,7 @@
   /* Chat: full width; the worker column is replaced by the back arrow to the worker list. */
   .is-chat .cf-worker-map { display: none; }
   .cf-chat-canvas { grid-template-rows: auto minmax(0, 1fr) auto auto; }
-  .cf-chat-header { display: grid; gap: 6px; padding: 12px 0 4px; border-bottom: 1px solid var(--cf-line); background: #fafbf8; }
+  .cf-chat-header { display: grid; gap: 6px; padding: 12px 0 4px; border-bottom: 1px solid var(--cf-line); background: var(--ws-bg, #fafbf8); }
   .cf-identity { position: static; flex-direction: row; justify-content: flex-start; gap: 10px; min-height: 40px; padding: 0 56px 0 54px; text-align: left; }
   .cf-identity-disc { width: 36px; height: 36px; font-size: 12px; }
   .cf-identity div { gap: 2px; }

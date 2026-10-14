@@ -10,6 +10,7 @@ from typing import cast
 from app.application.services.ai_gateway import ProviderAIGateway
 from app.domain.ai.providers import AIProviderError
 from app.domain.ai.registry import ModelRegistry, ModelRoute
+from app.infrastructure.ai.anthropic_messages import AnthropicMessagesProvider
 from app.infrastructure.ai.connections import (
     TextConnection,
     route_account_name,
@@ -21,6 +22,7 @@ from app.infrastructure.ai.model_profiles import DEFAULT_PROFILES, generation_al
 from app.infrastructure.ai.nvidia import NvidiaNimProvider
 from app.infrastructure.ai.openai_chat import ConfiguredChatProvider
 from app.infrastructure.ai.openrouter import OpenRouterPlannerProvider
+from app.infrastructure.ai.openrouter_claude import OpenRouterClaudeProvider
 from app.infrastructure.redis.coordination import RedisCoordinator
 
 logger = logging.getLogger("uvicorn.error")
@@ -237,7 +239,10 @@ def transport_for_text_route(route, config, *, timeout_seconds=None):
             "billing_allowed": current.billing_allowed,
             "billing_required": current.billing_required or TextConnection.model_validate(connection).billing_required,
         })
-        provider = ConfiguredChatProvider(name=name, connection=TextConnection.model_validate(connection),
+        connection = TextConnection.model_validate(connection)
+        transport = {"anthropic_messages": AnthropicMessagesProvider,
+                     "openrouter_claude": OpenRouterClaudeProvider}.get(connection.api_format, ConfiguredChatProvider)
+        provider = transport(name=name, connection=connection,
             credential=credential, profile=profile,
             timeout_seconds=timeout_seconds or config.ai_interactive_timeout_seconds)
         provider.account_name = route_account_name(route, config)

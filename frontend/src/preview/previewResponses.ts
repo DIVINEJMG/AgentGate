@@ -163,6 +163,7 @@ export async function previewResponse(method: string, path: string, _body?: unkn
 function fixtureFor(endpoint: string, fullPath: string, search: URLSearchParams): unknown {
   if (fullPath === '/api/v1/system/status') return { service: 'Audoryn preview', apiVersion: 'v1', status: 'operational', securityMode: 'fail-closed', architecture: 'modular-monolith', currentVersion: 'v2', supportedVersions: ['v1', 'v2'], checkedAt: time };
   if (fullPath === '/api/v1/organizations') return { organizations: [{ id: org, name: 'Sample workspace', role: 'owner', permissions: [], createdAt: time }] };
+  if (endpoint === '/onboarding') return previewOnboarding;
   if (endpoint === '/performance') return previewPerformance;
   if (endpoint === '/workforce') return workforce;
   if (endpoint === '/conversations') return { threads: conversationThreads };
@@ -218,6 +219,21 @@ function fixtureFor(endpoint: string, fullPath: string, search: URLSearchParams)
   if (endpoint === '/ai/operations') return { configuration: { enabled: true, configured: true, provider: 'Sample provider', providerHealth: 'operational', coordinatorModel: 'Sample planner', visionModel: 'Sample vision' }, invocations: { sampleSize: 28, successes: 26, failures: 2, successRate: 92.9, averageLatencyMs: 850, errorsByCategory: {}, roleRouting: {}, window: { limit: 100, truncated: false } }, planner: { waitingCount: 0, waitingConfiguration: 0, waitingProvider: 0, window: { limit: 100, truncated: false } } };
   throw new Error(`No local preview fixture for ${fullPath}. No network request was made.`);
 }
+
+// The getting-started checklist, part done, so its guides can be tried on sample data.
+const previewOnboarding = {
+  state: 'ready', checklistDismissed: false,
+  answers: { goal: 'research', tools: ['github', 'web_research'], care: 'visible', timezone: 'Africa/Lagos' },
+  setup: { workerId, workerName: 'Research analyst', threadId: 'preview-thread-1', policyId: null },
+  examples: ['Research the latest news about our industry and summarise it with sources', 'Summarise the open issues in my repository', 'What can you help me with?'],
+  checklist: { complete: 2, total: 5, steps: [
+    { id: 'connect', label: 'Connect a tool', description: 'Give your worker access to an account, such as GitHub or Slack.', complete: true, destination: 'connections/directory/github' },
+    { id: 'say_hi', label: 'Say hi to your worker', description: 'Send your first message in Conversations.', complete: true, destination: 'conversations' },
+    { id: 'first_task', label: 'Run a first task', description: 'Ask your worker to do something and watch it work.', complete: false, destination: 'conversations' },
+    { id: 'approval', label: 'Review an approval', description: 'Approve or decline an action your worker asked about.', complete: false, destination: 'inbox' },
+    { id: 'schedule', label: 'Set a schedule or a trigger', description: 'Let work start on its own, at set times or when something happens.', complete: false, destination: 'jobs' },
+  ] },
+};
 
 const productFixture = {
   workspace: { organizationId: org, name: 'Sample workspace', securityContactEmail: 'security@example.invalid', companyUrl: '', updatedBy: null, updatedAt: null },

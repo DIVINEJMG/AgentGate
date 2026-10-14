@@ -75,6 +75,17 @@ async def drain_started() -> None:
             await coordinator.close()
 
 
+_pending: set[asyncio.Task[str | None]] = set()
+# Set by the delivery watchdog while it runs (app/runtime/delivery_watchdog.py).
+watchdog_wake: asyncio.Event | None = None
+
+
+def arm_watchdog() -> None:
+    """Activity happened: the watchdog checks a little later that its deliveries arrived."""
+    if watchdog_wake is not None:
+        watchdog_wake.set()
+
+
 def request_outbox_drain_after_commit(*, reason: str) -> None:
     """Best-effort immediate QStash signal from SQLAlchemy's after_commit hook."""
 
@@ -83,7 +94,13 @@ def request_outbox_drain_after_commit(*, reason: str) -> None:
     except RuntimeError:
         return
 
+    arm_watchdog()
     task = loop.create_task(request_outbox_drain(reason=reason))
+    # The event loop keeps only a weak reference to tasks: without this one, a pending request
+    # can be garbage-collected mid-flight ("Task was destroyed but it is pending"). Since it may
+    # already hold the drain marker, losing it would hold back every commit for up to a minute.
+    _pending.add(task)
+    task.add_done_callback(_pending.discard)
 
     def _consume_result(completed: asyncio.Task[str | None]) -> None:
         if completed.cancelled():

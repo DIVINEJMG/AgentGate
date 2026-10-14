@@ -18,7 +18,10 @@ from app.application.services.integration_credentials import (
     decode_bundle,
     encode_bundle,
 )
-from app.application.services.integration_foundation import IntegrationFoundation
+from app.application.services.integration_foundation import (
+    IntegrationFoundation,
+    grants_review_message,
+)
 from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
 from app.execution.bootstrap import execution_provider_registry
@@ -205,12 +208,15 @@ async def reconnect(organization_id: UUID, connection_id: UUID, body: ReconnectI
     row.ciphertext = encrypt_integration_secret(body.credential)
     state.authorization_state, state.reason = "connected", ""
     connection.status = "connected"
+    review = await IntegrationFoundation(session).refresh_ongoing_grants(connection_id)
+    state.reason = grants_review_message(review)
     await append_audit(session, organization_id=organization_id, principal=principal,
         event_type="integration.reconnected", category="integration", resource_type="integration",
         resource_id=str(connection_id), resource_name=connection.display_name, outcome="connected",
         summary="The owner validated and replaced the encrypted provider credential.")
     await session.commit()
-    return {"authorizationState": "connected", "message": "Reconnected. Resume pending tasks to revalidate their exact action."}
+    return {"authorizationState": "connected", "needsReview": review,
+            "message": " ".join(filter(None, ["Reconnected. Resume pending tasks to revalidate their exact action.", state.reason]))}
 
 
 class ResumeInput(BaseModel):
@@ -420,8 +426,10 @@ async def complete_auth(organization_id: UUID, provider_id: str, body: AuthCallb
     state.authorization_state, state.reason = "connected", ""
     state.account_id = bundle.account_id
     state.credential_metadata = {"scopes": list(bundle.scopes), "expiresAt": bundle.expires_at.isoformat() if bundle.expires_at else None}
+    review = await IntegrationFoundation(session).refresh_ongoing_grants(connection.id)
+    state.reason = grants_review_message(review)
     await session.commit()
-    return {"authorizationState": "connected"}
+    return {"authorizationState": "connected", "needsReview": review}
 
 
 @router.post("/organizations/{organization_id}/integration-connections/{connection_id}/revoke")
