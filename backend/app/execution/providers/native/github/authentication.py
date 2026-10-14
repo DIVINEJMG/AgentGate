@@ -19,6 +19,15 @@ from app.execution.providers.native.http import ProviderTransportError
 from .transport import account_context
 
 
+def private_key_pem(value: str) -> bytes:
+    """The App key as PEM. Environment files often carry it on one line: podman's --env-file keeps
+    surrounding quotes and has no multi-line values, so `\\n` escapes stand for line breaks."""
+    text = value.strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
+        text = text[1:-1].strip()
+    return text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r\n", "\n").encode()
+
+
 def app_jwt() -> str:
     if not settings.github_app_id or not settings.github_app_private_key:
         raise ProviderTransportError(
@@ -26,9 +35,16 @@ def app_jwt() -> str:
             retryable=False,
             safe_message="GitHub App signing is not configured.",
         )
-    key = serialization.load_pem_private_key(
-        settings.github_app_private_key.get_secret_value().encode(), password=None
-    )
+    try:
+        key = serialization.load_pem_private_key(
+            private_key_pem(settings.github_app_private_key.get_secret_value()), password=None
+        )
+    except (ValueError, TypeError) as error:
+        raise ProviderTransportError(
+            code="authentication_error",
+            retryable=False,
+            safe_message="The GitHub App private key on this server could not be read. Check GITHUB_APP_PRIVATE_KEY.",
+        ) from error
     if not isinstance(key, rsa.RSAPrivateKey):
         raise ProviderTransportError(
             code="authentication_error",
