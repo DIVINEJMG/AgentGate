@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import difflib
 import hashlib
 import json
@@ -71,6 +72,20 @@ async def run_helper(runtime, row, *args: str) -> dict:
     return data
 
 
+async def write_control_file(runtime, sandbox_id, path, content, attempts=3):
+    """Upload the helper's request file. It only describes the next step (nothing in the
+    repository changes until the helper runs), so a failed upload is simply tried again: the
+    sandbox's file service sometimes drops a write."""
+    for attempt in range(attempts):
+        try:
+            await runtime.write(sandbox_id, path, content)
+            return
+        except Exception:
+            if attempt == attempts - 1:
+                raise
+            await asyncio.sleep(1 + attempt)
+
+
 async def save_file_checkpoint(runtime, row, request, result: dict) -> None:
     """Keep each changed file outside the sandbox (object storage), so a lost sandbox can be rebuilt
     with every change: one small upload per changed file instead of a full workspace export."""
@@ -113,13 +128,39 @@ def rollback_target(evidence: dict, request_input: dict) -> tuple[str, list[dict
     return str(entries[-2]["commit"]), entries[:-1]
 
 
-def log_failure(request, error):
-    # Exception messages and tracebacks may contain SDK headers, credentials or source.
+# Safe labels for sandbox errors; the message itself is never logged.
+FAILURE_HINTS = (
+    ("timed out", "timeout"),
+    ("timeout", "timeout"),
+    ("502", "service_unavailable"),
+    ("503", "service_unavailable"),
+    ("504", "service_unavailable"),
+    ("bad gateway", "service_unavailable"),
+    ("unavailable", "service_unavailable"),
+    ("connection", "connection_error"),
+    ("not found", "not_found"),
+    ("permission", "permission_denied"),
+    ("rate limit", "rate_limited"),
+)
+
+
+def failure_reason(error) -> str:
     reasons = {
         "Expected to receive information about written file": "missing_write_acknowledgement",
         "Received unexpected response from write operation": "unexpected_write_acknowledgement",
     }
-    reason = reasons.get(str(error), "unclassified_exception")
+    text = str(error)
+    if text in reasons:
+        return reasons[text]
+    lowered = text.lower()
+    return next(
+        (label for hint, label in FAILURE_HINTS if hint in lowered), "unclassified_exception"
+    )
+
+
+def log_failure(request, error):
+    # Exception messages and tracebacks may contain SDK headers, credentials or source.
+    reason = failure_reason(error)
     status = getattr(error, "status_code", None)
     logger.warning(
         "Coding action failed work_item=%s operation=%s stage=%s error_type=%s reason=%s http_status=%s",
@@ -603,7 +644,8 @@ async def execute_coding_action(provider, request, configuration, credential, ru
                 )
                 await checkpoint()
                 _stage.set("workspace_edit")
-                await runtime.write(
+                await write_control_file(
+                    runtime,
                     row.sandbox_id,
                     "/tmp/audoryn-step.json",
                     json.dumps(

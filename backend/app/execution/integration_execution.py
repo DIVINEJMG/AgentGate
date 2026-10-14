@@ -216,7 +216,15 @@ async def execute_native_action(
                 "temporary_provider_error",
                 "verification_failed",
             }
-            if not uncertain:
+            # Workspace edits, patches and rollbacks are safe to repeat (a repeat finds its work
+            # done); the coding service marks those failures retryable. Only writes that reach other
+            # systems, and workspace commands (reported as uncertain_outcome), pause for checking.
+            repeat_safe = (
+                request.capability.target == "workspace"
+                and error.error.code == "temporary_provider_error"
+                and error.error.retryable
+            )
+            if not uncertain or repeat_safe:
                 raise
             result = await reconcile()
             if result is not None:
