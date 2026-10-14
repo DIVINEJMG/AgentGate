@@ -30,6 +30,9 @@ uses the original database), do that first.
   through **OpenRouter**. The free models follow as fallbacks. A direct Anthropic connection is
   built but unused (the Anthropic account could not be verified).
 - **Phone layout:** the Conversations header now follows dark mode.
+- **GitHub App key in one line:** the key is read from the one-line form podman env files need,
+  and an unreadable key now says so ("Check GITHUB_APP_PRIVATE_KEY") instead of stopping tasks
+  with an internal error. Interrupted runs also log where they failed.
 
 ## 2. Code: branch and pull request
 
@@ -71,11 +74,26 @@ git push -u origin feature/onboarding-claude
 | `OPENROUTER_API_KEY` | the key with credit (secret) | Must be the same key as on the laptop, or another key with credit. Without credit, the Claude routes are skipped and the free models answer. |
 | `ANTHROPIC_API_KEY` | empty | Optional. Only for the direct Anthropic connection. |
 | `DELIVERY_WATCHDOG_SECONDS` | `180` | Optional; this is the default. `0` turns the watchdog off. |
+| `GITHUB_APP_PRIVATE_KEY` | the key **on one line**, with `\n` where the line breaks were | podman's `--env-file` has no multi-line values, so the key on Oracle could not be read (`MalformedFraming`) and GitHub tasks stopped with an internal error. This release reads the one-line form (quotes optional). See "Fixing the GitHub key" below. |
 
 The `AI_TEXT_CONNECTIONS` line, on one line:
 
 ```
 AI_TEXT_CONNECTIONS={"groq":{"base_url":"https://api.groq.com/openai/v1","hosting_provider":"groq","credential_ref":"groq","schema_mode":"groq_strict","enabled":true,"data_allowed":true},"hf_featherless":{"base_url":"https://router.huggingface.co/v1","hosting_provider":"featherless-ai","credential_ref":"huggingface","enabled":true,"data_allowed":true,"billing_required":true,"billing_allowed":false},"hf_novita":{"base_url":"https://router.huggingface.co/v1","hosting_provider":"novita","credential_ref":"huggingface","enabled":true,"data_allowed":true,"billing_required":true,"billing_allowed":false},"anthropic":{"api_format":"anthropic_messages","base_url":"https://api.anthropic.com/v1","hosting_provider":"anthropic","credential_ref":"anthropic","schema_mode":"json_schema","enabled":true,"data_allowed":true,"billing_required":true,"billing_allowed":true},"openrouter_claude":{"api_format":"openrouter_claude","base_url":"https://openrouter.ai/api/v1","hosting_provider":"anthropic","credential_ref":"openrouter","schema_mode":"json_schema","enabled":true,"data_allowed":true,"billing_required":true,"billing_allowed":true}}
+```
+
+**Fixing the GitHub key.** With the `.pem` file downloaded from the GitHub App settings, this
+prints the one-line form. Paste it after `GITHUB_APP_PRIVATE_KEY=` in Oracle's env file:
+
+```bash
+awk 'NF {sub(/\r/, ""); printf "%s\\n", $0}' audoryn.private-key.pem; echo
+/, ""); printf "%s\n", $0}' audoryn.private-key.pem; echo
+```
+
+After restarting, check it. This signs a token locally and sends nothing:
+
+```bash
+podman exec audoryn-api python -c "from app.execution.providers.native.github.authentication import app_jwt; app_jwt(); print('GitHub key OK')"
 ```
 
 **Do not copy** the laptop's tunnel addresses (`QSTASH_*_URL`, `UPSTASH_QSTASH_*_URL`,
@@ -151,7 +169,7 @@ Keep the webhook **Active** with the **Issues** event subscribed.
 
 ## 9. Proof
 
-- **Backend:** 1,531 tests pass, with and without the laptop `.env`. They include new tests for
+- **Backend:** 1,539 tests pass, with and without the laptop `.env`. They include new tests for
   the watchdog, reconnect refresh, onboarding, and both Claude connections.
 - **Static checks:** ruff, pyright (0 errors) and the CI verify scripts pass.
 - **Frontend:**

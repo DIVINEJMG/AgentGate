@@ -899,8 +899,12 @@ async def _execute_runtime_message(message: ExecutePayload, coordinator: RedisCo
                     run.status, run.result_summary = state, summary
                 await notify_integration_work(session, item, key=f"runtime-interrupted:{_runtime_step(item)}", content=summary)
                 await session.commit()
-                logger.error("Runtime interrupted work_item=%s error_type=%s state=%s",
-                    message.work_item_id, type(exc).__name__, state)
+                # Where it failed (file, line, function); the message itself may hold task content.
+                import traceback
+                where = " < ".join(f"{frame.filename.rsplit('/app/', 1)[-1]}:{frame.lineno} {frame.name}"
+                                   for frame in reversed(traceback.extract_tb(exc.__traceback__)[-4:]))
+                logger.error("Runtime interrupted work_item=%s error_type=%s state=%s at=%s",
+                    message.work_item_id, type(exc).__name__, state, where)
                 return {"status": state, "workItemId": str(item.id), "summary": summary}
     finally:
         heartbeat.cancel()
