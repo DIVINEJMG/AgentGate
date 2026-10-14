@@ -120,7 +120,17 @@ class E2BCodingRuntime:
         return await sandbox.files.read(path)
 
     async def write(self, sandbox_id, path, content):
-        await (await self.connect(sandbox_id)).files.write(path, content)
+        sandbox = await self.connect(sandbox_id)
+        try:
+            await sandbox.files.write(path, content)
+        except Exception as error:
+            # The sandbox's /tmp is sticky and protected (fs.protected_regular), so its file service
+            # can create a file there but not open one that already exists, such as the request
+            # file every edit reuses. Removing it first lets the same path be written again.
+            if "permission denied" not in str(error).lower():
+                raise
+            await sandbox.files.remove(path)
+            await sandbox.files.write(path, content)
 
     async def ensure_control_file(self, sandbox_id, path, content, stage):
         """Reconcile backend manifests without replaying repository mutations."""
