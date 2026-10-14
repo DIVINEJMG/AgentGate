@@ -43,6 +43,10 @@ export async function discoverConnectionResources(version: ApiVersion, org: stri
 export async function resumeIntegrationWork(version: ApiVersion, org: string, workItem: string) {
   return api.post(`${path(version, org)}/integration-work/${workItem}/resume`, {});
 }
+/** Settles a write whose outcome could not be confirmed: look again, run it again, or carry on. */
+export async function settleIntegrationOutcome(version: ApiVersion, org: string, workItem: string, outcome: 'check' | 'not_done' | 'done') {
+  return api.post(`${path(version, org)}/integration-work/${workItem}/outcome`, { outcome });
+}
 export async function prepareIntegrationTask(version: ApiVersion, org: string, command: string, clarification = '') {
   return api.post(`${path(version, org)}/integration-tasks/${command}/prepare`, { clarification });
 }

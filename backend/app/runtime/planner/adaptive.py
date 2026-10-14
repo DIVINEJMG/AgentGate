@@ -836,6 +836,10 @@ class AdaptiveRuntimePlanner:
 
         if decision not in {"act", "finish"}:
             raise RuntimeError("Planner decision must be act or finish.")
+        if not summary and decision == "act":
+            # Left out: the action's own title and instruction say what it does. A finish keeps the
+            # requirement, because its summary is the result.
+            summary = title or instruction[:300]
         if not summary:
             raise RuntimeError("Planner decision is missing a summary.")
         if decision == "finish":

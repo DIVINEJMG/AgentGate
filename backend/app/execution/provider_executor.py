@@ -4,7 +4,7 @@ from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from jsonschema import ValidationError
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bootstrap.settings import settings
@@ -30,6 +30,8 @@ from app.infrastructure.database.models import (
     AuditEvent,
     Integration,
     IntegrationCredential,
+    Run,
+    WorkItem,
 )
 from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.secrets.provider_vault import DatabaseSecretVault
@@ -293,13 +295,32 @@ class DatabaseProviderContextLoader:
         )
 
     async def checkpoint_write_dispatch(self, request: ExecutionRequest) -> bool:
-        conflicting = await self._session.scalar(
-            select(Action.id).where(
-                Action.organization_id == request.organization_id,
-                Action.resource_id == request.resource.id,
-                Action.idempotency_key != request.idempotency_key,
-                Action.status == "processing",
-                Action.payload["integrationCertainty"].astext == "dispatching",
+        # Workspace actions change only their own task's isolated sandbox, so they neither wait for
+        # nor hold back writes to the shared resource (and are safe to repeat).
+        workspace = request.capability.target == "workspace"
+        # A write held back by another one waits only while that write's own task is still working
+        # on it (running, or re-checking its outcome). Once that task is paused for a person to
+        # check, or has ended, it no longer holds back other tasks.
+        conflicting = (
+            None
+            if workspace
+            else await self._session.scalar(
+                select(Action.id)
+                .outerjoin(Run, Run.id == Action.run_id)
+                .outerjoin(WorkItem, WorkItem.id == Run.work_item_id)
+                .where(
+                    Action.organization_id == request.organization_id,
+                    Action.resource_id == request.resource.id,
+                    Action.idempotency_key != request.idempotency_key,
+                    Action.status == "processing",
+                    Action.payload["integrationCertainty"].astext == "dispatching",
+                    Action.scope.not_like("%.workspace.%"),
+                    or_(
+                        Action.run_id.is_(None),
+                        WorkItem.status.in_(["queued", "admitted", "running", "waiting_approval"]),
+                    ),
+                )
+                .limit(1)
             )
         )
         if conflicting is not None:
@@ -325,7 +346,8 @@ class DatabaseProviderContextLoader:
                 "Durable action record is required before dispatching an integration write."
             )
         payload = dict(row.payload or {})
-        reconcile = payload.get("integrationCertainty") == "dispatching"
+        # A workspace action repeated after an interruption simply runs again (it finds its work done).
+        reconcile = payload.get("integrationCertainty") == "dispatching" and not workspace
         payload["integrationCertainty"] = "dispatching"
         row.payload = payload
         from app.execution.providers.integration_hooks import ExecutionEvidenceHooks

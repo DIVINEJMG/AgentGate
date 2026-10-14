@@ -159,7 +159,7 @@ def activity_for(item: Any, run: Any, steps: list[Any], now: datetime) -> dict[s
                 "waiting_reconnect": "Reconnect the account to continue",
                 "waiting_ai": "Planning is paused; completed work remains saved",
                 "waiting_configuration": "Setup needs attention before work can continue",
-                "uncertain_outcome": "Checking an uncertain outcome before another action",
+                "uncertain_outcome": "I couldn't confirm whether the last write went through. Check it and tell me what happened",
             }.get(status, "Waiting to continue; completed work remains saved"),
         )
         if (
@@ -180,6 +180,8 @@ def activity_for(item: Any, run: Any, steps: list[Any], now: datetime) -> dict[s
         if meta.get("providerRetryCode") in {"rate_limited", "queued"} and meta.get("waitingReason"):
             # Waiting for a provider's limit or a free slot: say so plainly.
             detail = str(meta["waitingReason"]).rstrip(".") + ". It will continue automatically; completed work is saved."
+    elif meta.get("queueState") == "checking_outcome":
+        phase, detail = "recovery", "Looking again for the outcome of the last write; it won't be sent twice"
     elif meta.get("plannerPhase") == "awaiting_ai" and meta.get("queueState") == "planning":
         phase, detail = "awaiting_planner", "Waiting for the planner response"
         if int(meta.get("plannerAttemptCount", 0)) > 1:
