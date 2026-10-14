@@ -9,7 +9,7 @@ import type { ApiVersion } from '../lib/systemApi';
 import type { ManagedWorker } from '../lib/workforceApi';
 import { subscribeOrganizationRealtime } from '../platform/realtimeClient';
 import { filterJobs } from './workspaceListModel';
-import { IntegrationResumeControl } from './IntegrationTaskControls';
+import { IntegrationOutcomeControl, IntegrationResumeControl } from './IntegrationTaskControls';
 import { linkProps, navigate, queryParam, useRoute } from '../workspace/routes';
 import { Ago, Avatar, EmptyState, Notice, PageHeader, Pills, Sheet, SkeletonLines, State, sentence } from '../workspace/ui';
 import { GuideButton } from '../workspace/onboarding/guide';
@@ -184,6 +184,7 @@ export default function JobsWorkspacePage({ organization, apiVersion, data, work
               <div className='ws-queue-actions'>
                 {approval && <><button type='button' className='ws-button ws-button-sm' disabled={approvalBusy === approval.id} onClick={() => void decide(approval, 'reject')}>Decline</button><button type='button' className='ws-button ws-button-sm ws-button-primary' disabled={approvalBusy === approval.id} onClick={() => void decide(approval, 'approve')}>Approve</button></>}
                 {canRun && item.status === 'waiting_reconnect' && <IntegrationResumeControl organizationId={organization.id} version={apiVersion} workItemId={item.id} onDone={onApprovalDecided} />}
+                {canRun && item.status === 'uncertain_outcome' && <IntegrationOutcomeControl organizationId={organization.id} version={apiVersion} workItemId={item.id} onDone={onApprovalDecided} />}
                 {item.runId && <a className='ws-button ws-button-sm ws-button-quiet' {...linkProps({ page: 'runs', runId: item.runId })}>Run</a>}
                 {canManage && item.status === 'queued' && <button type='button' className='ws-button ws-button-sm' disabled={saving} onClick={() => onCancel(item)}>Cancel</button>}
                 {canRun && item.status === 'failed' && item.retryCount < 2 && <button type='button' className='ws-button ws-button-sm' disabled={saving} onClick={() => onRetry(item)}>Retry</button>}

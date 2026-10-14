@@ -204,6 +204,14 @@ def _provider_wait(item: WorkItem, error: Any, *, retry_limit: int, backoff_seco
     return max(backoff_seconds * 2**count, float(error.retry_after_seconds or 0)), {"providerRetryCount": count + 1}
 
 
+def _outcome_checks(item: WorkItem, step: int) -> int:
+    """How many times this step's uncertain write has already been looked for again."""
+    record = _runtime_meta(item).get("outcomeChecks")
+    if not isinstance(record, dict) or record.get("step") != step:
+        return 0
+    return _count(record.get("count"))
+
+
 def _waiting_message(error: Any, delay_seconds: float) -> str:
     """A plain sentence for the person: what is happening and roughly when work continues."""
     minutes = round(delay_seconds / 60)
@@ -945,6 +953,19 @@ class ManagedRuntimeExecutor:
 
     async def _wait_integration(self, item, run, step, error, current_step, *, saved_note: bool = True):
         state = "waiting_reconnect" if error.code == "authentication_error" else "uncertain_outcome"
+        checks = _outcome_checks(item, current_step)
+        scope = str((step.input or {}).get("scope", "")) if step is not None else ""
+        # Running the step again only looks for the write (its record says it was dispatched), so it
+        # cannot repeat it. Workspace commands are run again instead, so they wait for a person.
+        if state == "uncertain_outcome" and step is not None and ".workspace." not in scope \
+                and checks < settings.integration_outcome_checks:
+            delay = settings.integration_outcome_check_seconds * 2**checks
+            item.status, run.status = "queued", "running"
+            item.scheduled_at = utcnow() + timedelta(seconds=delay)
+            _write_runtime_meta(item, queueState="checking_outcome", outcomeChecks={"step": current_step, "count": checks + 1},
+                waitingReason="I couldn't confirm whether the last write went through, so I'll look for it again shortly.")
+            await self._session.commit()
+            return RuntimeStepOutcome("continue", item.id, run.id, current_step, "Looking for the write's outcome again.")
         item.status, run.status = state, state
         _write_runtime_meta(item, queueState=state, waitingReason=error.safe_message,
             executionCertainty="uncertain" if state == "uncertain_outcome" else "not_executed")

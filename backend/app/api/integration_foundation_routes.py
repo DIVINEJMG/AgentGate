@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -27,6 +27,7 @@ from app.domain.identity.principals import HumanPrincipal
 from app.execution.bootstrap import execution_provider_registry
 from app.execution.providers.integration_hooks import AuthenticationHooks, EventHooks
 from app.infrastructure.database.models import (
+    Action,
     ConversationCommand,
     ConversationThread,
     Integration,
@@ -40,6 +41,8 @@ from app.infrastructure.database.models import (
     Job,
     JobRevision,
     OrganizationMembership,
+    Run,
+    RunStep,
     Worker,
     WorkItem,
 )
@@ -333,6 +336,66 @@ async def resume_work(organization_id: UUID, work_item_id: UUID, principal: Prin
             "current_step": int(runtime.get("currentStep", 0)), "continuation_phase": "execute"})
     await session.commit()
     return {"status": "queued", "message": "The pending action will revalidate access and provider consent before execution."}
+
+
+class OutcomeInput(BaseModel):
+    # check: look for the write again. not_done: it didn't happen, so run it again.
+    # done: it happened, so carry on from the next step.
+    outcome: Literal["check", "not_done", "done"]
+
+
+@router.post("/organizations/{organization_id}/integration-work/{work_item_id}/outcome")
+async def settle_outcome(organization_id: UUID, work_item_id: UUID, body: OutcomeInput, principal: Principal, session: Session):
+    """The person settles a write whose outcome AgentGate could not confirm, so the task goes on."""
+    enabled()
+    require_permission(principal, "jobs.run")
+    item = await session.scalar(select(WorkItem).where(WorkItem.id == work_item_id,
+        WorkItem.organization_id == organization_id).with_for_update())
+    if not item or (item.payload or {}).get("requestedBy") != str(principal.user_id):
+        raise HTTPException(404, "Your pending task was not found.")
+    if item.status != "uncertain_outcome":
+        raise HTTPException(409, "This task is not waiting for a write to be checked.")
+    runtime = dict(item.payload.get("runtime", {}))
+    current = int(runtime.get("currentStep", 0))
+    run = await session.scalar(select(Run).where(Run.work_item_id == item.id).order_by(Run.created_at.desc()).limit(1))
+    if run is None:
+        raise HTTPException(409, "This task has no saved step to settle.")
+    step = await session.scalar(select(RunStep).where(RunStep.run_id == run.id, RunStep.step_index == current))
+    action = await session.scalar(select(Action).where(Action.organization_id == organization_id,
+        Action.idempotency_key == f"runtime:{run.id}:{current}").with_for_update())
+    scope = str((step.input or {}).get("scope", "")) if step else ""
+    if body.outcome == "check" and ".workspace." in scope:
+        raise HTTPException(409, "A workspace command can't be looked for. Say whether it ran instead.")
+    settled = {"outcome": body.outcome, "by": str(principal.user_id), "at": datetime.now(UTC).isoformat()}
+    if action is not None and body.outcome == "not_done":
+        # The next run of this step sends the write as new instead of looking for it.
+        action.payload = {**(action.payload or {}), "integrationCertainty": "not_executed", "outcomeSettled": settled}
+    phase = "execute"
+    if body.outcome == "done":
+        summary = "A person confirmed this action happened; its result could not be read back."
+        result = {"summary": summary, "data": {"confirmedBy": "person"}}
+        if action is not None:
+            action.status = "executed"
+            action.payload = {**(action.payload or {}), "integrationCertainty": "executed", "result": result,
+                              "outcomeSettled": settled}
+        if step is not None:
+            step.status, step.output = "completed", result
+        current, phase = current + 1, "plan"
+    item.status, item.scheduled_at, run.status = "queued", datetime.now(UTC), "running"
+    item.payload = {**item.payload, "runtime": {**runtime, "currentStep": current, "queueState": "queued",
+        "waitingReason": None, "executionCertainty": None, "outcomeSettled": settled}}
+    await append_audit(session, organization_id=organization_id, principal=principal,
+        event_type="integration.outcome.settled", category="runtime", resource_type="work_item",
+        resource_id=str(item.id), resource_name="Integration task", outcome=body.outcome,
+        summary="A person settled a write whose outcome could not be confirmed.",
+        metadata={"step": int(runtime.get("currentStep", 0)), "scope": scope})
+    await TransactionalOutbox(session).enqueue(topic="run.progress", aggregate_type="work_item", aggregate_id=str(item.id),
+        payload={"organization_id": str(item.organization_id), "work_item_id": str(item.id),
+            "current_step": current, "continuation_phase": phase})
+    await session.commit()
+    messages = {"check": "Looking for the write again.", "not_done": "The step will run again.",
+                "done": "The task carries on from the next step."}
+    return {"status": "queued", "message": messages[body.outcome]}
 
 
 @router.get("/organizations/{organization_id}/integration-review")

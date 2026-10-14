@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     # Waiting for a provider's rate limit or for capacity is not a failure: it has its own
     # budget and does not use up the failure retries.
     integration_rate_limit_max_waits: int = Field(default=12, ge=1, le=100)
+    # A write whose outcome could not be confirmed is looked for again this many times, waiting
+    # this long before the first look and twice as long before each next one, before a person
+    # is asked to check it.
+    integration_outcome_checks: int = Field(default=3, ge=0, le=10)
+    integration_outcome_check_seconds: int = Field(default=60, ge=10, le=3600)
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
