@@ -19,6 +19,18 @@ from app.domain.integrations.foundation import IntegrationNeed, IntegrationTaskD
 READ = "github.repository.metadata.read"
 
 
+@pytest.fixture(autouse=True)
+def github_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The expanded GitHub provider, whatever the environment (its descriptions are what these
+    messages quote); without this the result depended on GITHUB_EXPANDED_ENABLED in .env."""
+    from app.application.services import integration_foundation
+    from app.execution.providers.native.github.provider import ExpandedGitHubProvider
+    from app.execution.providers.registry import ProviderRegistry
+
+    registry = ProviderRegistry((ExpandedGitHubProvider(),))
+    monkeypatch.setattr(integration_foundation, "execution_provider_registry", lambda: registry)
+
+
 def repo(name: str, account: str = "acme", scopes: tuple[str, ...] = (READ,)) -> dict[str, Any]:
     return {"id": str(uuid4()), "connectionId": str(uuid4()), "provider": "github", "externalId": name,
             "name": name, "account": account, "capabilities": list(scopes), "health": "healthy",
