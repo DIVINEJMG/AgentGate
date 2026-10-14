@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from redis.exceptions import RedisError
 from sqlalchemy import select
 
+from app.bootstrap.settings import settings
 from app.execution.contracts import ExecutionProviderError
 from app.execution.providers.integration_hooks import AuthenticationHooks, CredentialBundle
 from app.infrastructure.database.models import IntegrationConnectionState, IntegrationCredential
@@ -68,7 +69,9 @@ class CredentialManager:
         bundle = decode_bundle(decrypt_integration_secret(row.ciphertext))
         if state and bundle.scopes:
             state.credential_metadata = {**state.credential_metadata, "scopes": list(bundle.scopes)}
-        if not bundle.expires_at or bundle.expires_at > datetime.now(UTC) + timedelta(seconds=30):
+        # Renew ahead of expiry, so a run never meets an expired token midway.
+        lead = timedelta(seconds=settings.integration_token_refresh_lead_seconds)
+        if not bundle.expires_at or bundle.expires_at > datetime.now(UTC) + lead:
             return bundle.access_token
         from app.execution.providers.integration_hooks import CredentialRenewalHooks
         renewable = bool(bundle.refresh_token) or (isinstance(provider, CredentialRenewalHooks)
@@ -82,12 +85,13 @@ class CredentialManager:
             if lease is None:
                 raise ExecutionProviderError(code="rate_limited", retryable=True, provider=connection.provider,
                     operation="credential.renew", correlation_id=correlation_id,
-                    safe_message="Credential renewal is already in progress; this action will wait.")
+                    retry_after_seconds=5,
+                    safe_message="The account's sign-in is being renewed, so this action is waiting for it")
             # Row lock and refresh defeat stale in-process bundles after another worker renewed.
             row = await self.session.scalar(select(IntegrationCredential).where(
                 IntegrationCredential.integration_id == connection.id).with_for_update().execution_options(populate_existing=True))
             bundle = decode_bundle(decrypt_integration_secret(row.ciphertext))
-            if bundle.expires_at and bundle.expires_at > datetime.now(UTC) + timedelta(seconds=30):
+            if bundle.expires_at and bundle.expires_at > datetime.now(UTC) + lead:
                 return bundle.access_token
             try:
                 async with asyncio.timeout(30):

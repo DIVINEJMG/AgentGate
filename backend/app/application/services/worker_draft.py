@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from app.application.services.grounding import grounded_in
 from app.domain.ai.providers import AIGateway, AIInvocationContext
 from app.domain.workforce.drafts import WorkerDraft
 
@@ -45,12 +46,14 @@ def _enforce_human_approval_intent(
     if _explicit_approval_requested(instruction):
         return draft
 
+    # Otherwise an approval step stays only when the AI quotes the human's own words asking for
+    # it, in any phrasing ("check with me before posting", "let me review it first").
     jobs = []
     for job in draft.initial_jobs:
         boundaries = [
             boundary
             for boundary in job.approval_boundaries
-            if boundary.kind == "allowed_origins_only"
+            if boundary.kind == "allowed_origins_only" or grounded_in(boundary.request_excerpt, instruction)
         ]
         jobs.append(job.model_copy(update={"approval_boundaries": boundaries}))
     return draft.model_copy(update={"initial_jobs": jobs})
@@ -86,7 +89,12 @@ class WorkerDraftGenerator:
                 "as 'ask me before submitting', 'never send without my approval', or an explicit "
                 "allowed-origin restriction. Do NOT infer an approval boundary merely because an "
                 "action writes data, sends externally, submits a form, clicks a checkbox, accepts "
-                "terms/privacy language, or is high risk. Never grant authority or connections. "
+                "terms/privacy language, or is high risk. The human may say this in any words; for every "
+                "approval boundary set request_excerpt to the exact words of the request that ask for it. "
+                "For a capability need whose actions cannot be undone (submitting forms, uploading, "
+                "publishing, merging, deleting, sending messages), set request_excerpt to the exact words "
+                "of the request that ask for that action; leave it null when the human did not ask for it. "
+                "Never grant authority or connections. "
                 "Choose tools according to the requested outcome and human preferences. A repository coordinate "
                 "or URL identifies a resource and does not select browser tools. Native integrations can work "
                 "with PRs, issues, mail, channels, calendars and files without website interaction. "

@@ -5,6 +5,7 @@ from typing import Any
 from redis.asyncio import Redis
 
 from app.bootstrap.settings import settings
+from app.observability.usage import MeteredRedis
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,7 +22,7 @@ class RedisCoordinator:
 
     @classmethod
     def from_settings(cls) -> "RedisCoordinator":
-        return cls(Redis.from_url(settings.redis_dsn, decode_responses=True))
+        return cls(MeteredRedis.from_url(settings.redis_dsn, decode_responses=True))
 
     async def ping(self) -> bool:
         return bool(await self._client.ping())
@@ -69,6 +70,33 @@ class RedisCoordinator:
 
     async def heartbeat(self, key: str, value: str, *, ttl_seconds: int = 60) -> None:
         await self._client.set(f"heartbeat:{key}", value, ex=ttl_seconds)
+
+    async def claim_flag(self, key: str, *, ttl_seconds: int) -> bool:
+        """Set a short-lived marker unless it is already set; True when this caller set it."""
+        return bool(await self._client.set(f"flag:{key}", "1", ex=max(1, ttl_seconds), nx=True))
+
+    async def clear_flag(self, key: str) -> None:
+        await self._client.delete(f"flag:{key}")
+
+    async def queue_position(self, key: str, member: str, *, stale_seconds: int) -> int:
+        """Join a first-come queue (or stay in it) and return how many are ahead. Members that stopped
+        checking in for stale_seconds (finished or cancelled tasks) are dropped."""
+        script = (
+            "local now=tonumber(ARGV[2]); local stale=tonumber(ARGV[3]); "
+            "for _,m in ipairs(redis.call('ZRANGE',KEYS[1],0,-1)) do "
+            "if now-tonumber(redis.call('HGET',KEYS[2],m) or '0')>stale then "
+            "redis.call('ZREM',KEYS[1],m); redis.call('HDEL',KEYS[2],m) end end; "
+            "redis.call('ZADD',KEYS[1],'NX',now,ARGV[1]); redis.call('HSET',KEYS[2],ARGV[1],now); "
+            "redis.call('EXPIRE',KEYS[1],86400); redis.call('EXPIRE',KEYS[2],86400); "
+            "return redis.call('ZRANK',KEYS[1],ARGV[1])"
+        )
+        import time
+        return int(await self._client.eval(script, 2, f"queue:{key}", f"queue-seen:{key}", member,
+                                           int(time.time()), max(1, stale_seconds)))
+
+    async def queue_leave(self, key: str, member: str) -> None:
+        await self._client.zrem(f"queue:{key}", member)
+        await self._client.hdel(f"queue-seen:{key}", member)
 
     async def cache_set(self, key: str, value: str, *, ttl_seconds: int) -> None:
         await self._client.set(f"cache:{key}", value, ex=ttl_seconds)

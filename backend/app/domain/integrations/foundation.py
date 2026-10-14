@@ -17,6 +17,18 @@ class IntegrationNeed(BaseModel):
     # Constraints must be grounded in the human instruction, never provider text.
     destinations: dict[str, str] = Field(default_factory=dict)
     constraints: dict[str, list[str]] = Field(default_factory=dict)
+    # The human's exact words asking for this need's writes (posting, creating, changing, sending).
+    # Writes other people can see run without approval only when asked for in so many words.
+    request_excerpt: str = Field(default="", max_length=500)
+
+
+class IntegrationEventTrigger(BaseModel):
+    """Run the task each time this happens in a connected account, instead of once now."""
+    model_config = ConfigDict(extra="forbid")
+    provider: str
+    event: str = Field(min_length=1, max_length=128)  # "issues.opened", or "push"
+    # The human's exact words asking for it; checked, never assumed.
+    request_excerpt: str = Field(min_length=1, max_length=500)
 
 
 class IntegrationTaskDraft(BaseModel):
@@ -26,6 +38,7 @@ class IntegrationTaskDraft(BaseModel):
     needs: list[IntegrationNeed] = Field(min_length=1, max_length=12)
     standing_request_excerpt: str | None = Field(default=None, max_length=500)
     runtime_requirements: list[str] = Field(default_factory=list)
+    event_trigger: IntegrationEventTrigger | None = None
 
 
 @dataclass(frozen=True)

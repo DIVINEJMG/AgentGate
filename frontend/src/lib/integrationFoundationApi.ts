@@ -35,8 +35,10 @@ export async function shareConnection(version: ApiVersion, org: string, connecti
 export async function reconnectConnection(version: ApiVersion, org: string, connection: string, credential: string) {
   return api.post(`${path(version, org)}/integration-connections/${connection}/reconnect`, { credential });
 }
-export async function discoverConnectionResources(version: ApiVersion, org: string, connection: string) {
-  return api.post(`${path(version, org)}/integration-connections/${connection}/discover`, {});
+/** Refreshes what the account offers. Resources the provider no longer returns become unavailable. */
+export async function discoverConnectionResources(version: ApiVersion, org: string, connection: string): Promise<{ count: number; unavailable: number; discoveredAt?: string | null }> {
+  const response = await api.post(`${path(version, org)}/integration-connections/${connection}/discover`, {});
+  return response.data;
 }
 export async function resumeIntegrationWork(version: ApiVersion, org: string, workItem: string) {
   return api.post(`${path(version, org)}/integration-work/${workItem}/resume`, {});

@@ -19,6 +19,7 @@ from app.infrastructure.ai.model_profiles import (
     model_profile,
     validate_context,
 )
+from app.infrastructure.ai.streaming import timeout_error, transport_timeout
 
 # Endpoint metadata is refreshed by readiness checks; local validation always remains mandatory.
 MODEL_FORMATS = {key.partition(":")[2]: (None if p.output_format == "prompt_json" else "json_object")
@@ -93,7 +94,7 @@ class OpenRouterPlannerProvider:
             body["provider"]["require_parameters"] = True
         try:
             async with httpx.AsyncClient(
-                timeout=self.timeout_seconds, transport=self.transport
+                timeout=transport_timeout(self.timeout_seconds, stream=request.stream), transport=self.transport
             ) as client:
                 if request.stream:
                     from app.infrastructure.ai.streaming import collect_response
@@ -187,7 +188,8 @@ class OpenRouterPlannerProvider:
                 usage=usage,
             )
         except httpx.TimeoutException as exc:
-            raise AIProviderError("timeout", "Planner request timed out.", retryable=True) from exc
+            raise timeout_error(exc, total_seconds=self.timeout_seconds, stream=request.stream,
+                                message="Planner request timed out.") from exc
         except httpx.HTTPError as exc:
             raise AIProviderError(
                 "provider_unavailable", "Planner endpoint could not be reached.", retryable=True

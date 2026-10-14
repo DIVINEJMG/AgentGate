@@ -211,7 +211,7 @@ async def test_full_diff_export_releases_transaction_for_every_external_call(wor
     assert database.saved.evidence["exportArtifactId"] == "new-diff"
 
 
-async def test_lost_edit_acknowledgement_remains_uncertain(workspace):
+async def test_lost_edit_acknowledgement_is_retried_because_edits_are_safe_to_repeat(workspace):
     request, database, runtime, _ = workspace
     request.operation, request.capability.scope = "repository.workspace.edit", "github.repository.workspace.edit"
     request.input = {"path": "allowed.py", "content": "saved edit"}
@@ -225,8 +225,9 @@ async def test_lost_edit_acknowledgement_remains_uncertain(workspace):
     runtime.read = AsyncMock()
     with pytest.raises(ExecutionProviderError) as failure:
         await service.execute_coding_action(None, request, {}, None, runtime)
-    assert failure.value.error.code == "uncertain_outcome"
-    assert not failure.value.error.retryable
+    # A repeated edit finds its work already done (sandbox_helper), so it is retried, not paused.
+    assert failure.value.error.code == "temporary_provider_error"
+    assert failure.value.error.retryable
     runtime.read.assert_not_awaited()
 
 

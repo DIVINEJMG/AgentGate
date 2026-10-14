@@ -266,6 +266,7 @@ async def request_runtime_execution(
     expected_step: int | None = None,
     reason: str = "queued",
     delay_seconds: int | None = None,
+    queue_partition: str | None = None,
 ) -> str | None:
     result = await request_runtime_execution_detailed(
         organization_id=organization_id,
@@ -273,6 +274,7 @@ async def request_runtime_execution(
         expected_step=expected_step,
         reason=reason,
         delay_seconds=delay_seconds,
+        queue_partition=queue_partition,
     )
     return result.message_id
 

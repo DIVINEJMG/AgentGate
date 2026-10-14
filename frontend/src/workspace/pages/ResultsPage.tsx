@@ -239,6 +239,7 @@ function ResultReader({ organization, apiVersion, resultId, artifacts, onExporte
         const artifact = artifacts.find((item) => item.id === block.artifactId);
         return <button type='button' className='ws-doc-attachment' key={index} onClick={() => void openArtifact(block.artifactId)}><Paperclip size={15} /><span><strong>{artifact?.name || block.label}</strong><small>{artifact ? `${formatBytes(artifact.bytes)} · ${artifact.contentType}` : 'Open attachment'}</small></span></button>;
       })}</div>
+      {(result.completionCheck?.length ?? 0) > 0 && <section className='ws-doc-sources ws-doc-criteria'><h2>Completion check</h2><ul>{result.completionCheck!.map((entry) => <li key={entry.criterion} data-status={entry.status}><State tone={entry.status === 'met' ? 'ok' : 'warn'} label={CRITERION_LABEL[entry.status]} /> {entry.criterion}{entry.evidenceSteps.length > 0 && <small> · shown by step {entry.evidenceSteps.join(', ')}</small>}</li>)}</ul></section>}
       {result.sourceReferences.length > 0 && <section className='ws-doc-sources'><h2>Sources</h2><ol>{result.sourceReferences.map((source) => <li key={source.url}><a href={source.url} target='_blank' rel='noreferrer'>{source.label}</a></li>)}</ol></section>}
       <details className='ws-technical ws-doc-technical'>
         <summary>How this was produced</summary>
@@ -256,6 +257,8 @@ function ResultReader({ organization, apiVersion, resultId, artifacts, onExporte
     </article>
   </div>;
 }
+
+const CRITERION_LABEL = { met: 'Met', not_met: 'Not met', not_verifiable: 'Not verified' } as const;
 
 function formatBytes(value: number) {
   if (value < 1024) return `${value} B`;

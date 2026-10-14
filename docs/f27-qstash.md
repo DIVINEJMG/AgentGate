@@ -14,8 +14,8 @@ Normal work is event-driven: creating, continuing, or retrying a WorkItem publis
 
 The staging recovery cadence is intentionally conservative:
 
-- Runtime recovery sweep: every 10 minutes (`*/10 * * * *`).
-- Transactional outbox recovery drain: every 15 minutes (`*/15 * * * *`).
+- Runtime recovery sweep: every 10 minutes (`*/10 * * * *`). It also runs coding-session clean-up and the stale web-research check, which used to run on every drain.
+- Transactional outbox recovery drain: every 15 minutes (`*/15 * * * *`). Commits send at most one drain request at a time (a Redis marker); see [phase 7](benchmarks/phase-7-events.md).
 - Heartbeat: every hour (`0 * * * *`).
 
 This baseline consumes about 264 scheduled QStash messages per day before real workload, leaving most of the free-plan daily allowance for actual runtime executions and continuations. Do not restore the old every-minute runtime sweep or five-minute outbox drain on the free plan.

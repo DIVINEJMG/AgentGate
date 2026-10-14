@@ -55,15 +55,16 @@ async def test_native_worker_classification_does_not_invent_a_browser_site():
 
 
 @pytest.mark.asyncio
-async def test_compiler_gets_conversation_context_and_rejects_invented_standing_grant(monkeypatch):
+async def test_compiler_gets_conversation_context_and_drops_invented_standing_grant(monkeypatch):
     foundation = IntegrationFoundation(cast(AsyncSession, SimpleNamespace()))
     monkeypatch.setattr(foundation, "catalog", AsyncMock(return_value=[]))
     gateway = SimpleNamespace(generate_structured=AsyncMock(return_value={
         "objective": "Review PR", "needs": [{"provider": "github", "scopes": ["github.repository.issues.read"]}], "completion_criteria": ["Report"],
         "standing_request_excerpt": "Do this forever"}))
-    with pytest.raises(IntegrationRequirementError):
-        await foundation.interpret(cast(AIGateway, gateway), organization_id=uuid4(), user_id=uuid4(),
-            instruction="Review that PR", conversation_context={"thread": {"messages": ["PR 17"]}})
+    # Words the human never said cannot make a task ongoing: it stays one-off, without a question.
+    draft = await foundation.interpret(cast(AIGateway, gateway), organization_id=uuid4(), user_id=uuid4(),
+        instruction="Review that PR", conversation_context={"thread": {"messages": ["PR 17"]}})
+    assert draft.standing_request_excerpt is None
     assert "PR 17" in gateway.generate_structured.call_args.kwargs["prompt"]
 
 

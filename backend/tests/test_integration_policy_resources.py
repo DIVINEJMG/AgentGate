@@ -49,11 +49,11 @@ def resource_setup(monkeypatch):
 @pytest.mark.parametrize("effect, outcome", [("allow", "ALLOW"), ("deny", "DENY"), ("require_approval", "REQUIRE_APPROVAL")])
 async def test_new_resource_identity_reaches_org_policy_without_legacy_connection_alias(resource_setup, monkeypatch, effect, outcome):
     session, org, rid, aid, _, _, legacy = resource_setup
-    monkeypatch.setattr(governance, "_policy_public", AsyncMock(return_value={
+    monkeypatch.setattr(governance, "_policies_public", AsyncMock(return_value=[{
         "id": "policy", "name": "Exact resource", "revision": 1, "effect": effect, "priority": 100,
         "selectors": {"agentIds": [str(aid)], "resourceIds": [str(rid)],
             "scopes": ["github.repository.contents.read"], "actions": [], "risks": []},
-    }))
+    }]))
     decision = await governance._evaluate(session, org, _system_principal(org),
         agent_id=aid, resource_id=str(rid), scope="github.repository.contents.read")
     assert decision["outcome"] == outcome
@@ -97,11 +97,11 @@ async def test_planner_keeps_authorized_tools_for_new_resource_ids(resource_setu
 
     session, org, rid, aid, row, connection, _ = resource_setup
     session.get.side_effect = [None, row, connection]
-    monkeypatch.setattr(governance, "_policy_public", AsyncMock(return_value={
+    monkeypatch.setattr(governance, "_policies_public", AsyncMock(return_value=[{
         "id": "policy", "name": "Exact resource", "revision": 1, "effect": "allow", "priority": 100,
         "selectors": {"agentIds": [str(aid)], "resourceIds": [str(rid)],
             "scopes": ["github.repository.contents.read"], "actions": [], "risks": []},
-    }))
+    }]))
     executor = object.__new__(managed.ManagedRuntimeExecutor)
     executor._session, executor._registry = session, ProviderRegistry((ExpandedGitHubProvider(),))
     executor._active_scopes = AsyncMock(return_value=frozenset({"github.repository.contents.read"}))
@@ -110,7 +110,7 @@ async def test_planner_keeps_authorized_tools_for_new_resource_ids(resource_setu
         "actions": [{"scope": "github.repository.contents.read"}]}]})
     tools = await executor._planner_tools(item=cast(WorkItem, SimpleNamespace(id=uuid4(), organization_id=org)),
         revision=cast(JobRevision, SimpleNamespace(definition={"requiredCapabilities": ["github.repository.contents.read"]})),
-        agent=cast(AgentIdentity, SimpleNamespace(id=aid)))
+        agent=cast(AgentIdentity, SimpleNamespace(id=aid, name="Agent", status="active")))
     assert [(tool["resourceId"], tool["scope"]) for tool in tools] == [(str(rid), "github.repository.contents.read")]
     assert executor._capability_exclusions == []
 
@@ -205,11 +205,11 @@ async def test_preparation_reuses_reads_but_execution_rechecks_current_policy(re
     ]}
     live = AsyncMock(return_value=resource)
     profile = AsyncMock(return_value={"activeScopes": ["read", "write"]})
-    public = AsyncMock(return_value={"id": "p", "name": "Policy", "revision": 1,
-        "effect": "allow", "priority": 100, "selectors": {}})
+    public = AsyncMock(return_value=[{"id": "p", "name": "Policy", "revision": 1,
+        "effect": "allow", "priority": 100, "selectors": {}}])
     monkeypatch.setattr(governance, "_live_policy_resource", live)
     monkeypatch.setattr(governance, "_profile", profile)
-    monkeypatch.setattr(governance, "_policy_public", public)
+    monkeypatch.setattr(governance, "_policies_public", public)
     cache = {}
     for scope in ("read", "write"):
         decision = await governance._evaluate(session, org, _system_principal(org),
@@ -222,7 +222,7 @@ async def test_preparation_reuses_reads_but_execution_rechecks_current_policy(re
     # Unknown capabilities remain denied even with a warm preparation snapshot.
     assert (await governance._evaluate(session, org, _system_principal(org),
         agent_id=aid, resource_id=str(rid), scope="delete", preparation_cache=cache))["outcome"] == "DENY"
-    public.return_value = {**public.return_value, "effect": "deny", "revision": 2}
+    public.return_value = [{**public.return_value[0], "effect": "deny", "revision": 2}]
     assert (await governance._evaluate(session, org, _system_principal(org),
         agent_id=aid, resource_id=str(rid), scope="write"))["outcome"] == "DENY"
     assert session.scalar.await_count == session.scalars.await_count == 2

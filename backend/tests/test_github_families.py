@@ -348,16 +348,20 @@ async def test_command_exit_file_cannot_fake_a_successful_test():
 
 async def test_coding_capacity_is_durable_and_does_not_create_an_extra_sandbox(monkeypatch):
     monkeypatch.setattr(settings, "coding_global_concurrency", 2)
+    queue = SimpleNamespace(queue_position=AsyncMock(return_value=0), queue_leave=AsyncMock(), close=AsyncMock())
+    monkeypatch.setattr("app.execution.coding.service.RedisCoordinator.from_settings", lambda: queue)
     session = SimpleNamespace(scalar=AsyncMock(side_effect=[2, 0]))
-    with pytest.raises(ExecutionProviderError, match="capacity is full"):
+    with pytest.raises(ExecutionProviderError, match="Waiting for a coding workspace: this task is next"):
         await admit_capacity(
             session,
             SimpleNamespace(
                 organization_id=uuid4(),
+                work_item_id=uuid4(),
                 operation="repository.workspace.open",
                 correlation_id="test",
             ),
         )
+    queue.queue_leave.assert_not_awaited()
 
 
 async def test_delayed_outbox_retry_retains_event_and_allows_other_deliveries():

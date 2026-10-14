@@ -77,7 +77,7 @@ export function PoliciesStage(props: {
         <label className='ws-field'>Scope<select value={p.evalScope} onChange={(event) => { p.setEvalScope(event.target.value); p.clearDecision(); }}><option value=''>Choose a scope</option>{p.scopeOptions.map((item) => <option key={item.scope} value={item.scope}>{item.scope}</option>)}</select></label>
         {p.decision && outcome && <div className='ws-verdict' data-tone={outcome.tone} key={p.decision.evaluatedAt} role='status'>
           <strong>{outcome.label}</strong>
-          <p>{p.decision.reason}</p>
+          <p>{p.decision.explanation || p.decision.reason}</p>{p.decision.explanation && <small className="policy-reason-detail">{p.decision.reason}</small>}
           <dl className='ws-facts ws-facts-stacked'>
             <div><dt>Deciding rule</dt><dd>{p.decision.winningPolicy ? `${p.decision.winningPolicy.name} · priority ${p.decision.winningPolicy.priority}` : 'No rule matched, or a precondition failed'}</dd></div>
             <div><dt>Risk</dt><dd>{p.decision.riskAssessment ? `${sentence(p.decision.riskAssessment.baselineRisk)} → ${p.decision.riskAssessment.effectiveRisk}` : 'Unavailable'}</dd></div>

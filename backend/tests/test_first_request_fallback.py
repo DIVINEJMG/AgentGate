@@ -160,8 +160,10 @@ def test_settings_wire_worker_and_chat_fallback_without_changing_vision():
     gateway = ai_gateway_from_settings(config)
     assert isinstance(gateway, OrderedTextGateway)
     assert len(gateway.routes) == 7
-    assert gateway.routes[0]["provider"] == "nvidia_nim"
-    assert gateway.routes[0]["model"] == "openai/gpt-oss-20b"
+    # The configured chat order, whatever it is (the owner chooses it in AI_INTERACTIVE_ROUTES).
+    from app.infrastructure.ai.text_routes import snapshot_routes
+    first = snapshot_routes(config, "interactive")[0]
+    assert (gateway.routes[0]["provider"], gateway.routes[0]["model"]) == (first["provider"], first["model"])
     assert gateway.budget_seconds == 1500
     assert gateway.attempt_seconds == 250
     assert gateway.legacy._registry.route("vision").model == config.ai_vision_model

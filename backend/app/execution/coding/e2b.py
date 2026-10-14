@@ -92,6 +92,16 @@ class E2BCodingRuntime:
         # Handles belong to this action only; releasing them does not pause/delete the VM.
         self._sandboxes.clear()
 
+    async def exists(self, sandbox_id):
+        """False only when E2B confirms the sandbox is gone (killed or expired); other errors raise."""
+        try:
+            await self.sdk.get_info(sandbox_id, api_key=self.api_key)
+        except Exception as error:
+            if "notfound" in type(error).__name__.lower() or "not found" in str(error).lower():
+                return False
+            raise
+        return True
+
     async def find(self, session_id):
         query = importlib.import_module("e2b").SandboxQuery(
             metadata={"codingSessionId": session_id}

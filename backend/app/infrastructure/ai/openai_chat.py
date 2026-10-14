@@ -13,7 +13,7 @@ from app.infrastructure.ai.nvidia import (
     _retry_after,
     _usage_from_payload,
 )
-from app.infrastructure.ai.streaming import collect_response
+from app.infrastructure.ai.streaming import collect_response, timeout_error, transport_timeout
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -149,7 +149,7 @@ class ConfiguredChatProvider:
         try:
             async with (
                 httpx.AsyncClient(
-                    timeout=self.timeout_seconds,
+                    timeout=transport_timeout(self.timeout_seconds, stream=bool(body["stream"])),
                     transport=self.transport,
                     follow_redirects=False,
                 ) as client,
@@ -229,7 +229,8 @@ class ConfiguredChatProvider:
         except AIProviderError:
             raise
         except httpx.TimeoutException as exc:
-            raise AIProviderError("timeout", "Text transport timed out.", retryable=True) from exc
+            raise timeout_error(exc, total_seconds=self.timeout_seconds, stream=bool(body["stream"]),
+                                message="Text transport timed out.") from exc
         except httpx.HTTPError as exc:
             raise AIProviderError(
                 "provider_unavailable", "Text endpoint could not be reached.", retryable=True

@@ -13,7 +13,9 @@ export default function App() {
   const [path, setPath] = useState(()=>routePath(window.location));
   const rawRoute=path==='/'?'home':path.slice(1);
   // Workspace URLs carry their own sub-paths (/app/workers/…, /workspace-preview/…).
-  const route=rawRoute.startsWith('app/')?'app':rawRoute.startsWith('workspace-preview/')?'workspace-preview':rawRoute;
+  // A GitHub setup return addressed to the site root (older links) still belongs to the workspace.
+  const githubSetup=rawRoute==='home'&&new URLSearchParams(window.location.search).has('github_setup');
+  const route=githubSetup||rawRoute.startsWith('app/')?'app':rawRoute.startsWith('workspace-preview/')?'workspace-preview':rawRoute;
   const [bootstrap]=useState(readBootstrap);
 
   useEffect(() => {

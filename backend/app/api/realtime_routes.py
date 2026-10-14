@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
@@ -81,6 +82,8 @@ async def organization_events_replay(
     organization_id: UUID,
     cursor: str = Query(default="0-0"),
     limit: int = Query(default=200, ge=1, le=500),
+    run_id: Annotated[UUID | None, Query(alias="runId")] = None,
+    worker_id: Annotated[UUID | None, Query(alias="workerId")] = None,
 ) -> dict[str, object]:
     token = _bearer_from_request(request)
     try:
@@ -92,18 +95,17 @@ async def organization_events_replay(
 
     bus = RedisRealtimeBus.from_settings()
     try:
-        events = await bus.read(
+        events, next_cursor = await bus.read_page(
             organization_id=organization_id,
             after=cursor,
             count=limit,
             block_ms=None,
+            run_id=run_id,
+            worker_id=worker_id,
         )
     finally:
         await bus.close()
 
-    next_cursor = cursor
-    if events:
-        next_cursor = str(events[-1]["stream_id"])
     return {
         "events": events,
         "cursor": next_cursor,
@@ -119,6 +121,8 @@ async def organization_events_sse(
     request: Request,
     organization_id: UUID,
     cursor: str = Query(default="0-0"),
+    run_id: Annotated[UUID | None, Query(alias="runId")] = None,
+    worker_id: Annotated[UUID | None, Query(alias="workerId")] = None,
 ) -> StreamingResponse:
     token = _bearer_from_request(request)
     try:
@@ -133,21 +137,23 @@ async def organization_events_sse(
         current = cursor
         try:
             while not await request.is_disconnected():
-                batch = await bus.read(
+                batch, current = await bus.read_page(
                     organization_id=organization_id,
                     after=current,
                     count=100,
                     block_ms=15000,
+                    run_id=run_id,
+                    worker_id=worker_id,
                 )
                 if not batch:
                     yield ": keepalive\n\n"
                     await asyncio.sleep(0)
                     continue
                 for event in batch:
-                    current = str(event["stream_id"])
+                    event_id = str(event["stream_id"])
                     data = json.dumps(event, separators=(",", ":"), default=str)
                     yield (
-                        f"id: {current}\n"
+                        f"id: {event_id}\n"
                         f"event: {event.get('event_type', 'message')}\n"
                         f"data: {data}\n\n"
                     )

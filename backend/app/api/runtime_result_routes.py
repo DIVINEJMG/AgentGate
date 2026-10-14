@@ -7,7 +7,7 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_dependencies import organization_principal
@@ -58,49 +58,97 @@ v1_router = APIRouter(tags=["runtime", "memory", "results"])
 v2_router = APIRouter(tags=["runtime", "memory", "results"])
 
 
+async def _runs_public(
+    session: AsyncSession, runs: list[Run]
+) -> list[dict[str, Any]]:
+    """Public run records for many runs in five queries, whatever the number of runs.
+
+    Only the columns the response uses are read: step and artifact IDs (never step input or
+    output), and the ``runtime`` part of each work item's payload. Reading whole rows per run
+    made the runs list transfer every stored step output on every refresh.
+    """
+    if not runs:
+        return []
+    run_ids = [run.id for run in runs]
+    items = {
+        row.id: row
+        for row in await session.execute(
+            select(WorkItem.id, WorkItem.job_id, WorkItem.payload["runtime"].label("runtime"))
+            .where(WorkItem.id.in_({run.work_item_id for run in runs}))
+        )
+    }
+    jobs = {
+        row.id: row
+        for row in await session.execute(
+            select(Job.id, Job.worker_id).where(Job.id.in_({item.job_id for item in items.values()}))
+        )
+    } if items else {}
+    workers = {
+        row.id: row
+        for row in await session.execute(
+            select(Worker.id, Worker.agent_identity_id)
+            .where(Worker.id.in_({job.worker_id for job in jobs.values()}))
+        )
+    } if jobs else {}
+    step_ids: dict[UUID, list[str]] = defaultdict(list)
+    for row in await session.execute(
+        select(RunStep.run_id, RunStep.id)
+        .where(RunStep.run_id.in_(run_ids))
+        .order_by(RunStep.run_id, RunStep.step_index)
+    ):
+        step_ids[row.run_id].append(str(row.id))
+    artifact_ids: dict[UUID, list[str]] = defaultdict(list)
+    for row in await session.execute(
+        select(Artifact.run_id, Artifact.id).where(Artifact.run_id.in_(run_ids))
+    ):
+        artifact_ids[row.run_id].append(str(row.id))
+    public = []
+    for run in runs:
+        item = items.get(run.work_item_id)
+        job = jobs.get(item.job_id) if item else None
+        worker = workers.get(job.worker_id) if job else None
+        raw_runtime = item.runtime if item is not None else None
+        public.append(_run_record(
+            run,
+            dict(raw_runtime) if isinstance(raw_runtime, dict) else {},
+            job_id=str(job.id) if job else "",
+            worker_id=str(worker.id) if worker else "",
+            agent_id=str(worker.agent_identity_id) if worker else "",
+            step_ids=step_ids[run.id],
+            artifact_ids=artifact_ids[run.id],
+        ))
+    return public
+
+
 async def _run_public(
     session: AsyncSession, run: Run
 ) -> dict[str, Any]:
-    item = await session.get(WorkItem, run.work_item_id)
-    job = await session.get(Job, item.job_id) if item else None
-    worker = await session.get(Worker, job.worker_id) if job else None
-    steps = list(
-        (
-            await session.scalars(
-                select(RunStep)
-                .where(RunStep.run_id == run.id)
-                .order_by(RunStep.step_index)
-            )
-        ).all()
-    )
-    artifacts = list(
-        (
-            await session.scalars(
-                select(Artifact).where(Artifact.run_id == run.id)
-            )
-        ).all()
-    )
-    raw_runtime = (
-        item.payload.get("runtime")
-        if item is not None and isinstance(item.payload, dict)
-        else None
-    )
-    meta: dict[str, Any] = (
-        dict(raw_runtime) if isinstance(raw_runtime, dict) else {}
-    )
+    return (await _runs_public(session, [run]))[0]
+
+
+def _run_record(
+    run: Run,
+    meta: dict[str, Any],
+    *,
+    job_id: str,
+    worker_id: str,
+    agent_id: str,
+    step_ids: list[str],
+    artifact_ids: list[str],
+) -> dict[str, Any]:
     return {
         "id": str(run.id),
         "organizationId": str(run.organization_id),
         "workItemId": str(run.work_item_id),
-        "jobId": str(job.id) if job else "",
-        "workerId": str(worker.id) if worker else "",
-        "agentId": str(worker.agent_identity_id) if worker else "",
+        "jobId": job_id,
+        "workerId": worker_id,
+        "agentId": agent_id,
         "status": run.status,
         "attempt": int(meta.get("attempt", 1)),
         "currentStep": int(meta.get("currentStep", 0)),
-        "stepIds": [str(step.id) for step in steps],
+        "stepIds": step_ids,
         "contextMemoryIds": list(meta.get("contextMemoryIds", [])),
-        "artifactIds": [str(artifact.id) for artifact in artifacts],
+        "artifactIds": artifact_ids,
         "planSummary": str(meta.get("planSummary", "")),
         "resultSummary": run.result_summary,
         "failure": meta.get("failure"),
@@ -239,7 +287,7 @@ async def runtime_v1(
             )
         ).all()
     )
-    public = [await _run_public(session, run) for run in runs]
+    public = await _runs_public(session, runs)
     counts = Counter(run.status for run in runs)
     return {
         "runs": public,
@@ -636,44 +684,67 @@ async def retry_item_v2(
     return {"data": {"workItem": await work_item_v2(session, item)}}
 
 
+async def _memories_state(
+    session: AsyncSession, memories: list[Memory]
+) -> dict[Any, dict[str, Any]]:
+    """Each memory's metadata from its audit events, for many memories in one query.
+
+    Reads only the events about these memories, and only their type and ``metadata`` part.
+    Previously every memory loaded every memory event of its organisation, as whole rows.
+    """
+    if not memories:
+        return {}
+    events: dict[tuple[Any, str], list[Any]] = defaultdict(list)
+    for row in await session.execute(
+        select(
+            AuditEvent.organization_id,
+            AuditEvent.event_type,
+            AuditEvent.resource["id"].astext.label("resource_id"),
+            AuditEvent.payload["metadata"].label("event_metadata"),
+        )
+        .where(
+            AuditEvent.organization_id.in_({memory.organization_id for memory in memories}),
+            AuditEvent.event_type.in_(["memory.created", "memory.archived", "memory.promoted"]),
+            AuditEvent.resource["id"].astext.in_([str(memory.id) for memory in memories]),
+        )
+        .order_by(AuditEvent.created_at)
+    ):
+        events[(row.organization_id, str(row.resource_id))].append(row)
+    result = {}
+    for memory in memories:
+        metadata: dict[str, Any] = {}
+        for event in events.get((memory.organization_id, str(memory.id)), []):
+            raw = event.event_metadata if event.event_metadata is not None else {}
+            if isinstance(raw, dict):
+                metadata.update(raw)
+            if event.event_type == "memory.archived":
+                metadata["status"] = "archived"
+            if event.event_type == "memory.promoted":
+                metadata["source"] = "promoted"
+        result[memory.id] = metadata
+    return result
+
+
 async def _memory_state(
     session: AsyncSession, memory: Memory
 ) -> dict[str, Any]:
-    events = list(
-        (
-            await session.scalars(
-                select(AuditEvent)
-                .where(
-                    AuditEvent.organization_id == memory.organization_id,
-                    AuditEvent.event_type.in_(
-                        ["memory.created", "memory.archived", "memory.promoted"]
-                    ),
-                )
-                .order_by(AuditEvent.created_at)
-            )
-        ).all()
-    )
-    relevant = [
-        event
-        for event in events
-        if str((event.resource or {}).get("id", "")) == str(memory.id)
-    ]
-    metadata: dict[str, Any] = {}
-    for event in relevant:
-        raw = (event.payload or {}).get("metadata", {})
-        if isinstance(raw, dict):
-            metadata.update(raw)
-        if event.event_type == "memory.archived":
-            metadata["status"] = "archived"
-        if event.event_type == "memory.promoted":
-            metadata["source"] = "promoted"
-    return metadata
+    return (await _memories_state(session, [memory]))[memory.id]
+
+
+async def _memories_public(
+    session: AsyncSession, memories: list[Memory]
+) -> list[dict[str, Any]]:
+    states = await _memories_state(session, memories)
+    return [_memory_record(memory, states[memory.id]) for memory in memories]
 
 
 async def _memory_public(
     session: AsyncSession, memory: Memory
 ) -> dict[str, Any]:
-    metadata = await _memory_state(session, memory)
+    return _memory_record(memory, await _memory_state(session, memory))
+
+
+def _memory_record(memory: Memory, metadata: dict[str, Any]) -> dict[str, Any]:
     scope = memory.scope
     owner = memory.owner_id
     return {
@@ -771,7 +842,7 @@ async def memory_v1(
             )
         ).all()
     )
-    public = [await _memory_public(session, row) for row in rows]
+    public = await _memories_public(session, rows)
     return {
         "memories": public,
         "policy": await _memory_policy(session, organization_id),
@@ -1233,18 +1304,47 @@ async def _run_execution_provenance(
 
     return tuple(provenance)
 
+async def _result_details(
+    session: AsyncSession, results: list[Result]
+) -> list[dict[str, Any]]:
+    """Result details with worker, job and latest version, in three queries for any number."""
+    if not results:
+        return []
+    workers = {
+        row.id: row
+        for row in await session.execute(
+            select(Worker.id, Worker.name, Worker.department)
+            .where(Worker.id.in_({result.worker_id for result in results}))
+        )
+    }
+    jobs = {
+        row.id: row.name
+        for row in await session.execute(select(Job.id, Job.name).where(Job.id.in_({result.job_id for result in results})))
+    }
+    bodies = {
+        (row.result_id, row.version): row.body
+        for row in await session.execute(
+            select(ResultVersion.result_id, ResultVersion.version, ResultVersion.body).where(
+                tuple_(ResultVersion.result_id, ResultVersion.version).in_(
+                    [(result.id, result.latest_version) for result in results]
+                )
+            )
+        )
+    }
+    return [
+        _result_record(result, workers.get(result.worker_id), jobs.get(result.job_id), bodies.get((result.id, result.latest_version)))
+        for result in results
+    ]
+
+
 async def _result_detail(
     session: AsyncSession, result: Result
 ) -> dict[str, Any]:
-    worker = await session.get(Worker, result.worker_id)
-    job = await session.get(Job, result.job_id)
-    version = await session.scalar(
-        select(ResultVersion).where(
-            ResultVersion.result_id == result.id,
-            ResultVersion.version == result.latest_version,
-        )
-    )
-    body = version.body if version and isinstance(version.body, dict) else {}
+    return (await _result_details(session, [result]))[0]
+
+
+def _result_record(result: Result, worker: Any, job_name: str | None, raw_body: Any) -> dict[str, Any]:
+    body = raw_body if isinstance(raw_body, dict) else {}
     return {
         "id": str(result.id),
         "organizationId": str(result.organization_id),
@@ -1252,7 +1352,7 @@ async def _result_detail(
         "workerName": worker.name if worker else "",
         "department": worker.department if worker else "",
         "jobId": str(result.job_id),
-        "jobName": job.name if job else "",
+        "jobName": job_name if job_name is not None else "",
         "title": result.title,
         "summary": str(body.get("summary", "")),
         "status": result.status,
@@ -1272,6 +1372,7 @@ async def _result_detail(
         "actionIds": list(body.get("actionIds", [])),
         "approvalIds": list(body.get("approvalIds", [])),
         "executionProvenance": list(body.get("executionProvenance", [])),
+        "completionCheck": list(body.get("completionCheck", [])),
         "correlationId": str(body.get("correlationId", "")),
         "runStartedAt": str(body.get("runStartedAt", "")),
         "durationMs": body.get("durationMs"),
@@ -1294,7 +1395,7 @@ async def _results_workspace(
             )
         ).all()
     )
-    details = [await _result_detail(session, row) for row in rows]
+    details = await _result_details(session, rows)
     seen = await latest_setting(session, organization_id, "results.seen")
     seen_at = str(seen.get("seenAt")) if seen and seen.get("seenAt") else None
     for item in details:

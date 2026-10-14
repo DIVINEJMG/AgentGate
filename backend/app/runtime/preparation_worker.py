@@ -2,9 +2,10 @@
 
 import asyncio
 import logging
+from contextlib import suppress
 from datetime import UTC, datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from app.bootstrap.settings import settings
 from app.infrastructure.database.models import (
@@ -14,10 +15,33 @@ from app.infrastructure.database.models import (
     PlannerDecision,
 )
 from app.infrastructure.database.session import session_factory
+from app.infrastructure.database.usage_records import record_usage
+from app.observability.usage import Usage, label_usage, metered
 
 logger = logging.getLogger("uvicorn.error")
 _tasks = {}
 _decision_ids = {}
+
+# Recovery runs often while preparations are active and rarely when nothing is pending, so an
+# idle backend lets the database scale to zero (Neon suspends a compute after five minutes
+# without queries). A finished preparation wakes it, since it may have scheduled a retry.
+RECOVERY_BUSY_SECONDS = 15.0
+_recovery_wake: asyncio.Event | None = None
+
+
+def _wake_recovery(_completed=None):
+    if _recovery_wake is not None:
+        _recovery_wake.set()
+
+
+def next_recovery_delay(*, started: int, active: int, next_retry_at, now, idle_seconds: float) -> float:
+    """Seconds until the next recovery pass."""
+    if started or active:
+        return RECOVERY_BUSY_SECONDS
+    if next_retry_at is not None:
+        until_retry = (next_retry_at - now).total_seconds() + 1
+        return max(RECOVERY_BUSY_SECONDS, min(idle_seconds, until_retry))
+    return max(RECOVERY_BUSY_SECONDS, idle_seconds)
 
 
 def start_preparation(command_id, decision_id=None):
@@ -26,7 +50,7 @@ def start_preparation(command_id, decision_id=None):
         previous.cancel()
         _tasks.pop(command_id, None)
     if command_id not in _tasks:
-        task = asyncio.create_task(_prepare(command_id))
+        task = asyncio.create_task(_metered(_prepare, command_id, kind="preparation.task"))
         _tasks[command_id] = task
         _decision_ids[command_id] = decision_id
         def finished(completed):
@@ -34,14 +58,28 @@ def start_preparation(command_id, decision_id=None):
                 _tasks.pop(command_id, None)
                 _decision_ids.pop(command_id, None)
         task.add_done_callback(finished)
+        task.add_done_callback(_wake_recovery)
 
 
 def start_worker_preparation(job_id):
     key = ("job", job_id)
     if key not in _tasks:
-        task = asyncio.create_task(_prepare_worker(job_id))
+        task = asyncio.create_task(_metered(_prepare_worker, job_id, kind="preparation.worker"))
         _tasks[key] = task
         task.add_done_callback(lambda completed: _tasks.pop(key, None))
+        task.add_done_callback(_wake_recovery)
+
+
+async def _metered(prepare, target_id, *, kind):
+    """Run one preparation with its own usage meter, recorded against its organisation."""
+    usage = Usage()
+    try:
+        with metered(usage):
+            return await prepare(target_id)
+    finally:
+        with suppress(Exception):
+            await record_usage(usage, kind=kind, organization_id=usage.labels.get("organization_id"),
+                outcome=usage.labels.get("outcome"))
 
 
 async def _prepare_worker(job_id):
@@ -51,6 +89,8 @@ async def _prepare_worker(job_id):
     try:
         async with session_factory() as session:
             job = await session.scalar(select(Job).where(Job.id == job_id).with_for_update())
+            if job:
+                label_usage(organization_id=job.organization_id)
             if job and job.status == "waiting_integration":
                 revision = await session.scalar(
                     select(JobRevision).where(
@@ -89,6 +129,8 @@ async def _prepare(command_id):
             from app.application.services.integration_tasks import report_preparation_wait
             command = await session.scalar(select(ConversationCommand).where(
                 ConversationCommand.id == command_id).with_for_update())
+            if command:
+                label_usage(organization_id=command.organization_id)
             if command and not command.target_id and command.status == "accepted":
                 await report_preparation_wait(session, command, status="accepted",
                     category="preparation_started", message="I’m preparing your saved task now. I’ll report any blocker here.")
@@ -97,6 +139,7 @@ async def _prepare(command_id):
             await session.commit()
             logger.info("AI preparation background ended command=%s status=%s", command_id,
                 command.status if command else "not_found")
+            label_usage(outcome=command.status if command else "not_found")
     except asyncio.CancelledError:
         logger.warning(
             "AI preparation interrupted command=%s; saved checkpoint retained", command_id
@@ -130,6 +173,8 @@ async def _prepare(command_id):
 
 
 async def recover_preparations():
+    """Restarts preparations that should be running. Returns how many it started and the
+    earliest scheduled retry still in the future (or None)."""
     now = datetime.now(UTC)
     async with session_factory() as session:
         rows = (
@@ -174,21 +219,39 @@ async def recover_preparations():
                 .limit(settings.runtime_sweep_limit)
             )
         ).all()
+        next_retry_at = None
+        if not rows and not jobs:
+            next_retry_at = await session.scalar(
+                select(func.min(PlannerDecision.retry_at)).where(
+                    PlannerDecision.status.in_(["pending", "accepted"]),
+                    PlannerDecision.retry_at > now,
+                )
+            )
     for command_id in rows:
         start_preparation(command_id)
     for job_id in jobs:
         start_worker_preparation(job_id)
+    return len(rows) + len(jobs), next_retry_at
 
 
 async def preparation_recovery_loop():
+    global _recovery_wake
+    _recovery_wake = asyncio.Event()
+    idle = float(settings.preparation_recovery_idle_seconds)
     while True:
+        delay = RECOVERY_BUSY_SECONDS
         try:
-            await recover_preparations()
+            started, next_retry_at = await recover_preparations()
+            delay = next_recovery_delay(started=started, active=len(_tasks), next_retry_at=next_retry_at, now=datetime.now(UTC), idle_seconds=idle)
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("AI preparation recovery unavailable; pending commands remain saved")
-        await asyncio.sleep(15)
+        _recovery_wake.clear()
+        try:
+            await asyncio.wait_for(_recovery_wake.wait(), timeout=delay)
+        except TimeoutError:
+            pass
 
 
 async def stop_preparations():

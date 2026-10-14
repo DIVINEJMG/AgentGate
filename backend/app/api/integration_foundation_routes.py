@@ -172,7 +172,9 @@ async def discover(organization_id: UUID, connection_id: UUID, principal: Princi
     rows = await IntegrationFoundation(session).discover(connection, credential)
     await IntegrationFoundation(session).queue_waiting_preparation(organization_id, principal.user_id)
     await session.commit()
-    return {"count": len(rows)}
+    available = [row for row in rows if row.health != "unavailable"]
+    return {"count": len(available), "unavailable": len(rows) - len(available),
+            "discoveredAt": (connection.config or {}).get("discoveredAt")}
 
 
 class ReconnectInput(BaseModel):
@@ -260,11 +262,21 @@ async def resume_preparation(organization_id: UUID, command_id: UUID, body: Resu
         raise HTTPException(404, "Your integration task was not found.")
     if command.target_id:
         return {"status": "accepted", "workItemId": command.target_id}
+    task = (command.payload or {}).get("integrationTask")
+    if task is None:
+        # The question was asked while the request was first being read, before preparation
+        # began: prepare it now from the original request and this answer.
+        thread = await session.get(ConversationThread, command.thread_id)
+        if thread is None or thread.worker_id is None:
+            raise HTTPException(409, "Answer the question in the conversation to continue.")
+        task = {"instruction": str((command.payload or {}).get("request") or ""), "workerId": str(thread.worker_id),
+                "threadId": str(command.thread_id), "messageId": str(command.source_message_id),
+                "standing": False, "context": {}}
+    task = dict(task)
     if body.clarification:
-        task = dict(command.payload["integrationTask"])
         task["instruction"] += "\nHuman clarification: " + body.clarification
         task.pop("draft", None)
-        command.payload = {**command.payload, "integrationTask": task}
+    command.payload = {**command.payload, "integrationTask": task}
     command.status = "accepted"
     from app.application.services.preparation_ai import restart_exhausted_preparation
     retry_state = await restart_exhausted_preparation(session, command)

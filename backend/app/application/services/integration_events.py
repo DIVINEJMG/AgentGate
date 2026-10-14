@@ -59,6 +59,8 @@ async def process_event(session, event_id):
         return
     provider = execution_provider_registry().get(event.provider)
     if isinstance(provider, EventRoutingHooks) and not await provider.event_allows_matching(session=session, event=event):
+        if event.status == "pending":  # e.g. a suspended installation: recorded, never left pending
+            event.status = "ignored"
         return
     resource = await session.scalar(select(IntegrationResource).where(
         IntegrationResource.connection_id == event.connection_id,
@@ -66,16 +68,26 @@ async def process_event(session, event_id):
     if resource is None:
         event.status = "unmatched"
         return
+    # A subscription may name just the event ("issues") or the event and its action
+    # ("issues.opened"), so a job can react to new issues without running on every edit.
+    action = (event.evidence or {}).get("action")
+    event_types = [event.event_type, *([f"{event.event_type}.{action}"] if action else [])]
     subscriptions = (await session.scalars(select(IntegrationEventSubscription).where(
         IntegrationEventSubscription.organization_id == event.organization_id,
         IntegrationEventSubscription.resource_id == resource.id,
-        IntegrationEventSubscription.event_type == event.event_type,
+        IntegrationEventSubscription.event_type.in_(event_types),
         IntegrationEventSubscription.enabled.is_(True)))).all()
     matched = False
     for subscription in subscriptions:
-        revision = await session.get(JobRevision, subscription.job_revision_id)
-        job = await session.get(Job, revision.job_id)
-        if job.status != "active" or job.current_revision != revision.revision:
+        subscribed = await session.get(JobRevision, subscription.job_revision_id)
+        job = await session.get(Job, subscribed.job_id) if subscribed else None
+        if job is None or job.status != "active":
+            continue
+        # The trigger belongs to the job, not to one revision of it: editing the job keeps it.
+        # Authority is still checked on the current revision's own grant below.
+        revision = subscribed if subscribed.revision == job.current_revision else await session.scalar(
+            select(JobRevision).where(JobRevision.job_id == job.id, JobRevision.revision == job.current_revision))
+        if revision is None:
             continue
         grant = await session.scalar(select(IntegrationTaskGrant).where(
             IntegrationTaskGrant.job_revision_id == revision.id, IntegrationTaskGrant.resource_id == resource.id,
@@ -93,7 +105,12 @@ async def process_event(session, event_id):
                     "trust": "untrusted_provider_evidence", "eventId": str(event.id), "payload": event.evidence}})
         session.add(item)
         await session.flush()
-        await notify_integration_work(session, item, key="queued", content="A verified provider event matched your configured job. I queued its authorized work.")
+        evidence = event.evidence or {}
+        subject = (f"#{evidence['number']} “{str(evidence.get('title') or '').strip()[:120]}”"
+                   if evidence.get("number") else str(evidence.get("title") or "").strip()[:120])
+        what = event.event_type.replace("_", " ") + (f" ({evidence['action']})" if evidence.get("action") else "")
+        await notify_integration_work(session, item, key="queued", content=(
+            f"New {what} in {resource.display_name}{': ' + subject if subject else ''}. Working on it now."))
         await TransactionalOutbox(session).enqueue(topic="run.progress", aggregate_type="work_item", aggregate_id=str(item.id),
             payload={"organization_id": str(item.organization_id), "work_item_id": str(item.id), "current_step": 0,
                 "continuation_phase": "plan", "correlation_id": item.correlation_id})

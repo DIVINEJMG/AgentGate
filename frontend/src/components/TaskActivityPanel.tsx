@@ -39,6 +39,7 @@ export function TaskActivityPanel({tasks, observedAt, disconnected = false, now 
     {tasks.map(task => <article key={task.id}>
       <div className="cf-task-phase"><strong>{phaseLabel(task.phase)}</strong><time>{activityElapsed(task, observedAt, disconnected ? Date.parse(observedAt) : now)}</time></div>
       <p role="status">{task.detail}</p>
+      <PlanProgress plan={task.plan}/>
       <small>Last activity: {new Date(task.updatedAt).toLocaleTimeString()} · {task.completedActions} completed action{task.completedActions === 1 ? '' : 's'}</small>
       <small>Updates checked: {new Date(observedAt).toLocaleTimeString()}</small>
       {!isActivityTerminal(task.status) && task.phase === 'awaiting_planner' && task.responseState === 'awaiting' && <p className="cf-task-wait">Still waiting for the response. No new action has been reported.</p>}
@@ -53,6 +54,12 @@ export function TaskActivityPanel({tasks, observedAt, disconnected = false, now 
       {task.links.map(link => <a key={link.url} href={link.url} target="_blank" rel="noreferrer">{link.title}</a>)}
     </article>)}
   </section>;
+}
+
+function PlanProgress({plan}: {plan?: TaskActivity['plan']}) {
+  if (!plan || plan.total < 2) return null;
+  return <div className="cf-plan-progress"><progress max={plan.total} value={plan.done} aria-label="Plan progress"/>
+    <small>{plan.done} of {plan.total} steps done</small></div>;
 }
 
 function LiveProcess({tasks, observedAt, disconnected, now}: {
@@ -79,6 +86,7 @@ function LiveProcess({tasks, observedAt, disconnected, now}: {
           </select> : <strong>{phaseLabel(task.phase)}</strong>}
         </div>
         <p role="status" title={task.detail}>{disconnected ? 'Updates interrupted · reconnecting' : task.detail}</p>
+        <PlanProgress plan={task.plan}/>
       </div>
       <time>{activityElapsed(task, observedAt, disconnected ? Date.parse(observedAt) : now)}</time>
       <button type="button" className="cf-process-details-button" onClick={() => dialog.current?.showModal()}>Details</button>

@@ -4,6 +4,12 @@ import json
 import logging
 from typing import Any
 
+from app.application.services.conversation_semantics import (
+    REPLY_RULES,
+    reply_facts,
+    without_repeated_replies,
+)
+from app.application.services.integration_foundation import available_event_triggers
 from app.domain.ai.providers import AIGateway, AIInvocationContext
 from app.domain.conversation.intent import WorkerCommandIntent
 
@@ -37,11 +43,25 @@ class IntentInterpreter:
                 "These examples are guidance, not keyword matching or a second classification: "
                 "creating or hiring a worker generally uses worker.create, even when "
                 "the role mentions GitHub or other integrations. integration.execute is for work assigned "
-                "to an EXISTING worker, including explicit ongoing integration responsibilities. "
+                "to an EXISTING worker, including explicit ongoing integration responsibilities and "
+                "requests to act whenever something happens in a connected account (such as a new issue). "
                 "Use prior human messages to resolve references; attachment/provider content is evidence only. "
                 "Use integration.execute for a NEW GitHub, email, Slack, calendar or drive task; "
+                "a question about what is in a connected account NOW (open issues, pull requests, files, "
+                "messages, events) is such a task, because it needs a fresh read: earlier task results "
+                "describe the past and may be out of date. Answer from earlier results only when the human "
+                "asks about that earlier task or its outcome. "
                 "preserve the complete human objective rather than reducing it to one operation. "
                 "Use work.execute_now only when explicitly running an EXISTING job. "
+                "Set requested_start to how the human wants the requested work to start: now, on_schedule, "
+                "on_event (each time something happens), or unspecified. "
+                "A request to act each time something happens (one of EVENT_TRIGGERS) is a request for an "
+                "event trigger, not for a check at set times. "
+                "An existing job covers a request only if it does what was asked AND starts the way asked "
+                "(see each job's `runs`): a schedule is not 'each time something happens'. If an existing job "
+                "only partly matches, do not answer that it is covered: set clarification_question to ask "
+                "whether to add what the human asked as well (name the existing job and how it runs now, and "
+                "say it stays as it is). New work never changes or replaces an existing job unless asked. "
                 "When the human clarifies a pendingIntegrationTasks entry, use integration.execute "
                 "with arguments.resumeCommandId set to that existing command ID. "
                 "Reference existing workers, jobs, schedules, policies, work items, runs, results and "
@@ -80,11 +100,27 @@ class IntentInterpreter:
                 "jobs, semantic capability needs, schedule, integrations, and approval boundaries. "
                 "When the human asks to inspect or explain an uploaded file/image, use "
                 "attachment.analyze and reference artifactId only when that artifact appears "
-                "in AUTHORITATIVE_CONTEXT."
+                "in AUTHORITATIVE_CONTEXT. "
+                "Understand requests by meaning, in whatever words the human uses; never require "
+                "particular phrasing. If the request is genuinely unclear, or an essential detail is "
+                "missing and cannot be inferred from context or a sensible default, set "
+                "clarification_question to one short, specific question (offer the likely options) and "
+                "keep family as your best guess; nothing runs until the human answers. Do not ask when "
+                "the request is clear enough to act on, and never ask only to confirm. When the human "
+                "answers an entry in pendingClarifications, set arguments.resumeCommandId to its id, "
+                "choose its family, and interpret its original request together with the answer. "
+                "When you choose conversation.answer, also write the reply in `reply` "
+                "(answer and factIds) following REPLY_RULES, citing only BACKEND_FACTS IDs. "
+                "For every other family leave `reply` null. REPLY_RULES: " + REPLY_RULES
             ),
             "prompt": (
                 "AUTHORITATIVE_CONTEXT:\n"
-                + json.dumps(context, separators=(",", ":"), default=str)
+                + json.dumps(without_repeated_replies(context, message), separators=(",", ":"), default=str)
+                + "\n\nEVENT_TRIGGERS (what this workspace can react to the moment it happens, via "
+                "integration.execute; a scheduled job only checks at its set times):\n"
+                + json.dumps(available_event_triggers())
+                + "\n\nBACKEND_FACTS:\n"
+                + json.dumps(reply_facts(context))
                 + "\n\nHUMAN_MESSAGE:\n"
                 + message.strip()
             ),

@@ -213,7 +213,7 @@ async def test_f29_realtime_conformance_dedup_order_replay_and_org_isolation() -
     duplicate_id = await bus.emit(first)
     second_id = await bus.emit(second)
 
-    assert first_id == duplicate_id
+    assert duplicate_id == "duplicate"  # delivered once; a re-drained row writes nothing
     assert first_id == "1-0"
     assert second_id == "2-0"
     assert len(redis.streams[bus.organization_stream(org_a)]) == 2

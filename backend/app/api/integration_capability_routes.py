@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import copy
 import hashlib
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -544,7 +548,36 @@ async def disconnect_v2(
     return {"data": {"integration": integration_v2(await integration_public(session, integration))}}
 
 
+# A read snapshot of the capability catalog for one tool preparation: the same pass otherwise
+# reads it three times (execution catalog, policy resource, capability profile).
+_CATALOG_SNAPSHOT: ContextVar[dict[Any, Any] | None] = ContextVar(
+    "audoryn_catalog_snapshot", default=None
+)
+
+
+@contextmanager
+def catalog_snapshot() -> Iterator[None]:
+    token = _CATALOG_SNAPSHOT.set({})
+    try:
+        yield
+    finally:
+        _CATALOG_SNAPSHOT.reset(token)
+
+
 async def _catalog(session: AsyncSession, organization_id: UUID) -> dict[str, Any]:
+    snapshot = _CATALOG_SNAPSHOT.get()
+    if snapshot is not None and organization_id in snapshot:
+        return copy.deepcopy(snapshot[organization_id][0])
+    catalog, integrations = await _read_catalog(session, organization_id)
+    if snapshot is not None:
+        # Keeping the rows also keeps them in the session, so lookups by id need no query.
+        snapshot[organization_id] = (copy.deepcopy(catalog), integrations)
+    return catalog
+
+
+async def _read_catalog(
+    session: AsyncSession, organization_id: UUID
+) -> tuple[dict[str, Any], list[Integration]]:
     integrations = list(
         (
             await session.scalars(
@@ -558,6 +591,21 @@ async def _catalog(session: AsyncSession, organization_id: UUID) -> dict[str, An
     resources: list[dict[str, Any]] = []
     all_scopes: set[str] = set()
     registry = execution_provider_registry()
+    credentialed = (
+        set(
+            (
+                await session.scalars(
+                    select(IntegrationCredential.integration_id).where(
+                        IntegrationCredential.integration_id.in_(
+                            [integration.id for integration in integrations]
+                        )
+                    )
+                )
+            ).all()
+        )
+        if integrations
+        else set()
+    )
     for integration in integrations:
         try:
             provider = registry.get(integration.provider)
@@ -573,14 +621,7 @@ async def _catalog(session: AsyncSession, organization_id: UUID) -> dict[str, An
             if isinstance(configured_available, list)
             else {capability.scope for capability in manifest.capabilities}
         )
-        credential_configured = (
-            await session.scalar(
-                select(IntegrationCredential.id).where(
-                    IntegrationCredential.integration_id == integration.id
-                )
-            )
-            is not None
-        )
+        credential_configured = integration.id in credentialed
         for capability in manifest.capabilities:
             if capability.scope not in available_capabilities:
                 continue
@@ -634,7 +675,7 @@ async def _catalog(session: AsyncSession, organization_id: UUID) -> dict[str, An
             "actions": sum(len(item["actions"]) for item in resources),
             "scopes": len(all_scopes),
         },
-    }
+    }, integrations
 
 
 def _catalog_v2(result: dict[str, Any]) -> dict[str, Any]:

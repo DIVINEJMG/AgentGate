@@ -66,10 +66,21 @@ def bounded_evidence(value: object, limit: int = 24000) -> dict:
     }
 
 
-def planner_evidence(observations: list[dict[str, object]]) -> dict:
-    """Keep every action identity separately from bounded, newest-first payloads."""
+def planner_evidence(observations: list[dict[str, object]], *, relevant: set[int] | None = None) -> dict:
+    """Keep every action identity separately from bounded, newest-first payloads.
+
+    With a saved plan (relevant is the set of step numbers behind the current plan step and the
+    steps it depends on), the full evidence is that set plus the latest two steps, and older
+    history shrinks to one short line each, so the prompt stays small however long the run is."""
     history = []
-    for item in observations:
+    compact_before = len(observations) - 12 if relevant is not None else 0
+    for index, item in enumerate(observations):
+        if index < compact_before:
+            entry = {key: item.get(key) for key in ("step", "scope", "status") if key in item}
+            if item.get("summary"):
+                entry["result"] = str(item.get("summary"))[:120]
+            history.append(entry)
+            continue
         entry = {key: item.get(key) for key in (
             "step", "scope", "resourceId", "actionFingerprint", "status"
         ) if key in item}
@@ -77,8 +88,16 @@ def planner_evidence(observations: list[dict[str, object]]) -> dict:
         if isinstance(verification, dict):
             entry["verified"] = verification.get("verified")
         entry["title"] = str(item.get("title") or "")[:180]
+        # What the step found, so older steps (beyond the bounded recent evidence) are not forgotten.
+        if item.get("summary"):
+            entry["result"] = str(item.get("summary"))[:240]
         history.append(entry)
-    recent = list(reversed(observations[-6:]))
+    if relevant is None:
+        recent = list(reversed(observations[-6:]))
+    else:
+        chosen = [item for item in observations if item.get("step") in relevant][-4:]
+        latest = [item for item in observations[-2:] if item not in chosen]
+        recent = list(reversed([*chosen, *latest]))
     allowance = max(1000, 16000 // max(1, len(recent)))
     return {
         "actionHistory": history,

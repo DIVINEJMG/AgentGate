@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,6 +26,8 @@ from app.application.services.conversations import (
 from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.ai.provider import ai_gateway_from_settings
 from app.infrastructure.database.session import database_session
+from app.infrastructure.database.usage_records import record_usage
+from app.observability.usage import Usage, metered
 
 v1_router = APIRouter(tags=["conversation"])
 v2_router = APIRouter(tags=["conversation"])
@@ -39,6 +41,11 @@ class CreateThreadRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     content: str = Field(min_length=1, max_length=12000)
     artifactReferences: list[dict[str, Any]] = Field(default_factory=list)
+    # Set by a screen that already knows the operation (the Create worker form), so the request
+    # is not guessed from its wording.
+    operation: Literal["worker.create"] | None = None
+    # The question this message answers, when the screen knows it.
+    resumeCommandId: UUID | None = None
 
 
 class UploadAttachmentRequest(BaseModel):
@@ -277,16 +284,24 @@ async def _send(
     principal: HumanPrincipal,
     session: AsyncSession,
 ) -> dict[str, Any]:
+    usage, outcome = Usage(), "error"
     try:
-        human, assistant, receipt = await ConversationService(session).send_message(
-            organization_id=organization_id,
-            principal=principal,
-            thread_id=thread_id,
-            content=payload.content,
-            artifact_references=payload.artifactReferences,
-        )
+        with metered(usage):
+            human, assistant, receipt = await ConversationService(session).send_message(
+                organization_id=organization_id,
+                principal=principal,
+                thread_id=thread_id,
+                content=payload.content,
+                artifact_references=payload.artifactReferences,
+                operation=payload.operation,
+                resume_command_id=payload.resumeCommandId,
+            )
+        outcome = receipt.status
     except Exception as exc:
         raise _http_error(exc) from exc
+    finally:
+        await record_usage(usage, kind="conversation.message", organization_id=organization_id,
+            thread_id=thread_id, phase=usage.labels.get("family"), outcome=outcome)
     return {
         "humanMessage": message_public(human),
         "response": message_public(assistant),

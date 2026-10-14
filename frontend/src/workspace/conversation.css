@@ -120,6 +120,10 @@
 .ws-app .cf-approval p { margin: 0; line-height: 1.55; }
 .ws-app .cf-approval strong { display: inline; margin: 0; font-weight: 600; }
 .ws-app .cf-approval-why { color: var(--ws-text-2); font-size: 13px; }
+.ws-app .cf-approval-input { display: grid; gap: 4px; margin: 6px 0; font-size: 13px; }
+.ws-app .cf-approval-input > div { display: grid; grid-template-columns: minmax(70px, 120px) 1fr; gap: 8px; }
+.ws-app .cf-approval-input dt { color: var(--ws-text-3); }
+.ws-app .cf-approval-input dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9em; overflow: auto; }
 .ws-app .cf-approval > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .ws-app .cf-approval-risk { margin-left: auto; color: var(--ws-text-3); font-size: 12px; text-transform: capitalize; }
 .ws-app .cf-approval-risk:is([data-risk="high"], [data-risk="critical"]) { color: var(--ws-danger); }

@@ -72,6 +72,11 @@ class SemanticCapabilityResolver:
         by_provider: dict[str, list[Integration]] = {}
         for integration in integrations:
             by_provider.setdefault(integration.provider, []).append(integration)
+        # Stored credentials for every connection in one query.
+        credentialed = set((await self._session.scalars(
+            select(IntegrationCredential.integration_id).where(
+                IntegrationCredential.integration_id.in_([integration.id for integration in integrations]))
+        )).all()) if integrations else set()
 
         missing: set[str] = set()
         candidates: dict[str, dict[str, object]] = {}
@@ -141,15 +146,10 @@ class SemanticCapabilityResolver:
                     if isinstance(configured, list)
                     else {cap.scope for cap in provider.manifest.capabilities}
                 )
-                credential_id = await self._session.scalar(
-                    select(IntegrationCredential.id).where(
-                        IntegrationCredential.integration_id == integration.id
-                    )
-                )
                 for capability in provider.manifest.capabilities:
                     if capability.scope not in declared:
                         continue
-                    if capability.requires_credential and credential_id is None:
+                    if capability.requires_credential and integration.id not in credentialed:
                         continue
                     available.add(capability.scope)
                     candidates[capability.scope] = {
@@ -205,6 +205,13 @@ class SemanticCapabilityResolver:
             )
 
         allowed_scopes = sorted(candidates)
+        if len(allowed_scopes) == 1:
+            # One possible capability: choosing it needs no AI call.
+            return CapabilityResolution(
+                scopes=tuple(allowed_scopes),
+                missing_integrations=tuple(sorted(missing)),
+                mappings=tuple(semantic),
+            )
         schema: dict[str, object] = {
             "type": "object",
             "additionalProperties": False,

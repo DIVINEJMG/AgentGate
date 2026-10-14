@@ -252,6 +252,8 @@ async def test_run_checkpoint_commits_before_cancellable_planning(monkeypatch):
     executor._load_context = AsyncMock(return_value=(object(), object(), object(), object()))
     executor._ensure_run = AsyncMock(return_value=saved_run)
     executor._load_steps = AsyncMock(return_value=[])
+    executor._step_headers = AsyncMock(return_value=[])
+    executor._integration_preflight = AsyncMock(return_value=None)
 
     monkeypatch.setattr(settings, "runtime_planner_timeout_seconds", 0.02)
 

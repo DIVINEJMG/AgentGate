@@ -167,6 +167,9 @@
 .ws-doc-attachment small { color: var(--ws-text-3); font-size: 12.5px; }
 .ws-doc-sources { display: grid; gap: 8px; padding-top: 20px; border-top: 1px solid var(--ws-line); }
 .ws-doc-sources h2 { font-size: 14px; font-weight: 600; }
+.ws-doc-criteria ul { display: grid; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.ws-doc-criteria li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ws-doc-criteria small { color: var(--ws-text-3); }
 .ws-app .ws-doc-sources ol { padding-left: 20px; list-style: decimal; display: grid; gap: 4px; font-size: 14px; }
 .ws-doc-technical dd code { display: inline-block; margin-right: 6px; color: var(--ws-text-2); }
 .ws-doc-foot { color: var(--ws-text-3); font-size: 12.5px; }
@@ -446,3 +449,16 @@
 @media (max-width: 860px) { .ws-field-pair, .ws-invite, .ws-plan { grid-template-columns: 1fr; gap: 16px; } .ws-app .ws-stats-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .ws-app p > svg:first-child { display: inline-block; vertical-align: -2px; margin-right: 4px; }
 .ws-tabs + .ws-plan { border-top: 0; padding-top: 0; }
+
+/* Approval preview and decision options (phase 4) */
+.ws-preview { display: grid; gap: 8px; margin: 4px 0 12px; }
+.ws-preview h3 { font-size: 13px; font-weight: 600; color: var(--ws-text-2); }
+.ws-preview-fields { display: grid; gap: 8px; margin: 0; }
+.ws-preview-fields > div { display: grid; grid-template-columns: minmax(96px, 160px) 1fr; gap: 12px; align-items: start; }
+.ws-preview-fields dt { color: var(--ws-text-3); font-size: 13px; }
+.ws-preview-fields dd { margin: 0; min-width: 0; }
+.ws-preview-value { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ws-preview-fields textarea, .ws-preview-fields input[type='number'] { width: 100%; font: inherit; }
+.ws-decision-box .ws-check { white-space: normal; align-items: flex-start; }
+.ws-decision-box .ws-check small { color: var(--ws-text-3); }
+@media (max-width: 560px) { .ws-preview-fields > div { grid-template-columns: 1fr; gap: 2px; } }

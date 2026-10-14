@@ -94,3 +94,26 @@ async def collect_response(
         "usage": usage,
         "choices": [{"finish_reason": finish, "message": {"content": "".join(parts)}}],
     }
+
+
+def transport_timeout(total_seconds: float, *, stream: bool) -> httpx.Timeout:
+    """A streamed response may take the whole budget while bytes keep arriving; only a silence
+    longer than `planner_stream_silence_seconds` ends it. Other requests keep one flat limit."""
+    from app.bootstrap.settings import settings
+
+    silence = settings.planner_stream_silence_seconds
+    if stream and silence < total_seconds:
+        return httpx.Timeout(total_seconds, read=silence)
+    return httpx.Timeout(total_seconds)
+
+
+def timeout_error(error: httpx.TimeoutException, *, total_seconds: float, stream: bool, message: str) -> AIProviderError:
+    """A silent stream is a failed connection (handled like an unreachable endpoint), not a slow
+    model; any other timeout keeps its meaning."""
+    from app.bootstrap.settings import settings
+
+    silence = settings.planner_stream_silence_seconds
+    if stream and silence < total_seconds and isinstance(error, httpx.ReadTimeout):
+        return AIProviderError("provider_unavailable", f"The response stream sent nothing for {silence} seconds.",
+                               retryable=True, rejection_reason="stream_silent")
+    return AIProviderError("timeout", message, retryable=True)

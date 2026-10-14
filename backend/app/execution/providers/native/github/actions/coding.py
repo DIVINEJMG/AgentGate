@@ -32,19 +32,54 @@ ACTIONS = (
     ),
     action(
         "repository.workspace.edit",
-        "Edit an authorized workspace file; this does not publish to GitHub.",
+        "Change one workspace file; this does not publish to GitHub. Modes: replace (exact find/replace "
+        "pairs in an existing file), write (whole content of a new or small file), append (add a chunk at "
+        "offset, the file's current length, for files over 10,000 characters) and delete. Safe to repeat. "
+        "Returns the file's size, hash and a short diff, and saves a checkpoint.",
         "contents:read",
         execution_semantics="workspace_mutation",
-        fields={"path": STRING, "content": BODY},
-        required=("path", "content"),
+        fields={
+            "path": STRING,
+            "mode": {"type": "string", "enum": ["replace", "write", "append", "delete"]},
+            "content": BODY,
+            "offset": {"type": "integer", "minimum": 0},
+            "replacements": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 20,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["find", "replace"],
+                    "properties": {
+                        "find": {"type": "string", "minLength": 1, "maxLength": 10000},
+                        "replace": {"type": "string", "maxLength": 10000},
+                    },
+                },
+            },
+        },
+        required=("path",),
+        prerequisites=("github.repository.workspace.rollback",),
     ),
     action(
         "repository.workspace.patch",
-        "Apply a unified patch inside the isolated workspace.",
+        "Apply a unified patch inside the isolated workspace; safe to repeat. Saves a checkpoint.",
         "contents:read",
         execution_semantics="workspace_mutation",
         fields={"patch": BODY},
         required=("patch",),
+        prerequisites=("github.repository.workspace.rollback",),
+    ),
+    action(
+        "repository.workspace.rollback",
+        "Undo workspace changes: to the previous checkpoint (undo the last change), to the baseline "
+        "(undo everything), or to a checkpoint returned by an earlier edit. Nothing is published.",
+        "contents:read",
+        execution_semantics="workspace_mutation",
+        fields={
+            "to": {"type": "string", "enum": ["previous", "baseline"]},
+            "checkpoint": {"type": "string", "pattern": "^[a-fA-F0-9]{7,40}$"},
+        },
     ),
     action(
         "repository.workspace.diff",

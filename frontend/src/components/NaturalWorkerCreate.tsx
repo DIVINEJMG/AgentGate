@@ -63,10 +63,39 @@ export default function NaturalWorkerCreate({
   const [receipt, setReceipt] = useState<ConversationReceipt | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // When Audoryn asks a question, the answer goes to the same conversation and continues the request.
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [answer, setAnswer] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
+  const asking = receipt?.status === 'clarification_required' && Boolean(threadId && receipt.command_id);
+
+  function finish(turnReceipt: ConversationReceipt) {
+    setReceipt(turnReceipt);
+    const worker = turnReceipt.references.find((item) => item.type === 'worker');
+    if (turnReceipt.status === 'completed' || turnReceipt.status === 'waiting_integration') {
+      onCreated(worker?.id);
+    }
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (asking) {
+      const reply = answer.trim();
+      if (!reply || !threadId || !receipt?.command_id) return;
+      setSaving(true);
+      setError(null);
+      try {
+        const turn = await sendConversationMessage(apiVersion, organization.id, threadId, reply, [],
+          { operation: 'worker.create', resumeCommandId: receipt.command_id });
+        setAnswer('');
+        finish(turn.receipt);
+      } catch (caught) {
+        setError(errorText(caught));
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     const trimmed = instruction.trim();
     if (!trimmed) return;
     setSaving(true);
@@ -74,6 +103,7 @@ export default function NaturalWorkerCreate({
     setReceipt(null);
     try {
       const thread = await createConversation(apiVersion, organization.id, undefined, 'Create worker');
+      setThreadId(thread.id);
       const references: Array<Record<string, unknown>> = [];
       for (const file of files) {
         const uploaded = await uploadConversationAttachment(apiVersion, organization.id, thread.id, {
@@ -89,24 +119,19 @@ export default function NaturalWorkerCreate({
           analysisId: uploaded.analysis.id,
         });
       }
-      const workerRequest = /^(create|hire|make)\b/i.test(trimmed)
-        ? trimmed
-        : `Create a worker that will: ${trimmed}`;
+      // The form is worker creation: the request is sent as written, with no wording required.
       const message = context.trim()
-        ? `${workerRequest}\n\nAdditional context from me:\n${context.trim()}`
-        : workerRequest;
+        ? `${trimmed}\n\nAdditional context from me:\n${context.trim()}`
+        : trimmed;
       const turn = await sendConversationMessage(
         apiVersion,
         organization.id,
         thread.id,
         message,
         references,
+        { operation: 'worker.create' },
       );
-      setReceipt(turn.receipt);
-      const worker = turn.receipt.references.find((item) => item.type === 'worker');
-      if (turn.receipt.status === 'completed' || turn.receipt.status === 'waiting_integration') {
-        onCreated(worker?.id);
-      }
+      finish(turn.receipt);
     } catch (caught) {
       setError(errorText(caught));
     } finally {
@@ -179,6 +204,18 @@ export default function NaturalWorkerCreate({
           <section className={`conversation-receipt ${receipt.status}`}>
             <strong>{receipt.status === 'completed' ? 'Worker ready' : receipt.status.replaceAll('_', ' ')}</strong>
             <p>{receipt.message}</p>
+            {asking && (
+              <label className="natural-worker-answer">
+                <span className="sr-only">Your answer</span>
+                <textarea
+                  maxLength={4000}
+                  value={answer}
+                  onChange={(event) => setAnswer(event.target.value)}
+                  placeholder="Your answer"
+                  autoFocus
+                />
+              </label>
+            )}
             {receipt.failure_category && <small>Reason: {receipt.failure_category.replaceAll('_', ' ')}</small>}
             {receipt.action_hints.length > 0 && (
               <div className="receipt-actions">
@@ -211,8 +248,8 @@ export default function NaturalWorkerCreate({
           <button type="button" className="ghost-button" onClick={onAdvanced}>
             <Settings2 size={14} /> Advanced setup
           </button>
-          <button className="primary-button" disabled={saving || !instruction.trim()}>
-            {saving ? 'Creating worker…' : 'Create worker'}
+          <button className="primary-button" disabled={saving || (asking ? !answer.trim() : !instruction.trim())}>
+            {saving ? (asking ? 'Sending…' : 'Creating worker…') : asking ? 'Send answer' : 'Create worker'}
           </button>
         </footer>
       </form>

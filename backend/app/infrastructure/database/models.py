@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import (
@@ -12,6 +12,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -331,6 +332,29 @@ class RunStep(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     output: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     __table_args__ = (UniqueConstraint("run_id", "step_index", name="uq_run_step_index"),)
 
+class RunPlanStep(TenantModel, Base):
+    """One step of a run's saved plan. The plan is written once by the planner and is the same for
+    every model that continues the run; it changes only through a counted, explained revision."""
+    __tablename__ = "run_plan_steps"
+    run_id: Mapped[UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-based, in order
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    goal: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    scope: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    target: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    depends_on: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    check: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # pending, done, skipped (not needed at finish) or superseded (replaced by a revision)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    # Run step numbers (1-based) of the actions that worked on this plan step.
+    action_steps: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    __table_args__ = (
+        UniqueConstraint("run_id", "position", name="uq_run_plan_step_position"),
+        Index("ix_run_plan_steps_run", "run_id", "position"),
+    )
+
+
 class Integration(TenantModel, Base):
     __tablename__ = "integrations"
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -492,7 +516,17 @@ class OutboxEvent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     delivery_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     next_delivery_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    __table_args__ = (Index("ix_outbox_unpublished", "published_at", "created_at"),)
+    __table_args__ = (
+        Index("ix_outbox_unpublished", "published_at", "created_at"),
+        # Created by migration 0010; declared here so a database built from the models matches.
+        Index(
+            "ix_outbox_delayed",
+            "next_delivery_at",
+            "created_at",
+            postgresql_where=text("published_at IS NULL"),
+            sqlite_where=text("published_at IS NULL"),
+        ),
+    )
 
 
 
@@ -556,6 +590,15 @@ class ConversationCommand(TenantModel, Base):
     __table_args__ = (
         Index("ix_conversation_commands_org_created", "organization_id", "created_at"),
         Index("ix_conversation_commands_thread_created", "thread_id", "created_at"),
+        # One integration command per chat message. Created by migration 0009; declared here so a
+        # database built from the models matches.
+        Index(
+            "uq_integration_command_message",
+            "source_message_id",
+            unique=True,
+            postgresql_where=text("family = 'integration.execute'"),
+            sqlite_where=text("family = 'integration.execute'"),
+        ),
     )
 
 
@@ -613,6 +656,35 @@ class AIInvocation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Index("ix_ai_invocations_org_created", "organization_id", "created_at"),
         Index("ix_ai_invocations_role_created", "role", "created_at"),
     )
+
+class UsageRecord(UUIDPrimaryKeyMixin, Base):
+    """Compute used by one runtime step or chat message (improvement plan, phase 0).
+    Append-only, so recording never contends with the run's own updates."""
+    __tablename__ = "usage_records"
+    organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    work_item_id: Mapped[UUID | None] = mapped_column(ForeignKey("work_items.id", ondelete="CASCADE"))
+    run_id: Mapped[UUID | None] = mapped_column(ForeignKey("runs.id", ondelete="SET NULL"))
+    thread_id: Mapped[UUID | None] = mapped_column(ForeignKey("conversation_threads.id", ondelete="SET NULL"))
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    step: Mapped[int | None] = mapped_column(Integer)
+    phase: Mapped[str | None] = mapped_column(String(32))
+    outcome: Mapped[str | None] = mapped_column(String(32))
+    db_statements: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    db_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    qstash_messages: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    redis_commands: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ai_calls: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ai_failed_calls: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ai_tokens_in: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ai_tokens_out: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ai_models: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    __table_args__ = (
+        Index("ix_usage_records_work_item", "work_item_id", "created_at"),
+        Index("ix_usage_records_org_created", "organization_id", "created_at"),
+    )
+
 
 class QueueDeliveryFailure(TenantModel, Base):
     __tablename__ = "queue_delivery_failures"

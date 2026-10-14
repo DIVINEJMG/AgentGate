@@ -134,7 +134,9 @@ class CapabilitySession:
         self.credential_id = credential_id
 
     async def scalars(self, statement: Any) -> _Rows:
-        del statement
+        # Stored credentials are read for all connections in one query.
+        if "integration_credentials" in str(statement):
+            return _Rows([self.integration.id] if self.credential_id else [])
         return _Rows([self.integration])
 
     async def scalar(self, statement: Any) -> UUID | None:
@@ -225,7 +227,7 @@ async def test_semantic_capability_resolver_can_only_select_live_exact_scope() -
         provider="gmail",
         display_name="Mailbox",
         status="connected",
-        config={"availableCapabilities": ["gmail.messages.recent.read"]},
+        config={"availableCapabilities": ["gmail.messages.recent.read", "gmail.mailbox.profile.read"]},
     )
     gateway = StructuredGateway([{"selectedScopes": ["gmail.messages.recent.read"]}])
     session = CapabilitySession(integration, uuid4())
@@ -253,7 +255,22 @@ async def test_semantic_capability_resolver_can_only_select_live_exact_scope() -
     assert isinstance(raw_selected, dict)
     items = raw_selected["items"]
     assert isinstance(items, dict)
-    assert items["enum"] == ["gmail.messages.recent.read"]
+    assert items["enum"] == ["gmail.mailbox.profile.read", "gmail.messages.recent.read"]
+
+
+@pytest.mark.asyncio
+async def test_a_single_possible_capability_is_chosen_without_an_ai_call() -> None:
+    integration = Integration(id=uuid4(), organization_id=uuid4(), provider="gmail", display_name="Mailbox",
+                              status="connected", config={"availableCapabilities": ["gmail.messages.recent.read"]})
+    gateway = StructuredGateway([])
+    resolver = SemanticCapabilityResolver(cast(AsyncSession, CapabilitySession(integration, uuid4())), gateway)
+    result = await resolver.resolve(
+        organization_id=integration.organization_id,
+        needs=[CapabilityNeed(provider="gmail", need="Read recent email", actions=["read"])],
+        invocation_context=AIInvocationContext(organization_id=integration.organization_id),
+    )
+    assert result.scopes == ("gmail.messages.recent.read",)
+    assert gateway.schemas == []
 
 
 @pytest.mark.asyncio

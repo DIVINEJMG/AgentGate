@@ -73,6 +73,26 @@ CAPABILITIES = (
 )
 
 
+# Slack answers HTTP 200 with ok=false; these errors mean the account needs reconnecting or
+# Slack wants us to slow down, not that the request itself was wrong.
+_RECONNECT_ERRORS = {
+    "invalid_auth",
+    "not_authed",
+    "token_expired",
+    "token_revoked",
+    "account_inactive",
+}
+
+
+def _failure(payload: dict[str, object], default):
+    error = text(payload.get("error"))
+    if error in _RECONNECT_ERRORS:
+        return "authentication_error", False
+    if error == "ratelimited":
+        return "rate_limited", True
+    return default, False
+
+
 class SlackProvider(NativeProvider):
     manifest = ProviderManifest(
         provider="slack",
@@ -260,11 +280,12 @@ class SlackProvider(NativeProvider):
                 )
                 payload = mapping(response.data)
                 if payload.get("ok") is not True:
+                    code, retryable = _failure(payload, "authorization_error")
                     raise self._execution_error(
                         operation=operation,
                         correlation_id=request.correlation_id,
-                        code="authorization_error",
-                        retryable=False,
+                        code=code,
+                        retryable=retryable,
                         safe_message=(
                             f"Slack conversations.list failed: "
                             f"{text(payload.get('error')) or 'unknown'}."
@@ -311,11 +332,12 @@ class SlackProvider(NativeProvider):
                 )
                 payload = mapping(response.data)
                 if payload.get("ok") is not True:
+                    code, retryable = _failure(payload, "validation_error")
                     raise self._execution_error(
                         operation=operation,
                         correlation_id=request.correlation_id,
-                        code="validation_error",
-                        retryable=False,
+                        code=code,
+                        retryable=retryable,
                         safe_message=(
                             f"Slack chat.postMessage failed: "
                             f"{text(payload.get('error')) or 'unknown'}."

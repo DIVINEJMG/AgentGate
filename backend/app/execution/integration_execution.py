@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from jsonschema import ValidationError, validate
 from redis.exceptions import RedisError
@@ -78,7 +79,10 @@ async def execute_native_action(
     execution_budget = settings.coding_initialization_seconds if initialization else 90
     lease_seconds = execution_budget + 120
 
-    def wait(message):
+    manifest = getattr(provider, "manifest", None)
+    label = getattr(manifest, "display_name", None) or request.resource.provider
+
+    def wait(message, seconds: float = 60):
         return ExecutionProviderError(
             code="rate_limited",
             retryable=True,
@@ -86,7 +90,7 @@ async def execute_native_action(
             operation=request.operation,
             correlation_id=request.correlation_id,
             safe_message=message,
-            retry_after_seconds=60,
+            retry_after_seconds=seconds,
         )
 
     async def reconcile():
@@ -115,33 +119,43 @@ async def execute_native_action(
         if request.capability.target == "workspace":
             partition += ":workspace"
             connection = str(connection) + ":workspace"
+        # A provider that said "slow down" to one action is not asked again by the others
+        # on the same account until its wait is over.
+        cooldown_key = f"integration-cooldown:{connection}"
+        cooling_until = float(await coordination.cache_get(cooldown_key) or "0")
+        if cooling_until > time.time():
+            raise wait(f"{label} is limiting requests right now", cooling_until - time.time())
         for key, limit in [
             (f"integration-org:{org}:{partition}", settings.integration_organization_concurrency),
             (f"integration-connection:{connection}", settings.integration_connection_concurrency),
         ]:
             slot = await coordination.acquire_slot(key, limit=limit, ttl_seconds=lease_seconds)
             if slot is None:
-                raise wait("Integration concurrency is full; this action will wait.")
+                raise wait(
+                    f"Other {label} actions are running, so this one is waiting for a free slot"
+                )
             slots.append(slot)
         if not await coordination.reserve_limit(
             f"integration-org:{org}:{partition}",
             limit=settings.integration_organization_rate_per_minute,
             ttl_seconds=60,
         ):
-            raise wait("Workspace integration rate budget is exhausted; queued work will wait.")
+            raise wait(f"This workspace has reached its {label} actions for this minute")
         if not await coordination.reserve_limit(
             f"integration-connection:{connection}",
             limit=settings.integration_connection_rate_per_minute,
             ttl_seconds=60,
         ):
-            raise wait("Account integration rate budget is exhausted; queued work will wait.")
+            raise wait(f"This {label} account has reached its actions for this minute")
         if request.capability.side_effect:
             lease = await coordination.acquire_lock(
                 f"integration-mutation:{connection}:{request.resource.id}",
                 ttl_seconds=lease_seconds,
             )
             if lease is None:
-                raise wait("Another action is changing this resource; this action will wait.")
+                raise wait(
+                    "Another action is changing this resource, so this one is waiting for it to finish"
+                )
         try:
             validate(request.input, request.capability.input_schema)
             if before_dispatch is not None:
@@ -187,6 +201,15 @@ async def execute_native_action(
                 ) from error
             return result
         except ExecutionProviderError as error:
+            if (
+                error.error.code == "rate_limited"
+                and error.error.retry_after_seconds
+                and request.capability.target != "workspace"
+            ):
+                pause = min(float(error.error.retry_after_seconds), 86400.0)
+                await coordination.cache_set(
+                    cooldown_key, str(time.time() + pause), ttl_seconds=max(1, int(pause) + 1)
+                )
             uncertain = request.capability.side_effect and error.error.code in {
                 "timeout",
                 "provider_unavailable",

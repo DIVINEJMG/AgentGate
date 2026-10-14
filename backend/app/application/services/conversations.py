@@ -13,7 +13,7 @@ from app.application.services.conversation_commands import (
 from app.application.services.conversation_context import ConversationContextAssembler
 from app.application.services.intent_interpreter import IntentInterpreter
 from app.domain.ai.providers import AIInvocationContext, AIProviderError
-from app.domain.conversation.intent import CommandReceipt, FailureCategory
+from app.domain.conversation.intent import CommandReceipt, FailureCategory, WorkerCommandIntent
 from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.ai.provider import ai_gateway_from_settings
 from app.infrastructure.database.models import (
@@ -24,6 +24,7 @@ from app.infrastructure.database.models import (
     Worker,
 )
 from app.infrastructure.database.outbox import TransactionalOutbox
+from app.observability.usage import label_usage
 
 
 class ConversationService:
@@ -165,6 +166,8 @@ class ConversationService:
         thread_id: UUID,
         content: str,
         artifact_references: list[dict[str, Any]] | None = None,
+        operation: str | None = None,
+        resume_command_id: UUID | None = None,
     ) -> tuple[ConversationMessage, ConversationMessage, CommandReceipt]:
         self._require_org(principal, organization_id)
         thread, _ = await self.get_thread(
@@ -207,11 +210,18 @@ class ConversationService:
         )
 
         try:
-            intent = await IntentInterpreter(gateway).interpret(
-                message=clean,
-                context=context,
-                invocation_context=invocation_context,
-            )
+            if operation is not None:
+                # The screen already knows the operation: no AI call is needed to guess it.
+                intent = WorkerCommandIntent(family=operation)  # type: ignore[arg-type]
+            else:
+                intent = await IntentInterpreter(gateway).interpret(
+                    message=clean,
+                    context=context,
+                    invocation_context=invocation_context,
+                )
+            if resume_command_id is not None:
+                intent = intent.model_copy(update={"arguments": {
+                    **intent.arguments, "resumeCommandId": str(resume_command_id)}})
             outcome = await ConversationCommandCompiler(self._session, gateway).compile_and_execute(
                 organization_id=organization_id,
                 principal=principal,
@@ -221,6 +231,7 @@ class ConversationService:
                 authoritative_context=context,
             )
             receipt = outcome.receipt
+            label_usage(family=outcome.command.family)
             command_refs = [
                 {
                     "id": str(outcome.command.id),

@@ -234,9 +234,8 @@ async def test_f29_realtime_bus_uses_streams_and_pubsub_fast_lane() -> None:
 
     assert stream_id == "1-0"
     keys = [item[0] for item in redis.xadds]
-    assert f"audoryn:events:{organization_id}" in keys
-    assert f"audoryn:runs:{run_id}" in keys
-    assert f"audoryn:worker:{worker_id}" in keys
+    # Written once, to the organisation stream; readers of one run or worker filter it.
+    assert keys == [f"audoryn:events:{organization_id}"]
     assert redis.publishes[0][0] == f"audoryn:realtime:{organization_id}"
 
 

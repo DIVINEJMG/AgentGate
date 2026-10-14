@@ -109,7 +109,7 @@ export const toolFor = (provider: string) => TOOLS.find((tool) => tool.provider 
 export const toolBySlug = (slug?: string) => TOOLS.find((tool) => tool.slug === slug);
 export const SIGN_IN_LABEL: Record<SignIn, string> = { github_app: 'GitHub App', token: 'Access token', none: 'No sign-in needed' };
 export const RISK_TONE: Record<string, 'ok' | 'info' | 'warn' | 'danger'> = { low: 'ok', medium: 'info', high: 'warn', critical: 'danger' };
-export const HEALTH_TONE: Record<string, 'ok' | 'warn' | 'danger' | 'neutral'> = { connected: 'ok', healthy: 'ok', degraded: 'warn', error: 'danger', disconnected: 'neutral' };
+export const HEALTH_TONE: Record<string, 'ok' | 'warn' | 'danger' | 'neutral'> = { connected: 'ok', healthy: 'ok', degraded: 'warn', error: 'danger', disconnected: 'neutral', unavailable: 'danger' };
 
 /* ---------- One loader for every Connections page ---------- */
 

@@ -20,6 +20,7 @@ from app.infrastructure.ai.model_profiles import (
     apply_profile,
     validate_context,
 )
+from app.infrastructure.ai.streaming import timeout_error, transport_timeout
 
 
 def _retry_after(value: str | None) -> int | None:
@@ -252,7 +253,7 @@ class NvidiaNimProvider:
         body = self._body(model=model, request=request, messages=messages)
         try:
             async with httpx.AsyncClient(
-                timeout=self._timeout_seconds,
+                timeout=transport_timeout(self._timeout_seconds, stream=request.stream),
                 transport=self._transport,
             ) as client:
                 if request.stream:
@@ -310,11 +311,8 @@ class NvidiaNimProvider:
         except AIProviderError:
             raise
         except httpx.TimeoutException as exc:
-            raise AIProviderError(
-                "timeout",
-                "NVIDIA NIM request timed out.",
-                retryable=True,
-            ) from exc
+            raise timeout_error(exc, total_seconds=self._timeout_seconds, stream=request.stream,
+                                message="NVIDIA NIM request timed out.") from exc
         except httpx.HTTPError as exc:
             raise AIProviderError(
                 "provider_unavailable",

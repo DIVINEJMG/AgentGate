@@ -87,7 +87,7 @@ async def test_initialization_has_separate_timeout_and_matching_slots(monkeypatc
     provider = ExpandedGitHubProvider(ScriptedHTTP([]))
     req = request(provider, operation, {"sha": "a" * 40} if "workspace" in operation else {})
     req = replace(req, capability=replace(req.capability, provider=connection), resource=replace(req.resource, provider=connection))
-    coordination = SimpleNamespace(acquire_slot=AsyncMock(return_value="slot"),
+    coordination = SimpleNamespace(acquire_slot=AsyncMock(return_value="slot"), cache_get=AsyncMock(return_value=None),
         reserve_limit=AsyncMock(return_value=True), release_slot=AsyncMock())
     executor = SimpleNamespace(execute=AsyncMock(return_value=SimpleNamespace(output={})))
     context = SimpleNamespace(resource=SimpleNamespace(metadata={"connectionId": "connection"}), configuration={}, credential="fixture")

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
+from pydantic import ValidationError
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,6 +37,7 @@ from app.application.services.browser_origin_authority import (
     explicit_http_origins,
 )
 from app.application.services.capability_autoresolver import SemanticCapabilityResolver
+from app.application.services.grounding import grounded_in
 from app.application.services.web_research import configured_sources, web_research_destination
 from app.application.services.worker_autonomy import WorkerAutonomyService
 from app.application.services.worker_memory import (
@@ -70,6 +72,16 @@ from app.infrastructure.database.models import (
     WorkItem,
 )
 from app.infrastructure.database.outbox import TransactionalOutbox
+
+
+class _AnsweredMessage:
+    """The human's message, read as the original request plus their answer to its question."""
+
+    def __init__(self, message: ConversationMessage, content: str) -> None:
+        self._message, self.content = message, content
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._message, name)
 
 
 class CommandResolutionError(ValueError):
@@ -127,13 +139,17 @@ class ConversationCommandCompiler:
             if prior is not None:
                 return CompiledCommandOutcome(command=prior, receipt=CommandReceipt.model_validate(prior.receipt))
 
+        source_message, intent, resumed = await self._continue_answered(
+            organization_id=organization_id, principal=principal, thread=thread,
+            source_message=source_message, intent=intent)
         command = existing_command or ConversationCommand(
             organization_id=organization_id,
             thread_id=thread.id,
             source_message_id=source_message.id,
             family=intent.family,
             status="accepted",
-            payload={"intent": intent.model_dump(mode="json")},
+            payload={"intent": intent.model_dump(mode="json"), "request": source_message.content[:6000],
+                     **({"resumedFrom": str(resumed.id)} if resumed is not None else {})},
             receipt={},
             created_by=principal.user_id,
             requires_confirmation=False,
@@ -150,16 +166,21 @@ class ConversationCommandCompiler:
             )
 
         try:
-            receipt = await self._dispatch(
-                organization_id=organization_id,
-                principal=principal,
-                thread=thread,
-                source_message=source_message,
-                intent=intent,
-                context=authoritative_context,
-                command=command,
-                confirmed=confirmed,
-            )
+            if intent.clarification_question and intent.family != "conversation.answer" and not confirmed:
+                # The AI could not tell what to do: ask, and continue when the human answers.
+                receipt = CommandReceipt(status="clarification_required",
+                    message=intent.clarification_question.strip(), command_id=command.id)
+            else:
+                receipt = await self._dispatch(
+                    organization_id=organization_id,
+                    principal=principal,
+                    thread=thread,
+                    source_message=source_message,
+                    intent=intent,
+                    context=authoritative_context,
+                    command=command,
+                    confirmed=confirmed,
+                )
         except CommandResolutionError as exc:
             receipt = CommandReceipt(
                 status="clarification_required",
@@ -224,6 +245,33 @@ class ConversationCommandCompiler:
             await self._session.commit()
             await self._session.refresh(command)
         return CompiledCommandOutcome(command=command, receipt=receipt)
+
+    async def _continue_answered(self, *, organization_id, principal, thread, source_message, intent):
+        """When the human answers a question this thread asked, read their message as the original
+        request plus the answer. Integration tasks saved for preparation continue in their own path."""
+        raw = intent.arguments.get("resumeCommandId")
+        if not raw:
+            return source_message, intent, None
+        try:
+            pending_id = UUID(str(raw))
+        except ValueError:
+            return source_message, intent, None
+        pending = await self._session.scalar(select(ConversationCommand).where(
+            ConversationCommand.id == pending_id, ConversationCommand.organization_id == organization_id,
+            ConversationCommand.thread_id == thread.id, ConversationCommand.created_by == principal.user_id,
+            ConversationCommand.status == "clarification_required").with_for_update())
+        # A message on another subject is a new request, even right after a question.
+        if pending is None or "integrationTask" in (pending.payload or {}) or pending.family != intent.family:
+            return source_message, intent, None
+        original = (pending.payload or {}).get("request")
+        if not original:
+            asked = await self._session.get(ConversationMessage, pending.source_message_id)
+            original = asked.content if asked is not None else ""
+        question = str((pending.receipt or {}).get("message") or "")
+        combined = f"{original}\n\nYou asked: {question}\nMy answer: {source_message.content}"
+        pending.status = "resumed"
+        arguments = {key: value for key, value in intent.arguments.items() if key != "resumeCommandId"}
+        return cast(ConversationMessage, _AnsweredMessage(source_message, combined)), intent.model_copy(update={"arguments": arguments}), pending
 
     async def confirm(
         self,
@@ -330,6 +378,11 @@ class ConversationCommandCompiler:
                     source_message_id=source_message.id,
                 )
             except AmbiguousSiteTarget as exc:
+                raise CommandResolutionError(str(exc)) from exc
+            except ValidationError:
+                raise
+            except ValueError as exc:
+                # A request the worker designer could not settle: ask, and continue on the answer.
                 raise CommandResolutionError(str(exc)) from exc
             command.target_type = "worker"
             command.target_id = str(result.worker.id)
@@ -938,7 +991,7 @@ class ConversationCommandCompiler:
                     command_id=command.id,
                 )
             required_site = str(intent.arguments.get("requiredSite") or "").strip()
-            if required_site and required_site.casefold() not in source_message.content.casefold():
+            if required_site and not grounded_in(required_site, source_message.content):
                 required_site = ""
             if (
                 not configured_sources()
@@ -992,7 +1045,13 @@ class ConversationCommandCompiler:
             )
 
         if family == "conversation.answer":
-            from app.application.services.conversation_semantics import grounded_reply
+            from app.application.services.conversation_semantics import (
+                grounded_reply,
+                reply_from_intent,
+            )
+            answer = reply_from_intent(intent, context)
+            if answer is not None:
+                return CommandReceipt(status="completed", message=answer, command_id=command.id)
             answer = await grounded_reply(self._gateway, message=source_message.content,
                 context=context, invocation_context=AIInvocationContext(
                     organization_id=organization_id, worker_id=thread.worker_id,

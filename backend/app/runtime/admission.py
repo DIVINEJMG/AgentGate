@@ -1,11 +1,13 @@
 """PostgreSQL-backed admission ordering for due Work Items."""
 
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.infrastructure.database.models import WorkItem
 
@@ -50,21 +52,41 @@ def admission_order(
     return sorted(items, key=score, reverse=True)
 
 
+def next_admission(now: datetime) -> Any:
+    """The id of the work item `admission_order` puts first among all due queued items, chosen in
+    SQL so admission reads one row instead of every queued item."""
+    priority = case(
+        (WorkItem.priority == "urgent", 6),
+        (WorkItem.priority == "high", 4),
+        (WorkItem.priority == "low", 0),
+        else_=2,
+    )
+    # Whole five-minute periods waited, up to 12: comparisons rather than timestamp
+    # arithmetic, so the result is exact and the same on every database.
+    age = case(
+        *[(WorkItem.created_at <= now - timedelta(seconds=300 * points), points) for points in range(12, 0, -1)],
+        else_=0,
+    )
+    active = aliased(WorkItem)
+    active_work = (
+        select(func.count())
+        .select_from(active)
+        .where(active.organization_id == WorkItem.organization_id, active.status.in_(["admitted", "running"]))
+        .scalar_subquery()
+    )
+    yielding = case((active_work >= 2, 2), else_=active_work)
+    return (
+        select(WorkItem.id)
+        .where(WorkItem.status == "queued", WorkItem.scheduled_at <= now)
+        .order_by((priority + age - yielding).desc(), WorkItem.created_at, WorkItem.id.desc())
+        .limit(1)
+    )
+
+
 async def admit_due_item(session: AsyncSession, item: WorkItem, *, now: datetime) -> bool:
     """Serialize admission across API processes; WorkItem is the durable authority."""
     await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _ADMISSION_LOCK})
-    queued = list((await session.scalars(
-        select(WorkItem).where(
-            WorkItem.status == "queued", WorkItem.scheduled_at <= now
-        ).order_by(*due_work_order(now)).limit(1000).with_for_update()
-    )).all())
-    active = list((await session.scalars(
-        select(WorkItem.organization_id).where(
-            WorkItem.status.in_(["admitted", "running"])
-        )
-    )).all())
-    order = admission_order(queued, now=now, active_by_organization=Counter(active))
-    if not order or order[0].id != item.id:
+    if await session.scalar(next_admission(now)) != item.id:
         return False
     item.status = "admitted"
     await session.flush()
