@@ -13,6 +13,8 @@ from app.infrastructure.database.models import (
 )
 from app.infrastructure.database.outbox import TransactionalOutbox
 
+INSTALLATION_EVENTS = frozenset({"installation", "installation_repositories"})
+
 
 async def accept_github_event(session, event):
     from app.infrastructure.database.models import GitHubInstallationBinding
@@ -27,8 +29,24 @@ async def accept_github_event(session, event):
     if not bindings:
         raise PermissionError("Installation has no explicitly verified tenant connection binding.")
     result = None
+    external_id = event.evidence.get("projectId") or event.resource_external_id
     for binding in bindings:
         identity = uuid4()
+        # An event for a repository no task is connected to (for example CI runs in other
+        # repositories the app can see) can only end "unmatched"; record it so without sending
+        # it through the queue. Installation changes are always processed.
+        connected = (
+            event.event_type in INSTALLATION_EVENTS
+            or await session.scalar(
+                select(IntegrationResource.id)
+                .where(
+                    IntegrationResource.connection_id == binding.connection_id,
+                    IntegrationResource.external_id == external_id,
+                )
+                .limit(1)
+            )
+            is not None
+        )
         inserted = await session.scalar(
             insert(IntegrationEventInbox)
             .values(
@@ -38,14 +56,14 @@ async def accept_github_event(session, event):
                 provider="github",
                 delivery_id=event.delivery_id,
                 event_type=event.event_type,
-                resource_external_id=event.evidence.get("projectId") or event.resource_external_id,
+                resource_external_id=external_id,
                 evidence=event.evidence,
-                status="pending",
+                status="pending" if connected else "unmatched",
             )
             .on_conflict_do_nothing(constraint="uq_integration_event_delivery")
             .returning(IntegrationEventInbox.id)
         )
-        if inserted is not None:
+        if inserted is not None and connected:
             await TransactionalOutbox(session).enqueue(
                 topic="integration.event.received",
                 aggregate_type="integration_event",
@@ -84,7 +102,7 @@ async def github_event_state(session, event):
         .where(IntegrationConnectionState.connection_id == binding.connection_id)
         .with_for_update()
     )
-    if event.event_type in {"installation", "installation_repositories"}:
+    if event.event_type in INSTALLATION_EVENTS:
         action = event.evidence.get("action")
         # Reordered events must not restore revoked access. Unsuspend/addition
         # requires fresh authenticated discovery, not a webhook-based grant.

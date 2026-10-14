@@ -127,7 +127,7 @@ class UpstashQStashProvider(QueueProvider):
         parallelism: int | None = None,
     ) -> QueueMessage:
         encoded = _destination_path(destination)
-        count_qstash_message()
+        count_qstash_message(destination)
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 f"{self._base_url}/v2/publish/{encoded}",

@@ -8,6 +8,7 @@ context lookup outside measured work.
 """
 from __future__ import annotations
 
+import logging
 import time
 from collections import Counter
 from collections.abc import Iterator
@@ -15,6 +16,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 from redis.asyncio import Redis
 from sqlalchemy import event
@@ -89,9 +91,13 @@ def label_usage(**labels: Any) -> None:
         meter.labels.update(labels)
 
 
-def count_qstash_message() -> None:
+def count_qstash_message(destination: str | None = None) -> None:
     if (meter := _CURRENT.get()) is not None:
         meter.qstash_messages += 1
+        return
+    # Every QStash message is billed; one sent outside measured work is still reported.
+    path = urlsplit(destination).path if destination else None
+    logging.getLogger("uvicorn.error").info("QStash message outside a meter destination=%s", path)
 
 
 def count_redis_commands(count: int = 1) -> None:

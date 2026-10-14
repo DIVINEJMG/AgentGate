@@ -78,6 +78,11 @@ def metered_endpoint(kind: str) -> Callable[[Callable[P, Awaitable[T]]], Callabl
         @functools.wraps(handler)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             usage, outcome = Usage(), "error"
+            # A delivery started by a QStash schedule is a billed message no publish counted.
+            request: Any = next((value for value in (*args, *kwargs.values())
+                                 if hasattr(value, "headers") and hasattr(value, "url")), None)
+            if request is not None and request.headers.get("Upstash-Schedule-Id"):
+                usage.qstash_messages += 1
             try:
                 with metered(usage):
                     result = await handler(*args, **kwargs)

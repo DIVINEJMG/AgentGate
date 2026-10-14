@@ -19,6 +19,40 @@ logger = logging.getLogger(__name__)
 # committed before the drain cleared it, and so before the drain read.
 DRAIN_PENDING = "outbox-drain-pending"
 COALESCED = "coalesced"
+DRAINED_HERE = "drained-here"
+# Set while the app is serving (app/bootstrap/lifecycle.py), so scripts and tests that commit
+# never drain from their own process.
+serving = False
+
+
+async def drain_here() -> str:
+    """Drain the outbox in this process, with the same grouping as a QStash drain request:
+    while one drain is on its way, later commits rely on it; it clears the marker before it
+    reads, so rows committed meanwhile are read by it or ask for the next one."""
+    coordinator = RedisCoordinator.from_settings()
+    try:
+        if not await coordinator.claim_flag(DRAIN_PENDING, ttl_seconds=settings.outbox_drain_coalesce_seconds):
+            return COALESCED
+    except RedisError:
+        logger.warning("Outbox drain coalescing is unavailable; draining on its own.")
+    finally:
+        with suppress(RedisError):
+            await coordinator.close()
+    from app.infrastructure.database.usage_records import record_usage
+    from app.observability.usage import Usage, metered
+    from app.runtime.outbox_publisher import drain_outbox_batch
+
+    usage, outcome, limit = Usage(), "error", 100
+    try:
+        with metered(usage):
+            published = limit
+            while published >= limit:  # a full batch may have left more behind
+                await drain_started()
+                published = await drain_outbox_batch(limit=limit)
+        outcome = "ok"
+    finally:
+        await record_usage(usage, kind="outbox.drain", organization_id=None, phase="local", outcome=outcome)
+    return DRAINED_HERE
 
 
 async def request_outbox_drain(*, reason: str) -> str | None:
@@ -29,6 +63,8 @@ async def request_outbox_drain(*, reason: str) -> str | None:
     committed business transaction; the periodic recovery drain reads any missed rows.
     """
 
+    if serving and settings.outbox_drain_local:
+        return await drain_here()
     if (
         settings.qstash_outbox_drain_url is None
         or settings.qstash_url is None
@@ -104,14 +140,14 @@ def request_outbox_drain_after_commit(*, reason: str) -> None:
 
     def _consume_result(completed: asyncio.Task[str | None]) -> None:
         if completed.cancelled():
-            logger.warning("Post-commit QStash outbox signal was cancelled.")
+            logger.warning("Post-commit outbox drain was cancelled.")
             return
         error = completed.exception()
         if error is not None:
             # Never turn an already-successful DB commit into an application failure.
             # The scheduled QStash recovery sweep is the durability backstop.
             logger.warning(
-                "Post-commit QStash outbox signal failed; recovery sweep will retry: %s",
+                "Post-commit outbox drain failed; the watchdog and scheduled drain retry: %s",
                 error,
             )
 

@@ -732,6 +732,17 @@ class ConversationCommandCompiler:
                     command_id=command.id,
                 )
             if family == "work.execute_now":
+                definition = (await current_revision(self._session, job)).definition
+                if (settings.integration_foundation_enabled and isinstance(definition, dict)
+                        and (definition.get("autonomy") or {}).get("oneShot")):
+                    # That job carried one earlier chat request and can't run again, so a new
+                    # message pointing at it is a new task.
+                    retarget = intent.model_copy(update={"family": "integration.execute"})
+                    command.family = retarget.family
+                    command.payload = {**command.payload, "intent": retarget.model_dump(mode="json")}
+                    return await self._dispatch(organization_id=organization_id, principal=principal,
+                        thread=thread, source_message=source_message, intent=retarget, context=context,
+                        command=command, confirmed=confirmed)
                 item = await queue_job(self._session, organization_id, job, principal)
                 item.payload = {**(item.payload or {}), "conversationOrigin": {
                     "threadId": str(thread.id), "messageId": str(source_message.id),
