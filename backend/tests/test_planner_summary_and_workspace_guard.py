@@ -66,7 +66,7 @@ class Guard:
             session = BenchSession(Session(self.db.engine, expire_on_commit=False))
             # A provider with no dispatch-evidence hook: only the guard is under test.
             registry = cast(ProviderRegistry, SimpleNamespace(get=lambda name: object()))
-            return await DatabaseProviderContextLoader(session, registry).checkpoint_write_dispatch(request)
+            return await DatabaseProviderContextLoader(cast(Any, session), registry).checkpoint_write_dispatch(request)
 
 
 @pytest.mark.asyncio
