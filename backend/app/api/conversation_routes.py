@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import traceback
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -29,6 +31,8 @@ from app.infrastructure.database.session import database_session
 from app.infrastructure.database.usage_records import record_usage
 from app.observability.usage import Usage, metered
 
+logger = logging.getLogger("uvicorn.error")
+
 v1_router = APIRouter(tags=["conversation"])
 v2_router = APIRouter(tags=["conversation"])
 
@@ -56,6 +60,9 @@ class UploadAttachmentRequest(BaseModel):
 
 
 def _http_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, HTTPException):
+        # A service's own refusal (status and plain message) reaches the person unchanged.
+        return exc
     if isinstance(exc, CrossTenantReferenceError):
         return HTTPException(403, str(exc))
     if isinstance(exc, PermissionError):
@@ -66,6 +73,10 @@ def _http_error(exc: Exception) -> HTTPException:
         return HTTPException(400, str(exc))
     if isinstance(exc, RuntimeError):
         return HTTPException(503, str(exc))
+    # Where it failed (file, line, function); the message itself may hold conversation content.
+    where = " < ".join(f"{frame.filename.rsplit('/app/', 1)[-1]}:{frame.lineno} {frame.name}"
+                       for frame in reversed(traceback.extract_tb(exc.__traceback__)[-4:]))
+    logger.error("Conversation operation failed error_type=%s at=%s", type(exc).__name__, where)
     return HTTPException(500, "Conversation operation failed.")
 
 
