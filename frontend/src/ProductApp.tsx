@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
 import { auth } from './platform/authClient';
@@ -16,11 +16,12 @@ import JobsPanel from './components/JobsPanel';
 import CommercialPanel from './components/CommercialPanel';
 import InvitationGate from './components/InvitationGate';
 import MemoryPanel from './components/MemoryPanel';
-import { IdentityLoading, OrganizationOnboarding, SignInGate } from './components/IdentityGate';
+import { IdentityLoading, SignInGate } from './components/IdentityGate';
 import { createOrganization, currentUser, listOrganizations, signIn, signOut, signUp, type OrganizationAccess } from './lib/identityApi';
 import { loadSystemStatus, type ApiVersion, type SystemStatus } from './lib/systemApi';
 import { clearPendingInvitationCode, getPendingInvitationCode } from './lib/commercialApi';
 import type { PerformanceWorkspace } from './lib/performanceApi';
+import { loadOnboarding, setChecklistDismissed, type Onboarding } from './lib/onboardingApi';
 import type { AppView } from './navigation';
 import { LiveProvider } from './workspace/live';
 import { formatRoute, navigate, routeForView, useRoute, type WorkspaceRoute } from './workspace/routes';
@@ -38,6 +39,9 @@ import AccessMap from './workspace/connections/AccessMap';
 import RunsPage from './workspace/pages/RunsPage';
 import PerformancePage from './workspace/pages/PerformancePage';
 import { DeveloperSettings } from './workspace/pages/LegacyPage';
+import WelcomeFlow from './workspace/onboarding/WelcomeFlow';
+import { OnboardingProvider } from './workspace/onboarding/guide';
+import { openSampleWorkspace } from './workspace/onboarding/GettingStarted';
 import './audit.css';
 import './incidents.css';
 import './product.css';
@@ -56,6 +60,7 @@ import './workspace/conversation.css';
 import './workspace/legacy.css';
 import './workspace/connections/connections.css';
 import './workspace/navigation.css';
+import './workspace/onboarding/onboarding.css';
 
 type EntryMode = 'signin' | 'signup' | 'app';
 export type WorkspacePreviewContext = {
@@ -82,6 +87,35 @@ export default function ProductApp({ entryMode, onBack, onSignedIn, onModeChange
   const [authError, setAuthError] = useState<string | null>(null);
   const [githubSetup, setGitHubSetup] = useState<string | null>(() => window.sessionStorage.getItem('audoryn.github.setup'));
   const [pendingInvite, setPendingInvite] = useState<string | null>(() => getPendingInvitationCode());
+  // First-run setup of the current workspace, read once per workspace. A failed read leaves the
+  // workspace as it is (no welcome questions, no checklist).
+  const [onboarding, setOnboarding] = useState<{ organizationId: string; value: Onboarding } | null>(null);
+  const onboardingRef = useRef(onboarding);
+  onboardingRef.current = onboarding;
+  const currentOrganizationId = organizations[0]?.id;
+
+  useEffect(() => {
+    if (!currentOrganizationId || onboardingRef.current?.organizationId === currentOrganizationId) return;
+    let active = true;
+    const done = (value: Onboarding) => { if (active) setOnboarding({ organizationId: currentOrganizationId, value }); };
+    loadOnboarding(apiVersion, currentOrganizationId).then(done).catch(() => done({ state: 'none' }));
+    return () => { active = false; };
+  }, [apiVersion, currentOrganizationId]);
+
+  // Progress is worked out on the server from what exists; read it again only while the
+  // checklist is showing.
+  const refreshOnboarding = useCallback(() => {
+    const current = onboardingRef.current;
+    if (!current || current.value.state !== 'ready' || current.value.checklistDismissed) return;
+    loadOnboarding(apiVersion, current.organizationId)
+      .then((value) => setOnboarding((now) => now?.organizationId === current.organizationId ? { ...now, value } : now)).catch(() => {});
+  }, [apiVersion]);
+  const dismissChecklist = useCallback((dismissed: boolean) => {
+    const current = onboardingRef.current;
+    if (!current) return;
+    setOnboarding({ ...current, value: { ...current.value, checklistDismissed: dismissed } });
+    setChecklistDismissed(apiVersion, current.organizationId, dismissed).catch(() => {});
+  }, [apiVersion]);
 
   function setApiVersion(version: ApiVersion) {
     setApiVersionState(version);
@@ -140,6 +174,8 @@ export default function ProductApp({ entryMode, onBack, onSignedIn, onModeChange
 
   async function handleCreateOrganization(name: string) {
     const organization = await createOrganization(apiVersion, name);
+    // A new workspace always starts with the welcome questions.
+    setOnboarding({ organizationId: organization.id, value: { state: 'welcome' } });
     setOrganizations([organization]);
     onSignedIn();
   }
@@ -167,7 +203,14 @@ export default function ProductApp({ entryMode, onBack, onSignedIn, onModeChange
   if (identityLoading) return <IdentityLoading />;
   if (!user) return <SignInGate key={entryMode} onAuthenticate={handleAuthenticate} error={authError} mode={entryMode === 'signup' ? 'signup' : 'signin'} onBack={onBack} onModeChange={(mode) => { setAuthError(null); onModeChange(mode); }} pendingInvitation={Boolean(pendingInvite)} />;
   if (pendingInvite) return <InvitationGate code={pendingInvite} apiVersion={apiVersion} onJoined={handleInviteJoined} onAbandon={handleInviteAbandon} />;
-  if (organizations.length === 0) return <OrganizationOnboarding user={user} apiVersion={apiVersion} onCreate={handleCreateOrganization} />;
+  const welcome = (organization: OrganizationAccess | null) => <WelcomeFlow user={user} organization={organization} apiVersion={apiVersion}
+    onCreateOrganization={handleCreateOrganization} onSampleData={openSampleWorkspace}
+    onFinished={(value, destination) => {
+      setOnboarding({ organizationId: organization?.id ?? '', value });
+      navigate(destination === 'conversation' && value.setup?.workerId
+        ? { page: 'conversations', workerId: value.setup.workerId, threadId: value.setup.threadId } : { page: 'home' });
+    }} />;
+  if (organizations.length === 0) return welcome(null);
 
   if (githubSetup) return <GitHubSignupConnection flowId={githubSetup} organizations={organizations} onFinished={(chosen, onboardingId) => {
     window.sessionStorage.removeItem('audoryn.github.setup');
@@ -180,6 +223,8 @@ export default function ProductApp({ entryMode, onBack, onSignedIn, onModeChange
   }} />;
 
   const organization = organizations[0];
+  if (onboarding?.organizationId === organization.id && onboarding.value.state === 'welcome') return welcome(organization);
+  if (onboarding?.organizationId !== organization.id) return <IdentityLoading />;
   const signedInUser = user;
   const operational = status?.state === 'operational' && !statusError;
   const accountLabel = signedInUser.name || signedInUser.email?.split('@')[0] || 'Account';
@@ -215,11 +260,13 @@ export default function ProductApp({ entryMode, onBack, onSignedIn, onModeChange
 
   return <LiveProvider organization={organization} apiVersion={apiVersion}>
     <RequestProgress />
+    <OnboardingProvider onboarding={onboarding.value} refresh={refreshOnboarding} dismiss={dismissChecklist}>
     <Shell route={route} organization={organization} organizations={organizations} accountName={accountLabel} accountEmail={signedInUser.email} theme={theme} onTheme={chooseTheme}
       onSwitchOrganization={(chosen) => { setOrganizations((items) => [chosen, ...items.filter((item) => item.id !== chosen.id)]); navigate({ page: 'home' }); }}
       onSignOut={previewContext ? undefined : () => void handleSignOut()} preview={previewContext ? { onExit: onBack } : undefined}>
       {page(route)}
     </Shell>
+    </OnboardingProvider>
     <Toaster />
   </LiveProvider>;
 }

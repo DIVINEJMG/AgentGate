@@ -160,3 +160,26 @@ async def test_readers_of_one_run_filter_the_organisation_stream_and_never_stall
     assert events == [] and cursor == "3-0"  # nothing for this run here, but the position still moves
     events, cursor = await bus.read_page(organization_id=organization, after=cursor, count=10, run_id=mine)
     assert [event["stream_id"] for event in events] == ["4-0"] and cursor == "5-0"
+
+
+@pytest.mark.asyncio
+async def test_a_drain_request_started_after_a_commit_is_kept_until_it_finishes(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Live test: the request was garbage-collected mid-flight ("Task was destroyed but it is
+    # pending") after claiming the drain marker, so a queued task never started.
+    import asyncio
+    import gc
+    release = asyncio.Event()
+
+    async def slow_request(*, reason: str) -> str:
+        await release.wait()
+        return "sent"
+
+    monkeypatch.setattr(outbox_trigger, "request_outbox_drain", slow_request)
+    outbox_trigger.request_outbox_drain_after_commit(reason="transaction_committed")
+    gc.collect()
+    [task] = list(outbox_trigger._pending)
+    assert not task.done()
+    release.set()
+    assert await task == "sent"
+    await asyncio.sleep(0)
+    assert not outbox_trigger._pending

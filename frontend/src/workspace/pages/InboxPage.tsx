@@ -11,6 +11,7 @@ import { usePageTitle } from '../history';
 import { useLive } from '../live';
 import { linkProps, navigate, type WorkspaceRoute } from '../routes';
 import { Ago, Avatar, Confirm, EmptyState, PageHeader, Pills, Sheet, SkeletonLines, State, humanize } from '../ui';
+import { GuideButton } from '../onboarding/guide';
 
 type Filter = 'all' | 'approvals' | 'escalations' | 'results' | 'done';
 type Item =
@@ -70,7 +71,7 @@ export default function InboxPage({ organization, user, apiVersion, route }: { o
           { value: 'results', label: 'Results', count: count('result') },
           { value: 'done', label: 'Done' },
         ]} />
-        {!live.loaded ? <SkeletonLines rows={4} avatar /> : visible.length === 0 ? <EmptyState icon={<CheckCircle2 size={18} />} title={filter === 'done' ? 'Nothing decided yet' : 'Inbox zero'}>{filter === 'done' ? 'Decided approvals and resolved escalations appear here.' : 'When a worker needs a decision, it lands here first.'}</EmptyState> : <ul className='ws-rows'>
+        {!live.loaded ? <SkeletonLines rows={4} avatar /> : visible.length === 0 ? <EmptyState icon={<CheckCircle2 size={18} />} title={filter === 'done' ? 'Nothing decided yet' : 'Inbox zero'} action={<GuideButton id='approval' label='How approvals work' />}>{filter === 'done' ? 'Decided approvals and resolved escalations appear here.' : 'When a worker needs a decision, it lands here first.'}</EmptyState> : <ul className='ws-rows'>
           {visible.map((item) => <InboxRow key={item.kind + item.id} item={item} current={selected?.id === item.id && selected.kind === item.kind} to={at({ kind: item.kind, id: item.id })} />)}
         </ul>}
       </div>

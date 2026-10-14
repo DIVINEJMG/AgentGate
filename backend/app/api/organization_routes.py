@@ -14,7 +14,11 @@ from app.api.auth_dependencies import bearer_token
 from app.domain.identity.permissions import permissions_for_role
 from app.infrastructure.auth.service import LocalAuthenticationService
 from app.infrastructure.auth.session_store import RedisSessionStore
-from app.infrastructure.database.models import Organization, OrganizationMembership
+from app.infrastructure.database.models import (
+    Organization,
+    OrganizationMembership,
+    OrganizationOnboarding,
+)
 from app.infrastructure.database.session import database_session
 
 
@@ -80,6 +84,8 @@ async def _create(name: str, user_id: UUID, session: AsyncSession) -> Organizati
         role="owner",
     )
     session.add(membership)
+    # New workspaces get the welcome questions and the getting-started checklist.
+    session.add(OrganizationOnboarding(organization_id=organization.id, user_id=user_id, state="welcome"))
     await session.commit()
     return OrganizationAccess(
         id=organization.id,

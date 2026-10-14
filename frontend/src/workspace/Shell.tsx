@@ -85,7 +85,7 @@ export function Shell({ route, organization, organizations, accountName, account
   const item = (entry: NavItem) => {
     const active = sameSection(route, entry.to) || (entry.to.page === 'conversations' && route.page === 'conversations');
     const Icon = entry.icon;
-    return <li key={entry.label}><a className='ws-nav-item' aria-current={active ? 'page' : undefined} title={collapsed ? entry.label : undefined} {...linkProps(entry.to)}>
+    return <li key={entry.label}><a className='ws-nav-item' data-guide={`nav-${entry.to.page}`} aria-current={active ? 'page' : undefined} title={collapsed ? entry.label : undefined} {...linkProps(entry.to)}>
       <Icon size={17} strokeWidth={1.7} aria-hidden='true' /><span className='ws-nav-label'>{entry.label}</span>
       {entry.badge !== undefined && <span className='ws-nav-badge' aria-label={`${entry.badge} need you`}>{entry.badge}</span>}
     </a></li>;

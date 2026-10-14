@@ -63,8 +63,8 @@ class TextConnection(BaseModel):
     @field_validator("api_format")
     @classmethod
     def supported_api(cls, value):
-        if value != "openai_chat":
-            raise ValueError("Only the OpenAI-compatible chat completion format is implemented.")
+        if value not in {"openai_chat", "anthropic_messages", "openrouter_claude"}:
+            raise ValueError("Use the OpenAI-compatible chat format, the Claude Messages API or Claude on OpenRouter.")
         return value
 
     @field_validator("schema_mode")
@@ -76,6 +76,25 @@ class TextConnection(BaseModel):
 
 
 DEFAULT_CONNECTIONS = {
+    # Claude through the native Messages API; enabled in the environment once a key is added.
+    "anthropic": TextConnection(
+        api_format="anthropic_messages",
+        base_url="https://api.anthropic.com/v1",
+        hosting_provider="anthropic",
+        credential_ref="anthropic",
+        schema_mode="json_schema",
+        billing_required=True,
+    ),
+    # Claude through OpenRouter (same models and prices, no Anthropic account needed); uses
+    # OPENROUTER_API_KEY. Enabled in the environment.
+    "openrouter_claude": TextConnection(
+        api_format="openrouter_claude",
+        base_url="https://openrouter.ai/api/v1",
+        hosting_provider="anthropic",
+        credential_ref="openrouter",
+        schema_mode="json_schema",
+        billing_required=True,
+    ),
     "groq": TextConnection(
         base_url="https://api.groq.com/openai/v1",
         hosting_provider="groq",
@@ -112,6 +131,10 @@ def route_credential(route, config):
         secret = (
             config.groq_api_key
             if ref == "groq"
+            else getattr(config, "anthropic_api_key", None)
+            if ref == "anthropic"
+            else config.openrouter_api_key
+            if ref == "openrouter"
             else config.hf_token
             if ref == "huggingface"
             else config.ai_text_api_keys.get(ref)
@@ -133,7 +156,8 @@ def snapshot_connection(route, config):
         connection = getattr(config, "ai_text_connections", {}).get(name)
         if connection:
             route["connection"] = connection.model_dump()
-            route["endpoint"] = connection.base_url + "/chat/completions"
+            route["endpoint"] = connection.base_url + (
+                "/messages" if connection.api_format == "anthropic_messages" else "/chat/completions")
             route["hostingProvider"] = connection.hosting_provider
             route["requestedModel"] = wire_model(connection, route["model"])
     return route

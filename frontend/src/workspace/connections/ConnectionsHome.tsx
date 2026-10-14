@@ -5,6 +5,7 @@ import { useLive } from '../live';
 import { linkProps } from '../routes';
 import { Ago, Notice, Section, SkeletonLines, sentence } from '../ui';
 import { ConnectionsHeader, Pulse, ToolMark } from './Chrome';
+import { GuideButton } from '../onboarding/guide';
 import { activityFor, HEALTH_TONE, resourcesFor, toolFor, TOOLS, useConnections, workerCountFor, type ConnectionsData } from './data';
 
 export default function ConnectionsHome({ organization, apiVersion }: { organization: OrganizationAccess; apiVersion: ApiVersion }) {
@@ -25,7 +26,7 @@ export default function ConnectionsHome({ organization, apiVersion }: { organiza
       {active.length === 0 ? <section className='ws-conn-empty'>
         <div><h2>Connect your first tool</h2><p>Workers can only reach tools you connect here, and only within your policies. Start with the directory.</p></div>
         <ul className='ws-conn-suggest'>{TOOLS.filter((tool) => tool.available).slice(0, 4).map((tool) => <li key={tool.slug}><a {...linkProps({ page: 'connections', view: 'tool', id: tool.slug })}><ToolMark provider={tool.provider} /><span><strong>{tool.name}</strong><small>{tool.summary}</small></span><ArrowRight size={14} /></a></li>)}</ul>
-        <a className='ws-button ws-button-primary' {...linkProps({ page: 'connections', view: 'directory' })}>Open the directory<ArrowRight size={14} /></a>
+        <span className='ob-empty-actions'><a className='ws-button ws-button-primary' {...linkProps({ page: 'connections', view: 'directory' })}>Open the directory<ArrowRight size={14} /></a><GuideButton id='connect' /></span>
       </section> : <ul className='ws-conn-grid' aria-label='Connected accounts'>
         {active.map((connection) => {
           const tool = toolFor(connection.provider);

@@ -69,6 +69,17 @@ class Organization(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     created_by: Mapped[UUID] = mapped_column(ForeignKey("human_identities.id"), nullable=False)
     __table_args__ = (CheckConstraint("length(name) >= 2", name="ck_organizations_name_length"),)
 
+class OrganizationOnboarding(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """First-run setup of a new workspace: the welcome answers, what was set up from them, and
+    the getting-started checklist. Workspaces created before onboarding existed have no row."""
+    __tablename__ = "organization_onboarding"
+    organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, unique=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("human_identities.id"), nullable=False)
+    state: Mapped[str] = mapped_column(String(16), nullable=False, default="welcome")  # welcome, ready
+    answers: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    setup: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    checklist_dismissed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
 class OrganizationMembership(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "organization_memberships"
     organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)

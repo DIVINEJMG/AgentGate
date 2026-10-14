@@ -44,6 +44,17 @@ class PlannerModelProfile(BaseModel):
 
 # Generation allowance can include private reasoning; final planner JSON stays bounded.
 DEFAULT_PROFILES: dict[str, PlannerModelProfile] = {
+    # Claude: effort is the cost control (thinking counts as output). Haiku answers chat at low
+    # effort; Sonnet plans at medium, Anthropic's starting point for well-specified agentic work.
+    "anthropic:claude-haiku-5-5": PlannerModelProfile(context_tokens=1000000, generation_tokens=8192,
+        output_format="json_schema", request_parameters={"reasoning_effort": "low"}),
+    "anthropic:claude-sonnet-5-5": PlannerModelProfile(context_tokens=1000000, generation_tokens=16384,
+        output_format="json_schema", request_parameters={"reasoning_effort": "medium"}),
+    # The same two models through OpenRouter.
+    "openrouter_claude:anthropic/claude-haiku-5.5": PlannerModelProfile(context_tokens=1000000, generation_tokens=8192,
+        output_format="json_schema", request_parameters={"reasoning_effort": "low"}),
+    "openrouter_claude:anthropic/claude-sonnet-5.5": PlannerModelProfile(context_tokens=1000000, generation_tokens=16384,
+        output_format="json_schema", request_parameters={"reasoning_effort": "medium"}),
     "groq:qwen/qwen3.8-27b": PlannerModelProfile(context_tokens=131072, generation_tokens=8192,
         output_format="json_schema", request_parameters={"reasoning_effort": "none"}),
     "hf_featherless:Qwen/Qwen2.5-7B-Instruct": PlannerModelProfile(context_tokens=32768, streaming=False),

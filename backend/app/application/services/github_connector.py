@@ -8,7 +8,10 @@ from fastapi import HTTPException
 from sqlalchemy import select, update
 
 from app.application.services.integration_credentials import encode_bundle
-from app.application.services.integration_foundation import IntegrationFoundation
+from app.application.services.integration_foundation import (
+    IntegrationFoundation,
+    grants_review_message,
+)
 from app.bootstrap.settings import settings
 from app.domain.identity.permissions import permissions_for_role
 from app.execution.providers.native.github.authentication import app_jwt, permission_scopes
@@ -171,9 +174,12 @@ async def connect_installation(organization_id, installation_id, principal, sess
         state.credential_metadata = {"scopes": list(bundle.scopes)}
         binding.permissions, binding.status = installation["permissions"], "active"
         await IntegrationFoundation(session).discover(connection, bundle.access_token)
+        review = await IntegrationFoundation(session).refresh_ongoing_grants(connection.id)
+        if review:
+            state.reason = grants_review_message(review)
         await finish_onboarding(session, row, connection.id)
         await session.commit()
-        return {"connectionId": str(connection.id), "state": "connected"}
+        return {"connectionId": str(connection.id), "state": "connected", "needsReview": review}
     connection = Integration(
         id=uuid4(),
         organization_id=organization_id,

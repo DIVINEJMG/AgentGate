@@ -11,6 +11,8 @@ import { notify } from '../feedback';
 import { useLive } from '../live';
 import { linkProps } from '../routes';
 import { Ago, Avatar, EmptyState, Notice, Section, SkeletonLines, State, humanize } from '../ui';
+import GettingStarted from '../onboarding/GettingStarted';
+import { GuideButton } from '../onboarding/guide';
 
 function greeting(name: string) {
   const hour = new Date().getHours();
@@ -68,6 +70,8 @@ export default function HomePage({ organization, user, apiVersion, operational, 
       </p>
     </header>
 
+    <GettingStarted />
+
     {statusError && !operational && <Notice tone='danger'><strong>Audoryn can’t confirm its own status.</strong> Actions stay blocked until it can. Your workers’ records are still shown.</Notice>}
 
     <div className='ws-cols'>
@@ -92,7 +96,7 @@ export default function HomePage({ organization, user, apiVersion, operational, 
         </Section>
 
         <Section title='Working now' count={live.loaded ? working.length : undefined} action={<a className='ws-link' {...linkProps({ page: 'runs' })}>All runs</a>}>
-          {!live.loaded ? <SkeletonLines rows={2} avatar /> : working.length === 0 ? <EmptyState title='No work in progress'>When a worker picks up a job, you’ll see its plan move step by step here.</EmptyState> : <ul className='ws-rows'>
+          {!live.loaded ? <SkeletonLines rows={2} avatar /> : working.length === 0 ? <EmptyState title='No work in progress' action={<GuideButton id='first_task' />}>When a worker picks up a job, you’ll see its plan move step by step here.</EmptyState> : <ul className='ws-rows'>
             {working.map((run) => <WorkingRow key={run.id} run={run} worker={workerName(run.workerId)} job={jobName(run.jobId)} />)}
           </ul>}
         </Section>

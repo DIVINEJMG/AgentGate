@@ -25,7 +25,7 @@ def test_twelve_ordered_models_and_disabled_rollout(monkeypatch):
     monkeypatch.setattr(settings, "ai_coordinator_model", config.ai_coordinator_model)
     routes = configured_routes()
     assert len(routes) == 12
-    assert len(DEFAULT_PROFILES) == 15
+    assert len(DEFAULT_PROFILES) == 19  # 15 open models plus Claude Haiku 5.5 and Sonnet 5.5, direct and via OpenRouter
     assert [route["model"] for route in routes] == [
         "moonshotai/kimi-k3",
         "z-ai/glm-5.3",

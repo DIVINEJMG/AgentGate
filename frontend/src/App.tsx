@@ -4,7 +4,8 @@ import {SiteApp} from './site/SiteApp';
 import {CmsPreview} from './site/preview/CmsPreview';
 import {navigatePublic, readBootstrap, routePath} from './site/runtime';
 
-const PreviewWorkspace = import.meta.env.DEV ? lazy(() => import('./preview/PreviewWorkspace')) : null;
+// The sample workspace ("Try with sample data"): local fixtures only, no network requests.
+const PreviewWorkspace = lazy(() => import('./preview/PreviewWorkspace'));
 // Public visitors do not need the authenticated workspace bundle.
 const ProductApp=lazy(()=>import('./ProductApp'));
 const navigate=navigatePublic;
@@ -28,9 +29,7 @@ export default function App() {
   const invitationPending = Boolean(getPendingInvitationCode());
   const cacheSeconds = bootstrap?.cacheSeconds ?? 60;
   if (route === 'workspace-preview') {
-    return PreviewWorkspace
-      ? <Suspense fallback={null}><PreviewWorkspace onExit={() => navigate('home')} /></Suspense>
-      : <SiteApp path='/' cacheSeconds={cacheSeconds} navigate={navigate} />;
+    return <Suspense fallback={null}><PreviewWorkspace onExit={() => navigate('home')} /></Suspense>;
   }
   if ((invitationPending && route !== 'terms' && route !== 'privacy') || route === 'login' || route === 'signup' || route === 'app') {
     return <Suspense fallback={null}><ProductApp entryMode={route === 'signup' ? 'signup' : route === 'app' ? 'app' : 'signin'} onBack={() => navigate('home')} onSignedIn={() => navigate('app')} onModeChange={(mode) => navigate(mode === 'signin' ? 'login' : 'signup')} /></Suspense>;

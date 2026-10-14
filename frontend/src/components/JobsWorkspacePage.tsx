@@ -12,6 +12,7 @@ import { filterJobs } from './workspaceListModel';
 import { IntegrationResumeControl } from './IntegrationTaskControls';
 import { linkProps, navigate, queryParam, useRoute } from '../workspace/routes';
 import { Ago, Avatar, EmptyState, Notice, PageHeader, Pills, Sheet, SkeletonLines, State, sentence } from '../workspace/ui';
+import { GuideButton } from '../workspace/onboarding/guide';
 import { notify } from '../workspace/feedback';
 import { usePageTitle } from '../workspace/history';
 
@@ -147,7 +148,7 @@ export default function JobsWorkspacePage({ organization, apiVersion, data, work
         <label className='ws-search-field'><Search size={15} aria-hidden='true' /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder='Search jobs or workers' aria-label='Search jobs' /></label>
       </div>
       {loading ? <SkeletonLines rows={5} /> : visibleJobs.length === 0
-        ? <EmptyState icon={<BriefcaseBusiness size={18} />} title={data.jobs.length ? 'Nothing matches these filters' : 'Give a worker its first job'} action={!data.jobs.length && canManage ? <button type='button' className='ws-button ws-button-primary' disabled={!activeWorkers} onClick={onCreate}><Plus size={15} />Create a job</button> : undefined}>{data.jobs.length ? 'Try another search or state.' : 'A job is a clear objective a worker owns. Audoryn prepares how it runs and what it may touch.'}</EmptyState>
+        ? <EmptyState icon={<BriefcaseBusiness size={18} />} title={data.jobs.length ? 'Nothing matches these filters' : 'Give a worker its first job'} action={!data.jobs.length && canManage ? <span className='ob-empty-actions'><button type='button' className='ws-button ws-button-primary' disabled={!activeWorkers} onClick={onCreate}><Plus size={15} />Create a job</button><GuideButton id='schedule' /></span> : undefined}>{data.jobs.length ? 'Try another search or state.' : 'A job is a clear objective a worker owns. Audoryn prepares how it runs and what it may touch.'}</EmptyState>
         : <div className='ws-day-groups'>
           {groupedJobs.map(({ worker, jobs }) => <section key={worker.id} className='ws-section' aria-label={`${worker.name} jobs`}>
             <div className='ws-section-head'><h2><Avatar name={worker.name} seed={worker.id} size={22} />{worker.name}</h2><span className='ws-count'>{jobs.length}</span><p>{worker.department || 'Worker'}</p></div>

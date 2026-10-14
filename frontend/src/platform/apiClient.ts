@@ -20,7 +20,7 @@ function readAccessToken() {
 }
 
 async function request<T = any>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<ApiResponse<T>> {
-  if (import.meta.env.DEV && isWorkspacePreview()) {
+  if (isWorkspacePreview()) {
     const { previewResponse } = await import('../preview/previewResponses');
     // The sample workspace emits the same request events, and can simulate a slow API
     // (sessionStorage 'audoryn.preview.latency' in ms) to show the loading states.

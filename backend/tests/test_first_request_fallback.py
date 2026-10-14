@@ -159,9 +159,9 @@ def test_settings_wire_worker_and_chat_fallback_without_changing_vision():
     )
     gateway = ai_gateway_from_settings(config)
     assert isinstance(gateway, OrderedTextGateway)
-    assert len(gateway.routes) == 7
     # The configured chat order, whatever it is (the owner chooses it in AI_INTERACTIVE_ROUTES).
     from app.infrastructure.ai.text_routes import snapshot_routes
+    assert len(gateway.routes) == len(snapshot_routes(config, "interactive"))
     first = snapshot_routes(config, "interactive")[0]
     assert (gateway.routes[0]["provider"], gateway.routes[0]["model"]) == (first["provider"], first["model"])
     assert gateway.budget_seconds == 1500

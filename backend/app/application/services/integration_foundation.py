@@ -27,6 +27,7 @@ from app.infrastructure.database.models import (
     IntegrationNotification,
     IntegrationResource,
     IntegrationTaskGrant,
+    Job,
     JobRevision,
     Worker,
     WorkItem,
@@ -109,6 +110,15 @@ def resource_choice_message(provider_name: str, hint: str, choices: list[dict], 
     question = (f"Which {provider_label(provider_name)} {noun} did you mean by “{hint}”?" if hint
                 else f"Which {provider_label(provider_name)} {noun} should I use for this?")
     return f"{question} Options: {', '.join(names)}{more}. Reply with its name."
+
+
+def grants_review_message(job_names: list[str]) -> str:
+    """Names the ongoing jobs whose access could not follow a reconnect."""
+    if not job_names:
+        return ""
+    return ("These ongoing jobs need their access reviewed before they use this account again: "
+            + ", ".join(f"“{name}”" for name in job_names)
+            + ". Their next run waits for you to review it.")
 
 
 class IntegrationFoundation:
@@ -586,6 +596,33 @@ class IntegrationFoundation:
                         "scopes": ask, "actions": [], "risks": [],
                         "_meta": {"description": "Writes other people can see, not asked for in the request: a person approves each one.",
                             "integrationJobRevisionId": str(revision.id)}}, created_at=datetime.now(UTC)))
+
+    async def refresh_ongoing_grants(self, connection_id: UUID) -> list[str]:
+        """After the account is reconnected, ongoing jobs that use it follow its current authority
+        when they pass the same checks as resuming a task. Returns the names of jobs that still
+        need review; their grants stay as they were, so they wait instead of running without tools."""
+        state = await self.session.scalar(select(IntegrationConnectionState).where(
+            IntegrationConnectionState.connection_id == connection_id))
+        if not state or state.authorization_state != "connected":
+            return []
+        rows = (await self.session.execute(select(IntegrationTaskGrant, IntegrationResource, Job.name)
+            .join(IntegrationResource, IntegrationResource.id == IntegrationTaskGrant.resource_id)
+            .join(JobRevision, JobRevision.id == IntegrationTaskGrant.job_revision_id)
+            .join(Job, Job.id == JobRevision.job_id)
+            .where(IntegrationResource.connection_id == connection_id,
+                IntegrationTaskGrant.standing.is_(True), IntegrationTaskGrant.active.is_(True),
+                IntegrationTaskGrant.authority_version != state.authority_version,
+                Job.status == "active", JobRevision.revision == Job.current_revision)
+            .order_by(Job.name))).all()
+        review: list[str] = []
+        for grant, resource, name in rows:
+            if (resource.health == "healthy"
+                    and set(grant.scopes).issubset(await self.resource_capabilities(resource))
+                    and await self.can_use(connection_id, grant.organization_id, grant.initiating_user_id, grant.worker_id)):
+                grant.authority_version = state.authority_version
+            elif name not in review:
+                review.append(name)
+        return review
 
     async def authorize(self, *, organization_id: UUID, agent_id: UUID, work_item_id: UUID | None, resource_id: UUID, scope: str | None, payload: dict) -> IntegrationResource:
         if work_item_id is None:

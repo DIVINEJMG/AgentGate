@@ -25,9 +25,16 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     if settings.smart_planner_enabled and settings.integration_foundation_enabled:
         from app.runtime.preparation_worker import preparation_recovery_loop
         preparation_recovery = asyncio.create_task(preparation_recovery_loop())
+    watchdog = None
+    if settings.delivery_watchdog_seconds:
+        from app.runtime.delivery_watchdog import delivery_watchdog_loop
+        watchdog = asyncio.create_task(delivery_watchdog_loop())
     try:
         yield
     finally:
+        if watchdog:
+            watchdog.cancel()
+            await asyncio.gather(watchdog, return_exceptions=True)
         from app.api.internal.runtime import stop_runtime_tasks
 
         await stop_runtime_tasks()
