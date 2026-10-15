@@ -46,13 +46,17 @@ def test_a_refused_write_is_explained_with_the_way_forward() -> None:  # F20
     assert refused_write("Something else broke.").startswith("I stopped: Something else broke.")
 
 
-def test_waiting_for_a_planning_turn_spends_no_retry() -> None:
+def test_waiting_for_a_planning_turn_spends_no_retry(monkeypatch: pytest.MonkeyPatch) -> None:
     """F27: another task holding the planning slots is a wait, not a failure; F26: once the
     automatic retries are spent, the message says how to continue."""
     from datetime import UTC, datetime, timedelta
 
+    from app.api.internal import runtime
     from app.api.internal.runtime import PLANNING_TURN, _planning_wait
     from app.domain.ai.providers import AIProviderError
+
+    # The smart planner's wait messages (F26); set here rather than taken from the local .env.
+    monkeypatch.setattr(runtime.settings, "smart_planner_enabled", True)
 
     now = datetime.now(UTC)
     busy = AIProviderError("rate_limited", "Organization planning capacity is full.", retryable=True,
