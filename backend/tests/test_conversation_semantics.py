@@ -31,7 +31,7 @@ def selector(outputs, calls):
         capabilities = ModelProviderCapabilities(structured_json=True)
 
         async def generate_text(self, *, model, request):
-            calls.append((model, request.prompt))
+            calls.append((model, request.full_prompt))  # as a model without native schemas reads it
             result = outputs[model].pop(0)
             if isinstance(result, Exception):
                 raise result

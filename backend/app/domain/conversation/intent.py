@@ -72,6 +72,10 @@ class ChatReply(BaseModel):
     factIds: list[str] = Field(default_factory=list, max_length=5)
 
 
+# A conversation request still waiting on the person (a question, an account connection, a
+# permission) or on the AI.
+PENDING_COMMAND_STATUSES = ("waiting_integration", "clarification_required", "waiting_ai", "policy_denied")
+
 class WorkerCommandIntent(BaseModel):
     """Schema-validated interpretation of one human conversational turn.
 

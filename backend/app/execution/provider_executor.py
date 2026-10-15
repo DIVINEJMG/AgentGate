@@ -7,6 +7,7 @@ from jsonschema import ValidationError
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.context.narrator import narrate
 from app.bootstrap.settings import settings
 from app.domain.actions.gateway import ActionProposal
 from app.domain.integrations.contracts import IntegrationExecutionResult
@@ -37,6 +38,13 @@ from app.infrastructure.database.outbox import TransactionalOutbox
 from app.infrastructure.secrets.provider_vault import DatabaseSecretVault
 from app.observability.metrics import ExecutionMetrics
 from app.realtime.contracts import REALTIME_EVENT_TYPES
+
+# Providers whose actions run without the durable integration lifecycle.
+NON_DURABLE_PROVIDERS = frozenset({"browser", "web_research"})
+
+
+def _durable(provider: str) -> bool:
+    return settings.integration_foundation_enabled and provider not in NON_DURABLE_PROVIDERS
 
 
 class ProviderContextLoader(Protocol):
@@ -74,10 +82,7 @@ class DatabaseProviderContextLoader:
         except ValueError as error:
             raise LookupError("Action resource is not a canonical integration resource.") from error
 
-        if settings.integration_foundation_enabled and proposal.provider not in {
-            "browser",
-            "web_research",
-        }:
+        if _durable(proposal.provider):
             return await self._load_foundation(proposal, integration_id)
 
         integration = await self._session.scalar(
@@ -151,7 +156,7 @@ class DatabaseProviderContextLoader:
         from app.application.services.integration_credentials import CredentialManager
         from app.application.services.integration_foundation import IntegrationFoundation
 
-        resource = await IntegrationFoundation(self._session).authorize(
+        authority = await IntegrationFoundation(self._session).task_authority(
             organization_id=proposal.organization_id,
             agent_id=proposal.agent_id,
             work_item_id=proposal.work_item_id,
@@ -159,27 +164,28 @@ class DatabaseProviderContextLoader:
             scope=proposal.scope,
             payload=proposal.payload,
         )
-        connection = await self._session.get(Integration, resource.connection_id)
+        # The rows the authority check just read are used as they are, not read again.
+        resource, connection, state, item, grant = (
+            authority.resource,
+            authority.connection,
+            authority.state,
+            authority.item,
+            authority.grant,
+        )
         if connection is None or connection.provider != proposal.provider:
             raise PermissionError("Connection does not match the requested provider.")
         provider = self._registry.get(connection.provider)
         credential = await CredentialManager(self._session).resolve(
-            connection=connection, provider=provider, correlation_id=proposal.correlation_id
+            connection=connection,
+            provider=provider,
+            correlation_id=proposal.correlation_id,
+            state=state,
         )
         configuration = {
             str(k): str(v)
             for k, v in {**(connection.config or {}), **resource.configuration}.items()
             if isinstance(v, (str, int, float, bool))
         }
-        from app.infrastructure.database.models import IntegrationConnectionState
-
-        state = await self._session.scalar(
-            select(IntegrationConnectionState).where(
-                IntegrationConnectionState.connection_id == connection.id
-            )
-        )
-        if state is None:
-            raise PermissionError("Connection ownership and authorization require review.")
         allowed = tuple(resource.capabilities)
         granted_scopes = tuple((state.credential_metadata or {}).get("scopes", []))
         if granted_scopes:
@@ -193,28 +199,13 @@ class DatabaseProviderContextLoader:
             )
         if proposal.scope not in allowed:
             raise PermissionError("Provider consent does not cover this capability.")
-        from app.execution.providers.integration_hooks import ScopedCredentialHooks
-        from app.infrastructure.database.models import (
-            IntegrationResource,
-            IntegrationTaskGrant,
-            WorkItem,
-        )
-
-        item = await self._session.get(WorkItem, proposal.work_item_id)
-        if item is None:
-            raise PermissionError("Integration work item no longer exists.")
-        grant = await self._session.scalar(
-            select(IntegrationTaskGrant).where(
-                IntegrationTaskGrant.job_revision_id == item.job_revision_id,
-                IntegrationTaskGrant.resource_id == resource.id,
-                IntegrationTaskGrant.active.is_(True),
-            )
-        )
         import json
 
-        if grant is None:
-            raise PermissionError("Integration task grant no longer exists.")
+        from app.execution.providers.integration_hooks import ScopedCredentialHooks
+        from app.infrastructure.database.models import IntegrationResource, IntegrationTaskGrant
+
         configuration["constraints"] = json.dumps(grant.constraints or {})
+        credential_row = None  # read (and locked) below when the credential is scoped per action
         if isinstance(provider, ScopedCredentialHooks):
             rows = (
                 await self._session.scalars(
@@ -282,9 +273,13 @@ class DatabaseProviderContextLoader:
             configuration=configuration,
             web_url=resource.web_url,
         )
-        row = await self._session.scalar(
-            select(IntegrationCredential).where(
-                IntegrationCredential.integration_id == connection.id
+        row = (
+            credential_row
+            if isinstance(provider, ScopedCredentialHooks)
+            else await self._session.scalar(
+                select(IntegrationCredential).where(
+                    IntegrationCredential.integration_id == connection.id
+                )
             )
         )
         return ProviderRuntimeContext(
@@ -324,14 +319,12 @@ class DatabaseProviderContextLoader:
             )
         )
         if conflicting is not None:
-            raise ExecutionProviderError(
-                code="rate_limited",
+            raise ExecutionProviderError.for_request(
+                request,
+                "rate_limited",
+                "Another write on this resource is still in flight or has an uncertain outcome. This action will wait for reconciliation.",
                 retryable=True,
-                provider=request.resource.provider,
-                operation=request.operation,
-                correlation_id=request.correlation_id,
                 retry_after_seconds=60,
-                safe_message="Another write on this resource is still in flight or has an uncertain outcome. This action will wait for reconciliation.",
             )
         row = await self._session.scalar(
             select(Action)
@@ -547,13 +540,7 @@ class UniversalProviderExecutor:
         snapshot: ExecutionAuthorizationSnapshot,
     ) -> IntegrationExecutionResult:
         execution = request.execution
-        if snapshot.capability_scope != execution.capability.scope:
-            raise PermissionError("Authorization snapshot capability mismatch.")
-        if snapshot.resource_id != execution.resource.id:
-            raise PermissionError("Authorization snapshot resource mismatch.")
-        if snapshot.correlation_id != execution.correlation_id:
-            raise PermissionError("Authorization snapshot correlation mismatch.")
-
+        _check_snapshot(snapshot, execution)
         proposal = ActionProposal(
             organization_id=execution.organization_id,
             agent_id=execution.agent_id,
@@ -585,12 +572,10 @@ class UniversalProviderExecutor:
                 configuration=resolved.context.configuration,
                 credential=resolved.context.credential,
             )
+        durable = _durable(execution.resource.provider)
 
         async def execute():
-            if settings.integration_foundation_enabled and execution.resource.provider not in {
-                "browser",
-                "web_research",
-            }:
+            if durable:
                 from app.execution.integration_execution import execute_native_action
 
                 before_dispatch = None
@@ -612,10 +597,7 @@ class UniversalProviderExecutor:
             )
 
         lifecycle = self._lifecycle
-        if settings.integration_foundation_enabled and execution.resource.provider not in {
-            "browser",
-            "web_research",
-        }:
+        if durable:
             from app.execution.integration_execution import DurableIntegrationRecovery
 
             lifecycle = ObserveActVerifyLifecycle(DurableIntegrationRecovery())
@@ -631,39 +613,16 @@ class UniversalProviderExecutor:
             recover=recover,
         )
         if outcome.error is not None:
-            if (
-                settings.integration_foundation_enabled
-                and execution.resource.provider not in {"browser", "web_research"}
-                and execution.capability.side_effect
-                and outcome.error.code == "verification_failed"
-            ):
-                raise ExecutionProviderError(
-                    code="uncertain_outcome",
-                    retryable=False,
-                    provider=execution.resource.provider,
-                    operation=execution.operation,
-                    correlation_id=execution.correlation_id,
-                    safe_message="This write was accepted, but verification did not establish its outcome. Automatic replay is paused.",
-                )
-            raise ExecutionProviderError(
-                code=outcome.error.code,
-                retryable=outcome.error.retryable,
-                provider=outcome.error.provider,
-                operation=outcome.error.operation,
-                correlation_id=outcome.error.correlation_id,
-                safe_message=outcome.error.safe_message,
-                internal_details=outcome.error.internal_details,
-                retry_after_seconds=outcome.error.retry_after_seconds,
-            )
+            raise _outcome_error(execution, outcome.error, durable=durable)
         if outcome.result is None or outcome.verification is None:
             raise RuntimeError("Execution lifecycle completed without a provider result.")
+        await self._record_outcome(execution, outcome, snapshot)
+        return _integration_result(execution, outcome, snapshot)
 
-        result = outcome.result
-        verification = outcome.verification
-        retry_count = max(
-            0,
-            len([item for item in outcome.checkpoints if item.stage == "act"]) - 1,
-        )
+    async def _record_outcome(
+        self, execution, outcome, snapshot: ExecutionAuthorizationSnapshot
+    ) -> None:
+        result, verification = outcome.result, outcome.verification
         await self._metrics.execution(
             provider=result.provider,
             capability=execution.capability.scope,
@@ -671,7 +630,7 @@ class UniversalProviderExecutor:
             correlation_id=execution.correlation_id,
             latency_ms=result.latency_ms,
             verified=verification.verified,
-            retries=retry_count,
+            retries=max(0, sum(1 for item in outcome.checkpoints if item.stage == "act") - 1),
             fallback_used=outcome.recovery is not None
             and outcome.recovery.action == "fallback_provider",
         )
@@ -682,35 +641,6 @@ class UniversalProviderExecutor:
                 verification=verification,
                 snapshot=snapshot,
             )
-
-        # Say what was found, so the planner and the person can tell an empty answer from a
-        # failed one. The verification note stays in the data below.
-        summary = describe_output(result.output) or verification.summary
-        from app.execution.integration_evidence import external_references
-
-        return IntegrationExecutionResult(
-            provider_operation=result.operation,
-            summary=summary,
-            data={
-                "executionCertainty": "verified" if verification.verified else "uncertain",
-                "externalReferences": external_references(result.output),
-                "output": result.output,
-                "verification": {
-                    "verified": verification.verified,
-                    "summary": verification.summary,
-                    "details": verification.details,
-                },
-                "lifecycle": [
-                    {
-                        "stage": checkpoint.stage,
-                        "attempt": checkpoint.attempt,
-                        "detail": checkpoint.detail,
-                    }
-                    for checkpoint in outcome.checkpoints
-                ],
-                "authorization": snapshot.as_dict(),
-            },
-        )
 
     async def execute(
         self,
@@ -727,43 +657,66 @@ class UniversalProviderExecutor:
         )
 
 
-def describe_output(output: object) -> str | None:
-    """A short plain sentence about a read's result: how many items, and the first few names."""
-    rows = output
-    if isinstance(output, dict):
-        lists = [value for value in output.values() if isinstance(value, list)]
-        if len(lists) != 1:
-            # One object (an issue, a file, a pull request): name it.
-            name = (
-                output.get("title")
-                or output.get("name")
-                or output.get("path")
-                or output.get("full_name")
-            )
-            if name is None:
-                return None
-            number = output.get("number")
-            return "Read " + (f"#{number} " if number is not None else "") + str(name)[:80] + "."
-        rows = lists[0]
-    if not isinstance(rows, list):
-        return None
-    if not rows:
-        return "Found nothing: the result is empty."
-    names = []
-    for row in rows[:3]:
-        if not isinstance(row, dict):
-            continue
-        number = row.get("number")
-        name = (
-            row.get("title")
-            or row.get("name")
-            or row.get("full_name")
-            or row.get("path")
-            or row.get("id")
+def _check_snapshot(snapshot: ExecutionAuthorizationSnapshot, execution) -> None:
+    for name, expected, actual in (
+        ("capability", snapshot.capability_scope, execution.capability.scope),
+        ("resource", snapshot.resource_id, execution.resource.id),
+        ("correlation", snapshot.correlation_id, execution.correlation_id),
+    ):
+        if expected != actual:
+            raise PermissionError(f"Authorization snapshot {name} mismatch.")
+
+
+def _outcome_error(execution, error, *, durable: bool) -> ExecutionProviderError:
+    """The lifecycle's error. A durable write that ran but could not be verified is uncertain,
+    so it is never replayed automatically."""
+    if durable and execution.capability.side_effect and error.code == "verification_failed":
+        return ExecutionProviderError.for_request(
+            execution,
+            "uncertain_outcome",
+            "This write was accepted, but verification did not establish its outcome. Automatic replay is paused.",
         )
-        if name is not None:
-            names.append((f"#{number} " if number is not None else "") + str(name)[:60])
-    count = f"Found {len(rows)} result{'s' if len(rows) != 1 else ''}"
-    return (
-        count + (": " + "; ".join(names) + ("; …" if len(rows) > 3 else "") if names else "") + "."
+    return ExecutionProviderError(
+        code=error.code,
+        retryable=error.retryable,
+        provider=error.provider,
+        operation=error.operation,
+        correlation_id=error.correlation_id,
+        safe_message=error.safe_message,
+        internal_details=error.internal_details,
+        retry_after_seconds=error.retry_after_seconds,
+    )
+
+
+def _integration_result(
+    execution, outcome, snapshot: ExecutionAuthorizationSnapshot
+) -> IntegrationExecutionResult:
+    from app.execution.integration_evidence import external_references
+
+    result, verification = outcome.result, outcome.verification
+    # Say what the step did (a write never reads as a read), so the planner and the person can
+    # tell an empty answer from a failed one. The verification note stays in the data below.
+    return IntegrationExecutionResult(
+        provider_operation=result.operation,
+        summary=narrate(execution.capability.scope, result.output, execution.input)
+        or verification.summary,
+        data={
+            "executionCertainty": "verified" if verification.verified else "uncertain",
+            "externalReferences": external_references(result.output),
+            "output": result.output,
+            "verification": {
+                "verified": verification.verified,
+                "summary": verification.summary,
+                "details": verification.details,
+            },
+            "lifecycle": [
+                {
+                    "stage": checkpoint.stage,
+                    "attempt": checkpoint.attempt,
+                    "detail": checkpoint.detail,
+                }
+                for checkpoint in outcome.checkpoints
+            ],
+            "authorization": snapshot.as_dict(),
+        },
     )

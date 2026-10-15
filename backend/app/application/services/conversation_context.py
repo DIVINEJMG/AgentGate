@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import desc, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.conversation.intent import PENDING_COMMAND_STATUSES
 from app.infrastructure.database.models import (
     Action,
     Approval,
@@ -435,7 +436,7 @@ class ConversationContextAssembler:
         commands = (await self._session.scalars(select(ConversationCommand).where(
             ConversationCommand.organization_id == organization_id, ConversationCommand.thread_id == thread_id,
             ConversationCommand.created_by == user_id, ConversationCommand.family == "integration.execute",
-            ConversationCommand.status.in_(["waiting_integration", "clarification_required", "waiting_ai", "policy_denied"])).limit(10))).all()
+            ConversationCommand.status.in_(PENDING_COMMAND_STATUSES)).limit(10))).all()
         return [{"id": str(c.id), "status": c.status, "requirement": c.receipt.get("message", "")} for c in commands]
 
     async def _pending_clarifications(self, organization_id, thread_id, user_id):

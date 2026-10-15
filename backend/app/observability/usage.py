@@ -9,6 +9,9 @@ context lookup outside measured work.
 from __future__ import annotations
 
 import logging
+import os
+import re
+import sys
 import time
 from collections import Counter
 from collections.abc import Iterator
@@ -18,10 +21,15 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
 
+import greenlet
 from redis.asyncio import Redis
 from sqlalchemy import event
 
 _CURRENT: ContextVar[Usage | None] = ContextVar("audoryn_usage_meter", default=None)
+# Development aid: with AUDORYN_TRACE_STATEMENTS=1 each meter also counts its statements by table and
+# the AgentGate line that issued them, and the usage log lists the most frequent ones.
+TRACE_STATEMENTS = os.environ.get("AUDORYN_TRACE_STATEMENTS") == "1"
+_TABLE = re.compile(r"^\s*(?:SELECT\b.*?\bFROM|INSERT INTO|UPDATE|DELETE FROM)\s+([\w.]+)", re.IGNORECASE | re.DOTALL)
 
 
 @dataclass(slots=True)
@@ -36,9 +44,13 @@ class Usage:
     ai_tokens_in: int = 0
     ai_tokens_out: int = 0
     ai_models: Counter[str] = field(default_factory=Counter)
+    # Characters sent to models, per prompt section ("planner.RECORDED OBSERVATIONS").
+    prompt_chars: Counter[str] = field(default_factory=Counter)
     seconds: float = 0.0
     # Set by the measured code, for example the runtime phase and run.
     labels: dict[str, Any] = field(default_factory=dict)
+    # Statements by "verb table @ file:line function" (only with TRACE_STATEMENTS).
+    statements: Counter[str] = field(default_factory=Counter)
 
     def merge(self, other: Usage) -> None:
         self.db_statements += other.db_statements
@@ -50,6 +62,7 @@ class Usage:
         self.ai_tokens_in += other.ai_tokens_in
         self.ai_tokens_out += other.ai_tokens_out
         self.ai_models.update(other.ai_models)
+        self.prompt_chars.update(other.prompt_chars)
         self.seconds += other.seconds
 
     def as_dict(self) -> dict[str, Any]:
@@ -63,7 +76,9 @@ class Usage:
             "aiTokensIn": self.ai_tokens_in,
             "aiTokensOut": self.ai_tokens_out,
             "aiModels": dict(sorted(self.ai_models.items())),
+            "promptChars": dict(sorted(self.prompt_chars.items())),
             "seconds": round(self.seconds, 3),
+            **({"statementSources": dict(self.statements.most_common(60))} if self.statements else {}),
         }
 
 
@@ -119,13 +134,38 @@ def count_ai_call(*, model: str, usage: dict[str, Any] | None, success: bool) ->
             setattr(meter, attribute, getattr(meter, attribute) + value)
 
 
+def count_prompt(role: str, sections: dict[str, int]) -> None:
+    if (meter := _CURRENT.get()) is not None:
+        meter.prompt_chars.update({f"{role}.{name}": size for name, size in sections.items()})
+
+
 def _after_cursor_execute(conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, executemany: bool) -> None:
     if (meter := _CURRENT.get()) is None:
         return
     meter.db_statements += 1
+    if TRACE_STATEMENTS:
+        meter.statements[_statement_source(statement)] += 1
     rowcount = getattr(cursor, "rowcount", -1)
     if isinstance(rowcount, int) and rowcount > 0:
         meter.db_rows += rowcount
+
+
+def _statement_source(statement: str) -> str:
+    """"select work_items @ runtime/managed.py:443 execute_step": the table and the innermost AgentGate
+    line outside the meter that issued the statement."""
+    verb = statement.split(None, 1)[0].lower()
+    target = f"{verb} {match.group(1)}" if (match := _TABLE.match(statement)) else verb
+    # An async session runs the statement in a greenlet; the awaiting code is on its parent's stack.
+    frame, parent = sys._getframe(), greenlet.getcurrent().parent  # pyright: ignore[reportPrivateUsage]
+    while frame is not None or parent is not None:
+        if frame is None:
+            frame, parent = parent.gr_frame, parent.parent  # pyright: ignore[reportOptionalMemberAccess]
+            continue
+        path = frame.f_code.co_filename.replace("\\", "/")
+        if "/app/" in path and not path.endswith(("/observability/usage.py", "/database/session.py")):
+            return f"{target} @ {path.rsplit('/app/', 1)[-1]}:{frame.f_lineno} {frame.f_code.co_name}"
+        frame = frame.f_back
+    return target
 
 
 def meter_database(engine: Any) -> None:

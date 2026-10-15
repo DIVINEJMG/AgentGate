@@ -34,6 +34,7 @@ async def inspect_pr(provider, repo, number, credential, configuration, request)
         configuration.get("defaultBranch", "main"),
         request.work_item_id,
         configuration.get("constraints", {}),
+        pull_request=int(number),
     )
     return pr
 

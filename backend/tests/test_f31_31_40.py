@@ -123,7 +123,7 @@ async def test_planner_rejects_prompt_injected_resource_and_scope() -> None:
     )
     planner = AdaptiveRuntimePlanner(cast(AIGateway, gateway))
 
-    with pytest.raises(RuntimeError, match="unavailable resource/capability pair"):
+    with pytest.raises(RuntimeError, match="`resourceId` 'outside-allowlist' is not allowed here"):
         await planner.choose_next(
             job={"name": "Read status"},
             worker={"name": "QQ"},
@@ -173,7 +173,7 @@ def test_conversation_failure_semantics_distinguish_provider_and_auth() -> None:
     assert service._provider_failure_category(auth) == "authentication_expiry"
     assert service._provider_failure_category(config) == "internal_platform_failure"
     assert service._provider_failure_category(invalid) == "provider_response_invalid"
-    assert "could not pass response validation" in service._provider_message(invalid)
+    assert "couldn't work out what to do" in service._provider_message(invalid)
     assert "Your message is saved" in service._provider_message(invalid)
     assert "No worker or external state was changed" in service._provider_message(provider)
 
@@ -220,14 +220,20 @@ def test_runtime_checkpoints_planning_before_governed_action_delivery() -> None:
 
 
 def test_runtime_provider_outage_waits_instead_of_failing_task() -> None:
-    source = (ROOT / "backend/app/api/internal/runtime.py").read_text(encoding="utf-8")
-    assert "except AIProviderError as exc:" in source
-    assert 'state = "waiting_configuration"' in source
-    assert 'state = "waiting_ai"' in source
-    assert '"aiRetryCount"' in source
-    assert '"kind": "ai_provider"' in source
-    assert "no external action was taken" in source
+    from datetime import UTC, datetime
 
+    from app.api.internal.runtime import _planning_wait
+    from app.domain.ai.providers import AIProviderError
+
+    now = datetime.now(UTC)
+    state, _, count, retry_at = _planning_wait(AIProviderError("provider_unavailable", "x", retryable=True), 0, preparing=False, now=now)
+    assert (state, count) == ("waiting_ai", 1) and retry_at is not None and retry_at > now  # retries by itself
+    state, summary, _, retry_at = _planning_wait(AIProviderError("content_rejected", "x", retryable=False), 0, preparing=False, now=now)
+    assert state == "waiting_ai" and retry_at is None and "Retry planning" in summary  # paused, never failed
+    state, _, _, _ = _planning_wait(AIProviderError("configuration_missing", "x", retryable=False), 0, preparing=False, now=now)
+    assert state == "waiting_configuration"
+    state, summary, _, _ = _planning_wait(AIProviderError("invalid_provider_response", "x", retryable=False), 0, preparing=True, now=now)
+    assert state == "waiting_ai" and "no external action was taken" in summary
 
 
 def test_trigger_failure_objects_are_normalized_for_frontend_rendering() -> None:

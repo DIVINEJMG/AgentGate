@@ -520,6 +520,10 @@ async def continue_run_v1(
     item = await session.get(WorkItem, run.work_item_id)
     if item is None:
         raise HTTPException(500, "Run work item is unavailable.")
+    # A task paused while planning starts a fresh planning decision (F16); otherwise this wakes it.
+    from app.runtime.smart_planner import restart_planning
+
+    await restart_planning(session, item, run)
     expected_step = int(
         ((item.payload or {}).get("runtime") or {}).get("currentStep", 0)
         if isinstance((item.payload or {}).get("runtime"), dict)

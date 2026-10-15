@@ -774,10 +774,22 @@ def test_existing_worker_job_create_uses_generic_browser_origin_provisioning() -
     assert "resource_origins.issubset(required)" in authority
 
 
-def test_ai_runtime_exposes_only_autonomy_suitable_browser_resources() -> None:
-    source = inspect.getsource(ManagedRuntimeExecutor)
-    assert "browser_integration_autonomy_suitable" in source
-    assert 'bool(autonomy.get("createdByAI"))' in source
+def test_ai_runtime_exposes_only_autonomy_suitable_browser_resources(monkeypatch) -> None:
+    """A browser resource must stay within the job's authorized origins; for a job the AI created it
+    must also be suitable for autonomous use."""
+    from app.runtime import managed
+
+    suitable = {"value": False}
+    monkeypatch.setattr(managed, "browser_integration_autonomy_suitable", lambda integration, origins: suitable["value"])
+    site, other = ("https://example.com",), ("https://other.example",)
+    admitted = managed._browser_resource_admitted
+    assert admitted(None, other, (), {})  # nothing authorized: no origin restriction
+    assert not admitted(None, other, site, {})  # outside the authorized origins
+    assert not admitted(None, (), site, {})  # no origins of its own
+    assert admitted(None, site, site, {})  # within them, job made by a person
+    assert not admitted(None, site, site, {"createdByAI": True})  # AI job, resource unsuitable
+    suitable["value"] = True
+    assert admitted(None, site, site, {"createdByAI": True})
 
 
 def test_managed_browser_origins_default_to_lean_visual_loading() -> None:

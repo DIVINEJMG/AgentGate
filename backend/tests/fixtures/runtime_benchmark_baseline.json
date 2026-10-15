@@ -112,17 +112,26 @@
       ],
       "result": {
         "status": "completed",
-        "summary": "Record a was read."
+        "summary": "Record a was read.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1
+            ]
+          }
+        ]
       }
     },
     "compute": {
       "qstash_messages": 5,
-      "db_statements": 168,
-      "db_rows": 153,
+      "db_statements": 166,
+      "db_rows": 152,
       "redis_commands": 47,
       "ai_calls": 2,
-      "ai_tokens_in": 7169,
-      "ai_tokens_out": 145,
+      "ai_tokens_in": 3053,
+      "ai_tokens_out": 189,
       "deliveries": 3,
       "idleDeliveries": 0,
       "drains": 3,
@@ -132,11 +141,11 @@
         "runtime.step:plan:continue": 1
       },
       "qstashTotal": 6,
-      "dbStatementsTotal": 184,
-      "dbRowsTotal": 98,
-      "dbBytesRead": 34533,
+      "dbStatementsTotal": 182,
+      "dbRowsTotal": 97,
+      "dbBytesRead": 34394,
       "redisTotal": 81,
-      "largestPromptChars": 15177
+      "largestPromptChars": 7025
     }
   },
   {
@@ -366,17 +375,27 @@
       ],
       "result": {
         "status": "completed",
-        "summary": "Record b was updated from a."
+        "summary": "Record b was updated from a.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1,
+              2
+            ]
+          }
+        ]
       }
     },
     "compute": {
       "qstash_messages": 9,
-      "db_statements": 257,
-      "db_rows": 259,
+      "db_statements": 253,
+      "db_rows": 257,
       "redis_commands": 74,
       "ai_calls": 3,
-      "ai_tokens_in": 11587,
-      "ai_tokens_out": 257,
+      "ai_tokens_in": 5106,
+      "ai_tokens_out": 300,
       "deliveries": 5,
       "idleDeliveries": 0,
       "drains": 5,
@@ -386,11 +405,11 @@
         "runtime.step:plan:continue": 2
       },
       "qstashTotal": 10,
-      "dbStatementsTotal": 281,
-      "dbRowsTotal": 180,
-      "dbBytesRead": 63770,
+      "dbStatementsTotal": 277,
+      "dbRowsTotal": 178,
+      "dbBytesRead": 63482,
       "redisTotal": 122,
-      "largestPromptChars": 16686
+      "largestPromptChars": 8098
     }
   },
   {
@@ -550,17 +569,26 @@
       ],
       "result": {
         "status": "completed",
-        "summary": "Record b was updated after approval."
+        "summary": "Record b was updated after approval.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1
+            ]
+          }
+        ]
       }
     },
     "compute": {
       "qstash_messages": 5,
-      "db_statements": 191,
-      "db_rows": 184,
+      "db_statements": 189,
+      "db_rows": 183,
       "redis_commands": 52,
       "ai_calls": 2,
-      "ai_tokens_in": 7285,
-      "ai_tokens_out": 163,
+      "ai_tokens_in": 2951,
+      "ai_tokens_out": 206,
       "deliveries": 4,
       "idleDeliveries": 0,
       "drains": 4,
@@ -571,11 +599,11 @@
         "runtime.step:resume:continue": 1
       },
       "qstashTotal": 8,
-      "dbStatementsTotal": 228,
-      "dbRowsTotal": 134,
-      "dbBytesRead": 46674,
+      "dbStatementsTotal": 226,
+      "dbRowsTotal": 133,
+      "dbBytesRead": 46439,
       "redisTotal": 101,
-      "largestPromptChars": 15218
+      "largestPromptChars": 6630
     }
   },
   {
@@ -691,17 +719,26 @@
       ],
       "result": {
         "status": "attention",
-        "summary": "Record a was read; writing is not permitted."
+        "summary": "Record a was read; writing is not permitted.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1
+            ]
+          }
+        ]
       }
     },
     "compute": {
       "qstash_messages": 5,
-      "db_statements": 168,
-      "db_rows": 163,
+      "db_statements": 166,
+      "db_rows": 162,
       "redis_commands": 47,
       "ai_calls": 2,
-      "ai_tokens_in": 7141,
-      "ai_tokens_out": 152,
+      "ai_tokens_in": 3025,
+      "ai_tokens_out": 195,
       "deliveries": 3,
       "idleDeliveries": 0,
       "drains": 3,
@@ -711,11 +748,11 @@
         "runtime.step:plan:continue": 1
       },
       "qstashTotal": 6,
-      "dbStatementsTotal": 184,
-      "dbRowsTotal": 108,
-      "dbBytesRead": 36288,
+      "dbStatementsTotal": 182,
+      "dbRowsTotal": 107,
+      "dbBytesRead": 36128,
       "redisTotal": 81,
-      "largestPromptChars": 15120
+      "largestPromptChars": 6968
     }
   },
   {
@@ -1195,17 +1232,33 @@
       ],
       "result": {
         "status": "completed",
-        "summary": "Eight records were read."
+        "summary": "Eight records were read.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ]
+          }
+        ]
       }
     },
     "compute": {
       "qstash_messages": 33,
-      "db_statements": 785,
-      "db_rows": 888,
+      "db_statements": 769,
+      "db_rows": 880,
       "redis_commands": 236,
       "ai_calls": 9,
-      "ai_tokens_in": 39440,
-      "ai_tokens_out": 831,
+      "ai_tokens_in": 21058,
+      "ai_tokens_out": 874,
       "deliveries": 17,
       "idleDeliveries": 0,
       "drains": 17,
@@ -1215,11 +1268,11 @@
         "runtime.step:plan:continue": 8
       },
       "qstashTotal": 34,
-      "dbStatementsTotal": 857,
-      "dbRowsTotal": 665,
-      "dbBytesRead": 246148,
+      "dbStatementsTotal": 841,
+      "dbRowsTotal": 657,
+      "dbBytesRead": 245022,
       "redisTotal": 368,
-      "largestPromptChars": 22219
+      "largestPromptChars": 14067
     }
   },
   {
@@ -1543,17 +1596,30 @@
       ],
       "result": {
         "status": "completed",
-        "summary": "Five large records were read."
+        "summary": "Five large records were read.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          }
+        ]
       }
     },
     "compute": {
       "qstash_messages": 21,
-      "db_statements": 521,
-      "db_rows": 543,
+      "db_statements": 511,
+      "db_rows": 538,
       "redis_commands": 155,
       "ai_calls": 6,
-      "ai_tokens_in": 31049,
-      "ai_tokens_out": 539,
+      "ai_tokens_in": 18781,
+      "ai_tokens_out": 583,
       "deliveries": 11,
       "idleDeliveries": 0,
       "drains": 11,
@@ -1563,11 +1629,11 @@
         "runtime.step:plan:continue": 5
       },
       "qstashTotal": 22,
-      "dbStatementsTotal": 569,
-      "dbRowsTotal": 392,
-      "dbBytesRead": 424407,
+      "dbStatementsTotal": 559,
+      "dbRowsTotal": 387,
+      "dbBytesRead": 423670,
       "redisTotal": 245,
-      "largestPromptChars": 22604
+      "largestPromptChars": 14452
     }
   },
   {
@@ -1689,17 +1755,26 @@
       },
       "result": {
         "status": "completed",
-        "summary": "Record a was read on schedule."
+        "summary": "Record a was read on schedule.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1
+            ]
+          }
+        ]
       }
     },
     "compute": {
       "qstash_messages": 5,
-      "db_statements": 168,
-      "db_rows": 153,
+      "db_statements": 166,
+      "db_rows": 152,
       "redis_commands": 47,
       "ai_calls": 2,
-      "ai_tokens_in": 7343,
-      "ai_tokens_out": 148,
+      "ai_tokens_in": 3227,
+      "ai_tokens_out": 192,
       "deliveries": 3,
       "idleDeliveries": 0,
       "drains": 3,
@@ -1709,11 +1784,11 @@
         "runtime.step:plan:continue": 1
       },
       "qstashTotal": 8,
-      "dbStatementsTotal": 198,
-      "dbRowsTotal": 108,
-      "dbBytesRead": 45551,
+      "dbStatementsTotal": 196,
+      "dbRowsTotal": 107,
+      "dbBytesRead": 45382,
       "redisTotal": 81,
-      "largestPromptChars": 15524
+      "largestPromptChars": 7372
     }
   },
   {
@@ -1873,17 +1948,26 @@
       ],
       "result": {
         "status": "completed",
-        "summary": "Record b was updated after review."
+        "summary": "Record b was updated after review.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1
+            ]
+          }
+        ]
       }
     },
     "compute": {
       "qstash_messages": 5,
-      "db_statements": 191,
-      "db_rows": 184,
+      "db_statements": 189,
+      "db_rows": 183,
       "redis_commands": 52,
       "ai_calls": 2,
-      "ai_tokens_in": 7301,
-      "ai_tokens_out": 160,
+      "ai_tokens_in": 2967,
+      "ai_tokens_out": 204,
       "deliveries": 4,
       "idleDeliveries": 0,
       "drains": 4,
@@ -1894,11 +1978,11 @@
         "runtime.step:resume:continue": 1
       },
       "qstashTotal": 8,
-      "dbStatementsTotal": 230,
-      "dbRowsTotal": 134,
-      "dbBytesRead": 47327,
+      "dbStatementsTotal": 228,
+      "dbRowsTotal": 133,
+      "dbBytesRead": 47081,
       "redisTotal": 101,
-      "largestPromptChars": 15251
+      "largestPromptChars": 6663
     }
   },
   {
@@ -1998,11 +2082,11 @@
     },
     "compute": {
       "qstash_messages": 3,
-      "db_statements": 127,
-      "db_rows": 119,
+      "db_statements": 125,
+      "db_rows": 118,
       "redis_commands": 31,
       "ai_calls": 1,
-      "ai_tokens_in": 3489,
+      "ai_tokens_in": 1302,
       "ai_tokens_out": 110,
       "deliveries": 3,
       "idleDeliveries": 0,
@@ -2013,11 +2097,11 @@
         "runtime.step:resume:completed": 1
       },
       "qstashTotal": 6,
-      "dbStatementsTotal": 156,
-      "dbRowsTotal": 86,
-      "dbBytesRead": 27921,
+      "dbStatementsTotal": 154,
+      "dbRowsTotal": 85,
+      "dbBytesRead": 27686,
       "redisTotal": 67,
-      "largestPromptChars": 13958
+      "largestPromptChars": 5210
     }
   },
   {
@@ -2254,17 +2338,27 @@
       ],
       "result": {
         "status": "completed",
-        "summary": "Records b and c were updated."
+        "summary": "Records b and c were updated.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1,
+              2
+            ]
+          }
+        ]
       }
     },
     "compute": {
       "qstash_messages": 9,
-      "db_statements": 280,
-      "db_rows": 290,
+      "db_statements": 276,
+      "db_rows": 288,
       "redis_commands": 79,
       "ai_calls": 3,
-      "ai_tokens_in": 11426,
-      "ai_tokens_out": 268,
+      "ai_tokens_in": 4945,
+      "ai_tokens_out": 312,
       "deliveries": 6,
       "idleDeliveries": 0,
       "drains": 6,
@@ -2276,11 +2370,11 @@
         "runtime.step:resume:continue": 1
       },
       "qstashTotal": 12,
-      "dbStatementsTotal": 339,
-      "dbRowsTotal": 228,
-      "dbBytesRead": 80421,
+      "dbStatementsTotal": 335,
+      "dbRowsTotal": 226,
+      "dbBytesRead": 80033,
       "redisTotal": 142,
-      "largestPromptChars": 16343
+      "largestPromptChars": 7755
     }
   },
   {
@@ -2410,11 +2504,11 @@
     },
     "compute": {
       "qstash_messages": 5,
-      "db_statements": 168,
-      "db_rows": 153,
+      "db_statements": 166,
+      "db_rows": 152,
       "redis_commands": 47,
       "ai_calls": 2,
-      "ai_tokens_in": 7191,
+      "ai_tokens_in": 3075,
       "ai_tokens_out": 172,
       "deliveries": 3,
       "idleDeliveries": 0,
@@ -2425,11 +2519,11 @@
         "runtime.step:plan:continue": 1
       },
       "qstashTotal": 6,
-      "dbStatementsTotal": 184,
-      "dbRowsTotal": 98,
-      "dbBytesRead": 34752,
+      "dbStatementsTotal": 182,
+      "dbRowsTotal": 97,
+      "dbBytesRead": 34604,
       "redisTotal": 81,
-      "largestPromptChars": 15222
+      "largestPromptChars": 7070
     }
   },
   {
@@ -2557,11 +2651,11 @@
     },
     "compute": {
       "qstash_messages": 5,
-      "db_statements": 168,
-      "db_rows": 153,
+      "db_statements": 166,
+      "db_rows": 152,
       "redis_commands": 47,
       "ai_calls": 2,
-      "ai_tokens_in": 7199,
+      "ai_tokens_in": 3083,
       "ai_tokens_out": 172,
       "deliveries": 3,
       "idleDeliveries": 0,
@@ -2572,11 +2666,160 @@
         "runtime.step:plan:continue": 1
       },
       "qstashTotal": 6,
-      "dbStatementsTotal": 184,
-      "dbRowsTotal": 98,
-      "dbBytesRead": 34814,
+      "dbStatementsTotal": 182,
+      "dbRowsTotal": 97,
+      "dbBytesRead": 34673,
       "redisTotal": 81,
-      "largestPromptChars": 15236
+      "largestPromptChars": 7084
+    }
+  },
+  {
+    "task": "criteria-missing",
+    "outcome": {
+      "workItem": "completed",
+      "run": "completed",
+      "summary": "Record a was read.",
+      "steps": [
+        {
+          "kind": "action",
+          "status": "completed",
+          "scope": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        },
+        {
+          "kind": "finish",
+          "status": "completed",
+          "scope": "",
+          "input": null
+        }
+      ],
+      "providerCalls": [
+        {
+          "operation": "bench.record.read",
+          "input": {
+            "key": "a"
+          }
+        }
+      ],
+      "approvals": [],
+      "plannerTools": [
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "resourceId": "<resource>",
+              "resourceName": "Bench store",
+              "provider": "bench",
+              "scope": "bench.record.read",
+              "operation": "bench.record.read",
+              "description": "Read a record in the bench store.",
+              "risk": "low",
+              "sideEffect": false,
+              "approvalRecommendation": "never",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "authorityConstraints": {},
+              "defaultStartUrl": "",
+              "allowedOrigins": []
+            }
+          ],
+          "exclusions": [
+            {
+              "resourceId": "<resource>",
+              "scope": "bench.record.write",
+              "reason": "No policy allows Bench agent to write on Bench store, so it is blocked by default. Add a policy, or use \u201cAlways allow\u201d on an approval, to permit it."
+            }
+          ]
+        }
+      ],
+      "planInLaterPrompts": "2 of 2",
+      "plan": [
+        "1. Read a: done"
+      ],
+      "result": {
+        "status": "completed",
+        "summary": "Record a was read.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1
+            ]
+          }
+        ]
+      }
+    },
+    "compute": {
+      "qstash_messages": 5,
+      "db_statements": 170,
+      "db_rows": 156,
+      "redis_commands": 53,
+      "ai_calls": 3,
+      "ai_tokens_in": 4906,
+      "ai_tokens_out": 238,
+      "deliveries": 3,
+      "idleDeliveries": 0,
+      "drains": 3,
+      "byOutcome": {
+        "runtime.step:execute:continue": 1,
+        "runtime.step:plan:completed": 1,
+        "runtime.step:plan:continue": 1
+      },
+      "qstashTotal": 6,
+      "dbStatementsTotal": 186,
+      "dbRowsTotal": 98,
+      "dbBytesRead": 34989,
+      "redisTotal": 87,
+      "largestPromptChars": 7294
     }
   },
   {
@@ -4200,17 +4443,45 @@
       ],
       "result": {
         "status": "completed",
-        "summary": "Thirty records were read."
+        "summary": "Thirty records were read.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20
+            ]
+          }
+        ]
       }
     },
     "compute": {
       "qstash_messages": 121,
-      "db_statements": 2721,
-      "db_rows": 4793,
+      "db_statements": 2661,
+      "db_rows": 4763,
       "redis_commands": 830,
       "ai_calls": 31,
-      "ai_tokens_in": 161217,
-      "ai_tokens_out": 3022,
+      "ai_tokens_in": 98012,
+      "ai_tokens_out": 3066,
       "deliveries": 61,
       "idleDeliveries": 0,
       "drains": 61,
@@ -4220,11 +4491,11 @@
         "runtime.step:plan:continue": 30
       },
       "qstashTotal": 122,
-      "dbStatementsTotal": 2969,
-      "dbRowsTotal": 4042,
-      "dbBytesRead": 1216108,
+      "dbStatementsTotal": 2909,
+      "dbRowsTotal": 4012,
+      "dbBytesRead": 1211776,
       "redisTotal": 1270,
-      "largestPromptChars": 29896
+      "largestPromptChars": 21745
     }
   },
   {
@@ -4585,17 +4856,30 @@
       ],
       "result": {
         "status": "completed",
-        "summary": "Five records were read."
+        "summary": "Five records were read.",
+        "completionCheck": [
+          {
+            "criterion": "The requested records were handled.",
+            "status": "met",
+            "evidenceSteps": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          }
+        ]
       }
     },
     "compute": {
       "qstash_messages": 21,
-      "db_statements": 532,
-      "db_rows": 554,
+      "db_statements": 522,
+      "db_rows": 549,
       "redis_commands": 165,
       "ai_calls": 7,
-      "ai_tokens_in": 25434,
-      "ai_tokens_out": 537,
+      "ai_tokens_in": 13166,
+      "ai_tokens_out": 581,
       "deliveries": 11,
       "idleDeliveries": 0,
       "drains": 11,
@@ -4605,11 +4889,11 @@
         "runtime.step:plan:continue": 5
       },
       "qstashTotal": 22,
-      "dbStatementsTotal": 580,
-      "dbRowsTotal": 397,
-      "dbBytesRead": 153797,
+      "dbStatementsTotal": 570,
+      "dbRowsTotal": 392,
+      "dbBytesRead": 153064,
       "redisTotal": 255,
-      "largestPromptChars": 21135
+      "largestPromptChars": 12983
     }
   }
 ]

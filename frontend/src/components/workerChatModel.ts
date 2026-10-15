@@ -92,3 +92,17 @@ export function threadsForWorker(threads: ConversationThread[], workerId: string
 export function latestThreadId(threads: ConversationThread[], workerId: string | null) {
   return threadsForWorker(threads, workerId)[0]?.id ?? null;
 }
+
+/** A control reference a worker message carries: Retry (a failed reply), Retry planning (a paused
+ * task) or the three outcome answers (a write that could not be confirmed). */
+export type MessageControl =
+  | { type: 'work_item'; controls: 'retry_planning'; id: string; runId: string }
+  | { type: 'work_item'; controls: 'outcome'; id: string }
+  | { type: 'message_retry'; id: string };
+
+export function messageControls(references: Array<Record<string, unknown>> = []): MessageControl[] {
+  return references.filter((reference): reference is MessageControl => typeof reference.id === 'string' && (
+    reference.type === 'message_retry'
+    || (reference.type === 'work_item' && reference.controls === 'outcome')
+    || (reference.type === 'work_item' && reference.controls === 'retry_planning' && typeof reference.runId === 'string')));
+}

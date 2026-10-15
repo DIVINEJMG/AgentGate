@@ -129,6 +129,12 @@ export async function sendConversationMessage(
   return normalizeTurn(version, response);
 }
 
+/** Reply again to a saved message whose reply failed; the message is not sent twice. */
+export async function retryConversationMessage(version: ApiVersion, organizationId: string, threadId: string, messageId: string): Promise<ConversationTurn> {
+  const response = await api.post(`/api/${version}/organizations/${organizationId}/conversations/${threadId}/messages/${messageId}/retry`, {});
+  return normalizeTurn(version, response);
+}
+
 export async function askWorker(
   version: ApiVersion,
   organizationId: string,

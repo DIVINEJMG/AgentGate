@@ -1,3 +1,4 @@
+import asyncio
 import importlib.util
 import json
 from datetime import UTC, datetime, timedelta
@@ -386,3 +387,31 @@ async def test_shared_account_also_reserves_chat_capacity():
     assert await acquire_account_slot(coordinator, config, "account", "complex", 2000) is None
     assert await acquire_account_slot(coordinator, config, "account", "interactive", 250)
     assert await acquire_account_slot(coordinator, config, "account", "interactive", 250) is None
+
+
+@pytest.mark.asyncio
+async def test_held_slots_are_short_lived_and_renewed_until_released(monkeypatch):
+    """A slot lives SLOT_TTL_SECONDS in Redis and is renewed while held, so one left by a process
+    that stopped mid-call frees itself quickly instead of after the call's whole limit."""
+    from app.infrastructure.ai import workloads
+
+    monkeypatch.setattr(workloads, "SLOT_TTL_SECONDS", 0.03)
+    ttls, renewed = [], []
+
+    async def acquire(key, *, limit, ttl_seconds):
+        ttls.append(ttl_seconds)
+        return SimpleNamespace(key=key)
+
+    async def renew(lease, *, ttl_seconds):
+        renewed.append(lease.key)
+
+    coordinator = SimpleNamespace(acquire_slot=acquire, renew_slot=renew, release_slot=AsyncMock())
+    config = SimpleNamespace(ai_account_concurrency=2, ai_interactive_reserved_slots=0)
+    slots = await workloads.acquire_account_slot(coordinator, config, "account", "interactive", 2000)
+    assert ttls == [0.03]
+    await asyncio.sleep(0.05)
+    assert renewed  # still held: kept alive
+    await workloads.release_workload_slot(coordinator, slots)
+    count = len(renewed)
+    await asyncio.sleep(0.05)
+    assert len(renewed) == count and id(slots) not in workloads._renewals  # released: no more renewals

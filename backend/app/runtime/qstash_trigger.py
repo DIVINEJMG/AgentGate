@@ -16,6 +16,7 @@ from app.infrastructure.qstash.provider import (
     UpstashQStashProvider,
 )
 from app.infrastructure.redis.coordination import RedisCoordinator
+from app.runtime import outbox_trigger
 
 logger = logging.getLogger("audoryn.runtime.qstash")
 _RUNTIME_DISPATCH_HEALTH_KEY = "runtime-dispatch-health"
@@ -151,6 +152,12 @@ async def request_runtime_execution_detailed(
         )
 
     step = max(0, int(expected_step or 0))
+    if not delay_seconds and outbox_trigger.serving and settings.runtime_run_local:
+        from app.api.internal.runtime import run_here
+
+        started = await run_here(organization_id, work_item_id, step, reason)
+        if started is not None:  # running here, or already running: no wake-up needed
+            return RuntimeSignalResult(message_id=f"local:{started}", state="queued", detail=None, updated_at=now)
     body = json.dumps(
         {
             "organization_id": str(organization_id),

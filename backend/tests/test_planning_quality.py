@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from app.runtime.evidence import planner_evidence
+from app.application.context.evidence import planner_evidence
 from app.runtime.planner.adaptive import AdaptiveRuntimePlanner, completion_check
 
 OBSERVED = [{"step": 1, "scope": "bench.record.read", "status": "completed", "title": "Read a", "summary": "Record a: 42"},

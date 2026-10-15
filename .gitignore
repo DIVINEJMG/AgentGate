@@ -49,3 +49,6 @@ frontend/artifacts/
 **/coverage/
 *.tsbuildinfo
 **/coverage.xml
+
+# Local AI simulator exchanges (backend/scripts/ai_simulator.py)
+.sim/

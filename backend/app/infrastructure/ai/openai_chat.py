@@ -6,7 +6,7 @@ import httpx
 
 from app.domain.ai.providers import AIProviderError, AIResponse, ModelProviderCapabilities
 from app.infrastructure.ai.connections import wire_model
-from app.infrastructure.ai.model_profiles import apply_profile, validate_context
+from app.infrastructure.ai.model_profiles import apply_profile, place_schema, validate_context
 from app.infrastructure.ai.nvidia import (
     _content_from_payload,
     _error_category,
@@ -100,7 +100,7 @@ class ConfiguredChatProvider:
             )
         wire_model(self.connection, model)
         validate_context(
-            self.planner_profile, request.system, request.prompt, request.max_output_tokens
+            self.planner_profile, request.system, request.full_prompt, request.max_output_tokens
         )
 
     def body(self, model, request):
@@ -136,7 +136,7 @@ class ConfiguredChatProvider:
             body["stream"] = False
         if body["stream"]:
             body["stream_options"] = {"include_usage": True}
-        return body
+        return place_schema(body, request)
 
     async def generate_text(self, *, model, request):
         self.validate_request(model=model, request=request)

@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.application.context.evidence import bounded_evidence
 from app.bootstrap.settings import settings
 from app.domain.actions.gateway import ActionProposal
 from app.execution.coding import service
@@ -13,7 +14,6 @@ from app.execution.contracts import ExecutionProviderError
 from app.execution.provider_executor import UniversalProviderExecutor
 from app.execution.providers.native.github.provider import ExpandedGitHubProvider
 from app.execution.providers.registry import ProviderRegistry
-from app.runtime.evidence import bounded_evidence
 from app.runtime.managed import ManagedRuntimeExecutor
 from app.runtime.planner.adaptive import AdaptiveRuntimePlanner, _json_for_prompt
 
@@ -45,7 +45,7 @@ def test_planner_rejects_full_schema_violations_before_checkpoint(payload):
         "resourceId": "repo",
         "input": payload,
     }
-    with pytest.raises(RuntimeError, match="constraint"):
+    with pytest.raises(RuntimeError, match="Planner input is invalid: `input"):
         AdaptiveRuntimePlanner(cast(Any, SimpleNamespace()))._validate(
             raw,
             tools=[{"scope": raw["scope"], "resourceId": "repo", "inputSchema": schema}],

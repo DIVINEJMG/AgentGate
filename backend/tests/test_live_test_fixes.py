@@ -12,6 +12,7 @@ import pytest
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.context.narrator import narrate
 from app.application.services import integration_foundation, integration_tasks
 from app.application.services.conversation_semantics import validate_route_proposal
 from app.application.services.integration_foundation import (
@@ -22,7 +23,6 @@ from app.application.services.reply_claims import unsupported_assertion
 from app.bootstrap.settings import settings
 from app.domain.ai.providers import AIGateway, AIProviderError
 from app.domain.integrations.foundation import IntegrationTaskDraft
-from app.execution.provider_executor import describe_output
 from app.execution.providers.native.github.provider import ExpandedGitHubProvider
 from app.execution.providers.registry import ProviderRegistry
 from app.infrastructure.database.models import (
@@ -33,15 +33,17 @@ from app.infrastructure.database.models import (
 from tests.test_integration_preparation_gaps import preparation_session
 
 
-@pytest.mark.parametrize(("output", "expected"), [
-    ([], "Found nothing: the result is empty."),
-    ([{"number": 3, "title": "Aud"}, {"number": 2, "title": "TE"}], "Found 2 results: #3 Aud; #2 TE."),
-    ({"items": [{"name": "a"}, {"name": "b"}, {"name": "c"}, {"name": "d"}]}, "Found 4 results: a; b; c; …."),
-    ({"sha": "abc", "message": "x"}, None),  # nothing to name: the verification note is kept
-    ({"number": 5, "title": "GE", "body": None}, "Read #5 GE."),  # one object is named
+@pytest.mark.parametrize(("scope", "output", "expected"), [
+    ("github.repository.issues.list", [], "Found nothing: the result is empty."),
+    ("github.repository.issues.list", [{"number": 3, "title": "Aud"}, {"number": 2, "title": "TE"}],
+     "Found 2 issues: #3 Aud; #2 TE."),
+    ("github.repository.code.search", {"items": [{"name": "a"}, {"name": "b"}, {"name": "c"}, {"name": "d"}]},
+     "Found 4 results: a; b; c; …."),
+    ("github.repository.commit.read", {"sha": "abc", "message": "x"}, None),  # nothing to name: the verification note is kept
+    ("github.repository.issue.read", {"number": 5, "title": "GE", "body": None}, "Read #5 GE."),  # one object is named
 ])
-def test_a_read_says_what_it_found(output: object, expected: str | None) -> None:
-    assert describe_output(output) == expected
+def test_a_read_says_what_it_found(scope: str, output: object, expected: str | None) -> None:
+    assert narrate(scope, output) == expected
 
 
 @pytest.mark.parametrize("answer", [
@@ -176,34 +178,21 @@ def test_only_writes_other_people_can_see_count_as_visible(monkeypatch: pytest.M
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("explicit", "asks"), [(False, True), (True, False)])
-async def test_a_comment_asks_first_unless_the_request_asked_for_it(monkeypatch: pytest.MonkeyPatch,
-                                                                    explicit: bool, asks: bool) -> None:
+async def test_every_visible_write_asks_first(monkeypatch: pytest.MonkeyPatch) -> None:  # Q1
     from app.infrastructure.database.models import Policy, PolicyRevision
     _github_registry(monkeypatch)
     added: list[Any] = []
-    session = SimpleNamespace(scalar=AsyncMock(return_value=None), add=added.append, flush=AsyncMock())
+    session = SimpleNamespace(scalars=AsyncMock(return_value=SimpleNamespace(all=list)), add=added.append, flush=AsyncMock())
     worker = SimpleNamespace(organization_id=uuid4(), agent_identity_id=uuid4())
-    binding = {"id": str(uuid4()), "provider": "github", "scopes": [READ_ISSUES, COMMENT], "explicitRequest": explicit}
+    # Even a write the person asked for in so many words asks first; "Always allow" is the way to stop asking.
+    binding = {"id": str(uuid4()), "provider": "github", "scopes": [READ_ISSUES, COMMENT]}
     await IntegrationFoundation(cast(AsyncSession, session)).provision_bound_authority(
         SimpleNamespace(id=uuid4()), worker, [binding])
     revisions = [row for row in added if isinstance(row, PolicyRevision)]
-    assert [(row.effect, row.selectors["scopes"]) for row in revisions] == (
-        [("allow", [READ_ISSUES, COMMENT]), ("require_approval", [COMMENT])] if asks else [("allow", [READ_ISSUES, COMMENT])])
-    if asks:  # the approval rule outranks the task's allow rule
-        assert revisions[1].priority > revisions[0].priority
-        assert any(isinstance(row, Policy) and row.name.startswith("Integration binding approval") for row in added)
-
-
-@pytest.mark.asyncio
-async def test_a_write_counts_as_asked_for_only_in_the_persons_own_words(monkeypatch: pytest.MonkeyPatch) -> None:
-    need = {"provider": "github", "resource_hint": "DIVINEJMG/school", "scopes": ["github.repository.issue.comment.create"]}
-    foundation, gateway = _foundation(monkeypatch, {**DRAFT, "event_trigger": None, "needs": [
-        {**need, "request_excerpt": "Comment on issue #2 saying I'm looking into it"},
-        {**need, "request_excerpt": "and also close it"}]})
-    draft = await foundation.interpret(cast(AIGateway, gateway), organization_id=uuid4(), user_id=uuid4(),
-                                       instruction="Comment on issue #2 saying I'm looking into it")
-    assert [entry.request_excerpt for entry in draft.needs] == ["Comment on issue #2 saying I'm looking into it", ""]
+    assert [(row.effect, row.selectors["scopes"]) for row in revisions] == [
+        ("allow", [READ_ISSUES, COMMENT]), ("require_approval", [COMMENT])]
+    assert revisions[1].priority > revisions[0].priority  # the approval rule outranks the task's allow rule
+    assert any(isinstance(row, Policy) and row.name.startswith("Integration binding approval") for row in added)
 
 
 def test_worker_jobs_treat_visible_writes_like_irreversible_actions() -> None:

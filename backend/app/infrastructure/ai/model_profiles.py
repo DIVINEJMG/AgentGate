@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -124,6 +124,19 @@ def model_profile(provider: str, model: str) -> PlannerModelProfile:
 
 def generation_allowance(profile: PlannerModelProfile, final_tokens: int) -> int:
     return max(profile.generation_tokens, final_tokens)
+
+
+def place_schema(body: dict[str, Any], request: Any) -> dict[str, Any]:
+    """Append the schema instruction to the last message unless the body asks the endpoint to
+    enforce the schema (a `json_schema` response format, or Claude's output format), so the model
+    reads the schema once, not twice."""
+    response_format, output_config = body.get("response_format"), body.get("output_config")
+    enforced = (isinstance(response_format, dict) and response_format.get("type") == "json_schema") or (
+        isinstance(output_config, dict) and bool(output_config.get("format")))
+    message = body["messages"][-1]
+    if request.schema_instruction and not enforced and isinstance(message.get("content"), str):
+        message["content"] += request.schema_instruction
+    return body
 
 
 def validate_context(

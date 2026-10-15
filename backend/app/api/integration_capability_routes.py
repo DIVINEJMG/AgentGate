@@ -564,6 +564,13 @@ def catalog_snapshot() -> Iterator[None]:
         _CATALOG_SNAPSHOT.reset(token)
 
 
+def snapshot_integrations(organization_id: UUID) -> dict[str, Integration]:
+    """The integration rows the current catalog snapshot read, by id (none outside a snapshot)."""
+    snapshot = _CATALOG_SNAPSHOT.get()
+    rows = snapshot[organization_id][1] if snapshot and organization_id in snapshot else []
+    return {str(row.id): row for row in rows}
+
+
 async def _catalog(session: AsyncSession, organization_id: UUID) -> dict[str, Any]:
     snapshot = _CATALOG_SNAPSHOT.get()
     if snapshot is not None and organization_id in snapshot:

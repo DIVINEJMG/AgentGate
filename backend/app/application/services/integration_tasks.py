@@ -17,6 +17,7 @@ from app.application.services.integration_foundation import (
 )
 from app.bootstrap.settings import settings
 from app.domain.ai.providers import AIProviderError
+from app.domain.conversation.intent import PENDING_COMMAND_STATUSES
 from app.domain.identity.permissions import permissions_for_role
 from app.domain.integrations.foundation import IntegrationTaskDraft
 from app.execution.bootstrap import execution_provider_registry
@@ -89,18 +90,44 @@ async def _set_up_event_trigger(session, command, task, draft, worker, job, revi
         aggregate_id=str(command.id), payload={"organization_id": str(command.organization_id), "thread_id": str(command.thread_id)})
 
 
+JOB_PERMISSIONS = frozenset({"jobs.manage", "jobs.run"})
+STANDING_PERMISSIONS = frozenset({"workforce.manage", "capabilities.manage", "policies.manage"})
+
+
+async def _permissions(session, command, *, fresh: bool = False) -> frozenset[str]:
+    """The requester's current permissions (re-read from the database when `fresh`)."""
+    query = select(OrganizationMembership).where(
+        OrganizationMembership.organization_id == command.organization_id,
+        OrganizationMembership.user_id == command.created_by)
+    member = await session.scalar(query.execution_options(populate_existing=True) if fresh else query)
+    return permissions_for_role(member.role) if member else frozenset()
+
+
+def _still_pending(command) -> bool:
+    return not command.target_id and command.status in {"accepted", *PENDING_COMMAND_STATUSES}
+
+
+def _ai_failure_message(error: AIProviderError) -> str:
+    if error.category == "invalid_provider_response":
+        return "AI task preparation returned tools or authority constraints outside the enabled catalog. Your request is saved; retry setup. Nothing was executed."
+    if error.category == "timeout" and not error.retryable:
+        return "Task preparation reached its time limit. Your request is saved; no provider work was executed."
+    if error.category == "quota_exhausted":
+        return ("Task preparation is blocked by this workspace’s local AI budget. Your request is saved."
+                if error.organization_scoped else
+                "The eligible AI accounts could not admit this task because their usage allowance is exhausted. Your request is saved.")
+    if error.retryable:
+        return "AI task preparation is temporarily unavailable. Your request and context are saved; recovery will retry within its saved time budget."
+    return "AI task preparation could not continue. Your request is saved; review the issue before retrying."
+
+
 async def prepare_integration_task(session, command_id: UUID) -> None:
+    """Turn a saved request into a bound, queued task (or an event job), or say what it waits for."""
     command = await session.scalar(select(ConversationCommand).where(ConversationCommand.id == command_id).with_for_update())
-    if not command or command.target_id or command.status not in {"accepted", "waiting_integration", "clarification_required", "waiting_ai", "policy_denied"}:
+    if not command or not _still_pending(command):
         return
     task = (command.payload or {}).get("integrationTask", {})
-    from app.application.services.preparation_ai import request_fingerprint
-    initial_fingerprint = request_fingerprint(command)
-    member = await session.scalar(select(OrganizationMembership).where(
-        OrganizationMembership.organization_id == command.organization_id,
-        OrganizationMembership.user_id == command.created_by))
-    permissions = permissions_for_role(member.role) if member else frozenset()
-    if not {"jobs.manage", "jobs.run"}.issubset(permissions):
+    if not JOB_PERMISSIONS <= await _permissions(session, command):
         await report_preparation_wait(session, command, status="policy_denied", category="policy_denial",
             message="I cannot prepare this task because your permission to create and run jobs was removed. Restore access before retrying; nothing was executed.")
         return
@@ -110,8 +137,40 @@ async def prepare_integration_task(session, command_id: UUID) -> None:
             message="The requested worker is unavailable in this organization. Choose an accessible worker; nothing was executed.")
         return
     foundation = IntegrationFoundation(session)
+    prepared = await _draft_and_bind(session, command, task, foundation)
+    if prepared is None:
+        return
+    task, draft, bindings, permissions = prepared
+    trigger = draft.event_trigger
+    # Ongoing authority only from the person's own words; otherwise the task is one-off. An event
+    # trigger is ongoing by nature, and its words were checked when it was drafted.
+    standing = (bool(draft.standing_request_excerpt) and grounded_in(draft.standing_request_excerpt, task["instruction"])) \
+        or trigger is not None
+    blocker = await _event_blocker(trigger) if trigger is not None else None
+    if blocker:
+        await report_preparation_wait(session, command, status="waiting_integration", message=blocker)
+        return
+    if standing and not STANDING_PERMISSIONS <= permissions:
+        await report_preparation_wait(session, command, status="policy_denied", category="policy_denial",
+            message="Permanent integration responsibilities require permission to manage workers, capabilities and policies. This request has not granted standing authority.")
+        return
+    job, revision = await _create_job(session, command, task, draft, worker, bindings, standing)
+    if trigger is not None:
+        await _set_up_event_trigger(session, command, task, draft, worker, job, revision, bindings, foundation)
+        return
+    await _queue_task(session, command, task, worker, job, revision, bindings, standing, foundation)
+
+
+async def _draft_and_bind(session, command, task, foundation):
+    """The task's draft (from the model, or saved) and its resource bindings, or None after
+    reporting why preparation waits. The request is revalidated after the model answers."""
+    from app.application.services.preparation_ai import (
+        DurablePreparationGateway,
+        request_fingerprint,
+    )
+
+    initial_fingerprint = request_fingerprint(command)
     try:
-        from app.application.services.preparation_ai import DurablePreparationGateway
         gateway = (DurablePreparationGateway(session, command) if settings.smart_planner_enabled
                    else ai_gateway_from_settings(session=session))
         if isinstance(gateway, DurablePreparationGateway) and not task.get("draft"):
@@ -123,81 +182,56 @@ async def prepare_integration_task(session, command_id: UUID) -> None:
         # Inference releases the transaction. Cancellation, sharing and membership may
         # have changed while the model was responding; revalidate before creating grants.
         await session.refresh(command, with_for_update=True)
-        if request_fingerprint(command) != initial_fingerprint:
-            return
-        if command.target_id or command.status not in {"accepted", "waiting_integration", "clarification_required", "waiting_ai", "policy_denied"}:
-            return
+        if request_fingerprint(command) != initial_fingerprint or not _still_pending(command):
+            return None
         command.payload = {**command.payload, "integrationTask": task}
-        member = await session.scalar(select(OrganizationMembership).where(
-            OrganizationMembership.organization_id == command.organization_id,
-            OrganizationMembership.user_id == command.created_by).execution_options(populate_existing=True))
-        permissions = permissions_for_role(member.role) if member else frozenset()
-        if not {"jobs.manage", "jobs.run"}.issubset(permissions):
+        permissions = await _permissions(session, command, fresh=True)
+        if not JOB_PERMISSIONS <= permissions:
             raise PermissionError("Task authority changed during preparation")
         bindings = await foundation.resolve(organization_id=command.organization_id, user_id=command.created_by, draft=draft, instruction=task["instruction"])
-    except (IntegrationRequirementError, AIProviderError) as error:
-        if isinstance(error, AIProviderError):
-            await session.refresh(command, with_for_update=True)
-            if request_fingerprint(command) != initial_fingerprint:
-                return
-            if error.category == "cancelled" and command.status not in {"accepted", "waiting_ai", "waiting_integration", "clarification_required", "policy_denied"}:
-                return
-            invalid_plan = error.category == "invalid_provider_response"
+    except AIProviderError as error:
+        await session.refresh(command, with_for_update=True)
+        if request_fingerprint(command) == initial_fingerprint and (error.category != "cancelled" or _still_pending(command)):
             await report_preparation_wait(session, command, status="waiting_ai", category=error.category,
-                message=("AI task preparation returned tools or authority constraints outside the enabled catalog. Your request is saved; retry setup. Nothing was executed."
-                    if invalid_plan else
-                    "Task preparation reached its time limit. Your request is saved; no provider work was executed."
-                    if error.category == "timeout" and not error.retryable else
-                    "Task preparation is blocked by this workspace’s local AI budget. Your request is saved."
-                    if error.category == "quota_exhausted" and error.organization_scoped else
-                    "The eligible AI accounts could not admit this task because their usage allowance is exhausted. Your request is saved."
-                    if error.category == "quota_exhausted" else
-                    "AI task preparation is temporarily unavailable. Your request and context are saved; recovery will retry within its saved time budget."
-                    if error.retryable else
-                    "AI task preparation could not continue. Your request is saved; review the issue before retrying."))
-        else:
-            await report_preparation_wait(session, command,
-                status="waiting_integration" if error.missing else "clarification_required", message=str(error))
-        return
+                                          message=_ai_failure_message(error))
+        return None
+    except IntegrationRequirementError as error:
+        await report_preparation_wait(session, command,
+            status="waiting_integration" if error.missing else "clarification_required", message=str(error))
+        return None
     except PermissionError:
         await report_preparation_wait(session, command, status="policy_denied", category="policy_denial",
             message="Account access changed during preparation. Review connection sharing and task permissions before retrying; nothing was executed.")
-        return
+        return None
     except ValidationError:
         await report_preparation_wait(session, command, status="waiting_ai", category="provider_model_outage",
             message="AI task preparation returned an invalid plan. Your request and context are saved; retry setup. No integration authority was granted.")
-        return
-    standing_excerpt = draft.standing_request_excerpt or ""
-    trigger = draft.event_trigger
-    # Ongoing authority only from the person's own words; otherwise the task is one-off. An event
-    # trigger is ongoing by nature, and its words were checked when it was drafted.
-    standing = (bool(standing_excerpt) and grounded_in(standing_excerpt, task["instruction"])) or trigger is not None
-    if trigger is not None:
-        provider = execution_provider_registry().get(trigger.provider)
-        events_enabled = getattr(provider, "events_enabled", None)
-        if not callable(events_enabled) or not events_enabled():
-            await report_preparation_wait(session, command, status="waiting_integration",
-                message=f"I can't react to {provider_label(trigger.provider)} events yet: event delivery isn't turned on "
-                        "for this workspace's server. An administrator needs to enable it; nothing was set up.")
-            return
-        kind = trigger.event.split(".")[0]
-        events = await cast(Any, provider).subscribed_events() if hasattr(provider, "subscribed_events") else None
-        if events is not None and kind not in events:
-            setting = _EVENT_SETTING.get(kind, kind.replace("_", " ").capitalize())
-            await report_preparation_wait(session, command, status="waiting_integration",
-                message=f"{provider_label(trigger.provider)} isn't sending “{setting}” events to Audoryn yet, so I "
-                        f"can't react to them. In the GitHub App's settings, under Permissions & events, tick "
-                        f"“{setting}” in Subscribe to events, then ask me again. Nothing was set up.")
-            return
-    if standing and not {"workforce.manage", "capabilities.manage", "policies.manage"}.issubset(permissions):
-        await report_preparation_wait(session, command, status="policy_denied", category="policy_denial",
-            message="Permanent integration responsibilities require permission to manage workers, capabilities and policies. This request has not granted standing authority.")
-        return
+        return None
+    return task, draft, bindings, permissions
+
+
+async def _event_blocker(trigger) -> str | None:
+    """Why the account cannot deliver the trigger's event yet, or None."""
+    provider = execution_provider_registry().get(trigger.provider)
+    events_enabled = getattr(provider, "events_enabled", None)
+    if not callable(events_enabled) or not events_enabled():
+        return (f"I can't react to {provider_label(trigger.provider)} events yet: event delivery isn't turned on "
+                "for this workspace's server. An administrator needs to enable it; nothing was set up.")
+    kind = trigger.event.split(".")[0]
+    events = await cast(Any, provider).subscribed_events() if hasattr(provider, "subscribed_events") else None
+    if events is not None and kind not in events:
+        setting = _EVENT_SETTING.get(kind, kind.replace("_", " ").capitalize())
+        return (f"{provider_label(trigger.provider)} isn't sending “{setting}” events to Audoryn yet, so I "
+                f"can't react to them. In the GitHub App's settings, under Permissions & events, tick "
+                f"“{setting}” in Subscribe to events, then ask me again. Nothing was set up.")
+    return None
+
+
+async def _create_job(session, command, task, draft, worker, bindings, standing):
     scopes = sorted({scope for binding in bindings for scope in binding["scopes"]})
-    now = datetime.now(UTC)
     job = Job(id=uuid4(), organization_id=command.organization_id, worker_id=worker.id,
         name=draft.objective[:160], status="active", current_revision=1)
-    revision = JobRevision(id=uuid4(), job_id=job.id, revision=1, created_by=command.created_by, created_at=now,
+    revision = JobRevision(id=uuid4(), job_id=job.id, revision=1, created_by=command.created_by, created_at=datetime.now(UTC),
         definition={"objective": draft.objective, "instructions": task["instruction"],
             "completionCriteria": draft.completion_criteria, "requiredCapabilities": scopes,
             "priority": "normal", "autonomy": {"integrationFoundation": True,
@@ -207,12 +241,14 @@ async def prepare_integration_task(session, command_id: UUID) -> None:
     await session.flush()
     session.add(revision)
     await session.flush()
-    if trigger is not None:
-        await _set_up_event_trigger(session, command, task, draft, worker, job, revision, bindings, foundation)
-        return
+    return job, revision
+
+
+async def _queue_task(session, command, task, worker, job, revision, bindings, standing, foundation) -> None:
+    """The job's first task, bound and queued, and the command pointed at it."""
     item = WorkItem(id=uuid4(), organization_id=command.organization_id, job_id=job.id,
         job_revision_id=revision.id, status="queued", priority="normal", correlation_id=str(uuid4()),
-        idempotency_key=f"integration-command:{command.id}", scheduled_at=now,
+        idempotency_key=f"integration-command:{command.id}", scheduled_at=revision.created_at,
         payload={"requestedBy": str(command.created_by), "integrationOrigin": {
             "threadId": task["threadId"], "messageId": task["messageId"], "commandId": str(command.id)},
             "trigger": {"type": "manual"}})

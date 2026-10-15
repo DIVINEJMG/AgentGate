@@ -548,13 +548,15 @@ def write(key: str, value: str) -> dict[str, Any]:
             "instruction": f"Write {value} to record {key}", "input": {"key": key, "value": value}}
 
 
-def finish(summary: str, status: str = "completed", criteria: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    answer = {"decision": "finish", "summary": summary, "title": "Done", "instruction": "Report the result.",
-              "resultStatus": status}
-    return {**answer, "criteria": criteria} if criteria is not None else answer
-
-
 CRITERION = "The requested records were handled."
+# A compliant model assesses the job's criterion when it finishes, citing the steps it took (steps
+# that do not exist are ignored by the evidence check).
+ASSESSED = [{"criterion": CRITERION, "status": "met", "evidenceSteps": list(range(1, 21))}]
+
+
+def finish(summary: str, status: str = "completed", criteria: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    return {"decision": "finish", "summary": summary, "title": "Done", "instruction": "Report the result.",
+            "resultStatus": status, "criteria": ASSESSED if criteria is None else criteria}
 
 
 @dataclass(frozen=True)
@@ -614,6 +616,9 @@ TASKS = [
          {"bench.record.read": "allow"}),
     Task("criteria-unproven", "The AI claims the criterion met but cites no real step: the result needs attention.",
          [read("a"), finish("Record a was read.", criteria=[{"criterion": CRITERION, "status": "met", "evidenceSteps": [7]}])],
+         {"bench.record.read": "allow"}),
+    Task("criteria-missing", "The AI finishes without assessing the criterion: it is asked once, then assesses it.",
+         [read("a"), finish("Record a was read.", criteria=[]), finish("Record a was read.")],
          {"bench.record.read": "allow"}),
     Task("planned-30-steps", "A 30-step job (more than the old 20-action limit) followed through its saved plan.",
          [*(read(str(index)) for index in range(30)), finish("Thirty records were read.")],

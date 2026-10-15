@@ -87,6 +87,48 @@ class AdmittedTextProvider:
         self.provider.validate_request(model=model, request=request)
         coordinator = self.coordinator = self.coordinator or RedisCoordinator.from_settings()
         health = self.account.replace("planner:account:", "planner:health:") + ":" + model
+        await self._raise_if_unavailable(coordinator, model, health)
+        org = getattr(self.context, "organization_id", None)
+        slot = None
+        probe = None
+        reservation, called, usage = None, False, None
+        try:
+            probe = await self._recovery_probe(coordinator, health)
+            if org:
+                slot, reservation = await self._admit_organization(coordinator, org, request)
+            from app.infrastructure.ai.workloads import acquire_account_slot, release_workload_slot
+            account_slot = await acquire_account_slot(coordinator, self.config, self.account, self.workload,
+                self.config.runtime_planner_timeout_seconds + 10)
+            if account_slot is None:
+                raise AIProviderError("rate_limited", "The model account is at its concurrency limit.",
+                                      retryable=True, account_scoped=True, retry_after_seconds=15,
+                                      budget_scope="concurrency")
+            try:
+                called = True
+                self.dispatch_started = True
+                logger.info("AI model dispatch workload=%s connection=%s model=%s model_called=true",
+                    self.workload, self.name, model)
+                response = await self.provider.generate_text(model=model, request=request)
+                usage = response.usage
+            except AIProviderError as exc:
+                exc.model_called = called
+                await self._cool_down(coordinator, exc, health)
+                raise
+            finally:
+                await release_workload_slot(coordinator, account_slot)
+            await coordinator.cache_delete(health + ":failures")
+            return response
+        finally:
+            from app.infrastructure.ai.workloads import settle_workload_budget
+            await settle_workload_budget(coordinator, reservation, called=called, usage=usage)
+            if slot:
+                from app.infrastructure.ai.workloads import release_workload_slot
+                await release_workload_slot(coordinator, slot)
+            if probe:
+                await coordinator.release_lock(probe)
+
+    async def _raise_if_unavailable(self, coordinator, model, health):
+        """The account or model is cooling down, or the endpoint cannot serve this model."""
         if await coordinator.cache_get(self.account):
             raise AIProviderError(
                 "rate_limited",
@@ -106,78 +148,63 @@ class AdmittedTextProvider:
                     "This text endpoint is unavailable or incompatible.",
                     retryable=False,
                 )
-        org = getattr(self.context, "organization_id", None)
-        slot = None
-        probe = None
-        reservation, called, usage = None, False, None
+
+    async def _recovery_probe(self, coordinator, health):
+        """After repeated failures one request at a time probes the model; None while healthy."""
+        if int(await coordinator.cache_get(health + ":failures") or 0) < 5:
+            return None
+        probe = await coordinator.acquire_lock(
+            health + ":probe", ttl_seconds=self.config.runtime_planner_timeout_seconds + 10
+        )
+        if not probe:
+            raise AIProviderError(
+                "provider_unavailable",
+                "A recovery probe is already running.",
+                retryable=True,
+            )
+        return probe
+
+    async def _admit_organization(self, coordinator, org, request):
+        """The organization's request slot and the budget reserved for this request."""
+        from app.infrastructure.ai.workloads import (
+            acquire_workload_slot,
+            release_workload_slot,
+            reserve_workload_budgets,
+        )
+        slot = await acquire_workload_slot(coordinator, self.config, org, self.workload,
+                                         self.config.runtime_planner_timeout_seconds + 10)
+        if not slot:
+            raise AIProviderError(
+                "rate_limited",
+                "Organization request concurrency is full.",
+                retryable=True,
+                organization_scoped=True,
+                budget_scope="concurrency",
+            )
+        bound = len((request.system + request.full_prompt).encode()) + generation_allowance(
+            self.profile, request.max_output_tokens)
         try:
-            if int(await coordinator.cache_get(health + ":failures") or 0) >= 5:
-                probe = await coordinator.acquire_lock(
-                    health + ":probe", ttl_seconds=self.config.runtime_planner_timeout_seconds + 10
-                )
-                if not probe:
-                    raise AIProviderError(
-                        "provider_unavailable",
-                        "A recovery probe is already running.",
-                        retryable=True,
-                    )
-            if org:
-                from app.infrastructure.ai.workloads import acquire_workload_slot
-                slot = await acquire_workload_slot(coordinator, self.config, org, self.workload,
-                                                 self.config.runtime_planner_timeout_seconds + 10)
-                if not slot:
-                    raise AIProviderError(
-                        "rate_limited",
-                        "Organization request concurrency is full.",
-                        retryable=True,
-                        organization_scoped=True,
-                    )
-                from app.infrastructure.ai.workloads import reserve_workload_budgets
-                bound = len((request.system + request.prompt).encode()) + generation_allowance(
-                    self.profile, request.max_output_tokens)
-                reservation = await reserve_workload_budgets(coordinator, self.config, org, self.workload, bound)
-            from app.infrastructure.ai.workloads import acquire_account_slot, release_workload_slot
-            account_slot = await acquire_account_slot(coordinator, self.config, self.account, self.workload,
-                self.config.runtime_planner_timeout_seconds + 10)
-            if account_slot is None:
-                raise AIProviderError("rate_limited", "The model account is at its concurrency limit.",
-                                      retryable=True, account_scoped=True, retry_after_seconds=15)
-            try:
-                called = True
-                self.dispatch_started = True
-                logger.info("AI model dispatch workload=%s connection=%s model=%s model_called=true",
-                    self.workload, self.name, model)
-                response = await self.provider.generate_text(model=model, request=request)
-                usage = response.usage
-            except AIProviderError as exc:
-                exc.model_called = called
-                if exc.account_scoped or exc.category in {"authentication_failed", "quota_exhausted"}:
-                    await coordinator.cache_set(
-                        self.account, exc.category, ttl_seconds=exc.retry_after_seconds or 120
-                    )
-                elif exc.category == "rate_limited":
-                    await coordinator.cache_set(
-                        health, exc.category, ttl_seconds=exc.retry_after_seconds or 60
-                    )
-                elif exc.category in {"provider_unavailable", "timeout"}:
-                    failures = await coordinator.increment_counter(
-                        health + ":failures", ttl_seconds=300
-                    )
-                    if failures >= 5:
-                        await coordinator.cache_set(health, exc.category, ttl_seconds=120)
-                raise
-            finally:
-                await release_workload_slot(coordinator, account_slot)
-            await coordinator.cache_delete(health + ":failures")
-            return response
-        finally:
-            from app.infrastructure.ai.workloads import settle_workload_budget
-            await settle_workload_budget(coordinator, reservation, called=called, usage=usage)
-            if slot:
-                from app.infrastructure.ai.workloads import release_workload_slot
-                await release_workload_slot(coordinator, slot)
-            if probe:
-                await coordinator.release_lock(probe)
+            return slot, await reserve_workload_budgets(coordinator, self.config, org, self.workload, bound)
+        except BaseException:
+            await release_workload_slot(coordinator, slot)  # the caller never received it
+            raise
+
+    async def _cool_down(self, coordinator, exc, health):
+        """Rest the account or the model after a failure that calls for a pause."""
+        if exc.account_scoped or exc.category in {"authentication_failed", "quota_exhausted"}:
+            await coordinator.cache_set(
+                self.account, exc.category, ttl_seconds=exc.retry_after_seconds or 120
+            )
+        elif exc.category == "rate_limited":
+            await coordinator.cache_set(
+                health, exc.category, ttl_seconds=exc.retry_after_seconds or 60
+            )
+        elif exc.category in {"provider_unavailable", "timeout"}:
+            failures = await coordinator.increment_counter(
+                health + ":failures", ttl_seconds=300
+            )
+            if failures >= 5:
+                await coordinator.cache_set(health, exc.category, ttl_seconds=120)
 
     async def close(self):
         if self.coordinator:

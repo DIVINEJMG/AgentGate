@@ -48,6 +48,7 @@ from app.application.services.worker_site_targets import AmbiguousSiteTarget
 from app.bootstrap.settings import settings
 from app.domain.ai.providers import AIGateway, AIInvocationContext, AIProviderError
 from app.domain.conversation.intent import (
+    PENDING_COMMAND_STATUSES,
     CommandReceipt,
     CommandReference,
     EntityReference,
@@ -139,6 +140,8 @@ class ConversationCommandCompiler:
             if prior is not None:
                 return CompiledCommandOutcome(command=prior, receipt=CommandReceipt.model_validate(prior.receipt))
 
+        intent = await self._close_declined(organization_id=organization_id, principal=principal,
+                                            thread=thread, intent=intent)
         source_message, intent, resumed = await self._continue_answered(
             organization_id=organization_id, principal=principal, thread=thread,
             source_message=source_message, intent=intent)
@@ -246,6 +249,27 @@ class ConversationCommandCompiler:
             await self._session.refresh(command)
         return CompiledCommandOutcome(command=command, receipt=receipt)
 
+    async def _close_declined(self, *, organization_id, principal, thread, intent):
+        """A chat answer to a pending question (resumeCommandId) declines it: the pending request
+        is closed and nothing new is created; the reply says so."""
+        raw = intent.arguments.get("resumeCommandId")
+        if intent.family != "conversation.answer" or not raw:
+            return intent
+        try:
+            pending_id = UUID(str(raw))
+        except ValueError:
+            pending_id = None
+        pending = pending_id and await self._session.scalar(select(ConversationCommand).where(
+            ConversationCommand.id == pending_id, ConversationCommand.organization_id == organization_id,
+            ConversationCommand.thread_id == thread.id, ConversationCommand.created_by == principal.user_id,
+            ConversationCommand.status.in_(PENDING_COMMAND_STATUSES)).with_for_update())
+        if pending is not None:
+            pending.status = "cancelled"
+            pending.receipt = {**(pending.receipt or {}), "status": "cancelled",
+                               "message": "Not needed: the person declined it."}
+        return intent.model_copy(update={"arguments": {key: value for key, value in intent.arguments.items()
+                                                       if key != "resumeCommandId"}})
+
     async def _continue_answered(self, *, organization_id, principal, thread, source_message, intent):
         """When the human answers a question this thread asked, read their message as the original
         request plus the answer. Integration tasks saved for preparation continue in their own path."""
@@ -319,109 +343,23 @@ class ConversationCommandCompiler:
         command: ConversationCommand,
         confirmed: bool,
     ) -> CommandReceipt:
+        """Run the command for the intent's family: one handler per family (or family group)."""
         family = intent.family
+        request: dict[str, Any] = {"organization_id": organization_id, "principal": principal, "thread": thread,
+                                   "source_message": source_message, "intent": intent, "context": context,
+                                   "command": command, "confirmed": confirmed, "family": family}
+        receipt = await self._handle(family, request)
+        if receipt is not None:
+            return receipt
+        raise CommandResolutionError(
+            f"I understood the request as {family}, but that operation is not available."
+        )
 
+    async def _handle(self, family: str, request: dict[str, Any]) -> CommandReceipt | None:
         if family == "integration.execute":
-            if not settings.integration_foundation_enabled:
-                return CommandReceipt(status="unavailable", message="Integration task execution is not enabled in this environment.")
-            require_permission(principal, "jobs.manage")
-            require_permission(principal, "jobs.run")
-            if intent.arguments.get("resumeCommandId"):
-                pending = await self._session.scalar(select(ConversationCommand).where(
-                    ConversationCommand.id == UUID(str(intent.arguments["resumeCommandId"])),
-                    ConversationCommand.organization_id == organization_id, ConversationCommand.thread_id == thread.id,
-                    ConversationCommand.created_by == principal.user_id, ConversationCommand.family == "integration.execute",
-                    ConversationCommand.status.in_(["waiting_integration", "clarification_required", "waiting_ai", "policy_denied"])).with_for_update())
-                if pending is None:
-                    raise CommandResolutionError("That pending integration task is not available in this conversation.")
-                task = dict(pending.payload["integrationTask"])
-                task["instruction"] += "\nHuman clarification: " + source_message.content
-                task.pop("draft", None)
-                pending.payload = {**pending.payload, "integrationTask": task}
-                pending.status = "accepted"
-                from app.application.services.preparation_ai import restart_exhausted_preparation
-                retry_state = await restart_exhausted_preparation(self._session, pending)
-                await TransactionalOutbox(self._session).enqueue(topic="integration.task.prepare",
-                    aggregate_type="conversation_command", aggregate_id=str(pending.id),
-                    payload={"command_id": str(pending.id), "organization_id": str(organization_id)})
-                command.target_type, command.target_id = "command", str(pending.id)
-                return CommandReceipt(status="accepted", message=(
-                    "I saved your request and queued a fresh preparation attempt. Previous task history remains saved."
-                    if retry_state == "fresh_decision_queued" else
-                    "I saved your clarification. Task preparation is queued; I’ll report when it starts or encounters a blocker."), command_id=command.id)
-            worker = await self._resolve_worker_for_job(organization_id, intent.worker, thread)
-            if worker is None:
-                raise CommandResolutionError("Which worker should handle this integration task?")
-            from app.application.services.integration_request_context import (
-                integration_request_context,
-            )
-            command.payload = {**command.payload, "integrationTask": {
-                "instruction": source_message.content, "workerId": str(worker.id),
-                "threadId": str(thread.id), "messageId": str(source_message.id),
-                "standing": False, "context": integration_request_context(context)}}
-            await TransactionalOutbox(self._session).enqueue(topic="integration.task.prepare",
-                aggregate_type="conversation_command", aggregate_id=str(command.id),
-                payload={"command_id": str(command.id), "organization_id": str(organization_id)})
-            return CommandReceipt(status="accepted", message="I accepted your integration task. I’ll resolve its account and resource, then send updates here.", command_id=command.id)
-
+            return await self._on_integration_execute(**request)
         if family == "worker.create":
-            try:
-                result = await WorkerAutonomyService(
-                    self._session,
-                    self._gateway,
-                ).create_from_instruction(
-                    organization_id=organization_id,
-                    principal=principal,
-                    instruction=source_message.content,
-                    authoritative_context=context,
-                    source_thread_id=thread.id,
-                    source_message_id=source_message.id,
-                )
-            except AmbiguousSiteTarget as exc:
-                raise CommandResolutionError(str(exc)) from exc
-            except ValidationError:
-                raise
-            except ValueError as exc:
-                # A request the worker designer could not settle: ask, and continue on the answer.
-                raise CommandResolutionError(str(exc)) from exc
-            command.target_type = "worker"
-            command.target_id = str(result.worker.id)
-            if result.wait_reasons:
-                return CommandReceipt(status="waiting_integration",
-                    message=f"I created {result.worker.name}, but its setup needs attention: " + "; ".join(result.wait_reasons),
-                    references=list(result.references), command_id=command.id,
-                    failure_category="missing_integration")
-            if result.missing_integrations:
-                providers = ", ".join(result.missing_integrations)
-                return CommandReceipt(
-                    status="waiting_integration",
-                    message=(
-                        f"I created {result.worker.name} and its job setup. "
-                        f"Before all work can start, connect: {providers}."
-                    ),
-                    references=list(result.references),
-                    command_id=command.id,
-                    failure_category="missing_integration",
-                    action_hints=[
-                        {
-                            "kind": "connect_integration",
-                            "provider": provider,
-                            "label": f"Connect {provider.replace('_', ' ').title()}",
-                        }
-                        for provider in result.missing_integrations
-                    ],
-                )
-            job_names = ", ".join(job.name for job in result.jobs)
-            return CommandReceipt(
-                status="completed",
-                message=(
-                    f"I created {result.worker.name}"
-                    + (f" with {job_names}." if job_names else ".")
-                ),
-                references=list(result.references),
-                command_id=command.id,
-            )
-
+            return await self._on_worker_create(**request)
         if family in {
             "worker.update",
             "worker.status",
@@ -431,179 +369,7 @@ class ConversationCommandCompiler:
             "instruction.add",
             "instruction.remove",
         }:
-            worker = await self._resolve_worker(organization_id, intent.worker, thread)
-            command.target_type = "worker"
-            command.target_id = str(worker.id)
-
-            if family == "worker.status":
-                require_permission(principal, "workforce.read")
-                return await self._worker_status(organization_id, worker, command)
-            if family == "worker.pause":
-                updated = await set_worker_status(
-                    self._session, organization_id, worker.id, principal, "paused"
-                )
-                await self._worker_event(updated, "paused")
-                return self._receipt(
-                    "completed",
-                    f"I paused {updated.name}. New runtime work will not proceed while the worker is paused.",
-                    updated,
-                )
-            if family == "worker.resume":
-                updated = await set_worker_status(
-                    self._session, organization_id, worker.id, principal, "active"
-                )
-                await self._worker_event(updated, "active")
-                paused_jobs = list(
-                    (
-                        await self._session.scalars(
-                            select(Job).where(
-                                Job.organization_id == organization_id,
-                                Job.worker_id == worker.id,
-                                Job.status == "paused",
-                            )
-                        )
-                    ).all()
-                )
-                resumed_job = None
-                if intent.job is not None:
-                    resumed_job = await self._resolve_job(
-                        organization_id,
-                        intent.job,
-                        worker,
-                        prefer_current=False,
-                    )
-                    if resumed_job.status == "paused":
-                        resumed_job.status = "active"
-                        await self._resume_job_schedule(organization_id, resumed_job, principal)
-                elif len(paused_jobs) == 1:
-                    resumed_job = paused_jobs[0]
-                    resumed_job.status = "active"
-                    await self._resume_job_schedule(organization_id, resumed_job, principal)
-                await self._session.commit()
-                message = f"I resumed {updated.name}."
-                references = [self._ref("worker", updated.id, updated.name)]
-                if resumed_job is not None:
-                    message += f" I also resumed {resumed_job.name}."
-                    references.append(self._ref("job", resumed_job.id, resumed_job.name))
-                return CommandReceipt(
-                    status="completed",
-                    message=message,
-                    references=references,
-                    command_id=command.id,
-                )
-            if family == "worker.update":
-                updated = await update_worker(
-                    self._session,
-                    organization_id,
-                    worker.id,
-                    principal,
-                    dict(intent.arguments),
-                )
-                return self._receipt(
-                    "completed",
-                    f"I updated {updated.name}.",
-                    updated,
-                )
-            if family == "worker.delete":
-                require_permission(principal, "workforce.manage")
-                if not confirmed:
-                    return CommandReceipt(
-                        status="waiting_confirmation",
-                        message=(
-                            f"Deleting {worker.name} is destructive. Confirm this command "
-                            "after its jobs have been removed."
-                        ),
-                        references=[self._ref("worker", worker.id, worker.name)],
-                        command_id=command.id,
-                        failure_category="approval_wait",
-                        action_hints=[
-                            {
-                                "kind": "confirm_command",
-                                "label": "Confirm deletion",
-                            }
-                        ],
-                    )
-                jobs = list(
-                    (
-                        await self._session.scalars(
-                            select(Job).where(
-                                Job.organization_id == organization_id,
-                                Job.worker_id == worker.id,
-                            )
-                        )
-                    ).all()
-                )
-                if jobs:
-                    raise CommandResolutionError(
-                        f"{worker.name} still has {len(jobs)} job(s). Delete those jobs before deleting the worker."
-                    )
-                worker_id = worker.id
-                worker_name = worker.name
-                await delete_worker_v1(
-                    organization_id,
-                    worker_id,
-                    principal,
-                    self._session,
-                )
-                return CommandReceipt(
-                    status="completed",
-                    message=f"I deleted {worker_name}.",
-                    references=[self._ref("worker", worker_id, worker_name)],
-                    command_id=command.id,
-                )
-            if family == "instruction.add":
-                require_permission(principal, "workforce.manage")
-                text = str(
-                    intent.arguments.get("instruction")
-                    or intent.arguments.get("text")
-                    or source_message.content
-                ).strip()
-                if not text:
-                    raise CommandResolutionError("What instruction should I add?")
-                if contains_secret_material(text):
-                    raise CommandResolutionError(
-                        "Secrets and credentials cannot be stored as Worker instructions."
-                    )
-                directive = WorkerDirective(
-                    organization_id=organization_id,
-                    worker_id=worker.id,
-                    text=text,
-                    status="active",
-                    created_by=principal.user_id,
-                    source_thread_id=thread.id,
-                    source_message_id=source_message.id,
-                )
-                self._session.add(directive)
-                await self._session.flush()
-                await WorkerMemoryService(self._session).add_standing_memory(
-                    worker=worker,
-                    instruction=text,
-                    source_thread_id=thread.id,
-                    source_message_id=source_message.id,
-                )
-                return CommandReceipt(
-                    status="completed",
-                    message=f"I added that as a standing instruction for {worker.name}.",
-                    references=[
-                        self._ref("worker", worker.id, worker.name),
-                        self._ref("directive", directive.id, None),
-                    ],
-                    command_id=command.id,
-                )
-            if family == "instruction.remove":
-                require_permission(principal, "workforce.manage")
-                directive = await self._resolve_directive(organization_id, worker, intent.arguments)
-                directive.status = "removed"
-                return CommandReceipt(
-                    status="completed",
-                    message=f"I removed that standing instruction from {worker.name}.",
-                    references=[
-                        self._ref("worker", worker.id, worker.name),
-                        self._ref("directive", directive.id, None),
-                    ],
-                    command_id=command.id,
-                )
-
+            return await self._on_worker(**request)
         if family in {
             "job.create",
             "job.update",
@@ -616,462 +382,796 @@ class ConversationCommandCompiler:
             "schedule.pause",
             "schedule.resume",
         }:
-            worker = await self._resolve_worker_for_job(organization_id, intent.worker, thread)
-            if family == "job.create":
-                require_permission(principal, "jobs.manage")
-                if worker is None:
-                    raise CommandResolutionError("Which worker should own this job?")
-                name = str(
-                    intent.arguments.get("name")
-                    or (intent.job.name if intent.job is not None else "")
-                ).strip()
-                if not name:
-                    raise CommandResolutionError("What should I call this job?")
-                job_payload, browser_scopes = await self._prepare_existing_worker_job_payload(
-                    organization_id=organization_id,
-                    principal=principal,
-                    worker=worker,
-                    source_message=source_message,
-                    source_thread_id=thread.id,
-                    name=name,
-                    arguments=dict(intent.arguments),
-                )
-                job = await create_job(
-                    self._session,
-                    organization_id,
-                    principal,
-                    job_payload,
-                )
-                if browser_scopes:
-                    await _provision_managed_job_authority(
-                        self._session,
-                        organization_id,
-                        worker,
-                        principal,
-                        list(browser_scopes),
-                    )
-                await job_status_v1(
-                    organization_id,
-                    job.id,
-                    {"status": "active"},
-                    principal,
-                    self._session,
-                )
-                command.target_type = "job"
-                command.target_id = str(job.id)
-                return CommandReceipt(
-                    status="completed",
-                    message=f"I created the {job.name} job for {worker.name}.",
-                    references=[
-                        self._ref("worker", worker.id, worker.name),
-                        self._ref("job", job.id, job.name),
-                    ],
-                    command_id=command.id,
-                )
+            return await self._on_job(**request)
+        if family in {"policy.add", "policy.update", "policy.remove"}:
+            return await self._on_policy(**request)
+        if family == "result.query":
+            return await self._on_result_query(**request)
+        if family == "failure.explain":
+            return await self._on_failure_explain(**request)
+        if family == "integration.require":
+            return await self._on_integration_require(**request)
+        if family == "attachment.analyze":
+            return await self._on_attachment_analyze(**request)
+        if family == "web.research":
+            return await self._on_web_research(**request)
+        if family == "conversation.answer":
+            return await self._on_conversation_answer(**request)
+        return None
 
-            job = await self._resolve_job(
+    async def _on_integration_execute(self, *, organization_id: UUID, principal: HumanPrincipal, thread: ConversationThread, source_message: ConversationMessage, intent: WorkerCommandIntent, context: dict[str, Any], command: ConversationCommand, **_: Any) -> CommandReceipt | None:
+        if not settings.integration_foundation_enabled:
+            return CommandReceipt(status="unavailable", message="Integration task execution is not enabled in this environment.")
+        require_permission(principal, "jobs.manage")
+        require_permission(principal, "jobs.run")
+        if intent.arguments.get("resumeCommandId"):
+            pending = await self._session.scalar(select(ConversationCommand).where(
+                ConversationCommand.id == UUID(str(intent.arguments["resumeCommandId"])),
+                ConversationCommand.organization_id == organization_id, ConversationCommand.thread_id == thread.id,
+                ConversationCommand.created_by == principal.user_id, ConversationCommand.family == "integration.execute",
+                ConversationCommand.status.in_(PENDING_COMMAND_STATUSES)).with_for_update())
+            if pending is None:
+                raise CommandResolutionError("That pending integration task is not available in this conversation.")
+            task = dict(pending.payload["integrationTask"])
+            task["instruction"] += "\nHuman clarification: " + source_message.content
+            task.pop("draft", None)
+            pending.payload = {**pending.payload, "integrationTask": task}
+            pending.status = "accepted"
+            from app.application.services.preparation_ai import restart_exhausted_preparation
+            retry_state = await restart_exhausted_preparation(self._session, pending)
+            await TransactionalOutbox(self._session).enqueue(topic="integration.task.prepare",
+                aggregate_type="conversation_command", aggregate_id=str(pending.id),
+                payload={"command_id": str(pending.id), "organization_id": str(organization_id)})
+            command.target_type, command.target_id = "command", str(pending.id)
+            return CommandReceipt(status="accepted", message=(
+                "I saved your request and queued a fresh preparation attempt. Previous task history remains saved."
+                if retry_state == "fresh_decision_queued" else
+                "I saved your clarification. Task preparation is queued; I’ll report when it starts or encounters a blocker."), command_id=command.id)
+        worker = await self._resolve_worker_for_job(organization_id, intent.worker, thread)
+        if worker is None:
+            raise CommandResolutionError("Which worker should handle this integration task?")
+        from app.application.services.integration_request_context import (
+            integration_request_context,
+        )
+        command.payload = {**command.payload, "integrationTask": {
+            "instruction": source_message.content, "workerId": str(worker.id),
+            "threadId": str(thread.id), "messageId": str(source_message.id),
+            "standing": False, "context": integration_request_context(context)}}
+        await TransactionalOutbox(self._session).enqueue(topic="integration.task.prepare",
+            aggregate_type="conversation_command", aggregate_id=str(command.id),
+            payload={"command_id": str(command.id), "organization_id": str(organization_id)})
+        return CommandReceipt(status="accepted", message="I accepted your integration task. I’ll resolve its account and resource, then send updates here.", command_id=command.id)
+
+    async def _on_worker_create(self, *, organization_id: UUID, principal: HumanPrincipal, thread: ConversationThread, source_message: ConversationMessage, context: dict[str, Any], command: ConversationCommand, **_: Any) -> CommandReceipt | None:
+        try:
+            result = await WorkerAutonomyService(
+                self._session,
+                self._gateway,
+            ).create_from_instruction(
+                organization_id=organization_id,
+                principal=principal,
+                instruction=source_message.content,
+                authoritative_context=context,
+                source_thread_id=thread.id,
+                source_message_id=source_message.id,
+            )
+        except AmbiguousSiteTarget as exc:
+            raise CommandResolutionError(str(exc)) from exc
+        except ValidationError:
+            raise
+        except ValueError as exc:
+            # A request the worker designer could not settle: ask, and continue on the answer.
+            raise CommandResolutionError(str(exc)) from exc
+        command.target_type = "worker"
+        command.target_id = str(result.worker.id)
+        if result.wait_reasons:
+            return CommandReceipt(status="waiting_integration",
+                message=f"I created {result.worker.name}, but its setup needs attention: " + "; ".join(result.wait_reasons),
+                references=list(result.references), command_id=command.id,
+                failure_category="missing_integration")
+        if result.missing_integrations:
+            providers = ", ".join(result.missing_integrations)
+            return CommandReceipt(
+                status="waiting_integration",
+                message=(
+                    f"I created {result.worker.name} and its job setup. "
+                    f"Before all work can start, connect: {providers}."
+                ),
+                references=list(result.references),
+                command_id=command.id,
+                failure_category="missing_integration",
+                action_hints=[
+                    {
+                        "kind": "connect_integration",
+                        "provider": provider,
+                        "label": f"Connect {provider.replace('_', ' ').title()}",
+                    }
+                    for provider in result.missing_integrations
+                ],
+            )
+        job_names = ", ".join(job.name for job in result.jobs)
+        return CommandReceipt(
+            status="completed",
+            message=(
+                f"I created {result.worker.name}"
+                + (f" with {job_names}." if job_names else ".")
+            ),
+            references=list(result.references),
+            command_id=command.id,
+        )
+
+    async def _on_worker_status(self, *, organization_id: UUID, principal: HumanPrincipal, command: ConversationCommand, worker: Worker, **_: Any) -> CommandReceipt | None:
+        require_permission(principal, "workforce.read")
+        return await self._worker_status(organization_id, worker, command)
+
+    async def _on_worker_pause(self, *, organization_id: UUID, principal: HumanPrincipal, worker: Worker, **_: Any) -> CommandReceipt | None:
+        updated = await set_worker_status(
+            self._session, organization_id, worker.id, principal, "paused"
+        )
+        await self._worker_event(updated, "paused")
+        return self._receipt(
+            "completed",
+            f"I paused {updated.name}. New runtime work will not proceed while the worker is paused.",
+            updated,
+        )
+
+    async def _on_worker_resume(self, *, organization_id: UUID, principal: HumanPrincipal, intent: WorkerCommandIntent, command: ConversationCommand, worker: Worker, **_: Any) -> CommandReceipt | None:
+        updated = await set_worker_status(
+            self._session, organization_id, worker.id, principal, "active"
+        )
+        await self._worker_event(updated, "active")
+        paused_jobs = list(
+            (
+                await self._session.scalars(
+                    select(Job).where(
+                        Job.organization_id == organization_id,
+                        Job.worker_id == worker.id,
+                        Job.status == "paused",
+                    )
+                )
+            ).all()
+        )
+        resumed_job = None
+        if intent.job is not None:
+            resumed_job = await self._resolve_job(
                 organization_id,
                 intent.job,
                 worker,
-                prefer_current=True,
+                prefer_current=False,
             )
-            command.target_type = "job"
-            command.target_id = str(job.id)
+            if resumed_job.status == "paused":
+                resumed_job.status = "active"
+                await self._resume_job_schedule(organization_id, resumed_job, principal)
+        elif len(paused_jobs) == 1:
+            resumed_job = paused_jobs[0]
+            resumed_job.status = "active"
+            await self._resume_job_schedule(organization_id, resumed_job, principal)
+        await self._session.commit()
+        message = f"I resumed {updated.name}."
+        references = [self._ref("worker", updated.id, updated.name)]
+        if resumed_job is not None:
+            message += f" I also resumed {resumed_job.name}."
+            references.append(self._ref("job", resumed_job.id, resumed_job.name))
+        return CommandReceipt(
+            status="completed",
+            message=message,
+            references=references,
+            command_id=command.id,
+        )
 
-            if family == "job.status":
-                require_permission(principal, "jobs.read")
-                return await self._job_status(organization_id, job, command)
-            if family == "job.update":
-                updated = await update_job(
-                    self._session,
-                    organization_id,
-                    job.id,
-                    principal,
-                    dict(intent.arguments),
-                )
-                return self._receipt(
-                    "completed",
-                    f"I updated {updated.name}.",
-                    updated,
-                    object_type="job",
-                )
-            if family == "job.stop":
-                require_permission(principal, "jobs.manage")
-                await job_status_v1(
-                    organization_id,
-                    job.id,
-                    {"status": "paused"},
-                    principal,
-                    self._session,
-                )
-                await self._pause_job_schedule(organization_id, job, principal)
-                await self._cancel_open_work(organization_id, job, principal)
-                return self._receipt(
-                    "completed",
-                    f"I stopped {job.name} and cancelled its open work.",
-                    job,
-                    object_type="job",
-                )
-            if family == "job.retry":
-                require_permission(principal, "jobs.run")
-                item = await self._latest_work_item(
-                    organization_id, job, statuses={"failed", "cancelled"}
-                )
-                if item is None:
-                    raise CommandResolutionError(
-                        f"{job.name} has no failed or cancelled work item to retry."
+    async def _on_worker_update(self, *, organization_id: UUID, principal: HumanPrincipal, intent: WorkerCommandIntent, worker: Worker, **_: Any) -> CommandReceipt | None:
+        updated = await update_worker(
+            self._session,
+            organization_id,
+            worker.id,
+            principal,
+            dict(intent.arguments),
+        )
+        return self._receipt(
+            "completed",
+            f"I updated {updated.name}.",
+            updated,
+        )
+
+    async def _on_worker_delete(self, *, organization_id: UUID, principal: HumanPrincipal, command: ConversationCommand, confirmed: bool, worker: Worker, **_: Any) -> CommandReceipt | None:
+        require_permission(principal, "workforce.manage")
+        if not confirmed:
+            return CommandReceipt(
+                status="waiting_confirmation",
+                message=(
+                    f"Deleting {worker.name} is destructive. Confirm this command "
+                    "after its jobs have been removed."
+                ),
+                references=[self._ref("worker", worker.id, worker.name)],
+                command_id=command.id,
+                failure_category="approval_wait",
+                action_hints=[
+                    {
+                        "kind": "confirm_command",
+                        "label": "Confirm deletion",
+                    }
+                ],
+            )
+        jobs = list(
+            (
+                await self._session.scalars(
+                    select(Job).where(
+                        Job.organization_id == organization_id,
+                        Job.worker_id == worker.id,
                     )
-                await retry_item_v1(organization_id, item.id, principal, self._session)
-                return CommandReceipt(
-                    status="accepted",
-                    message=f"I queued a retry for {job.name}.",
-                    references=[
-                        self._ref("job", job.id, job.name),
-                        self._ref("work_item", item.id, None),
-                    ],
-                    command_id=command.id,
                 )
-            if family == "work.execute_now":
-                definition = (await current_revision(self._session, job)).definition
-                if (settings.integration_foundation_enabled and isinstance(definition, dict)
-                        and (definition.get("autonomy") or {}).get("oneShot")):
-                    # That job carried one earlier chat request and can't run again, so a new
-                    # message pointing at it is a new task.
-                    retarget = intent.model_copy(update={"family": "integration.execute"})
-                    command.family = retarget.family
-                    command.payload = {**command.payload, "intent": retarget.model_dump(mode="json")}
-                    return await self._dispatch(organization_id=organization_id, principal=principal,
-                        thread=thread, source_message=source_message, intent=retarget, context=context,
-                        command=command, confirmed=confirmed)
-                item = await queue_job(self._session, organization_id, job, principal)
-                item.payload = {**(item.payload or {}), "conversationOrigin": {
-                    "threadId": str(thread.id), "messageId": str(source_message.id),
-                    "commandId": str(command.id),
-                }}
-                return CommandReceipt(
-                    status="accepted",
-                    message=f"I queued {job.name} to run now.",
-                    references=[
-                        self._ref("job", job.id, job.name),
-                        self._ref("work_item", item.id, None),
-                    ],
-                    command_id=command.id,
-                )
-            if family.startswith("schedule."):
-                config = await self._change_schedule(
-                    organization_id=organization_id,
-                    principal=principal,
-                    job=job,
-                    family=family,
-                    arguments=intent.arguments,
-                )
-                schedule = config.get("schedule", {})
-                if not isinstance(schedule, dict):
-                    schedule = {}
-                state = "active" if schedule.get("enabled") else "paused"
-                return CommandReceipt(
-                    status="completed",
-                    message=f"I changed {job.name}'s schedule. It is now {state}.",
-                    references=[
-                        self._ref("job", job.id, job.name),
-                        CommandReference(
-                            type="schedule",
-                            id=str(config.get("id") or ""),
-                            name=job.name,
-                        ),
-                    ],
-                    command_id=command.id,
-                )
+            ).all()
+        )
+        if jobs:
+            raise CommandResolutionError(
+                f"{worker.name} still has {len(jobs)} job(s). Delete those jobs before deleting the worker."
+            )
+        worker_id = worker.id
+        worker_name = worker.name
+        await delete_worker_v1(
+            organization_id,
+            worker_id,
+            principal,
+            self._session,
+        )
+        return CommandReceipt(
+            status="completed",
+            message=f"I deleted {worker_name}.",
+            references=[self._ref("worker", worker_id, worker_name)],
+            command_id=command.id,
+        )
 
-        if family in {"policy.add", "policy.update", "policy.remove"}:
-            if family == "policy.add":
-                require_permission(principal, "policies.manage")
-                worker = await self._resolve_worker_for_job(organization_id, intent.worker, thread)
-                payload = self._policy_payload(intent, worker)
-                policy = await _create_policy(self._session, organization_id, principal, payload)
-                command.target_type = "policy"
-                command.target_id = str(policy.id)
-                return self._receipt(
-                    "completed",
-                    f"I added the {policy.name} policy.",
-                    policy,
-                    object_type="policy",
-                )
+    async def _on_instruction_add(self, *, organization_id: UUID, principal: HumanPrincipal, thread: ConversationThread, source_message: ConversationMessage, intent: WorkerCommandIntent, command: ConversationCommand, worker: Worker, **_: Any) -> CommandReceipt | None:
+        require_permission(principal, "workforce.manage")
+        text = str(
+            intent.arguments.get("instruction")
+            or intent.arguments.get("text")
+            or source_message.content
+        ).strip()
+        if not text:
+            raise CommandResolutionError("What instruction should I add?")
+        if contains_secret_material(text):
+            raise CommandResolutionError(
+                "Secrets and credentials cannot be stored as Worker instructions."
+            )
+        directive = WorkerDirective(
+            organization_id=organization_id,
+            worker_id=worker.id,
+            text=text,
+            status="active",
+            created_by=principal.user_id,
+            source_thread_id=thread.id,
+            source_message_id=source_message.id,
+        )
+        self._session.add(directive)
+        await self._session.flush()
+        await WorkerMemoryService(self._session).add_standing_memory(
+            worker=worker,
+            instruction=text,
+            source_thread_id=thread.id,
+            source_message_id=source_message.id,
+        )
+        return CommandReceipt(
+            status="completed",
+            message=f"I added that as a standing instruction for {worker.name}.",
+            references=[
+                self._ref("worker", worker.id, worker.name),
+                self._ref("directive", directive.id, None),
+            ],
+            command_id=command.id,
+        )
 
-            policy = await self._resolve_policy(organization_id, intent.policy)
-            command.target_type = "policy"
-            command.target_id = str(policy.id)
-            if family == "policy.update":
-                updated = await _update_policy(
+    async def _on_instruction_remove(self, *, organization_id: UUID, principal: HumanPrincipal, intent: WorkerCommandIntent, command: ConversationCommand, worker: Worker, **_: Any) -> CommandReceipt | None:
+        require_permission(principal, "workforce.manage")
+        directive = await self._resolve_directive(organization_id, worker, intent.arguments)
+        directive.status = "removed"
+        return CommandReceipt(
+            status="completed",
+            message=f"I removed that standing instruction from {worker.name}.",
+            references=[
+                self._ref("worker", worker.id, worker.name),
+                self._ref("directive", directive.id, None),
+            ],
+            command_id=command.id,
+        )
+
+    async def _on_worker(self, **request: Any) -> CommandReceipt | None:
+        """Commands on one worker: resolve it once, then the family's handler."""
+        organization_id, thread, intent, command, family = (request[key] for key in ('organization_id', 'thread', 'intent', 'command', 'family'))
+        worker = await self._resolve_worker(organization_id, intent.worker, thread)
+        command.target_type = "worker"
+        command.target_id = str(worker.id)
+        if family == "worker.status":
+            return await self._on_worker_status(worker=worker, **request)
+        if family == "worker.pause":
+            return await self._on_worker_pause(worker=worker, **request)
+        if family == "worker.resume":
+            return await self._on_worker_resume(worker=worker, **request)
+        if family == "worker.update":
+            return await self._on_worker_update(worker=worker, **request)
+        if family == "worker.delete":
+            return await self._on_worker_delete(worker=worker, **request)
+        if family == "instruction.add":
+            return await self._on_instruction_add(worker=worker, **request)
+        if family == "instruction.remove":
+            return await self._on_instruction_remove(worker=worker, **request)
+        return None
+
+    async def _on_job_status(self, *, organization_id: UUID, principal: HumanPrincipal, command: ConversationCommand, job: Job, **_: Any) -> CommandReceipt | None:
+        require_permission(principal, "jobs.read")
+        return await self._job_status(organization_id, job, command)
+
+    async def _on_job_update(self, *, organization_id: UUID, principal: HumanPrincipal, intent: WorkerCommandIntent, job: Job, **_: Any) -> CommandReceipt | None:
+        updated = await update_job(
+            self._session,
+            organization_id,
+            job.id,
+            principal,
+            dict(intent.arguments),
+        )
+        return self._receipt(
+            "completed",
+            f"I updated {updated.name}.",
+            updated,
+            object_type="job",
+        )
+
+    async def _on_job_stop(self, *, organization_id: UUID, principal: HumanPrincipal, job: Job, **_: Any) -> CommandReceipt | None:
+        require_permission(principal, "jobs.manage")
+        await job_status_v1(
+            organization_id,
+            job.id,
+            {"status": "paused"},
+            principal,
+            self._session,
+        )
+        await self._pause_job_schedule(organization_id, job, principal)
+        await self._cancel_open_work(organization_id, job, principal)
+        return self._receipt(
+            "completed",
+            f"I stopped {job.name} and cancelled its open work.",
+            job,
+            object_type="job",
+        )
+
+    async def _on_job_retry(self, *, organization_id: UUID, principal: HumanPrincipal, command: ConversationCommand, job: Job, **_: Any) -> CommandReceipt | None:
+        require_permission(principal, "jobs.run")
+        item = await self._latest_work_item(
+            organization_id, job, statuses={"failed", "cancelled"}
+        )
+        if item is None:
+            raise CommandResolutionError(
+                f"{job.name} has no failed or cancelled work item to retry."
+            )
+        await retry_item_v1(organization_id, item.id, principal, self._session)
+        return CommandReceipt(
+            status="accepted",
+            message=f"I queued a retry for {job.name}.",
+            references=[
+                self._ref("job", job.id, job.name),
+                self._ref("work_item", item.id, None),
+            ],
+            command_id=command.id,
+        )
+
+    async def _on_work_execute_now(self, *, organization_id: UUID, principal: HumanPrincipal, thread: ConversationThread, source_message: ConversationMessage, intent: WorkerCommandIntent, context: dict[str, Any], command: ConversationCommand, confirmed: bool, job: Job, **_: Any) -> CommandReceipt | None:
+        definition = (await current_revision(self._session, job)).definition
+        if (settings.integration_foundation_enabled and isinstance(definition, dict)
+                and (definition.get("autonomy") or {}).get("oneShot")):
+            # That job carried one earlier chat request and can't run again, so a new
+            # message pointing at it is a new task.
+            retarget = intent.model_copy(update={"family": "integration.execute"})
+            command.family = retarget.family
+            command.payload = {**command.payload, "intent": retarget.model_dump(mode="json")}
+            return await self._dispatch(organization_id=organization_id, principal=principal,
+                thread=thread, source_message=source_message, intent=retarget, context=context,
+                command=command, confirmed=confirmed)
+        item = await queue_job(self._session, organization_id, job, principal)
+        item.payload = {**(item.payload or {}), "conversationOrigin": {
+            "threadId": str(thread.id), "messageId": str(source_message.id),
+            "commandId": str(command.id),
+        }}
+        return CommandReceipt(
+            status="accepted",
+            message=f"I queued {job.name} to run now.",
+            references=[
+                self._ref("job", job.id, job.name),
+                self._ref("work_item", item.id, None),
+            ],
+            command_id=command.id,
+        )
+
+    async def _on_schedule(self, *, organization_id: UUID, principal: HumanPrincipal, intent: WorkerCommandIntent, command: ConversationCommand, family: str, job: Job, **_: Any) -> CommandReceipt | None:
+        config = await self._change_schedule(
+            organization_id=organization_id,
+            principal=principal,
+            job=job,
+            family=family,
+            arguments=intent.arguments,
+        )
+        schedule = config.get("schedule", {})
+        if not isinstance(schedule, dict):
+            schedule = {}
+        state = "active" if schedule.get("enabled") else "paused"
+        return CommandReceipt(
+            status="completed",
+            message=f"I changed {job.name}'s schedule. It is now {state}.",
+            references=[
+                self._ref("job", job.id, job.name),
+                CommandReference(
+                    type="schedule",
+                    id=str(config.get("id") or ""),
+                    name=job.name,
+                ),
+            ],
+            command_id=command.id,
+        )
+
+    async def _on_job(self, **request: Any) -> CommandReceipt | None:
+        """Commands on one job: resolve it once, then the family's handler."""
+        organization_id, principal, thread, source_message, intent, command, family = (request[key] for key in ('organization_id', 'principal', 'thread', 'source_message', 'intent', 'command', 'family'))
+        worker = await self._resolve_worker_for_job(organization_id, intent.worker, thread)
+        if family == "job.create":
+            require_permission(principal, "jobs.manage")
+            if worker is None:
+                raise CommandResolutionError("Which worker should own this job?")
+            name = str(
+                intent.arguments.get("name")
+                or (intent.job.name if intent.job is not None else "")
+            ).strip()
+            if not name:
+                raise CommandResolutionError("What should I call this job?")
+            job_payload, browser_scopes = await self._prepare_existing_worker_job_payload(
+                organization_id=organization_id,
+                principal=principal,
+                worker=worker,
+                source_message=source_message,
+                source_thread_id=thread.id,
+                name=name,
+                arguments=dict(intent.arguments),
+            )
+            job = await create_job(
+                self._session,
+                organization_id,
+                principal,
+                job_payload,
+            )
+            if browser_scopes:
+                await _provision_managed_job_authority(
                     self._session,
                     organization_id,
-                    policy.id,
+                    worker,
                     principal,
-                    dict(intent.arguments),
+                    list(browser_scopes),
                 )
-                return self._receipt(
-                    "completed",
-                    f"I updated the {updated.name} policy.",
-                    updated,
-                    object_type="policy",
-                )
-            require_permission(principal, "policies.manage")
-            if not confirmed:
-                return CommandReceipt(
-                    status="waiting_confirmation",
-                    message=f"Removing {policy.name} disables a governance rule. Confirm this command to continue.",
-                    references=[self._ref("policy", policy.id, policy.name)],
-                    command_id=command.id,
-                    failure_category="approval_wait",
-                    action_hints=[
-                        {
-                            "kind": "confirm_command",
-                            "label": "Confirm policy removal",
-                        }
-                    ],
-                )
-            await policy_status_v1(
+            await job_status_v1(
                 organization_id,
-                policy.id,
-                {"status": "disabled"},
+                job.id,
+                {"status": "active"},
                 principal,
                 self._session,
             )
-            return self._receipt(
-                "completed",
-                f"I disabled the {policy.name} policy.",
-                policy,
-                object_type="policy",
-            )
-
-        if family == "result.query":
-            require_permission(principal, "results.read")
-            worker = await self._resolve_worker_for_job(organization_id, intent.worker, thread)
-            return await self._result_query(organization_id, worker, intent, command)
-
-        if family == "failure.explain":
-            require_permission(principal, "jobs.read")
-            worker = await self._resolve_worker_for_job(organization_id, intent.worker, thread)
-            job = None
-            if intent.job is not None or worker is not None:
-                try:
-                    job = await self._resolve_job(
-                        organization_id,
-                        intent.job,
-                        worker,
-                        prefer_current=False,
-                    )
-                except CommandResolutionError:
-                    if intent.job is not None:
-                        raise
-            return await self._failure_explain(organization_id, worker, job, intent, command)
-
-        if family == "integration.require":
-            require_permission(principal, "integrations.read")
-            provider = (
-                str(intent.arguments.get("provider") or intent.arguments.get("integration") or "")
-                .strip()
-                .lower()
-            )
-            if not provider:
-                raise CommandResolutionError("Which integration do you need?")
-            if settings.integration_foundation_enabled and provider not in {"browser", "web_research"}:
-                from app.application.services.integration_foundation import IntegrationFoundation
-                resources = [row for row in await IntegrationFoundation(self._session).catalog(
-                    organization_id, principal.user_id) if row["provider"] == provider]
-                account = str(intent.arguments.get("account") or "").casefold()
-                resource = str(intent.arguments.get("resource") or "").casefold()
-                resources = [row for row in resources if
-                    (not account or account in {row["account"].casefold(), row["connectionId"].casefold()}) and
-                    (not resource or resource in {row["name"].casefold(), row["externalId"].casefold(), row["id"].casefold(), *(str(alias).casefold() for alias in row.get("aliases", []))})]
-                if not resources:
-                    return CommandReceipt(status="waiting_integration", message=f"Connect or share the intended {provider} account and discover its exact resources.")
-                if len(resources) != 1:
-                    raise CommandResolutionError(f"Which {provider} account and resource should I check?")
-                row = resources[0]
-                return CommandReceipt(status="completed" if row["health"] == "healthy" else "waiting_integration",
-                    message=f"{row['account']} / {row['name']}: {row['health']}. Task authority is checked separately.",
-                    references=[self._ref("integration", row["connectionId"], row["account"])])
-            integration = await self._session.scalar(
-                select(Integration).where(
-                    Integration.organization_id == organization_id,
-                    func.lower(Integration.provider) == provider,
-                )
-            )
-            if integration is None or integration.status not in {
-                "active",
-                "connected",
-                "healthy",
-            }:
-                return CommandReceipt(
-                    status="waiting_integration",
-                    message=f"{provider} needs to be connected before this work can continue.",
-                    references=[],
-                    command_id=command.id,
-                    failure_category="missing_integration",
-                    action_hints=[
-                        {
-                            "kind": "connect_integration",
-                            "provider": provider,
-                            "label": f"Connect {provider.replace('_', ' ').title()}",
-                        }
-                    ],
-                )
+            command.target_type = "job"
+            command.target_id = str(job.id)
             return CommandReceipt(
                 status="completed",
-                message=f"{integration.display_name} is connected.",
+                message=f"I created the {job.name} job for {worker.name}.",
                 references=[
-                    self._ref(
-                        "integration",
-                        integration.id,
-                        integration.display_name,
-                    )
+                    self._ref("worker", worker.id, worker.name),
+                    self._ref("job", job.id, job.name),
                 ],
                 command_id=command.id,
             )
 
-        if family == "attachment.analyze":
-            artifact_id = self._attachment_id(intent, source_message)
-            if artifact_id is None:
-                raise CommandResolutionError("Which uploaded attachment should I analyze?")
-            analysis = await AttachmentIngestionService(
-                self._session,
-                self._gateway,
-            ).analyze_existing(
-                organization_id=organization_id,
-                artifact_id=artifact_id,
-                thread_id=thread.id,
-                worker_id=thread.worker_id,
-                question=str(intent.arguments.get("question") or source_message.content or ""),
+        job = await self._resolve_job(
+            organization_id,
+            intent.job,
+            worker,
+            prefer_current=True,
+        )
+        command.target_type = "job"
+        command.target_id = str(job.id)
+        if family == "job.status":
+            return await self._on_job_status(worker=worker, job=job, **request)
+        if family == "job.update":
+            return await self._on_job_update(worker=worker, job=job, **request)
+        if family == "job.stop":
+            return await self._on_job_stop(worker=worker, job=job, **request)
+        if family == "job.retry":
+            return await self._on_job_retry(worker=worker, job=job, **request)
+        if family == "work.execute_now":
+            return await self._on_work_execute_now(worker=worker, job=job, **request)
+        if family.startswith("schedule."):
+            return await self._on_schedule(worker=worker, job=job, **request)
+        return None
+
+    async def _on_policy(self, *, organization_id: UUID, principal: HumanPrincipal, thread: ConversationThread, intent: WorkerCommandIntent, command: ConversationCommand, confirmed: bool, family: str, **_: Any) -> CommandReceipt | None:
+        if family == "policy.add":
+            require_permission(principal, "policies.manage")
+            worker = await self._resolve_worker_for_job(organization_id, intent.worker, thread)
+            payload = self._policy_payload(intent, worker)
+            policy = await _create_policy(self._session, organization_id, principal, payload)
+            command.target_type = "policy"
+            command.target_id = str(policy.id)
+            return self._receipt(
+                "completed",
+                f"I added the {policy.name} policy.",
+                policy,
+                object_type="policy",
             )
-            if analysis.status in {"waiting_configuration", "waiting_ai"}:
-                return CommandReceipt(
-                    status="unavailable",
-                    message=(
-                        "The attachment is stored safely, but visual analysis is "
-                        "waiting for the AI vision provider."
-                    ),
-                    references=[
-                        self._ref("artifact", artifact_id, None),
-                        self._ref("artifact_analysis", analysis.id, None),
-                    ],
-                    command_id=command.id,
-                )
-            if analysis.status == "failed":
-                return CommandReceipt(
-                    status="unavailable",
-                    message="The attachment is stored, but its analysis could not be completed.",
-                    references=[
-                        self._ref("artifact", artifact_id, None),
-                        self._ref("artifact_analysis", analysis.id, None),
-                    ],
-                    command_id=command.id,
-                )
-            summary = str(analysis.findings.get("summary") or "")
-            if not summary:
-                summary = str(analysis.findings.get("excerpt") or "")
-            if not summary:
-                summary = "Attachment analysis completed."
+
+        policy = await self._resolve_policy(organization_id, intent.policy)
+        command.target_type = "policy"
+        command.target_id = str(policy.id)
+        if family == "policy.update":
+            updated = await _update_policy(
+                self._session,
+                organization_id,
+                policy.id,
+                principal,
+                dict(intent.arguments),
+            )
+            return self._receipt(
+                "completed",
+                f"I updated the {updated.name} policy.",
+                updated,
+                object_type="policy",
+            )
+        require_permission(principal, "policies.manage")
+        if not confirmed:
             return CommandReceipt(
-                status="completed",
-                message=summary[:12000],
+                status="waiting_confirmation",
+                message=f"Removing {policy.name} disables a governance rule. Confirm this command to continue.",
+                references=[self._ref("policy", policy.id, policy.name)],
+                command_id=command.id,
+                failure_category="approval_wait",
+                action_hints=[
+                    {
+                        "kind": "confirm_command",
+                        "label": "Confirm policy removal",
+                    }
+                ],
+            )
+        await policy_status_v1(
+            organization_id,
+            policy.id,
+            {"status": "disabled"},
+            principal,
+            self._session,
+        )
+        return self._receipt(
+            "completed",
+            f"I disabled the {policy.name} policy.",
+            policy,
+            object_type="policy",
+        )
+
+    async def _on_result_query(self, *, organization_id: UUID, principal: HumanPrincipal, thread: ConversationThread, intent: WorkerCommandIntent, command: ConversationCommand, **_: Any) -> CommandReceipt | None:
+        require_permission(principal, "results.read")
+        worker = await self._resolve_worker_for_job(organization_id, intent.worker, thread)
+        return await self._result_query(organization_id, worker, intent, command)
+
+    async def _on_failure_explain(self, *, organization_id: UUID, principal: HumanPrincipal, thread: ConversationThread, intent: WorkerCommandIntent, command: ConversationCommand, **_: Any) -> CommandReceipt | None:
+        require_permission(principal, "jobs.read")
+        worker = await self._resolve_worker_for_job(organization_id, intent.worker, thread)
+        job = None
+        if intent.job is not None or worker is not None:
+            try:
+                job = await self._resolve_job(
+                    organization_id,
+                    intent.job,
+                    worker,
+                    prefer_current=False,
+                )
+            except CommandResolutionError:
+                if intent.job is not None:
+                    raise
+        return await self._failure_explain(organization_id, worker, job, intent, command)
+
+    async def _on_integration_require(self, *, organization_id: UUID, principal: HumanPrincipal, intent: WorkerCommandIntent, command: ConversationCommand, **_: Any) -> CommandReceipt | None:
+        require_permission(principal, "integrations.read")
+        provider = (
+            str(intent.arguments.get("provider") or intent.arguments.get("integration") or "")
+            .strip()
+            .lower()
+        )
+        if not provider:
+            raise CommandResolutionError("Which integration do you need?")
+        if settings.integration_foundation_enabled and provider not in {"browser", "web_research"}:
+            from app.application.services.integration_foundation import IntegrationFoundation
+            resources = [row for row in await IntegrationFoundation(self._session).catalog(
+                organization_id, principal.user_id) if row["provider"] == provider]
+            account = str(intent.arguments.get("account") or "").casefold()
+            resource = str(intent.arguments.get("resource") or "").casefold()
+            resources = [row for row in resources if
+                (not account or account in {row["account"].casefold(), row["connectionId"].casefold()}) and
+                (not resource or resource in {row["name"].casefold(), row["externalId"].casefold(), row["id"].casefold(), *(str(alias).casefold() for alias in row.get("aliases", []))})]
+            if not resources:
+                return CommandReceipt(status="waiting_integration", message=f"Connect or share the intended {provider} account and discover its exact resources.")
+            if len(resources) != 1:
+                raise CommandResolutionError(f"Which {provider} account and resource should I check?")
+            row = resources[0]
+            return CommandReceipt(status="completed" if row["health"] == "healthy" else "waiting_integration",
+                message=f"{row['account']} / {row['name']}: {row['health']}. Task authority is checked separately.",
+                references=[self._ref("integration", row["connectionId"], row["account"])])
+        integration = await self._session.scalar(
+            select(Integration).where(
+                Integration.organization_id == organization_id,
+                func.lower(Integration.provider) == provider,
+            )
+        )
+        if integration is None or integration.status not in {
+            "active",
+            "connected",
+            "healthy",
+        }:
+            return CommandReceipt(
+                status="waiting_integration",
+                message=f"{provider} needs to be connected before this work can continue.",
+                references=[],
+                command_id=command.id,
+                failure_category="missing_integration",
+                action_hints=[
+                    {
+                        "kind": "connect_integration",
+                        "provider": provider,
+                        "label": f"Connect {provider.replace('_', ' ').title()}",
+                    }
+                ],
+            )
+        return CommandReceipt(
+            status="completed",
+            message=f"{integration.display_name} is connected.",
+            references=[
+                self._ref(
+                    "integration",
+                    integration.id,
+                    integration.display_name,
+                )
+            ],
+            command_id=command.id,
+        )
+
+    async def _on_attachment_analyze(self, *, organization_id: UUID, thread: ConversationThread, source_message: ConversationMessage, intent: WorkerCommandIntent, command: ConversationCommand, **_: Any) -> CommandReceipt | None:
+        artifact_id = self._attachment_id(intent, source_message)
+        if artifact_id is None:
+            raise CommandResolutionError("Which uploaded attachment should I analyze?")
+        analysis = await AttachmentIngestionService(
+            self._session,
+            self._gateway,
+        ).analyze_existing(
+            organization_id=organization_id,
+            artifact_id=artifact_id,
+            thread_id=thread.id,
+            worker_id=thread.worker_id,
+            question=str(intent.arguments.get("question") or source_message.content or ""),
+        )
+        if analysis.status in {"waiting_configuration", "waiting_ai"}:
+            return CommandReceipt(
+                status="unavailable",
+                message=(
+                    "The attachment is stored safely, but visual analysis is "
+                    "waiting for the AI vision provider."
+                ),
                 references=[
                     self._ref("artifact", artifact_id, None),
                     self._ref("artifact_analysis", analysis.id, None),
                 ],
                 command_id=command.id,
             )
-
-        if family == "web.research":
-            require_permission(principal, "workforce.read")
-            query = str(intent.arguments.get("query") or source_message.content).strip()
-            if not query or query.lower() in {"search", "search the web", "look this up"}:
-                raise CommandResolutionError("What would you like me to search for?")
-            if contains_secret_material(query):
-                raise CommandResolutionError(
-                    "The search appears to contain private credentials. Please remove them."
-                )
-            requested = str(intent.arguments.get("requiredSource") or "").strip().lower()
-            if requested and requested not in source_message.content.lower():
-                requested = ""
-            if requested and requested not in {"brave", "tavily"}:
-                return CommandReceipt(
-                    status="unavailable",
-                    message=(f"I cannot use {requested} as a required search source. "
-                             "Brave and Tavily are the configured structured search options."),
-                    command_id=command.id,
-                )
-            required_site = str(intent.arguments.get("requiredSite") or "").strip()
-            if required_site and not grounded_in(required_site, source_message.content):
-                required_site = ""
-            if (
-                not configured_sources()
-                or not web_research_destination()
-                or not settings.qstash_url
-                or not settings.qstash_token
-            ):
-                return CommandReceipt(
-                    status="waiting_integration",
-                    message="Web research needs a configured search provider, QStash, and research callback.",
-                    command_id=command.id,
-                    failure_category="missing_integration",
-                )
-            # Serialize admission by organization so concurrent conversations cannot
-            # oversubscribe the daily/hourly provider spend limits.
-            await self._session.scalar(
-                select(Organization.id)
-                .where(Organization.id == organization_id)
-                .with_for_update()
-            )
-            now = datetime.now(UTC)
-            for window, limit, label in (
-                (timedelta(hours=1), settings.web_research_hourly_limit_per_organization, "hour"),
-                (timedelta(days=1), settings.web_research_daily_limit_per_organization, "day"),
-            ):
-                used = await self._session.scalar(
-                    select(func.count(ConversationCommand.id)).where(
-                        ConversationCommand.organization_id == organization_id,
-                        ConversationCommand.family == "web.research",
-                        ConversationCommand.status.in_(["accepted", "completed"]),
-                        ConversationCommand.created_at >= now - window,
-                    )
-                )
-                if int(used or 0) > max(1, limit):
-                    return CommandReceipt(
-                        status="unavailable",
-                        message=f"This workspace has reached its web research limit for the {label}.",
-                        command_id=command.id,
-                    )
-            command.payload = {
-                "intent": intent.model_dump(mode="json"),
-                "query": query[:500],
-                "requiredSource": requested or None,
-                "requiredSite": required_site[:200] or None,
-                "oneRequestPublicRead": True,
-            }
+        if analysis.status == "failed":
             return CommandReceipt(
-                status="accepted",
-                message="I’m checking current sources and will reply here with what I can verify.",
+                status="unavailable",
+                message="The attachment is stored, but its analysis could not be completed.",
+                references=[
+                    self._ref("artifact", artifact_id, None),
+                    self._ref("artifact_analysis", analysis.id, None),
+                ],
                 command_id=command.id,
             )
-
-        if family == "conversation.answer":
-            from app.application.services.conversation_semantics import (
-                grounded_reply,
-                reply_from_intent,
-            )
-            answer = reply_from_intent(intent, context)
-            if answer is not None:
-                return CommandReceipt(status="completed", message=answer, command_id=command.id)
-            answer = await grounded_reply(self._gateway, message=source_message.content,
-                context=context, invocation_context=AIInvocationContext(
-                    organization_id=organization_id, worker_id=thread.worker_id,
-                    thread_id=thread.id, correlation_id=f"conversation:{source_message.id}"))
-            return CommandReceipt(status="completed", message=answer, command_id=command.id)
-
-        raise CommandResolutionError(
-            f"I understood the request as {family}, but that operation is not available."
+        summary = str(analysis.findings.get("summary") or "")
+        if not summary:
+            summary = str(analysis.findings.get("excerpt") or "")
+        if not summary:
+            summary = "Attachment analysis completed."
+        return CommandReceipt(
+            status="completed",
+            message=summary[:12000],
+            references=[
+                self._ref("artifact", artifact_id, None),
+                self._ref("artifact_analysis", analysis.id, None),
+            ],
+            command_id=command.id,
         )
+
+    async def _on_web_research(self, *, organization_id: UUID, principal: HumanPrincipal, source_message: ConversationMessage, intent: WorkerCommandIntent, command: ConversationCommand, **_: Any) -> CommandReceipt | None:
+        require_permission(principal, "workforce.read")
+        query = str(intent.arguments.get("query") or source_message.content).strip()
+        if not query or query.lower() in {"search", "search the web", "look this up"}:
+            raise CommandResolutionError("What would you like me to search for?")
+        if contains_secret_material(query):
+            raise CommandResolutionError(
+                "The search appears to contain private credentials. Please remove them."
+            )
+        requested = str(intent.arguments.get("requiredSource") or "").strip().lower()
+        if requested and requested not in source_message.content.lower():
+            requested = ""
+        if requested and requested not in {"brave", "tavily"}:
+            return CommandReceipt(
+                status="unavailable",
+                message=(f"I cannot use {requested} as a required search source. "
+                         "Brave and Tavily are the configured structured search options."),
+                command_id=command.id,
+            )
+        required_site = str(intent.arguments.get("requiredSite") or "").strip()
+        if required_site and not grounded_in(required_site, source_message.content):
+            required_site = ""
+        if (
+            not configured_sources()
+            or not web_research_destination()
+            or not settings.qstash_url
+            or not settings.qstash_token
+        ):
+            return CommandReceipt(
+                status="waiting_integration",
+                message="Web research needs a configured search provider, QStash, and research callback.",
+                command_id=command.id,
+                failure_category="missing_integration",
+            )
+        # Serialize admission by organization so concurrent conversations cannot
+        # oversubscribe the daily/hourly provider spend limits.
+        await self._session.scalar(
+            select(Organization.id)
+            .where(Organization.id == organization_id)
+            .with_for_update()
+        )
+        now = datetime.now(UTC)
+        # The hour's and the day's research, counted in one query.
+        last_hour, last_day = (await self._session.execute(
+            select(func.count(ConversationCommand.id).filter(ConversationCommand.created_at >= now - timedelta(hours=1)),
+                   func.count(ConversationCommand.id)).where(
+                ConversationCommand.organization_id == organization_id,
+                ConversationCommand.family == "web.research",
+                ConversationCommand.status.in_(["accepted", "completed"]),
+                ConversationCommand.created_at >= now - timedelta(days=1),
+            )
+        )).one()
+        for used, limit, label in (
+            (last_hour, settings.web_research_hourly_limit_per_organization, "hour"),
+            (last_day, settings.web_research_daily_limit_per_organization, "day"),
+        ):
+            if int(used or 0) > max(1, limit):
+                return CommandReceipt(
+                    status="unavailable",
+                    message=f"This workspace has reached its web research limit for the {label}.",
+                    command_id=command.id,
+                )
+        command.payload = {
+            "intent": intent.model_dump(mode="json"),
+            "query": query[:500],
+            "requiredSource": requested or None,
+            "requiredSite": required_site[:200] or None,
+            "oneRequestPublicRead": True,
+        }
+        return CommandReceipt(
+            status="accepted",
+            message="I’m checking current sources and will reply here with what I can verify.",
+            command_id=command.id,
+        )
+
+    async def _on_conversation_answer(self, *, organization_id: UUID, thread: ConversationThread, source_message: ConversationMessage, intent: WorkerCommandIntent, context: dict[str, Any], command: ConversationCommand, **_: Any) -> CommandReceipt | None:
+        from app.application.services.conversation_semantics import (
+            grounded_reply,
+            reply_from_intent,
+        )
+        answer = reply_from_intent(intent, context)
+        if answer is not None:
+            return CommandReceipt(status="completed", message=answer, command_id=command.id)
+        answer = await grounded_reply(self._gateway, message=source_message.content,
+            context=context, invocation_context=AIInvocationContext(
+                organization_id=organization_id, worker_id=thread.worker_id,
+                thread_id=thread.id, correlation_id=f"conversation:{source_message.id}"))
+        return CommandReceipt(status="completed", message=answer, command_id=command.id)
 
     async def _prepare_existing_worker_job_payload(
         self,

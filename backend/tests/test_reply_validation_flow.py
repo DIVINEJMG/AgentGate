@@ -97,7 +97,7 @@ async def test_exhausted_validation_is_not_reported_as_outage(caplog):
     assert caught.value.validation_exhausted
     service = object.__new__(ConversationService)
     message = service._provider_message(caught.value)
-    assert "response validation" in message and "unavailable" not in message and "outage" not in message
+    assert "couldn't work out what to do" in message and "unavailable" not in message and "outage" not in message
     assert "validation_failures=2" in caplog.text
     assert "origin=local_validation" in caplog.text
 

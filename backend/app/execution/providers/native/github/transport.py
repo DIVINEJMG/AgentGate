@@ -22,6 +22,66 @@ from app.infrastructure.redis.coordination import RedisCoordinator
 
 account_context: ContextVar[str] = ContextVar("github_account", default="")
 TRUSTED_DOWNLOAD_HOSTS = {"api.github.com", "codeload.github.com", "uploads.github.com"}
+# One request at a time per installation; a request finding it busy waits this long for its turn
+# (a GitHub call normally takes well under a second) before the step's own retry takes over.
+TURN_WAIT_SECONDS = 15.0
+
+
+async def _pace(coordinator, key: str, method: str) -> None:
+    """Respect the installation's cool-down, and space its writes at least a second apart."""
+    cooldown = float(await coordinator.cache_get(key + ":cooldown") or "0")
+    if cooldown > time.time():
+        raise ProviderTransportError(
+            code="rate_limited",
+            retryable=True,
+            retry_after_seconds=cooldown - time.time(),
+            safe_message="This GitHub installation is cooling down. Other integrations remain available.",
+        )
+    if method != "GET":
+        last = float(await coordinator.cache_get(key + ":last-write") or "0")
+        await asyncio.sleep(max(0.0, 1.0 - (time.time() - last)))
+        await coordinator.cache_set(key + ":last-write", str(time.time()), ttl_seconds=120)
+
+
+def _redirect_target(response, binary: bool) -> tuple[str, str | None]:
+    """A redirect's target and host, refused unless it is an approved GitHub host (or, for a binary
+    download, a signed artifact URL, which never receives the installation token)."""
+    target = response.headers.get("location", "")
+    parts = urlsplit(target)
+    allowed = parts.hostname in TRUSTED_DOWNLOAD_HOSTS or (
+        binary and parts.hostname and parts.hostname.endswith(".blob.core.windows.net")
+    )
+    if not allowed or parts.scheme != "https" or parts.username:
+        raise ProviderTransportError(
+            code="policy_blocked",
+            retryable=False,
+            safe_message="GitHub redirect is outside trusted download destinations.",
+        )
+    return target, parts.hostname
+
+
+async def _read_body(response, max_bytes: int) -> bytearray:
+    """The response body, refused once it exceeds the action's evidence budget."""
+    raw = bytearray()
+    async for chunk in response.aiter_bytes():
+        raw.extend(chunk)
+        if len(raw) > max_bytes:
+            raise ProviderTransportError(
+                code="validation_error",
+                retryable=False,
+                safe_message="GitHub response exceeds this action's evidence size budget.",
+            )
+    return raw
+
+
+async def _wait_for_turn(coordinator, key: str):
+    """The installation's request lock, waited for up to TURN_WAIT_SECONDS; None if still busy."""
+    deadline = time.monotonic() + TURN_WAIT_SECONDS
+    while (
+        lease := await coordinator.acquire_lock(key, ttl_seconds=210)
+    ) is None and time.monotonic() < deadline:
+        await asyncio.sleep(0.25)
+    return lease
 
 
 @dataclass(frozen=True)
@@ -126,7 +186,7 @@ class GitHubHTTPClient:
         if credential:
             request_headers["Authorization"] = "Bearer " + credential
         try:
-            lease = await coordinator.acquire_lock(key + ":http", ttl_seconds=210)
+            lease = await _wait_for_turn(coordinator, key + ":http")
             if lease is None:
                 raise ProviderTransportError(
                     code="rate_limited",
@@ -134,18 +194,7 @@ class GitHubHTTPClient:
                     retry_after_seconds=1,
                     safe_message="This GitHub installation has a request in progress; queued work will wait.",
                 )
-            cooldown = float(await coordinator.cache_get(key + ":cooldown") or "0")
-            if cooldown > time.time():
-                raise ProviderTransportError(
-                    code="rate_limited",
-                    retryable=True,
-                    retry_after_seconds=cooldown - time.time(),
-                    safe_message="This GitHub installation is cooling down. Other integrations remain available.",
-                )
-            if method != "GET":
-                last = float(await coordinator.cache_get(key + ":last-write") or "0")
-                await asyncio.sleep(max(0.0, 1.0 - (time.time() - last)))
-                await coordinator.cache_set(key + ":last-write", str(time.time()), ttl_seconds=120)
+            await _pace(coordinator, key, method)
             async with self.connection() as client, asyncio.timeout(90):
                 for _ in range(4):
                     async with client.stream(
@@ -153,60 +202,15 @@ class GitHubHTTPClient:
                     ) as response:
                         response_headers = dict(response.headers)
                         if response.status_code in {301, 302, 303, 307, 308}:
-                            target = response.headers.get("location", "")
-                            target_host = urlsplit(target).hostname
-                            # Signed artifact URLs never receive the installation token.
-                            allowed = target_host in TRUSTED_DOWNLOAD_HOSTS or (
-                                binary
-                                and target_host
-                                and target_host.endswith(".blob.core.windows.net")
-                            )
-                            if (
-                                not allowed
-                                or urlsplit(target).scheme != "https"
-                                or urlsplit(target).username
-                            ):
-                                raise ProviderTransportError(
-                                    code="policy_blocked",
-                                    retryable=False,
-                                    safe_message="GitHub redirect is outside trusted download destinations.",
-                                )
+                            target, target_host = _redirect_target(response, binary)
                             if target_host != host:
                                 request_headers.pop("Authorization", None)
                             url, host = target, target_host
                             continue
-                        raw = bytearray()
-                        async for chunk in response.aiter_bytes():
-                            raw.extend(chunk)
-                            if len(raw) > max_bytes:
-                                raise ProviderTransportError(
-                                    code="validation_error",
-                                    retryable=False,
-                                    safe_message="GitHub response exceeds this action's evidence size budget.",
-                                )
+                        raw = await _read_body(response, max_bytes)
                         if response.status_code >= 400:
-                            code, retryable, delay = classify_status(
-                                response.status_code,
-                                response_headers,
-                                bytes(raw).decode(errors="replace")[:1000],
-                            )
-                            if code == "rate_limited":
-                                await coordinator.cache_set(
-                                    key + ":cooldown",
-                                    str(time.time() + (delay or 60)),
-                                    ttl_seconds=max(1, int(delay or 60)),
-                                )
-                            if code == "temporary_provider_error":
-                                await self._failed(coordinator, key)
-                            raise ProviderTransportError(
-                                code=code,
-                                retryable=retryable,
-                                retry_after_seconds=delay,
-                                safe_message=(
-                                    "GitHub is limiting requests right now."
-                                    if code == "rate_limited"
-                                    else f"GitHub request stopped: {code.replace('_', ' ')}."
-                                ),
+                            await self._raise_for_status(
+                                coordinator, key, response.status_code, response_headers, raw
                             )
                         await coordinator.cache_delete(key + ":failures")
                         decoded = {} if not raw or binary else json.loads(raw)
@@ -242,6 +246,31 @@ class GitHubHTTPClient:
                 await coordinator.close()
             except RedisError:
                 pass
+
+    async def _raise_for_status(self, coordinator, key, status_code, response_headers, raw):
+        """Raise the classified error for a failed response, cooling the installation down when GitHub
+        limits it and counting a transient failure."""
+        code, retryable, delay = classify_status(
+            status_code, response_headers, bytes(raw).decode(errors="replace")[:1000]
+        )
+        if code == "rate_limited":
+            await coordinator.cache_set(
+                key + ":cooldown",
+                str(time.time() + (delay or 60)),
+                ttl_seconds=max(1, int(delay or 60)),
+            )
+        if code == "temporary_provider_error":
+            await self._failed(coordinator, key)
+        raise ProviderTransportError(
+            code=code,
+            retryable=retryable,
+            retry_after_seconds=delay,
+            safe_message=(
+                "GitHub is limiting requests right now."
+                if code == "rate_limited"
+                else f"GitHub request stopped: {code.replace('_', ' ')}."
+            ),
+        )
 
     async def _failed(self, coordinator, key):
         count = int(await coordinator.cache_get(key + ":failures") or "0") + 1

@@ -61,6 +61,14 @@ class AITextRequest:
     correlation_id: str | None = None
     json_schema: dict[str, object] | None = None
     schema_name: str | None = None
+    # The schema and output instruction for a model that does not enforce the schema itself; a
+    # provider appends it to the prompt unless its endpoint enforces `json_schema` (place_schema).
+    schema_instruction: str = ""
+
+    @property
+    def full_prompt(self) -> str:
+        """The prompt as sent when the schema is not enforced natively (the larger case, for sizing)."""
+        return self.prompt + self.schema_instruction
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +112,7 @@ class AIProviderError(RuntimeError):
         self.organization_scoped = organization_scoped
         self.budget_scope = budget_scope if budget_scope in {
             "organization_tokens", "organization_requests", "complex_tokens", "complex_requests",
+            "concurrency",  # AgentGate's own slots are all taken: wait, it is not a provider failure
         } else None
         self.model_called = model_called
         self.validation_rule = validation_rule if validation_rule in {

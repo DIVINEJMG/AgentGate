@@ -429,8 +429,11 @@ async def test_next_day_resume_cannot_bypass_daily_budget(monkeypatch):
         active_seconds=300,
         evidence={"budgetDay": "2026-10-05", "reservedSeconds": 1800},
     )
+    # Four other tasks still working today hold the whole daily budget.
+    working = [("running", 0, {"budgetDay": "2026-10-06", "reservedSeconds": 1800}, "running")] * 4
     session = SimpleNamespace(
-        execute=AsyncMock(), scalar=AsyncMock(return_value=SimpleNamespace(reserved_seconds=7200))
+        execute=AsyncMock(return_value=SimpleNamespace(all=lambda: working)),
+        scalar=AsyncMock(return_value=SimpleNamespace(reserved_seconds=0)),
     )
     req = SimpleNamespace(operation="repository.workspace.read", correlation_id="test")
     with pytest.raises(ExecutionProviderError, match="Today's organization"):
@@ -522,3 +525,23 @@ async def test_project_catalog_does_not_expose_installation_only_projects():
         None,
     )
     assert [r.external_id for r in page.resources] == ["visible"]
+
+
+@pytest.mark.asyncio
+async def test_a_request_waits_for_the_installations_turn(monkeypatch):
+    """One request at a time per installation: a second one waits for its turn (it does not fail
+    at once), and gives up only after TURN_WAIT_SECONDS."""
+    from types import SimpleNamespace as Namespace
+
+    from app.execution.providers.native.github import transport
+
+    answers = iter([None, None, "lease"])
+    coordinator = Namespace(acquire_lock=lambda key, ttl_seconds: _value(next(answers)))
+    assert await transport._wait_for_turn(coordinator, "github:x:http") == "lease"
+    monkeypatch.setattr(transport, "TURN_WAIT_SECONDS", 0.3)
+    busy = Namespace(acquire_lock=lambda key, ttl_seconds: _value(None))
+    assert await transport._wait_for_turn(busy, "github:x:http") is None
+
+
+async def _value(value):
+    return value

@@ -34,7 +34,14 @@ class Session:
         self.refresh = AsyncMock()
 
     async def scalar(self, query):
+        if "max(" in str(query):  # the highest recovery round any attempt used
+            return max((a.recovery_round for a in self.attempts), default=None)
         return self.decision
+
+    def add_unique(self, row):
+        """Attempts are unique per decision, recovery round and route (as in the database)."""
+        key = (row.decision_id, row.recovery_round, row.route_index)
+        assert key not in {(a.decision_id, a.recovery_round, a.route_index) for a in self.attempts}, key
 
     async def scalars(self, query):
         assert self.decision is not None
@@ -48,6 +55,7 @@ class Session:
         if isinstance(row, PlannerDecision):
             self.decision = row
         else:
+            self.add_unique(row)
             self.attempts.append(row)
 
 
@@ -726,3 +734,42 @@ async def test_cancelled_inference_records_timing_without_swallowing_cancellatio
     result = recorder.finish.await_args.kwargs
     assert result["error_category"] == category
     assert result["latency_ms"] >= 0 and result["success"] is False
+
+
+@pytest.mark.asyncio
+async def test_retry_planning_starts_a_fresh_decision(setup):  # F16
+    session, item, run, _ = setup
+    planner = module.SmartPlanner(session, item, run, 0)
+    await planner.prepare()
+
+    async def refuse(gateway):
+        raise AIProviderError("content_rejected", "declined", retryable=False)
+
+    with pytest.raises(AIProviderError):
+        await planner.choose({}, refuse)
+    assert session.decision.status == "exhausted"
+    item.status = "waiting_ai"
+    assert await module.restart_planning(session, item, run)
+    assert (item.status, run.status, session.decision.status) == ("queued", "running", "pending")
+    assert session.decision.recovery_round == 1  # a fresh round: no clash with the refused attempt
+    assert item.payload["runtime"]["waitingReason"] == "Planning again, as you asked."
+    seen = []
+
+    async def answer(gateway):
+        seen.append(gateway._registry.route("planner").model)
+        return proposal()
+
+    again = module.SmartPlanner(session, item, run, 0)
+    await again.prepare()
+    await again.choose({}, answer)
+    assert seen == ["first"]  # every route is tried again; the refusal stays on record
+    assert len(session.attempts) == 2
+
+
+@pytest.mark.asyncio
+async def test_retry_planning_leaves_a_task_that_is_not_paused(setup):
+    session, item, run, _ = setup
+    planner = module.SmartPlanner(session, item, run, 0)
+    await planner.prepare()
+    item.status = "running"
+    assert not await module.restart_planning(session, item, run)

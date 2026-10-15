@@ -96,7 +96,8 @@ async def test_planner_keeps_authorized_tools_for_new_resource_ids(resource_setu
     from app.runtime import managed
 
     session, org, rid, aid, row, connection, _ = resource_setup
-    session.get.side_effect = [None, row, connection]
+    # A foundation resource has no legacy integration row, so the planner reads none for it.
+    session.get.side_effect = [row, connection]
     monkeypatch.setattr(governance, "_policies_public", AsyncMock(return_value=[{
         "id": "policy", "name": "Exact resource", "revision": 1, "effect": "allow", "priority": 100,
         "selectors": {"agentIds": [str(aid)], "resourceIds": [str(rid)],

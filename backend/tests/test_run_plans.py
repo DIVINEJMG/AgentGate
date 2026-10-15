@@ -11,9 +11,9 @@ from uuid import uuid4
 
 import pytest
 
+from app.application.context.evidence import planner_evidence
 from app.application.services.task_activity import activity_for
 from app.bootstrap.settings import settings
-from app.runtime.evidence import planner_evidence
 from app.runtime.managed import _plan_progress, _plan_view, action_budget
 from app.runtime.planner.adaptive import (
     AdaptivePlanDecision,

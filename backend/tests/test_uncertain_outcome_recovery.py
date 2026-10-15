@@ -87,10 +87,11 @@ async def test_an_uncertain_write_still_being_checked_holds_back_another_write()
 
 def _paused(scope: str = ISSUE, step: bool = True) -> tuple[ManagedRuntimeExecutor, Any, Any, Any]:
     executor = ManagedRuntimeExecutor.__new__(ManagedRuntimeExecutor)
-    executor._session = cast(Any, SimpleNamespace(commit=AsyncMock()))
+    executor._session = cast(Any, SimpleNamespace(commit=AsyncMock(), scalar=AsyncMock(return_value="DIVINEJMG/school")))
     item = SimpleNamespace(id=uuid4(), status="running", scheduled_at=None, payload={"runtime": {"currentStep": 2}})
     run = SimpleNamespace(id=uuid4(), status="running")
-    return executor, item, run, SimpleNamespace(input={"scope": scope}) if step else None
+    spec = {"scope": scope, "resourceId": str(uuid4()), "actionInput": {"title": "Uncertain write test"}}
+    return executor, item, run, SimpleNamespace(input=spec) if step else None
 
 
 async def _wait(executor: Any, item: Any, run: Any, step: Any) -> Any:
@@ -112,6 +113,11 @@ async def test_an_uncertain_write_is_looked_for_again_then_waits_for_a_person(mo
     outcome = await _wait(executor, item, run, step)
     assert outcome.state == "noop" and item.status == "uncertain_outcome"
     managed.notify_integration_work.assert_awaited_once()  # type: ignore[attr-defined]
+    told = managed.notify_integration_work.await_args.kwargs  # type: ignore[attr-defined]
+    # F21: the write is named, with where to look and the three answers offered in the chat.
+    assert told["content"].startswith("I couldn't confirm whether the issue “Uncertain write test” was created in DIVINEJMG/school.")
+    assert "It happened, It didn't happen, or Check again" in told["content"]
+    assert told["references"] == {"type": "work_item", "id": str(item.id), "controls": "outcome"}
 
 
 @pytest.mark.asyncio

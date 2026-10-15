@@ -61,7 +61,7 @@ async def test_a_rejected_proposal_is_logged_with_its_reason(caplog: pytest.LogC
             invocation_context=AIInvocationContext(correlation_id="corr-1"))
     assert decision.scope == TOOLS[0]["scope"]
     [record] = [r for r in caplog.records if "Planner proposal rejected" in r.getMessage()]
-    assert "call=1 correlation=corr-1 reason=Planner selected an unavailable resource/capability pair" in record.getMessage()
+    assert "call=1 correlation=corr-1 reason=`scope` 'bench.record.delete' is not allowed here" in record.getMessage()
 
 
 # --- Coding ------------------------------------------------------------------------------------

@@ -17,6 +17,7 @@ from app.infrastructure.ai.model_profiles import (
     PlannerModelProfile,
     apply_profile,
     model_profile,
+    place_schema,
     validate_context,
 )
 from app.infrastructure.ai.streaming import timeout_error, transport_timeout
@@ -68,7 +69,7 @@ class OpenRouterPlannerProvider:
         if not model.endswith(":free"):
             raise AIProviderError("configuration_missing", "Paid planner models require separate authorization.", retryable=False)
         profile = self.profile_for(model)
-        validate_context(profile, request.system, request.prompt, request.max_output_tokens)
+        validate_context(profile, request.system, request.full_prompt, request.max_output_tokens)
 
     async def generate_text(self, *, model: str, request: AITextRequest) -> AIResponse:
         self.validate_request(model=model, request=request)
@@ -90,6 +91,7 @@ class OpenRouterPlannerProvider:
             },
         }
         apply_profile(body, profile, request)
+        place_schema(body, request)
         if "response_format" in body:
             body["provider"]["require_parameters"] = True
         try:

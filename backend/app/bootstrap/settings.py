@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     # A long-running server drains its own outbox after a commit instead of asking QStash to
     # call it back (one QStash message per drain). The scheduled drain stays the backstop.
     outbox_drain_local: bool = True
+    # Likewise, a due runtime step runs in the serving process instead of through a QStash
+    # wake-up; QStash keeps delayed wake-ups, full capacity and recovery.
+    runtime_run_local: bool = True
     worker_heartbeat_ttl_seconds: int = 60
     auth_session_ttl_seconds: int = 60 * 60 * 24 * 7
     auth_login_failure_window_seconds: int = 60 * 15
@@ -311,6 +314,8 @@ class Settings(BaseSettings):
     def validate_security(self) -> None:
         if self.is_production and "*" in self.cors_allowed_origins:
             raise ValueError("Wildcard CORS is forbidden in production.")
+        if self.is_production and any(c.simulator for c in self.ai_text_connections.values()):
+            raise ValueError("A simulated model connection is forbidden in production.")
 
 
 @lru_cache

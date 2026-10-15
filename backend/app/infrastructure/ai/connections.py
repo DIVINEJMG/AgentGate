@@ -2,7 +2,7 @@
 
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
 
 from app.domain.ai.providers import AIProviderError
 
@@ -10,6 +10,9 @@ from app.domain.ai.providers import AIProviderError
 class TextConnection(BaseModel):
     model_config = ConfigDict(extra="forbid")
     api_format: str = "openai_chat"
+    # A local stand-in for the model during testing (scripts/ai_simulator.py): the only kind of
+    # connection that may use a loopback address. Refused in production (Settings).
+    simulator: bool = False
     base_url: str
     hosting_provider: str
     credential_ref: str
@@ -21,10 +24,21 @@ class TextConnection(BaseModel):
 
     @field_validator("base_url")
     @classmethod
-    def public_https_endpoint(cls, value):
+    def public_https_endpoint(cls, value, info: ValidationInfo):
         import ipaddress
 
         parsed = urlsplit(value)
+        if info.data.get("simulator"):
+            if (
+                parsed.scheme not in {"http", "https"}
+                or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+                or parsed.username
+                or parsed.password
+                or parsed.query
+                or parsed.fragment
+            ):
+                raise ValueError("A simulator connection must use a credential-free loopback URL.")
+            return value.rstrip("/")
         if (
             parsed.scheme != "https"
             or not parsed.hostname

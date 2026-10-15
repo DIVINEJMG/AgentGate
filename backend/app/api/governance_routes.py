@@ -4,6 +4,7 @@ import fnmatch
 import hashlib
 import json
 from collections import Counter, defaultdict
+from collections.abc import Awaitable, Callable
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
@@ -468,6 +469,42 @@ async def _evaluate(
     return {**decision, "explanation": explain_decision(decision)}
 
 
+async def _cached(cache: dict[Any, Any], key: Any, load: Callable[[], Awaitable[Any]]) -> Any:
+    """A pass-local read snapshot: each key is read once per preparation pass."""
+    if key not in cache:
+        cache[key] = await load()
+    return cache[key]
+
+
+def _denied(reason: str, request: dict[str, Any], preconditions: dict[str, bool],
+            assessment: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {"outcome": "DENY", "reason": reason, "evaluatedAt": utcnow().isoformat(), "request": request,
+            "preconditions": preconditions, "winningPolicy": None, "matchedPolicies": [], "riskAssessment": assessment}
+
+
+def _decided(matched: list[dict[str, Any]], request: dict[str, Any], preconditions: dict[str, bool],
+             assessment: dict[str, Any]) -> dict[str, Any]:
+    """The highest-priority matching policies decide; ties resolve as DENY > REQUIRE_APPROVAL > ALLOW."""
+    highest = max(item["priority"] for item in matched)
+    contenders = sorted((item for item in matched if item["priority"] == highest),
+                        key=lambda item: (-EFFECT_WEIGHT[item["effect"]], item["name"], item["id"]))
+    winner = contenders[0]
+    summary_keys = ("id", "name", "effect", "priority", "revision")
+    return {
+        "outcome": OUTCOME[winner["effect"]],
+        "reason": (
+            f"Matched {len(contenders)} {'policy' if len(contenders) == 1 else 'policies'} at highest priority {highest}. "
+            "Safety precedence resolves ties as DENY > REQUIRE_APPROVAL > ALLOW."
+        ),
+        "evaluatedAt": utcnow().isoformat(),
+        "request": request,
+        "preconditions": preconditions,
+        "winningPolicy": {key: winner[key] for key in summary_keys},
+        "matchedPolicies": [{key: item[key] for key in summary_keys} for item in matched],
+        "riskAssessment": assessment,
+    }
+
+
 async def _evaluate_policies(
     session: AsyncSession,
     organization_id: UUID,
@@ -478,221 +515,55 @@ async def _evaluate_policies(
     scope: str,
     preparation_cache: dict[Any, Any] | None = None,
 ) -> dict[str, Any]:
+    """Whether the agent may use `scope` on the resource: denied unless the agent is active, the
+    resource is live, the scope is available and declared, and an enabled policy matches."""
     require_permission(principal, "policies.read")
     # Only the tool-preparation caller supplies this pass-local read snapshot.
     # Execution and approval revalidation continue to read current policy data.
     cache = preparation_cache if preparation_cache is not None else {}
-    agent_key = (organization_id, agent_id, "agent")
-    if agent_key not in cache:
-        cache[agent_key] = await session.scalar(
-            select(AgentIdentity).where(
-                AgentIdentity.organization_id == organization_id,
-                AgentIdentity.id == agent_id,
-            )
-        )
-    agent = cache[agent_key]
-    request = {
-        "agentId": str(agent_id),
-        "resourceId": resource_id,
-        "scope": scope,
-    }
-    default_preconditions = {
-        "agentActive": bool(agent and agent.status == "active"),
-        "resourceLive": False,
-        "scopeAvailable": False,
-        "scopeDeclared": False,
-    }
+    agent = await _cached(cache, (organization_id, agent_id, "agent"), lambda: session.scalar(
+        select(AgentIdentity).where(AgentIdentity.organization_id == organization_id, AgentIdentity.id == agent_id)))
+    request: dict[str, Any] = {"agentId": str(agent_id), "resourceId": resource_id, "scope": scope,
+                               "agentName": None, "resourceName": None, "action": None, "target": None, "risk": None}
+    preconditions = {"agentActive": bool(agent and agent.status == "active"), "resourceLive": False,
+                     "scopeAvailable": False, "scopeDeclared": False}
     if agent is None:
-        return {
-            "outcome": "DENY",
-            "reason": "Agent identity is unavailable. Default deny applies.",
-            "evaluatedAt": utcnow().isoformat(),
-            "request": {
-                **request,
-                "agentName": None,
-                "resourceName": None,
-                "action": None,
-                "target": None,
-                "risk": None,
-            },
-            "preconditions": default_preconditions,
-            "winningPolicy": None,
-            "matchedPolicies": [],
-            "riskAssessment": None,
-        }
-
-    resource_key = (organization_id, resource_id, "resource")
-    if resource_key not in cache:
-        cache[resource_key] = await _live_policy_resource(session, organization_id, resource_id)
-    resource = cache[resource_key]
+        return _denied("Agent identity is unavailable. Default deny applies.", request, preconditions)
+    request["agentName"] = agent.name
+    resource = await _cached(cache, (organization_id, resource_id, "resource"),
+                             lambda: _live_policy_resource(session, organization_id, resource_id))
     if resource is None:
-        return {
-            "outcome": "DENY",
-            "reason": "Resource is not present in the live capability catalog. Default deny applies.",
-            "evaluatedAt": utcnow().isoformat(),
-            "request": {
-                **request,
-                "agentName": agent.name,
-                "resourceName": None,
-                "action": None,
-                "target": None,
-                "risk": None,
-            },
-            "preconditions": default_preconditions,
-            "winningPolicy": None,
-            "matchedPolicies": [],
-            "riskAssessment": None,
-        }
-    capability = next(
-        (item for item in resource["actions"] if item["scope"] == scope),
-        None,
-    )
+        return _denied("Resource is not present in the live capability catalog. Default deny applies.", request, preconditions)
+    request["resourceName"] = resource["displayName"]
+    capability = next((item for item in resource["actions"] if item["scope"] == scope), None)
     if capability is None:
-        return {
-            "outcome": "DENY",
-            "reason": "Requested scope is not available on this resource. Default deny applies.",
-            "evaluatedAt": utcnow().isoformat(),
-            "request": {
-                **request,
-                "agentName": agent.name,
-                "resourceName": resource["displayName"],
-                "action": None,
-                "target": None,
-                "risk": None,
-            },
-            "preconditions": {
-                **default_preconditions,
-                "resourceLive": resource["status"] == "connected",
-            },
-            "winningPolicy": None,
-            "matchedPolicies": [],
-            "riskAssessment": None,
-        }
-
-    profile_key = (organization_id, agent_id, "profile")
-    if profile_key not in cache:
-        cache[profile_key] = await _profile(session, organization_id, agent_id)
-    profile = cache[profile_key]
-    declared = scope in profile["activeScopes"]
-    assessment = _risk_for_capability(
-        capability,
-        agent_id=str(agent_id),
-        agent_name=agent.name,
-        resource_id=resource_id,
-        resource_name=resource["displayName"],
-    )
-    preconditions = {
-        "agentActive": agent.status == "active",
-        "resourceLive": resource["status"] == "connected",
-        "scopeAvailable": True,
-        "scopeDeclared": declared,
-    }
-    details = {
-        "agentName": agent.name,
-        "resourceName": resource["displayName"],
-        "action": capability["action"],
-        "target": capability["target"],
-        "risk": assessment["effectiveRisk"],
-    }
+        return _denied("Requested scope is not available on this resource. Default deny applies.", request,
+                       {**preconditions, "resourceLive": resource["status"] == "connected"})
+    profile = await _cached(cache, (organization_id, agent_id, "profile"), lambda: _profile(session, organization_id, agent_id))
+    assessment = _risk_for_capability(capability, agent_id=str(agent_id), agent_name=agent.name,
+                                      resource_id=resource_id, resource_name=resource["displayName"])
+    preconditions = {"agentActive": agent.status == "active", "resourceLive": resource["status"] == "connected",
+                     "scopeAvailable": True, "scopeDeclared": scope in profile["activeScopes"]}
+    request.update(action=capability["action"], target=capability["target"], risk=assessment["effectiveRisk"])
     if not all(preconditions.values()):
-        reason = (
-            "Agent identity is not active. Default deny applies."
-            if not preconditions["agentActive"]
-            else "Resource health is not fully connected. Audoryn fails closed."
-            if not preconditions["resourceLive"]
-            else "Agent has not declared this live capability scope. Default deny applies."
-        )
-        return {
-            "outcome": "DENY",
-            "reason": reason,
-            "evaluatedAt": utcnow().isoformat(),
-            "request": {**request, **details},
-            "preconditions": preconditions,
-            "winningPolicy": None,
-            "matchedPolicies": [],
-            "riskAssessment": assessment,
-        }
+        reason = ("Agent identity is not active. Default deny applies." if not preconditions["agentActive"]
+                  else "Resource health is not fully connected. Audoryn fails closed." if not preconditions["resourceLive"]
+                  else "Agent has not declared this live capability scope. Default deny applies.")
+        return _denied(reason, request, preconditions, assessment)
 
-    policies_key = (organization_id, "policies")
-    if policies_key not in cache:
-        policies = list(
-            (
-                await session.scalars(
-                    select(Policy).where(
-                        Policy.organization_id == organization_id,
-                        Policy.status == "enabled",
-                    )
-                )
-            ).all()
-        )
-        cache[policies_key] = await _policies_public(session, policies)
-    public = cache[policies_key]
-    matched = [
-        item
-        for item in public
-        if _matches(
-            item,
-            agent_id=str(agent_id),
-            resource_id=resource_id,
-            action=capability["action"],
-            scope=scope,
-            risk=assessment["effectiveRisk"],
-            provider=str(resource.get("provider") or ""),
-            resource_name=str(resource.get("displayName") or ""),
-        )
-    ]
+    async def enabled_policies() -> list[dict[str, Any]]:
+        rows = (await session.scalars(select(Policy).where(
+            Policy.organization_id == organization_id, Policy.status == "enabled"))).all()
+        return await _policies_public(session, list(rows))
+
+    public = await _cached(cache, (organization_id, "policies"), enabled_policies)
+    matched = [item for item in public if _matches(
+        item, agent_id=str(agent_id), resource_id=resource_id, action=capability["action"], scope=scope,
+        risk=assessment["effectiveRisk"], provider=str(resource.get("provider") or ""),
+        resource_name=str(resource.get("displayName") or ""))]
     if not matched:
-        return {
-            "outcome": "DENY",
-            "reason": "No enabled policy matches this request. Default deny applies.",
-            "evaluatedAt": utcnow().isoformat(),
-            "request": {**request, **details},
-            "preconditions": preconditions,
-            "winningPolicy": None,
-            "matchedPolicies": [],
-            "riskAssessment": assessment,
-        }
-
-    highest = max(item["priority"] for item in matched)
-    contenders = [item for item in matched if item["priority"] == highest]
-    contenders.sort(
-        key=lambda item: (
-            -EFFECT_WEIGHT[item["effect"]],
-            item["name"],
-            item["id"],
-        )
-    )
-    winner = contenders[0]
-    summaries = [
-        {
-            "id": item["id"],
-            "name": item["name"],
-            "effect": item["effect"],
-            "priority": item["priority"],
-            "revision": item["revision"],
-        }
-        for item in matched
-    ]
-    return {
-        "outcome": OUTCOME[winner["effect"]],
-        "reason": (
-            f"Matched {len(contenders)} policy"
-            f"{'' if len(contenders) == 1 else 'ies'} at highest priority {highest}. "
-            "Safety precedence resolves ties as DENY > REQUIRE_APPROVAL > ALLOW."
-        ),
-        "evaluatedAt": utcnow().isoformat(),
-        "request": {**request, **details},
-        "preconditions": preconditions,
-        "winningPolicy": {
-            "id": winner["id"],
-            "name": winner["name"],
-            "effect": winner["effect"],
-            "priority": winner["priority"],
-            "revision": winner["revision"],
-        },
-        "matchedPolicies": summaries,
-        "riskAssessment": assessment,
-    }
+        return _denied("No enabled policy matches this request. Default deny applies.", request, preconditions, assessment)
+    return _decided(matched, request, preconditions, assessment)
 
 
 def _decision_v2(decision: dict[str, Any]) -> dict[str, Any]:

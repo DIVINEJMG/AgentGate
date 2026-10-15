@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.services.ai_gateway import ReleasingGateway
 from app.application.services.conversation_commands import (
     ConversationCommandCompiler,
     CrossTenantReferenceError,
@@ -195,8 +196,46 @@ class ConversationService:
             thread.title = clean[:80]
         await self._session.flush()
         await self._message_event(thread, human)
+        # Saved before any model call: a slow or failed reply never loses the person's message.
+        await self._session.commit()
+        assistant, receipt = await self._reply(principal, thread, human, operation=operation,
+                                               resume_command_id=resume_command_id)
+        return human, assistant, receipt
 
-        gateway = ai_gateway_from_settings(session=self._session)
+    async def retry_message(
+        self,
+        *,
+        organization_id: UUID,
+        principal: HumanPrincipal,
+        thread_id: UUID,
+        message_id: UUID,
+    ) -> tuple[ConversationMessage, ConversationMessage, CommandReceipt]:
+        """Reply again to a saved message whose reply failed, so the person need not resend it."""
+        self._require_org(principal, organization_id)
+        thread, _ = await self.get_thread(organization_id=organization_id, principal=principal, thread_id=thread_id)
+        human = await self._session.get(ConversationMessage, message_id)
+        if human is None or human.thread_id != thread.id or human.role != "human":
+            raise LookupError("That message is not in this conversation.")
+        handled = await self._session.scalar(select(ConversationCommand.id).where(
+            ConversationCommand.source_message_id == human.id, ConversationCommand.status != "unavailable").limit(1))
+        if handled is not None:
+            raise ValueError("That message already has a reply; send a new message instead.")
+        assistant, receipt = await self._reply(principal, thread, human)
+        return human, assistant, receipt
+
+    async def _reply(
+        self,
+        principal: HumanPrincipal,
+        thread: ConversationThread,
+        human: ConversationMessage,
+        *,
+        operation: str | None = None,
+        resume_command_id: UUID | None = None,
+    ) -> tuple[ConversationMessage, CommandReceipt]:
+        """Interpret a saved message, run what it asks, and save the reply. No database transaction
+        stays open while a model answers (ReleasingGateway)."""
+        organization_id = thread.organization_id
+        gateway = ReleasingGateway(ai_gateway_from_settings(session=self._session, durable_telemetry=True), self._session)
         context = await ConversationContextAssembler(self._session).assemble(
             organization_id=organization_id,
             thread=thread,
@@ -208,14 +247,14 @@ class ConversationService:
             thread_id=thread.id,
             correlation_id=f"conversation:{human.id}",
         )
-
+        retry_refs: list[dict[str, str]] = []
         try:
             if operation is not None:
                 # The screen already knows the operation: no AI call is needed to guess it.
                 intent = WorkerCommandIntent(family=operation)  # type: ignore[arg-type]
             else:
                 intent = await IntentInterpreter(gateway).interpret(
-                    message=clean,
+                    message=human.content,
                     context=context,
                     invocation_context=invocation_context,
                 )
@@ -246,6 +285,8 @@ class ConversationService:
                 failure_category=self._provider_failure_category(exc),
             )
             command_refs = []
+            # The chat offers Retry on this reply: it replies again to the saved message (F12).
+            retry_refs = [{"type": "message_retry", "id": str(human.id)}]
 
         assistant = ConversationMessage(
             organization_id=organization_id,
@@ -256,7 +297,7 @@ class ConversationService:
             command_references=command_refs,
             result_references=[
                 reference.model_dump(mode="json") for reference in receipt.result_references
-            ],
+            ] + retry_refs,
         )
         self._session.add(assistant)
         await self._session.flush()
@@ -274,7 +315,7 @@ class ConversationService:
         await self._session.commit()
         await self._session.refresh(human)
         await self._session.refresh(assistant)
-        return human, assistant, receipt
+        return assistant, receipt
 
     async def confirm_command(
         self,
@@ -303,7 +344,7 @@ class ConversationService:
             thread=thread,
             user_id=principal.user_id,
         )
-        gateway = ai_gateway_from_settings(session=self._session)
+        gateway = ReleasingGateway(ai_gateway_from_settings(session=self._session, durable_telemetry=True), self._session)
         outcome = await ConversationCommandCompiler(self._session, gateway).confirm(
             organization_id=organization_id,
             principal=principal,
@@ -395,12 +436,8 @@ class ConversationService:
 
     def _provider_message(self, error: AIProviderError) -> str:
         if error.category == "invalid_provider_response":
-            return (
-                "The AI responses could not pass response validation. Your message is saved; "
-                "this reply attempt did not execute a task. Please retry."
-                if error.validation_exhausted else
-                "The AI response could not pass response validation. Your message is saved; please retry."
-            )
+            return ("I couldn't work out what to do with that message, so nothing was run. Your message is saved: "
+                    "retry it, or rephrase it.")
         if error.category == "rate_limited" and error.organization_scoped:
             return "This workspace’s local AI request capacity is busy. Your message is saved; please try again shortly."
         if error.category == "quota_exhausted":
