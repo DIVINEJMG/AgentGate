@@ -18,7 +18,7 @@ import httpx
 
 from app.domain.ai.providers import AIProviderError, AIResponse
 from app.infrastructure.ai.connections import wire_model
-from app.infrastructure.ai.model_profiles import generation_allowance
+from app.infrastructure.ai.model_profiles import generation_allowance, place_schema
 from app.infrastructure.ai.nvidia import _error_category, _retry_after
 from app.infrastructure.ai.openai_chat import ConfiguredChatProvider
 from app.infrastructure.ai.streaming import timeout_error, transport_timeout
@@ -160,7 +160,7 @@ class AnthropicMessagesProvider(ConfiguredChatProvider):
                 output_config["format"] = {"type": "json_schema", "schema": schema}
         if output_config:
             body["output_config"] = output_config
-        return body
+        return place_schema(body, request)
 
     async def generate_text(self, *, model, request):
         self.validate_request(model=model, request=request)

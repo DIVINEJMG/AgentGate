@@ -1,0 +1,201 @@
+{
+ "step": 10,
+ "status": "completed",
+ "scope": "github.repository.workspace.close",
+ "input": {
+  "scope": "github.repository.workspace.close",
+  "title": "Close workspace",
+  "planStep": 11,
+  "provider": "github",
+  "operation": "repository.workspace.close",
+  "resourceId": "f6b836a3-d68a-441c-80ac-ee4938775f94",
+  "actionInput": {},
+  "instruction": "Persist the workspace evidence and delete the sandbox.",
+  "planStepDone": true
+ },
+ "output": {
+  "data": {
+   "output": {
+    "diff": "--- a/README.md\n+++ b/README.md\n@@ -1 +1,18 @@\n-# school+# school\n+\n+## Setup\n+\n+1. Clone the repository:\n+\n+   ```bash\n+   git clone https://github.com/DIVINEJMG/school.git\n+   cd school\n+   ```\n+\n+2. Run the helper script to check your environment:\n+\n+   ```bash\n+   bash scripts/setup.sh\n+   ```\n+\n+The script checks that `git` is installed and prints the next steps.--- a/scripts/setup.sh\n+++ b/scripts/setup.sh\n@@ -0,0 +1,11 @@\n+#!/usr/bin/env bash\n+# Checks the tools this project needs and prints the next steps.\n+set -euo pipefail\n+\n+if ! command -v git >/dev/null 2>&1; then\n+  echo \"git is not installed. Install it from https://git-scm.com and run this script again.\" >&2\n+  exit 1\n+fi\n+\n+echo \"git $(git --version | awk '{print $3}') found.\"\n+echo \"Setup complete. See README.md for the next steps.\"\n",
+    "status": "closed",
+    "baseSha": "28435fde2146a079d3194977b0f8670a7f4feedb",
+    "changes": [
+     {
+      "path": "README.md",
+      "content": "# school\n\n## Setup\n\n1. Clone the repository:\n\n   ```bash\n   git clone https://github.com/DIVINEJMG/school.git\n   cd school\n   ```\n\n2. Run the helper script to check your environment:\n\n   ```bash\n   bash scripts/setup.sh\n   ```\n\nThe script checks that `git` is installed and prints the next steps."
+     },
+     {
+      "path": "scripts/setup.sh",
+      "content": "#!/usr/bin/env bash\n# Checks the tools this project needs and prints the next steps.\nset -euo pipefail\n\nif ! command -v git >/dev/null 2>&1; then\n  echo \"git is not installed. Install it from https://git-scm.com and run this script again.\" >&2\n  exit 1\nfi\n\necho \"git $(git --version | awk '{print $3}') found.\"\necho \"Setup complete. See README.md for the next steps.\"\n"
+     }
+    ],
+    "artifact": {
+     "artifactId": "08c437d1-c444-4b84-af3a-0b22316b2233"
+    },
+    "sessionId": "f8790794-f57e-4008-9ef2-816541802792",
+    "sourceFingerprint": "4affc654c04850591b6662b78fa68977f1cc2883dea4f15bec3943eec8f9e01f",
+    "publicationAllowed": true,
+    "publicationBlocker": null
+   },
+   "lifecycle": [
+    {
+     "stage": "observe",
+     "detail": "Execution context observed.",
+     "attempt": 0
+    },
+    {
+     "stage": "locate",
+     "detail": "Authorized resource located.",
+     "attempt": 0
+    },
+    {
+     "stage": "plan",
+     "detail": "Provider-neutral execution request prepared.",
+     "attempt": 0
+    },
+    {
+     "stage": "policy_check",
+     "detail": "Action Gateway authorization already satisfied.",
+     "attempt": 0
+    },
+    {
+     "stage": "act",
+     "detail": "Provider action executed.",
+     "attempt": 1
+    },
+    {
+     "stage": "verify",
+     "detail": "Isolated workspace state was inspected; GitHub publication is a separate action.",
+     "attempt": 1
+    },
+    {
+     "stage": "completed",
+     "detail": "Execution verified.",
+     "attempt": 1
+    }
+   ],
+   "verification": {
+    "details": {
+     "observedAt": "2026-10-14T21:38:43.938403+00:00"
+    },
+    "summary": "Isolated workspace state was inspected; GitHub publication is a separate action.",
+    "verified": true
+   },
+   "authorization": {
+    "risk": "medium",
+    "adapter": "native_api",
+    "agent_id": "ce29ed6f-da2d-483a-b8b8-a74819baf5ae",
+    "provider": "github",
+    "worker_id": "b0c29064-8fe7-449c-981a-93375b2be3da",
+    "approval_id": null,
+    "resource_id": "f6b836a3-d68a-441c-80ac-ee4938775f94",
+    "authorized_at": "2026-10-14T21:37:14.954644+00:00",
+    "policy_reason": "Matched 8 policyies at highest priority 100. Safety precedence resolves ties as DENY > REQUIRE_APPROVAL > ALLOW.",
+    "correlation_id": "052d3104-8e73-41c1-a417-f267fe38d082",
+    "policy_outcome": "ALLOW",
+    "adapter_version": "2.0.0",
+    "approval_status": null,
+    "organization_id": "650c94c4-b642-4767-b9a9-6b56a0f53e83",
+    "resource_origin": "https://github.com",
+    "capability_scope": "github.repository.workspace.close",
+    "approval_required": false,
+    "action_fingerprint": "sha256:2d113529ad2b995f96a5525053c46fae0ee23ca760034611771774f87c3ec2ad",
+    "credential_strategy": "api_token",
+    "credential_reference": "secret://integration-credential/a8d1c117-fb3f-4699-a7e9-e9b945f7ec19",
+    "provider_permissions": [
+     "github.repository.branch.create",
+     "github.repository.branch.read",
+     "github.repository.branch.update",
+     "github.repository.branches.read",
+     "github.repository.check.create",
+     "github.repository.checks.read",
+     "github.repository.code.search",
+     "github.repository.code_scanning.read",
+     "github.repository.commit.create",
+     "github.repository.commit.read",
+     "github.repository.commits.read",
+     "github.repository.compare.read",
+     "github.repository.contents.read",
+     "github.repository.deployment.statuses.read",
+     "github.repository.deployments.read",
+     "github.repository.discussion.categories.read",
+     "github.repository.discussion.comment.create",
+     "github.repository.discussion.create",
+     "github.repository.discussion.read",
+     "github.repository.discussion.update",
+     "github.repository.discussions.read",
+     "github.repository.discussions.search",
+     "github.repository.issue.comment.create",
+     "github.repository.issue.comments.read",
+     "github.repository.issue.labels.set",
+     "github.repository.issue.read",
+     "github.repository.issue.update",
+     "github.repository.issues.create",
+     "github.repository.issues.list",
+     "github.repository.issues.read",
+     "github.repository.issues.search",
+     "github.repository.label.create",
+     "github.repository.label.update",
+     "github.repository.labels.read",
+     "github.repository.metadata.read",
+     "github.repository.milestone.create",
+     "github.repository.milestone.update",
+     "github.repository.milestones.read",
+     "github.repository.pull_request.branch.update",
+     "github.repository.pull_request.create",
+     "github.repository.pull_request.files.read",
+     "github.repository.pull_request.merge",
+     "github.repository.pull_request.read",
+     "github.repository.pull_request.ready",
+     "github.repository.pull_request.reviewers.request",
+     "github.repository.pull_request.update",
+     "github.repository.pull_requests.list",
+     "github.repository.pull_requests.read",
+     "github.repository.readme.read",
+     "github.repository.release.asset.upload",
+     "github.repository.release.create",
+     "github.repository.release.publish",
+     "github.repository.release.read",
+     "github.repository.release.update",
+     "github.repository.releases.read",
+     "github.repository.review.comment.create",
+     "github.repository.review.comments.read",
+     "github.repository.review.submit",
+     "github.repository.review.thread.resolve",
+     "github.repository.reviews.read",
+     "github.repository.status.read",
+     "github.repository.tags.read",
+     "github.repository.tree.read",
+     "github.repository.workflow.artifact.read",
+     "github.repository.workflow.artifacts.read",
+     "github.repository.workflow.cancel",
+     "github.repository.workflow.dispatch",
+     "github.repository.workflow.jobs.read",
+     "github.repository.workflow.logs.read",
+     "github.repository.workflow.rerun",
+     "github.repository.workflow.run.read",
+     "github.repository.workflow.runs.read",
+     "github.repository.workflows.read",
+     "github.repository.workspace.close",
+     "github.repository.workspace.command.cancel",
+     "github.repository.workspace.command.start",
+     "github.repository.workspace.command.status",
+     "github.repository.workspace.diff",
+     "github.repository.workspace.edit",
+     "github.repository.workspace.open",
+     "github.repository.workspace.patch",
+     "github.repository.workspace.read",
+     "github.repository.workspace.rollback",
+     "github.repository.workspace.search"
+    ],
+    "resource_external_id": "980890773",
+    "approval_recommendation": "none",
+    "approval_action_fingerprint": null
+   },
+   "executionCertainty": "verified",
+   "externalReferences": []
+  },
+  "summary": "Found 2 results: README.md; scripts/setup.sh.",
+  "actionId": "424e0703-09b4-493a-bb54-895069603ddc"
+ }
+}

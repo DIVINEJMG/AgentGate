@@ -1,0 +1,355 @@
+{
+ "narration": {
+  "s1_open_issues/00-github.repository.issues.list": "Found 1 issue: #2 TE.",
+  "s1_open_issues/01-github.repository.issue.read": "Read #2 TE.",
+  "s2_create_issue/00-github.repository.issues.create": "Created issue #7 Simulation test.",
+  "s3_coding_draft_pr/00-github.repository.metadata.read": "Read DIVINEJMG/school.",
+  "s3_coding_draft_pr/01-github.repository.branch.read": "Read main.",
+  "s3_coding_draft_pr/02-github.repository.workspace.open": "Opened a workspace at 28435fd.",
+  "s3_coding_draft_pr/03-github.repository.workspace.read": "Read README.md.",
+  "s3_coding_draft_pr/04-github.repository.workspace.edit": "Edited README.md (1 file changed, 18 insertions(+), 1 deletion(-)).",
+  "s3_coding_draft_pr/05-github.repository.workspace.edit": "Edited scripts/setup.sh (1 file changed, 11 insertions(+)).",
+  "s3_coding_draft_pr/06-github.repository.workspace.diff": "Compared the workspace with 2 changed files: README.md; scripts/setup.sh.",
+  "s3_coding_draft_pr/07-github.repository.branch.create": "Created branch codex/55ea0379/readme-setup at 28435fd.",
+  "s3_coding_draft_pr/08-github.repository.commit.create": "Committed a8a2d5c to codex/55ea0379/readme-setup.",
+  "s3_coding_draft_pr/09-github.repository.pull_request.create": "Opened draft pull request #8 Add setup instructions and a helper script.",
+  "s3_coding_draft_pr/10-github.repository.workspace.close": "Closed the workspace with 2 changed files: README.md; scripts/setup.sh.",
+  "s5_clarification/00-github.repository.pull_request.read": "Read #8 Add setup instructions and a helper script.",
+  "s5_clarification/01-github.repository.pull_request.ready": "Marked pull request ready for review.",
+  "s6_uncertain_write/00-github.repository.issues.create": "Created issue #9 Uncertain write test."
+ },
+ "plannerObservations": {
+  "s1_open_issues": [
+   {
+    "chars": 834,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "count",
+     "items"
+    ],
+    "scope": "github.repository.issues.list",
+    "summary": "Found 1 result: #2 TE.",
+    "truncated": false
+   },
+   {
+    "chars": 935,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "assignees",
+     "author_association",
+     "comments",
+     "created_at",
+     "id",
+     "labels",
+     "locked",
+     "node_id",
+     "number",
+     "state",
+     "title",
+     "updated_at",
+     "user",
+     "webUrl"
+    ],
+    "scope": "github.repository.issue.read",
+    "summary": "Read #2 TE.",
+    "truncated": false
+   }
+  ],
+  "s2_create_issue": [
+   {
+    "chars": 767,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "author",
+     "createdAt",
+     "number",
+     "state",
+     "title",
+     "webUrl"
+    ],
+    "scope": "github.repository.issues.create",
+    "summary": "Read #7 Simulation test.",
+    "truncated": false
+   }
+  ],
+  "s3_coding_draft_pr": [
+   {
+    "chars": 855,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "archived",
+     "defaultBranch",
+     "forksCount",
+     "fullName",
+     "openIssuesCount",
+     "private",
+     "watchersCount",
+     "webUrl"
+    ],
+    "scope": "github.repository.metadata.read",
+    "summary": "GitHub response was inspected within the declared evidence limits.",
+    "truncated": false
+   },
+   {
+    "chars": 1492,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "commit",
+     "name",
+     "protected",
+     "protection"
+    ],
+    "scope": "github.repository.branch.read",
+    "summary": "Read main.",
+    "truncated": false
+   },
+   {
+    "chars": 851,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "baseSha",
+     "initializationStage",
+     "sessionId",
+     "sourceFiles",
+     "status"
+    ],
+    "scope": "github.repository.workspace.open",
+    "summary": "Isolated workspace state was inspected; GitHub publication is a separate action.",
+    "truncated": false
+   },
+   {
+    "chars": 772,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "content",
+     "offset",
+     "path",
+     "sessionId",
+     "status",
+     "totalChars",
+     "truncated"
+    ],
+    "scope": "github.repository.workspace.read",
+    "summary": "Read README.md.",
+    "truncated": false
+   },
+   {
+    "chars": 1605,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "alreadyApplied",
+     "changed",
+     "checkpoint",
+     "diffStat",
+     "exists",
+     "mode",
+     "path",
+     "preview",
+     "previewTruncated",
+     "sessionId",
+     "sha256",
+     "size",
+     "status"
+    ],
+    "scope": "github.repository.workspace.edit",
+    "summary": "Found 1 result: README.md.",
+    "truncated": false
+   },
+   {
+    "chars": 1637,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "alreadyApplied",
+     "changed",
+     "checkpoint",
+     "diffStat",
+     "exists",
+     "mode",
+     "path",
+     "preview",
+     "previewTruncated",
+     "sessionId",
+     "sha256",
+     "size",
+     "status"
+    ],
+    "scope": "github.repository.workspace.edit",
+    "summary": "Found 1 result: scripts/setup.sh.",
+    "truncated": false
+   },
+   {
+    "chars": 2036,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "artifact",
+     "baseSha",
+     "changes",
+     "diff",
+     "publicationAllowed",
+     "sessionId",
+     "sourceFingerprint",
+     "status"
+    ],
+    "scope": "github.repository.workspace.diff",
+    "summary": "Found 2 results: README.md; scripts/setup.sh.",
+    "truncated": false
+   },
+   {
+    "chars": 802,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "node_id",
+     "object",
+     "ref"
+    ],
+    "scope": "github.repository.branch.create",
+    "summary": "GitHub canonical state was inspected.",
+    "truncated": false
+   },
+   {
+    "chars": 798,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "node_id",
+     "object",
+     "ref"
+    ],
+    "scope": "github.repository.commit.create",
+    "summary": "GitHub canonical state was inspected.",
+    "truncated": false
+   },
+   {
+    "chars": 1912,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "additions",
+     "assignees",
+     "author_association",
+     "base",
+     "body",
+     "changed_files",
+     "comments",
+     "commits",
+     "created_at",
+     "deletions",
+     "draft",
+     "head",
+     "id",
+     "labels",
+     "locked",
+     "maintainer_can_modify",
+     "mergeable_state",
+     "merged",
+     "node_id",
+     "number",
+     "requested_reviewers",
+     "requested_teams",
+     "review_comments",
+     "state",
+     "title",
+     "updated_at",
+     "user",
+     "webUrl"
+    ],
+    "scope": "github.repository.pull_request.create",
+    "summary": "Read #8 Add setup instructions and a helper script.",
+    "truncated": false
+   },
+   {
+    "chars": 1911,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "artifact",
+     "baseSha",
+     "changes",
+     "diff",
+     "publicationAllowed",
+     "sessionId",
+     "sourceFingerprint",
+     "status"
+    ],
+    "scope": "github.repository.workspace.close",
+    "summary": "Found 2 results: README.md; scripts/setup.sh.",
+    "truncated": false
+   }
+  ],
+  "s4_bad_model": [],
+  "s5_clarification": [
+   {
+    "chars": 1972,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "additions",
+     "assignees",
+     "author_association",
+     "base",
+     "body",
+     "changed_files",
+     "comments",
+     "commits",
+     "created_at",
+     "deletions",
+     "draft",
+     "head",
+     "id",
+     "labels",
+     "locked",
+     "maintainer_can_modify",
+     "mergeable",
+     "mergeable_state",
+     "merged",
+     "node_id",
+     "number",
+     "rebaseable",
+     "requested_reviewers",
+     "requested_teams",
+     "review_comments",
+     "state",
+     "title",
+     "updated_at",
+     "user",
+     "webUrl"
+    ],
+    "scope": "github.repository.pull_request.read",
+    "summary": "Read #8 Add setup instructions and a helper script.",
+    "truncated": false
+   }
+  ],
+  "s6_uncertain_write": [
+   {
+    "chars": 782,
+    "omittedPaths": 0,
+    "providerDataKeys": [
+     "author",
+     "createdAt",
+     "number",
+     "state",
+     "title",
+     "webUrl"
+    ],
+    "scope": "github.repository.issues.create",
+    "summary": "Read #9 Uncertain write test.",
+    "truncated": false
+   }
+  ],
+  "s7_event_trigger": []
+ },
+ "plannerPrompt": {
+  "chars": 6546,
+  "sections": {
+   "(before first section)": 193,
+   "ACTION BUDGET": 29,
+   "AUTHORIZED TOOLS": 320,
+   "PLAN": 271,
+   "PLANNING RULES": 2766,
+   "RECORDED OBSERVATIONS": 2882,
+   "RECORDED OBSERVATIONS.actionHistory": 593,
+   "RECORDED OBSERVATIONS.instruction": 152,
+   "RECORDED OBSERVATIONS.recentEvidence": 2057,
+   "TRIGGER": 28,
+   "TRIGGER.type": 8,
+   "WORKER CHARTER": 57,
+   "WORKER CHARTER.data": 30
+  }
+ }
+}

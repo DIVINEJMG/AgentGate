@@ -17,6 +17,27 @@ def for_workload[GatewayT](gateway: GatewayT, workload: AIWorkload, purpose: str
     return cast(GatewayT, select(workload, purpose)) if callable(select) else gateway
 
 
+# A held slot lives this long in Redis and is renewed while its call runs, so a slot left by a
+# process that stopped mid-call frees itself within this time rather than the call's whole limit.
+SLOT_TTL_SECONDS = 90
+_renewals: dict[int, asyncio.Task[None]] = {}  # by the held slots tuple
+
+
+def _keep_alive(coordinator, slots, hold_seconds):
+    """Renew the slots every third of their TTL until released, for at most `hold_seconds`."""
+    async def renew():
+        deadline = asyncio.get_running_loop().time() + hold_seconds
+        while asyncio.get_running_loop().time() < deadline:
+            await asyncio.sleep(SLOT_TTL_SECONDS / 3)
+            try:
+                for lease in filter(None, slots):
+                    await coordinator.renew_slot(lease, ttl_seconds=SLOT_TTL_SECONDS)
+            except Exception:  # noqa: BLE001 - an unrenewed slot simply expires
+                logger.warning("AI slot renewal failed; the slot expires on its own.")
+    _renewals[id(slots)] = asyncio.get_running_loop().create_task(renew())
+    return slots
+
+
 async def acquire_workload_slot(coordinator, config, org, workload, ttl_seconds):
     # Background work cannot consume the seats reserved for human requests.
     # Both classes still acquire the same total ceiling and share request/token budgets.
@@ -26,7 +47,7 @@ async def acquire_workload_slot(coordinator, config, org, workload, ttl_seconds)
         if limit <= 0:
             return None
         background = await coordinator.acquire_slot(
-            f"planner:complex:{org}", limit=limit, ttl_seconds=ttl_seconds
+            f"planner:complex:{org}", limit=limit, ttl_seconds=min(ttl_seconds, SLOT_TTL_SECONDS)
         )
         if background is None:
             return None
@@ -34,11 +55,11 @@ async def acquire_workload_slot(coordinator, config, org, workload, ttl_seconds)
         total = await coordinator.acquire_slot(
             f"planner:org:{org}",
             limit=config.smart_planner_org_concurrency,
-            ttl_seconds=ttl_seconds,
+            ttl_seconds=min(ttl_seconds, SLOT_TTL_SECONDS),
         )
         if total is None and background:
             await coordinator.release_slot(background)
-        return (total, background) if total else None
+        return _keep_alive(coordinator, (total, background), ttl_seconds) if total else None
     except BaseException:
         if background:
             await coordinator.release_slot(background)
@@ -47,6 +68,8 @@ async def acquire_workload_slot(coordinator, config, org, workload, ttl_seconds)
 
 async def release_workload_slot(coordinator, slots):
     if slots:
+        if (renewal := _renewals.pop(id(slots), None)) is not None:
+            renewal.cancel()
         try:
             await coordinator.release_slot(slots[0])
         finally:
@@ -62,17 +85,17 @@ async def acquire_account_slot(coordinator, config, account, workload, ttl_secon
         if limit <= 0:
             return None
         background = await coordinator.acquire_slot(
-            account + ":complex-concurrency", limit=limit, ttl_seconds=ttl_seconds
+            account + ":complex-concurrency", limit=limit, ttl_seconds=min(ttl_seconds, SLOT_TTL_SECONDS)
         )
         if background is None:
             return None
     try:
         total = await coordinator.acquire_slot(
-            account + ":concurrency", limit=config.ai_account_concurrency, ttl_seconds=ttl_seconds
+            account + ":concurrency", limit=config.ai_account_concurrency, ttl_seconds=min(ttl_seconds, SLOT_TTL_SECONDS)
         )
         if total is None and background:
             await coordinator.release_slot(background)
-        return (total, background) if total else None
+        return _keep_alive(coordinator, (total, background), ttl_seconds) if total else None
     except BaseException:
         if background:
             await coordinator.release_slot(background)

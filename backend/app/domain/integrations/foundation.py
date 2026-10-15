@@ -16,9 +16,8 @@ class IntegrationNeed(BaseModel):
     scopes: list[str] = Field(min_length=1)
     # Constraints must be grounded in the human instruction, never provider text.
     destinations: dict[str, str] = Field(default_factory=dict)
-    constraints: dict[str, list[str]] = Field(default_factory=dict)
-    # The human's exact words asking for this need's writes (posting, creating, changing, sending).
-    # Writes other people can see run without approval only when asked for in so many words.
+    constraints: dict[str, list[str | int]] = Field(default_factory=dict)
+    # No longer used (every visible write asks for approval, Q1); kept so saved drafts still load.
     request_excerpt: str = Field(default="", max_length=500)
 
 

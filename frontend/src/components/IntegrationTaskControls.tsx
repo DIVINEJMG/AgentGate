@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { prepareIntegrationTask, resumeIntegrationWork, settleIntegrationOutcome } from '../lib/integrationFoundationApi';
+import { continueRun } from '../lib/runtimeApi';
 import type { ApiVersion } from '../lib/systemApi';
+import type { MessageControl } from './workerChatModel';
 
 export function IntegrationTaskControls({ organizationId, version, commandId, clarify }: {
   organizationId: string; version: ApiVersion; commandId: string; clarify: boolean;
@@ -52,4 +54,32 @@ export function IntegrationOutcomeControl({ organizationId, version, workItemId,
     <button type="button" className="ws-button ws-button-sm" disabled={busy} title="It happened, so carry on from the next step" onClick={() => void settle('done')}>It happened</button>
     {error && <span role="alert">{error}</span>}
   </>;
+}
+
+/** For a task paused while planning: start a fresh planning attempt. */
+export function RetryPlanningControl({ organizationId, version, runId, onDone }: {
+  organizationId: string; version: ApiVersion; runId: string; onDone: () => void;
+}) {
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  async function retry() {
+    setBusy(true); setError('');
+    try { await continueRun(version, organizationId, runId); onDone(); }
+    catch { setError('Planning could not restart. Try again shortly.'); }
+    finally { setBusy(false); }
+  }
+  return <><button type="button" className="ws-button ws-button-sm" disabled={busy} onClick={() => void retry()}>Retry planning</button>{error && <span role="alert">{error}</span>}</>;
+}
+
+/** The buttons a worker message offers in the chat: Retry, Retry planning, or the three outcome answers. */
+export function MessageControls({ organizationId, version, controls, onRetryMessage, onDone }: {
+  organizationId: string; version: ApiVersion; controls: MessageControl[];
+  onRetryMessage: (messageId: string) => void; onDone: () => void;
+}) {
+  return <div className="cf-live-result-actions">{controls.map((control) =>
+    control.type === 'message_retry'
+      ? <button key={control.id} type="button" className="ws-button ws-button-sm" onClick={() => onRetryMessage(control.id)}>Retry</button>
+      : control.controls === 'retry_planning'
+        ? <RetryPlanningControl key={control.id} organizationId={organizationId} version={version} runId={control.runId} onDone={onDone}/>
+        : <IntegrationOutcomeControl key={control.id} organizationId={organizationId} version={version} workItemId={control.id} onDone={onDone}/>)}
+  </div>;
 }

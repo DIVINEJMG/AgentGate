@@ -49,6 +49,8 @@ line-length = 100
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 include = ["app", "tests"]
+# The context engine is new code, held to strict typing (context-quality-fix-plan, 4.3).
+strict = ["app/application/context"]
 
 [build-system]
 requires = ["setuptools>=80"]

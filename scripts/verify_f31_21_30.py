@@ -149,7 +149,7 @@ if "nvidia/ising-calibration-1.5-31b" not in provider_factory:
 for token in (
     "AdaptiveRuntimePlanner",
     "ai_gateway_from_settings",
-    "availableCapabilityScopes",
+    "_planner_tools",  # the planner's allowlist (was the duplicate availableCapabilityScopes list)
     "_planner_observations",
 ):
     if token not in managed:

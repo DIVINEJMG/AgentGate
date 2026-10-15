@@ -229,7 +229,7 @@ async def test_timed_out_write_reconciles_without_replaying():
     adapter, coordinator = DeterministicAdapter(fail=True, reconcile=True), Coordination()
     request, context = execution()
     result = await execute_native_action(provider=adapter, request=request, context=context, coordinator=coordinator)
-    assert result.output["id"] == "object-1"
+    assert isinstance(result.output, dict) and result.output["id"] == "object-1"
     assert adapter.calls == 1 and adapter.reconciliations == 1
     assert len(coordinator.released) == 3
 
@@ -319,8 +319,9 @@ async def test_request_only_grant_cannot_be_used_by_another_user():
     grant = IntegrationTaskGrant(resource_id=resource_id, worker_id=worker.id, initiating_user_id=user, standing=False,
         work_item_id=item.id, authority_version=1, scopes=["test.read"], destinations={})
     resource_row = IntegrationResource(id=resource_id, connection_id=uuid4(), organization_id=org, capabilities=["test.read"])
-    session = SimpleNamespace(get=AsyncMock(side_effect=[item, resource_row]),
-        scalar=AsyncMock(side_effect=[worker, grant, SimpleNamespace(authority_version=1)]))
+    # The worker, grant, resource, connection and its state come back in one joined read.
+    joined = SimpleNamespace(first=lambda: (worker, grant, resource_row, None, SimpleNamespace(authority_version=1)))
+    session = SimpleNamespace(get=AsyncMock(return_value=item), execute=AsyncMock(return_value=joined))
     with pytest.raises(PermissionError, match="Request-only"):
         await IntegrationFoundation(cast(AsyncSession, session)).authorize(organization_id=org, agent_id=agent,
             work_item_id=item.id, resource_id=resource_id, scope="test.read", payload={})

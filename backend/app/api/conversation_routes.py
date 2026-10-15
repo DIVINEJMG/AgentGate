@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-import traceback
+from collections.abc import Awaitable, Callable
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -25,10 +25,13 @@ from app.application.services.conversations import (
     receipt_public,
     thread_public,
 )
+from app.domain.conversation.intent import CommandReceipt
 from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.ai.provider import ai_gateway_from_settings
+from app.infrastructure.database.models import ConversationMessage
 from app.infrastructure.database.session import database_session
 from app.infrastructure.database.usage_records import record_usage
+from app.observability.frames import app_frames
 from app.observability.usage import Usage, metered
 
 logger = logging.getLogger("uvicorn.error")
@@ -73,10 +76,11 @@ def _http_error(exc: Exception) -> HTTPException:
         return HTTPException(400, str(exc))
     if isinstance(exc, RuntimeError):
         return HTTPException(503, str(exc))
-    # Where it failed (file, line, function); the message itself may hold conversation content.
-    where = " < ".join(f"{frame.filename.rsplit('/app/', 1)[-1]}:{frame.lineno} {frame.name}"
-                       for frame in reversed(traceback.extract_tb(exc.__traceback__)[-4:]))
-    logger.error("Conversation operation failed error_type=%s at=%s", type(exc).__name__, where)
+    # Where it failed in AgentGate's own code, and the first cause; the message itself may hold
+    # conversation content, so it is not logged.
+    cause = exc.__cause__ or exc.__context__
+    logger.error("Conversation operation failed error_type=%s cause=%s at=%s", type(exc).__name__,
+                 type(cause).__name__ if cause else None, app_frames(exc))
     return HTTPException(500, "Conversation operation failed.")
 
 
@@ -288,25 +292,15 @@ async def upload_attachment_v2(
     }
 
 
-async def _send(
-    organization_id: UUID,
-    thread_id: UUID,
-    payload: SendMessageRequest,
-    principal: HumanPrincipal,
-    session: AsyncSession,
-) -> dict[str, Any]:
+Reply = tuple[ConversationMessage, ConversationMessage, CommandReceipt]
+
+
+async def _replied(organization_id: UUID, thread_id: UUID, reply: Callable[[], Awaitable[Reply]]) -> dict[str, Any]:
+    """Run one reply to a message, metered and recorded, as the API's response."""
     usage, outcome = Usage(), "error"
     try:
         with metered(usage):
-            human, assistant, receipt = await ConversationService(session).send_message(
-                organization_id=organization_id,
-                principal=principal,
-                thread_id=thread_id,
-                content=payload.content,
-                artifact_references=payload.artifactReferences,
-                operation=payload.operation,
-                resume_command_id=payload.resumeCommandId,
-            )
+            human, assistant, receipt = await reply()
         outcome = receipt.status
     except Exception as exc:
         raise _http_error(exc) from exc
@@ -318,6 +312,60 @@ async def _send(
         "response": message_public(assistant),
         "receipt": receipt_public(receipt),
     }
+
+
+async def _send(
+    organization_id: UUID,
+    thread_id: UUID,
+    payload: SendMessageRequest,
+    principal: HumanPrincipal,
+    session: AsyncSession,
+) -> dict[str, Any]:
+    return await _replied(organization_id, thread_id, lambda: ConversationService(session).send_message(
+        organization_id=organization_id,
+        principal=principal,
+        thread_id=thread_id,
+        content=payload.content,
+        artifact_references=payload.artifactReferences,
+        operation=payload.operation,
+        resume_command_id=payload.resumeCommandId,
+    ))
+
+
+def _retry(organization_id: UUID, thread_id: UUID, message_id: UUID, principal: HumanPrincipal,
+           session: AsyncSession) -> Awaitable[dict[str, Any]]:
+    return _replied(organization_id, thread_id, lambda: ConversationService(session).retry_message(
+        organization_id=organization_id, principal=principal, thread_id=thread_id, message_id=message_id))
+
+
+@v1_router.post(
+    "/organizations/{organization_id}/conversations/{thread_id}/messages/{message_id}/retry",
+    status_code=201,
+)
+async def retry_message_v1(
+    organization_id: UUID,
+    thread_id: UUID,
+    message_id: UUID,
+    principal: Annotated[HumanPrincipal, Depends(organization_principal)],
+    session: Annotated[AsyncSession, Depends(database_session)],
+) -> dict[str, Any]:
+    """Reply again to a saved message whose reply failed."""
+    return await _retry(organization_id, thread_id, message_id, principal, session)
+
+
+@v2_router.post(
+    "/organizations/{organization_id}/conversations/{thread_id}/messages/{message_id}/retry",
+    status_code=201,
+)
+async def retry_message_v2(
+    organization_id: UUID,
+    thread_id: UUID,
+    message_id: UUID,
+    principal: Annotated[HumanPrincipal, Depends(organization_principal)],
+    session: Annotated[AsyncSession, Depends(database_session)],
+) -> dict[str, Any]:
+    """Reply again to a saved message whose reply failed."""
+    return {"data": await _retry(organization_id, thread_id, message_id, principal, session)}
 
 
 @v1_router.post(

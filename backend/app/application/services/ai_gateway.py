@@ -11,6 +11,7 @@ from typing import Any, NoReturn, cast
 
 from jsonschema import Draft202012Validator
 
+from app.application.context.corrections import schema_correction
 from app.domain.ai.providers import (
     AIGateway,
     AIInvocationContext,
@@ -326,9 +327,10 @@ class ProviderAIGateway(AIGateway):
             ensure_ascii=False,
             separators=(",", ":"),
         )
-        base_prompt = (
-            prompt
-            + "\n\nAUTHORITATIVE_JSON_SCHEMA\n"
+        # Sent once: as the response format where the endpoint enforces it, otherwise in the
+        # prompt (place_schema).
+        schema_instruction = (
+            "\n\nAUTHORITATIVE_JSON_SCHEMA\n"
             + schema_json
             + "\n\nReturn exactly one JSON object that validates against "
             + schema_name
@@ -339,7 +341,7 @@ class ProviderAIGateway(AIGateway):
         if max_inference_calls not in {1, 2}:
             raise ValueError("Structured inference is limited to two calls.")
         for repair_attempt in range(max_inference_calls):
-            current_prompt = base_prompt
+            current_prompt = prompt
             if feedback:
                 current_prompt += (
                     "\n\nYOUR PREVIOUS RESPONSE WAS INVALID. "
@@ -354,7 +356,7 @@ class ProviderAIGateway(AIGateway):
                 max_output_tokens=max_output_tokens or self._default_max_output_tokens,
                 response_format="json_object",
                 correlation_id=invocation_context.correlation_id,
-                json_schema=schema, schema_name=schema_name,
+                json_schema=schema, schema_name=schema_name, schema_instruction=schema_instruction,
             )
 
             async def operation(
@@ -386,7 +388,7 @@ class ProviderAIGateway(AIGateway):
             )
             if not errors:
                 return parsed
-            feedback = "; ".join(error.message for error in errors[:8])
+            feedback = schema_correction(errors)
             if repair_attempt == max_inference_calls - 1:
                 raise AIProviderError(
                     "invalid_provider_response",
@@ -515,3 +517,39 @@ class ProviderAIGateway(AIGateway):
             schema_name=None,
             operation=operation,
         )
+
+
+class ReleasingGateway(AIGateway):
+    """A gateway that ends the caller's database transaction before each model call, so no
+    connection or row lock is held while a model answers (a slow answer cannot cost the work done
+    before it). Pair it with a gateway whose telemetry uses its own transactions."""
+
+    def __init__(self, gateway: Any, session: Any) -> None:
+        self._gateway, self._session = gateway, session
+
+    async def _call(self, name: str, kwargs: dict[str, Any]) -> Any:
+        await self._session.commit()
+        return await getattr(self._gateway, name)(**kwargs)
+
+    async def generate_text(self, **kwargs: Any) -> AIResponse:  # type: ignore[override]
+        return await self._call("generate_text", kwargs)
+
+    async def generate_structured(self, **kwargs: Any) -> dict[str, object]:  # type: ignore[override]
+        return await self._call("generate_structured", kwargs)
+
+    async def analyze_media(self, **kwargs: Any) -> AIResponse:  # type: ignore[override]
+        return await self._call("analyze_media", kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        """Other model calls the inner gateway offers (validated or reviewed structured output)
+        release the transaction too; anything else, and anything it lacks, is its own."""
+        attribute = getattr(self._gateway, name)
+        if name == "with_workload":  # the same gateway for another workload still releases
+            return lambda *args, **kwargs: ReleasingGateway(attribute(*args, **kwargs), self._session)
+        if not name.startswith(("generate", "analyze")) or not callable(attribute):
+            return attribute
+
+        async def call(**kwargs: Any) -> Any:
+            return await self._call(name, kwargs)
+
+        return call

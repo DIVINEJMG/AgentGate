@@ -127,9 +127,9 @@ def test_ai_provider_retry_publishes_delayed_runtime_wakeup() -> None:
     ).read_text(encoding="utf-8")
 
     assert 'reason=f"ai-provider-retry:{int(retry_at.timestamp())}"' in runtime_api
-    assert "delay_seconds=retry_delay_seconds" in runtime_api
+    assert "delay_seconds=max(1, ceil((retry_at - datetime.now(UTC)).total_seconds()))" in runtime_api
     assert '"retryDispatchQueued": retry_dispatch_id is not None' in runtime_api
-    assert "retry_scheduled and retry_at is not None" in runtime_api
+    assert "if retry_at is not None:" in runtime_api
 
 
 def test_runtime_provider_retry_uses_qstash_delay_instead_of_waiting_for_sweep() -> None:

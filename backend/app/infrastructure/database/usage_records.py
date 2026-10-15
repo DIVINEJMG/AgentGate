@@ -57,7 +57,8 @@ async def record_usage(
         qstash_messages=usage.qstash_messages, redis_commands=usage.redis_commands,
         ai_calls=usage.ai_calls, ai_failed_calls=usage.ai_failed_calls,
         ai_tokens_in=usage.ai_tokens_in, ai_tokens_out=usage.ai_tokens_out,
-        ai_models=dict(usage.ai_models), duration_ms=int(usage.seconds * 1000),
+        ai_models=dict(usage.ai_models), prompt_chars=dict(usage.prompt_chars),
+        duration_ms=int(usage.seconds * 1000),
     )
     try:
         async with asyncio.timeout(5):

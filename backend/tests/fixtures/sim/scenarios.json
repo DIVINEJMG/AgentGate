@@ -1,0 +1,210 @@
+[
+ {
+  "id": "s1_open_issues",
+  "messages": [
+   "What are the open issues in DIVINEJMG/school"
+  ],
+  "requests": [
+   1,
+   6
+  ],
+  "workItem": "181d53d6",
+  "expected": "completed; reports open issue #2 'TE'; reads GitHub fresh",
+  "findings": [
+   "F1",
+   "F2",
+   "F3",
+   "F4"
+  ],
+  "evidenceFiles": 2,
+  "modelRequests": 6,
+  "corrections": 1,
+  "largestPromptChars": {
+   "worker_command_intent_v1": 67590,
+   "integration_task": 67825,
+   "audoryn_next_action": 21059
+  }
+ },
+ {
+  "id": "s2_create_issue",
+  "messages": [
+   "Create an issue in DIVINEJMG/school titled “Simulation test” saying this was created by a simulated run."
+  ],
+  "requests": [
+   7,
+   10
+  ],
+  "workItem": "087ed8f1",
+  "expected": "completed; one issue created (#7) with the requested title and body",
+  "findings": [
+   "F5",
+   "F6",
+   "Q1"
+  ],
+  "evidenceFiles": 1,
+  "modelRequests": 4,
+  "corrections": 0,
+  "largestPromptChars": {
+   "worker_command_intent_v1": 69429,
+   "integration_task": 69387,
+   "audoryn_next_action": 16946
+  }
+ },
+ {
+  "id": "s3_coding_draft_pr",
+  "humanSteps": [
+   "approve opening the draft pull request (or --approve)"
+  ],
+  "messages": [
+   "In DIVINEJMG/school, add a README section about setup and a small helper script, then open a draft PR."
+  ],
+  "requests": [
+   11,
+   24
+  ],
+  "workItem": "55ea0379",
+  "expected": "completed; two workspace edits in one sandbox, task branch, commit, draft PR (#8) after approval",
+  "findings": [
+   "F5",
+   "F7",
+   "F8",
+   "F9",
+   "F10",
+   "F11"
+  ],
+  "evidenceFiles": 11,
+  "modelRequests": 14,
+  "corrections": 0,
+  "largestPromptChars": {
+   "worker_command_intent_v1": 70119,
+   "integration_task": 70925,
+   "audoryn_next_action": 39110
+  }
+ },
+ {
+  "id": "s4_bad_model",
+  "humanSteps": [
+   "send the second message after the first fails",
+   "press Retry planning in Run history after the refusal"
+  ],
+  "messages": [
+   "List All open Pull request in the DIVINEJMG/school",
+   "List the open pull requests in DIVINEJMG/school."
+  ],
+  "requests": [
+   25,
+   32
+  ],
+  "workItem": "496f0411",
+  "expected": "nothing harmful runs; corrections name the problem; a refused task can be resumed",
+  "findings": [
+   "F12",
+   "F13",
+   "F14",
+   "F15",
+   "F16"
+  ],
+  "evidenceFiles": 0,
+  "modelRequests": 8,
+  "corrections": 3,
+  "largestPromptChars": {
+   "worker_command_intent_v1": 74432,
+   "integration_task": 72995,
+   "audoryn_next_action": 16053
+  }
+ },
+ {
+  "id": "s5_clarification",
+  "humanSteps": [
+   "answer the clarification question with the second message"
+  ],
+  "messages": [
+   "Please merge the new branch into main.",
+   "merge  codex/55ea0379/readme-setup in DIVINEJMG/school (draft pull request #8)."
+  ],
+  "requests": [
+   33,
+   37
+  ],
+  "workItem": "1e81a73a",
+  "expected": "a short clarification question; the answer continues the same request; the named PR can be merged after approval",
+  "findings": [
+   "F17",
+   "F18",
+   "F19",
+   "F20"
+  ],
+  "evidenceFiles": 2,
+  "modelRequests": 5,
+  "corrections": 0,
+  "largestPromptChars": {
+   "worker_command_intent_v1": 73875,
+   "integration_task": 47360,
+   "audoryn_next_action": 32827
+  }
+ },
+ {
+  "id": "s6_uncertain_write",
+  "humanSteps": [
+   "press Check again, then It didn't happen, on the Jobs page"
+  ],
+  "messages": [
+   "Create an issue in DIVINEJMG/school titled “Uncertain write test” saying it checks how AgentGate handles a lost write."
+  ],
+  "requests": [
+   38,
+   41
+  ],
+  "workItem": "2ab06143",
+  "faults": [
+   {
+    "method": "POST",
+    "path_suffix": "/issues",
+    "mode": "dropped",
+    "times": 1
+   }
+  ],
+  "expected": "write held as dispatching; three automatic checks; pause with Check again / It didn't happen / It happened; one issue after 'It didn't happen'",
+  "findings": [
+   "F21"
+  ],
+  "evidenceFiles": 1,
+  "modelRequests": 4,
+  "corrections": 0,
+  "largestPromptChars": {
+   "worker_command_intent_v1": 76284,
+   "integration_task": 47388,
+   "audoryn_next_action": 17240
+  }
+ },
+ {
+  "id": "s7_event_trigger",
+  "humanSteps": [
+   "answer the clarification with the second message",
+   "point the GitHub App webhook at the tunnel and open an issue"
+  ],
+  "messages": [
+   "When a new issue is opened in DIVINEJMG/school, summarise it here.",
+   "keep that one"
+  ],
+  "requests": [
+   42,
+   48
+  ],
+  "workItem": null,
+  "expected": "no duplicate job; an issues.opened webhook runs the existing job once and posts one summary",
+  "findings": [
+   "F22",
+   "F23",
+   "F24"
+  ],
+  "evidenceFiles": 0,
+  "modelRequests": 7,
+  "corrections": 1,
+  "largestPromptChars": {
+   "worker_command_intent_v1": 78116,
+   "integration_task": 47323,
+   "audoryn_next_action": 22094
+  }
+ }
+]

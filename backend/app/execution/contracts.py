@@ -272,6 +272,27 @@ class ExecutionProviderError(RuntimeError):
             retry_after_seconds=retry_after_seconds,
         )
 
+    @classmethod
+    def for_request(
+        cls,
+        request: ExecutionRequest,
+        code: ExecutionErrorCode,
+        safe_message: str,
+        *,
+        retryable: bool = False,
+        retry_after_seconds: float | None = None,
+    ) -> ExecutionProviderError:
+        """The error for one execution request, named by its provider, operation and correlation."""
+        return cls(
+            code=code,
+            retryable=retryable,
+            provider=request.resource.provider,
+            operation=request.operation,
+            correlation_id=request.correlation_id,
+            safe_message=safe_message,
+            retry_after_seconds=retry_after_seconds,
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class ProviderRuntimeContext:

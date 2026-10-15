@@ -12,7 +12,7 @@ from typing import Any
 
 from app.infrastructure.ai.anthropic_messages import EFFORTS, claude_schema
 from app.infrastructure.ai.connections import wire_model
-from app.infrastructure.ai.model_profiles import generation_allowance
+from app.infrastructure.ai.model_profiles import generation_allowance, place_schema
 from app.infrastructure.ai.openai_chat import ConfiguredChatProvider
 
 
@@ -48,4 +48,4 @@ class OpenRouterClaudeProvider(ConfiguredChatProvider):
                     "name": request.schema_name or "decision", "strict": True, "schema": schema}}
         if body["stream"]:
             body["stream_options"] = {"include_usage": True}
-        return body
+        return place_schema(body, request)

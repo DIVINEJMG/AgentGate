@@ -116,6 +116,7 @@ async def test_usage_is_saved_as_one_row_and_saving_never_raises(monkeypatch: py
     monkeypatch.setattr(settings, "usage_records_enabled", True)
     usage = Usage(db_statements=7, qstash_messages=2, ai_calls=1, ai_tokens_in=50, seconds=1.25)
     usage.ai_models["fast"] += 1
+    usage.prompt_chars["planner.JOB"] += 40
     organization_id, work_item_id = uuid4(), uuid4()
     await usage_records.record_usage(usage, kind="runtime.step", organization_id=organization_id,
                                      work_item_id=work_item_id, step=3, phase="plan", outcome="continue")
@@ -124,6 +125,7 @@ async def test_usage_is_saved_as_one_row_and_saving_never_raises(monkeypatch: py
     assert (row.kind, row.step, row.phase, row.outcome) == ("runtime.step", 3, "plan", "continue")
     assert (row.db_statements, row.qstash_messages, row.ai_calls, row.ai_tokens_in) == (7, 2, 1, 50)
     assert row.ai_models == {"fast": 1} and row.duration_ms == 1250
+    assert row.prompt_chars == {"planner.JOB": 40}
 
     monkeypatch.setattr(session_module, "session_factory", Mock(side_effect=RuntimeError("database down")))
     await usage_records.record_usage(usage, kind="runtime.step", organization_id=organization_id)

@@ -54,7 +54,7 @@ async def test_interruption_and_branch_race(tmp_path):
 @pytest.mark.asyncio
 async def test_bad_test_result_and_unavailable_scope_cannot_publish(tmp_path):
     planner = ScriptedPlanner(MANIFEST, "resource", "12345678-0000-0000-0000-000000000000", True)
-    with pytest.raises(RuntimeError, match="unavailable"):
+    with pytest.raises(RuntimeError, match="No tools are authorized"):
         await planner.choose_next(tools=[], observations=[])
     with pytest.raises(FixtureBlocked, match="did not pass"):
         await planner.choose_next(tools=[], observations=[{

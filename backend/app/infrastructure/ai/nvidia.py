@@ -18,6 +18,7 @@ from app.domain.ai.providers import (
 from app.infrastructure.ai.model_profiles import (
     PlannerModelProfile,
     apply_profile,
+    place_schema,
     validate_context,
 )
 from app.infrastructure.ai.streaming import timeout_error, transport_timeout
@@ -169,7 +170,7 @@ class NvidiaNimProvider:
             body["stream_options"] = {"include_usage": True}
         body.update(self._extra_body)
         if self.planner_profile is not None:
-            validate_context(self.planner_profile, request.system, request.prompt, request.max_output_tokens)
+            validate_context(self.planner_profile, request.system, request.full_prompt, request.max_output_tokens)
             apply_profile(body, self.planner_profile, request)
         elif request.response_format == "json_object" and model.startswith("nvidia/nemotron-"):
             # Hosted NVIDIA NIM has been inconsistent with native response_format
@@ -185,7 +186,7 @@ class NvidiaNimProvider:
             )
             template_kwargs["enable_thinking"] = False
             body["chat_template_kwargs"] = template_kwargs
-        return body
+        return place_schema(body, request)
 
     async def _raise_for_error(self, response: httpx.Response) -> None:
         raw = await response.aread()
@@ -346,7 +347,7 @@ class NvidiaNimProvider:
         if not self._coordinator_api_key:
             raise AIProviderError("configuration_missing", "NVIDIA planner credential is not configured.", retryable=False, account_scoped=True)
         if self.planner_profile is not None:
-            validate_context(self.planner_profile, request.system, request.prompt, request.max_output_tokens)
+            validate_context(self.planner_profile, request.system, request.full_prompt, request.max_output_tokens)
 
     async def generate_text(self, *, model: str, request: AITextRequest) -> AIResponse:
         messages: list[dict[str, object]] = []

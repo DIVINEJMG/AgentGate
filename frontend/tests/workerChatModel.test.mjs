@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { approvalInConversation, conversationFrames, discoveryWorkers, isHumanMessage, latestThreadId, liveResultLabel, liveResultReference, threadsForWorker } from '../src/components/workerChatModel.ts';
+import { approvalInConversation, conversationFrames, discoveryWorkers, isHumanMessage, latestThreadId, liveResultLabel, liveResultReference, messageControls, threadsForWorker } from '../src/components/workerChatModel.ts';
 
 test('approval ownership stays in its conversation, including legacy references and thread switches', () => {
   const messages = [{ threadId: 'old', resultReferences: [{ type: 'approval', id: 'approval' }] }];
@@ -104,4 +104,17 @@ test('blocked and partial outcomes remain live results with accurate labels', ()
   const completed = liveResultReference({ resultReferences: [{ type: 'result', id: 'r',
     presentation: 'live_result', status: 'completed' }] });
   assert.equal(liveResultLabel(completed), 'COMPLETED');
+});
+
+test('a worker message offers only the controls it carries', () => {
+  const references = [
+    { type: 'approval', id: 'a1' },
+    { type: 'work_item', id: 'w1', runId: 'r1', controls: 'retry_planning' },
+    { type: 'work_item', id: 'w2', controls: 'outcome' },
+    { type: 'message_retry', id: 'm1' },
+    { type: 'work_item', id: 'w3', controls: 'retry_planning' },
+    { type: 'result', id: 'x', presentation: 'live_result' },
+  ];
+  assert.deepEqual(messageControls(references).map((control) => control.id), ['w1', 'w2', 'm1']);
+  assert.deepEqual(messageControls(), []);
 });

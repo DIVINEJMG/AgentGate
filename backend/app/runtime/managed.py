@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import copy
 import hashlib
-import json
 import logging
 import time
 from collections import OrderedDict
@@ -20,13 +19,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.governance_routes import _evaluate
-from app.api.integration_capability_routes import _catalog, catalog_snapshot
+from app.api.integration_capability_routes import _catalog, catalog_snapshot, snapshot_integrations
 from app.api.product_common import utcnow
 from app.application.services.browser_origin_authority import (
     browser_integration_autonomy_suitable,
     browser_integration_origins,
     explicit_http_origins,
 )
+from app.application.messages import approval_wait, refused_write, uncertain_write
+from app.application.context.evidence import as_map, browser_evidence, compact_output, planned_action_fingerprint
 from app.application.services.live_results import append_live_result_message
 from app.application.services.integration_foundation import notify_integration_work
 from app.application.services.worker_memory import WorkerMemoryService
@@ -68,7 +69,7 @@ from app.infrastructure.database.models import (
 from app.infrastructure.ai.provider import ai_gateway_from_settings
 from app.infrastructure.database.outbox import TransactionalOutbox
 from app.observability.usage import label_usage
-from app.runtime.planner.adaptive import AdaptivePlanDecision, AdaptiveRuntimePlanner
+from app.runtime.planner.adaptive import AdaptivePlanDecision, AdaptiveRuntimePlanner, survives_revision
 
 
 RuntimeState = Literal["completed", "continue", "waiting_approval", "failed", "noop"]
@@ -148,6 +149,7 @@ def _plan_view(rows: list[RunPlanStep], steps: list[RunStep]) -> list[dict[str, 
     """The saved plan with each step's progress, read from the run's own action steps (each records
     the plan step it worked on), so completing an action never has to write the plan."""
     worked: dict[int, list[int]] = {}
+    completed: dict[int, list[int]] = {}
     done: set[int] = set()
     for step in steps:
         spec = step.input if isinstance(step.input, dict) else {}
@@ -155,12 +157,16 @@ def _plan_view(rows: list[RunPlanStep], steps: list[RunStep]) -> list[dict[str, 
         if step.kind != "action" or not isinstance(position, int):
             continue
         worked.setdefault(position, []).append(step.step_index + 1)
-        if step.status == "completed" and spec.get("planStepDone") is True:
-            done.add(position)
+        if step.status == "completed":
+            completed.setdefault(position, []).append(step.step_index + 1)
+            if spec.get("planStepDone") is True:
+                done.add(position)
+    # A step a revision kept (saved as done) stays done.
     return [{"position": row.position, "title": row.title, "goal": row.goal, "scope": row.scope,
              "target": row.target, "dependsOn": list(row.depends_on or []), "check": row.check,
-             "status": "done" if row.position in done else row.status if row.status != "done" else "pending",
-             "actionSteps": worked.get(row.position, [])} for row in rows]
+             "status": "done" if row.position in done else row.status,
+             "actionSteps": worked.get(row.position, []),
+             "completedActions": completed.get(row.position, [])} for row in rows]
 
 
 def _plan_progress(view: list[dict[str, object]]) -> dict[str, object]:
@@ -230,6 +236,26 @@ def _step_output(step: RunStep) -> dict[str, Any]:
     return dict(step.output or {}) if isinstance(step.output, dict) else {}
 
 
+def _authorized_browser_origins(definition: dict[str, Any], autonomy: dict[str, Any]) -> tuple[str, ...]:
+    """The browser origins the job may use: those authorized on it, else the explicit HTTP origins in
+    its objective and instructions."""
+    raw = autonomy.get("authorizedBrowserOrigins")
+    origins = tuple(str(origin) for origin in raw if str(origin)) if isinstance(raw, list) else ()
+    return origins or explicit_http_origins(
+        chr(10).join((str(definition.get("objective", "")), str(definition.get("instructions", "")))))
+
+
+def _browser_resource_admitted(integration: Integration | None, resource_origins: tuple[str, ...],
+                               authorized: tuple[str, ...], autonomy: dict[str, Any]) -> bool:
+    """Whether a browser resource stays within the job's authorized origins (and, for a job the AI
+    created, is suitable for autonomous use)."""
+    if not authorized:
+        return True
+    if not resource_origins or not set(resource_origins).issubset(authorized):
+        return False
+    return not autonomy.get("createdByAI") or browser_integration_autonomy_suitable(integration, set(authorized))
+
+
 def _integration_config(integration: Integration | None) -> dict[str, Any]:
     return dict(integration.config or {}) if integration and isinstance(integration.config, dict) else {}
 
@@ -272,6 +298,10 @@ class ManagedRuntimeExecutor:
         self._planner = AdaptiveRuntimePlanner(
             ai_gateway_from_settings(planner=True)
         )
+        # The catalog read by the latest tools build, and the one revalidated after planning, which
+        # recording the chosen action then uses instead of reading it again.
+        self._last_catalog: dict | None = None
+        self._revalidated_catalog: dict | None = None
 
     async def execute_step(
         self,
@@ -666,30 +696,18 @@ class ManagedRuntimeExecutor:
         }
         raw_autonomy = definition.get("autonomy")
         autonomy = dict(raw_autonomy) if isinstance(raw_autonomy, dict) else {}
-        raw_authorized_origins = autonomy.get("authorizedBrowserOrigins")
-        authorized_browser_origins = (
-            tuple(str(item) for item in raw_authorized_origins if str(item))
-            if isinstance(raw_authorized_origins, list)
-            else ()
-        )
-        if not authorized_browser_origins:
-            authorized_browser_origins = explicit_http_origins(
-                "\n".join(
-                    (
-                        str(definition.get("objective", "")),
-                        str(definition.get("instructions", "")),
-                    )
-                )
-            )
+        authorized_browser_origins = _authorized_browser_origins(definition, autonomy)
         active = await self._active_scopes(agent.id)
         catalog_started = time.monotonic()
-        catalog = await self._execution_catalog(item)
+        catalog = self._last_catalog = await self._execution_catalog(item)
         self._tool_preparation_metrics["catalogSeconds"] = round(time.monotonic() - catalog_started, 3)
         self._capability_exclusions = list(catalog.get("capabilityExclusions", []))
         resources = list(catalog.get("resources", []))
         tools: list[dict[str, object]] = []
         # The policy check would read this same agent row again.
         preparation_cache: dict[Any, Any] = {(item.organization_id, agent.id, "agent"): agent}
+        # Rows the catalog read just now (a legacy resource's id is its integration's id).
+        integrations = snapshot_integrations(item.organization_id)
 
         for resource in resources:
             if resource.get("status") != "connected":
@@ -700,33 +718,16 @@ class ManagedRuntimeExecutor:
             except KeyError:
                 continue
             resource_id = str(resource.get("id", ""))
-            integration: Integration | None = None
-            try:
-                integration = await self._session.get(Integration, UUID(resource_id))
-            except ValueError:
-                integration = None
+            integration = integrations.get(resource_id)
             config = _integration_config(integration)
             resource_browser_origins = (
                 browser_integration_origins(integration)
                 if provider_name == "browser"
                 else ()
             )
-            if provider_name == "browser" and authorized_browser_origins:
-                resource_origin_set = set(resource_browser_origins)
-                authorized_origin_set = set(authorized_browser_origins)
-                if (
-                    not resource_origin_set
-                    or not resource_origin_set.issubset(authorized_origin_set)
-                ):
-                    continue
-                if (
-                    bool(autonomy.get("createdByAI"))
-                    and not browser_integration_autonomy_suitable(
-                        integration,
-                        authorized_origin_set,
-                    )
-                ):
-                    continue
+            if provider_name == "browser" and not _browser_resource_admitted(
+                    integration, resource_browser_origins, authorized_browser_origins, autonomy):
+                continue
             actions = list(resource.get("actions", []))
             for action in actions:
                 scope = str(action.get("scope", ""))
@@ -745,18 +746,8 @@ class ManagedRuntimeExecutor:
                 if capability is None:
                     self._capability_exclusions.append({"resourceId": resource_id, "scope": scope, "reason": "Provider tool is disabled or unavailable"})
                     continue
-                policy_started = time.monotonic()
-                policy = await self._policy_decision(
-                    item=item,
-                    agent=agent,
-                    resource_id=resource_id,
-                    scope=scope,
-                    preparation_cache=preparation_cache,
-                )
-                policy_seconds = time.monotonic() - policy_started
-                self._tool_preparation_metrics["policyChecks"] += 1
-                self._tool_preparation_metrics["policySeconds"] += policy_seconds
-                self._tool_preparation_metrics["slowestPolicySeconds"] = max(self._tool_preparation_metrics["slowestPolicySeconds"], policy_seconds)
+                policy = await self._timed_policy_decision(item=item, agent=agent, resource_id=resource_id,
+                                                           scope=scope, preparation_cache=preparation_cache)
                 if policy.get("outcome") == "DENY":
                     self._capability_exclusions.append({"resourceId": resource_id, "scope": scope,
                         "reason": str(policy.get("explanation") or policy.get("reason") or "Organizational policy denies this action")})
@@ -794,6 +785,17 @@ class ManagedRuntimeExecutor:
         self._tool_preparation_metrics["policySeconds"] = round(self._tool_preparation_metrics["policySeconds"], 3)
         telemetry_logger.info("Planner tool preparation work_item=%s timing=%s", item.id, self._tool_preparation_metrics)
         return tools
+
+    async def _timed_policy_decision(self, **arguments: Any) -> dict:
+        """The policy decision for one candidate tool, timed into the tool-preparation metrics."""
+        started = time.monotonic()
+        policy = await self._policy_decision(**arguments)
+        seconds = time.monotonic() - started
+        metrics = self._tool_preparation_metrics
+        metrics["policyChecks"] += 1
+        metrics["policySeconds"] += seconds
+        metrics["slowestPolicySeconds"] = max(metrics["slowestPolicySeconds"], seconds)
+        return policy
 
     async def _execution_catalog(self, item: WorkItem) -> dict:
         catalog = await _catalog(self._session, item.organization_id)
@@ -967,150 +969,72 @@ class ManagedRuntimeExecutor:
             await self._session.commit()
             return RuntimeStepOutcome("continue", item.id, run.id, current_step, "Looking for the write's outcome again.")
         item.status, run.status = state, state
-        _write_runtime_meta(item, queueState=state, waitingReason=error.safe_message,
+        content = error.safe_message + (" Completed steps remain saved." if saved_note else "")
+        references = None
+        if state == "uncertain_outcome" and step is not None:
+            # Name the write, where to look, and offer the three answers in the chat (F21).
+            spec = step.input or {}
+            content = uncertain_write(scope, as_map(spec.get("actionInput")), await self._resource_name(spec.get("resourceId")))
+            references = {"type": "work_item", "id": str(item.id), "controls": "outcome"}
+        _write_runtime_meta(item, queueState=state, waitingReason=content,
             executionCertainty="uncertain" if state == "uncertain_outcome" else "not_executed")
-        await notify_integration_work(self._session, item, key=f"{state}:{current_step}",
-            content=error.safe_message + (" Completed steps remain saved." if saved_note else ""))
+        await notify_integration_work(self._session, item, key=f"{state}:{current_step}", content=content,
+                                      references=references)
         await self._session.commit()
         return RuntimeStepOutcome("noop", item.id, run.id, current_step, error.safe_message)
 
+    async def _resource_name(self, resource_id: object) -> str | None:
+        """A resource's name for a message (None when unknown)."""
+        from app.infrastructure.database.models import IntegrationResource
+
+        try:
+            return await self._session.scalar(select(IntegrationResource.display_name).where(
+                IntegrationResource.id == UUID(str(resource_id))))
+        except ValueError:
+            return None
+
     def _planner_observations(self, steps: list[RunStep]) -> list[dict[str, object]]:
+        """What the planner is shown of each step: its identity and summary, and its output as
+        compacted evidence (app.application.context.evidence)."""
         observations: list[dict[str, object]] = []
         for step in steps:
-            if step.status != "completed" and not (step.status == "failed" and (_step_output(step).get("data") or {}).get("integrationFailure")):
-                continue
-            spec = dict(step.input or {}) if isinstance(step.input, dict) else {}
             output = _step_output(step)
+            data = as_map(output.get("data"))
+            if step.status != "completed" and not (step.status == "failed" and data.get("integrationFailure")):
+                continue
+            spec = as_map(step.input)
+            scope = str(spec.get("scope", ""))
             entry: dict[str, object] = {
                 "trust": "untrusted_tool_output",
                 "step": step.step_index + 1,
                 "status": step.status,
                 "title": str(spec.get("title", "")),
-                "scope": str(spec.get("scope", "")),
+                "scope": scope,
                 "resourceId": str(spec.get("resourceId", "")),
                 "summary": str(output.get("summary", ""))[:2000],
             }
             action_input = spec.get("actionInput")
-            if spec.get("scope") == "github.repository.contents.read" and isinstance(action_input, dict):
-                entry["actionInput"] = {key: action_input[key] for key in ("path", "ref") if key in action_input}
             if isinstance(action_input, dict):
-                entry["actionFingerprint"] = hashlib.sha256(
-                    json.dumps(
-                        {"scope": spec.get("scope"), "resource": spec.get("resourceId"),
-                         "input": action_input}, sort_keys=True, default=str,
-                    ).encode("utf-8")
-                ).hexdigest()
-            if spec.get("scope") == "browser.element.press_key":
-                action_input = spec.get("actionInput")
-                if isinstance(action_input, dict):
-                    entry["actionInput"] = {"value": str(action_input.get("value") or "")[:32]}
-            data = output.get("data")
-            data_map = data if isinstance(data, dict) else {}
-            if data_map.get("integrationFailure"):
-                entry["data"] = {"integrationFailure": data_map["integrationFailure"]}
-            provider_output = data_map.get("output")
-            provider_map = provider_output if isinstance(provider_output, dict) else {}
-            browser_observation = provider_map.get("observation")
-            if isinstance(browser_observation, dict):
-                raw_elements = browser_observation.get("elements")
-                elements = [
-                    element
-                    for element in (raw_elements if isinstance(raw_elements, list) else [])
-                    if isinstance(element, dict)
-                ]
-                raw_form_details = browser_observation.get("formDetails")
-                form_details = (
-                    raw_form_details if isinstance(raw_form_details, list) else []
-                )
-                form_refs: set[str] = set()
-                for form in form_details:
-                    if not isinstance(form, dict):
-                        continue
-                    for key in ("fieldRefs", "submitRefs"):
-                        refs = form.get(key)
-                        if isinstance(refs, list):
-                            form_refs.update(str(ref) for ref in refs)
-
-                ranked_elements: list[tuple[int, str, dict[str, object]]] = []
-                for element in elements:
-                    ref = str(element.get("ref") or "")
-                    tag = str(element.get("tag") or "").lower()
-                    role = str(element.get("role") or "").lower()
-                    element_type = str(element.get("element_type") or "").lower()
-                    if ref in form_refs:
-                        priority = 0
-                    elif (
-                        tag in {"input", "textarea", "select", "button"}
-                        or role in {"textbox", "checkbox", "combobox", "button"}
-                        or element_type in {"text", "email", "checkbox", "submit"}
-                    ):
-                        priority = 1
-                    else:
-                        priority = 2
-                    ranked_elements.append((priority, ref, element))
-                ranked_elements.sort(key=lambda item: (item[0], item[1]))
-
-                compact_elements: list[dict[str, object]] = []
-                for _, _, element in ranked_elements[:100]:
-                    compact: dict[str, object] = {}
-                    for key in (
-                        "ref",
-                        "tag",
-                        "role",
-                        "element_type",
-                        "field_name",
-                        "checked",
-                        "disabled",
-                        "keyboard_enter_safe",
-                    ):
-                        if key in element:
-                            compact[key] = element.get(key)
-                    for key, limit in (
-                        ("name", 240),
-                        ("text", 240),
-                        ("href", 320),
-                        ("value", 240),
-                    ):
-                        if key in element and element.get(key) is not None:
-                            compact[key] = str(element.get(key))[:limit]
-                    compact_elements.append(compact)
-
-                action_evidence = provider_map.get("actionEvidence")
-                compact_action_evidence = (
-                    {
-                        "operation": action_evidence.get("operation"),
-                        "result": action_evidence.get("result"),
-                        "outcome": action_evidence.get("outcome"),
-                        "verification": action_evidence.get("verification"),
-                        "stateChanged": action_evidence.get("stateChanged"),
-                        "elementReference": action_evidence.get("elementReference"),
-                        "beforeObservationId": action_evidence.get("beforeObservationId"),
-                        "afterObservationId": action_evidence.get("afterObservationId"),
-                    }
-                    if isinstance(action_evidence, dict)
-                    else {}
-                )
-                entry["browserObservation"] = {
-                    "id": browser_observation.get("id"),
-                    "sessionId": browser_observation.get("sessionId"),
-                    "url": browser_observation.get("url"),
-                    "title": browser_observation.get("title"),
-                    "formDetails": form_details,
-                    "elements": compact_elements,
-                    "pageState": browser_observation.get("pageState", {}),
-                    "actionEvidence": compact_action_evidence,
-                    "visibleText": str(browser_observation.get("visibleText") or "")[:12000],
-                    "ariaSnapshot": str(browser_observation.get("ariaSnapshot") or "")[:2500],
-                }
+                entry["actionFingerprint"] = planned_action_fingerprint(scope, spec.get("resourceId"), action_input)
+            request = as_map(action_input)
+            if scope == "github.repository.contents.read" and isinstance(action_input, dict):
+                entry["actionInput"] = {key: request[key] for key in ("path", "ref") if key in request}
+            elif scope == "browser.element.press_key" and isinstance(action_input, dict):
+                entry["actionInput"] = {"value": str(request.get("value") or "")[:32]}
+            if data.get("integrationFailure"):
+                entry["data"] = {"integrationFailure": data["integrationFailure"]}
+            provider_output = data.get("output")
+            verification = as_map(data.get("verification"))
+            observation = as_map(provider_output).get("observation")
+            if isinstance(observation, dict):
+                entry["browserObservation"] = browser_evidence(
+                    as_map(observation), as_map(provider_output).get("actionEvidence"))
             else:
-                from app.runtime.evidence import bounded_evidence
-                entry["providerOutput"] = bounded_evidence(provider_map)
-            verification = data_map.get("verification")
-            if isinstance(verification, dict):
-                entry["verification"] = {
-                    "verified": verification.get("verified"),
-                    "summary": verification.get("summary"),
-                }
+                entry["providerOutput"] = compact_output(
+                    scope, provider_output, action_input=request,
+                    confirmed_fields=as_map(verification.get("details")).get("confirmedFields"))
+            if isinstance(data.get("verification"), dict):
+                entry["verification"] = {"verified": verification.get("verified"), "summary": verification.get("summary")}
             observations.append(entry)
         return observations
 
@@ -1343,34 +1267,8 @@ class ManagedRuntimeExecutor:
             if smart is None:
                 decision = await self._choose_planner_decision(**arguments)
             else:
-                assert smart.decision is not None
-                from app.runtime.smart_planner import recovery_context
-                recovery = recovery_context(steps, durable_observations, smart.decision)
-                arguments["trigger"] = {**trigger, "recovery": recovery}
-                async def choose_route(gateway):
-                    return await self._choose_planner_decision(**arguments,
-                        planner=AdaptiveRuntimePlanner(gateway))
-                decision = await smart.choose({"revision": str(revision.id), "definition": definition,
-                    "tools": tools, "observations": arguments["observations"], "trigger": trigger,
-                    "profile": profile, "memory": memory_context}, choose_route)
-                refreshed_tools = await self._planner_tools(item=item, revision=revision, agent=agent)
-                if refreshed_tools != tools:
-                    smart.decision.status = "pending"
-                    smart.decision.accepted_proposal = None
-                    await self._session.commit()
-                    raise AIProviderError("invalid_provider_response",
-                        "Available authority changed during planning; revalidation is required.", retryable=False)
-                payload = dict(item.payload or {})
-                runtime = dict(payload.get("runtime") or {})
-                runtime.update(plannerDecisionId=str(smart.decision.id),
-                    plannerRecoveryRound=smart.decision.recovery_round,
-                    plannerRecoveryMode=recovery["mode"], plannerStatus="accepted",
-                    plannerAttemptCount=smart.attempt_count,
-                    plannerElapsedSeconds=round(settings.runtime_planner_timeout_seconds-smart.remaining(), 3))
-                runtime["aiRetryCount"] = 0
-                payload["runtime"] = runtime
-                item.payload = payload
-                await self._session.commit()
+                decision = await self._smart_decision(smart, arguments, revision=revision, agent=agent,
+                                                      durable_observations=durable_observations)
         finally:
             ai_seconds = time.monotonic() - ai_started
             logger.info("Runtime AI response finished work_item=%s run=%s elapsed=%.3fs",
@@ -1389,6 +1287,37 @@ class ManagedRuntimeExecutor:
         await self._session.flush()
         return decision
 
+    async def _smart_decision(self, smart, arguments: dict[str, Any], *, revision: JobRevision,
+                              agent: AgentIdentity, durable_observations: list) -> AdaptivePlanDecision:
+        """Plan through the smart planner's routes, then check that the tools are still authorized
+        (planning can take minutes) before accepting the decision."""
+        assert smart.decision is not None
+        from app.runtime.smart_planner import recovery_context
+        item, trigger, tools = arguments["item"], arguments["trigger"], arguments["tools"]
+        recovery = recovery_context(arguments["steps"], durable_observations, smart.decision)
+        arguments["trigger"] = {**trigger, "recovery": recovery}
+
+        async def choose_route(gateway):
+            return await self._choose_planner_decision(**arguments, planner=AdaptiveRuntimePlanner(gateway))
+        decision = await smart.choose({"revision": str(revision.id), "definition": arguments["definition"],
+            "tools": tools, "observations": arguments["observations"], "trigger": trigger,
+            "profile": arguments["profile"], "memory": arguments["memory_context"]}, choose_route)
+        if await self._planner_tools(item=item, revision=revision, agent=agent) != tools:
+            smart.decision.status = "pending"
+            smart.decision.accepted_proposal = None
+            await self._session.commit()
+            raise AIProviderError("invalid_provider_response",
+                "Available authority changed during planning; revalidation is required.", retryable=False)
+        self._revalidated_catalog = self._last_catalog
+        _write_runtime_meta(item, plannerDecisionId=str(smart.decision.id),
+            plannerRecoveryRound=smart.decision.recovery_round,
+            plannerRecoveryMode=recovery["mode"], plannerStatus="accepted",
+            plannerAttemptCount=smart.attempt_count,
+            plannerElapsedSeconds=round(settings.runtime_planner_timeout_seconds - smart.remaining(), 3),
+            aiRetryCount=0)
+        await self._session.commit()
+        return decision
+
     async def _choose_planner_decision(self, *, item, run, job, worker, definition, profile,
         memory_context, trigger, tools, observations, steps, planner=None, plan=None, plan_revisions_left=0):
         decision = await (planner or self._planner).choose_next(
@@ -1398,9 +1327,7 @@ class ManagedRuntimeExecutor:
                 "instructions": str(definition.get("instructions", "")),
                 "completionCriteria": list(definition.get("completionCriteria", [])),
                 "capabilityExclusions": getattr(self, "_capability_exclusions", [])[:30],
-                "availableCapabilityScopes": [
-                    str(tool.get("scope", "")) for tool in tools
-                ],
+                "workItemId": str(item.id),
             },
             worker={
                 "name": worker.name,
@@ -1441,9 +1368,14 @@ class ManagedRuntimeExecutor:
             return  # a replayed first decision: the plan is already saved
         revision = _count(_runtime_meta(item).get("planRevisions")) + (1 if rows else 0)
         if rows:
-            # The revision replaces every step not yet done; its numbers continue after them.
-            for row in rows:
-                if row.status == "pending":
+            # The revision replaces the steps with no completed work; its numbers continue after them.
+            view = _plan_view(rows, list(getattr(self, "_plan_steps", [])))
+            for row, step in zip(rows, view, strict=True):
+                if row.status != "pending":
+                    continue
+                if survives_revision(step):
+                    row.status = "done"
+                else:
                     row.status = "superseded"
                     await self._session.delete(row)
             logger.info("Runtime plan revised work_item=%s run=%s revision=%s reason=%s",
@@ -1483,7 +1415,7 @@ class ManagedRuntimeExecutor:
         decision: AdaptivePlanDecision,
         step_index: int,
     ) -> RunStep:
-        catalog = await self._execution_catalog(item)
+        catalog = self._revalidated_catalog or await self._execution_catalog(item)
         resource = next(
             (
                 candidate
@@ -1808,106 +1740,13 @@ class ManagedRuntimeExecutor:
             )
 
         if decision["outcome"] == "DENY":
-            action = existing or Action(
-                organization_id=item.organization_id,
-                agent_id=agent.id,
-                run_id=run.id,
-                status="blocked",
-                resource_id=resource_id,
-                scope=scope,
-                idempotency_key=proposal.idempotency_key,
-                payload={},
-            )
-            if existing is None:
-                self._session.add(action)
-            action.status = "blocked"
-            action.payload = self._action_record_payload(
-                proposal=proposal,
-                decision=decision,
-                fingerprint=fingerprint,
-                result=None,
-                error=str(decision["reason"]),
-            )
-            await self._fail(
-                item=item,
-                run=run,
-                step=step,
-                message=str(decision["reason"]),
-            )
-            return RuntimeStepOutcome(
-                state="failed",
-                work_item_id=item.id,
-                run_id=run.id,
-                current_step=current_step,
-                summary=str(decision["reason"]),
-            )
-
+            return await self._deny(item=item, run=run, step=step, agent=agent, proposal=proposal,
+                                    decision=decision, fingerprint=fingerprint, existing=existing,
+                                    current_step=current_step)
         if decision["outcome"] == "REQUIRE_APPROVAL":
-            action = existing or Action(
-                organization_id=item.organization_id,
-                agent_id=agent.id,
-                run_id=run.id,
-                status="held",
-                resource_id=resource_id,
-                scope=scope,
-                idempotency_key=proposal.idempotency_key,
-                payload={},
-            )
-            if existing is None:
-                self._session.add(action)
-                await self._session.flush()
-            approval = await self._session.scalar(
-                select(Approval).where(Approval.action_id == action.id)
-            )
-            if approval is None:
-                approval = Approval(
-                    organization_id=item.organization_id,
-                    action_id=action.id,
-                    status="pending",
-                    decided_by=None,
-                    decision_reason=None,
-                )
-                self._session.add(approval)
-                await self._session.flush()
-            action.status = "held"
-            action.payload = self._action_record_payload(
-                proposal=proposal,
-                decision=decision,
-                fingerprint=fingerprint,
-                result=None,
-                error=None,
-            )
-            step.status = "waiting_approval"
-            step.output = {
-                "actionId": str(action.id),
-                "approvalId": str(approval.id),
-                "actionFingerprint": fingerprint,
-                "approvalReason": str(decision.get("reason") or "Human approval is required."),
-            }
-            run.status = "waiting_approval"
-            item.status = "waiting_approval"
-            _write_runtime_meta(
-                item,
-                waitingReason=str(decision.get("reason") or "Human approval is required."),
-                approvalId=str(approval.id),
-            )
-            await self._queue_action_events(
-                item=item,
-                action=action,
-                approval=approval,
-                event="approval.created",
-            )
-            await notify_integration_work(self._session, item, key=f"approval:{approval.id}",
-                content=f"I need approval for {scope} on {resource_id}. {decision.get('reason', 'Organizational policy requires approval.')} Proposed content: {json.dumps(input_payload, ensure_ascii=False)[:3000]}",
-                references={"type": "approval", "id": str(approval.id)})
-            await self._session.commit()
-            return RuntimeStepOutcome(
-                state="waiting_approval",
-                work_item_id=item.id,
-                run_id=run.id,
-                current_step=current_step,
-                summary=str(decision.get("reason") or "Action is waiting for human approval."),
-            )
+            return await self._hold_for_approval(item=item, run=run, step=step, agent=agent, proposal=proposal,
+                                                 decision=decision, fingerprint=fingerprint, existing=existing,
+                                                 current_step=current_step)
 
         return await self._execute_authorized(
             item=item,
@@ -1922,6 +1761,72 @@ class ManagedRuntimeExecutor:
             current_step=current_step,
             existing=existing,
         )
+
+    def _action_record(self, *, existing: Action | None, item: WorkItem, run: Run, agent: AgentIdentity,
+                       proposal: ActionProposal, status: str) -> Action:
+        """The step's action record: the one saved for this idempotency key, or a new one."""
+        action = existing or Action(
+            organization_id=item.organization_id,
+            agent_id=agent.id,
+            run_id=run.id,
+            status=status,
+            resource_id=proposal.resource_id,
+            scope=proposal.scope,
+            idempotency_key=proposal.idempotency_key,
+            payload={},
+        )
+        if existing is None:
+            self._session.add(action)
+        return action
+
+    async def _deny(self, *, item: WorkItem, run: Run, step: RunStep, agent: AgentIdentity, proposal: ActionProposal,
+                    decision: dict[str, Any], fingerprint: str, existing: Action | None,
+                    current_step: int) -> RuntimeStepOutcome:
+        """Policy denies the action: record it as blocked and end the task."""
+        action = self._action_record(existing=existing, item=item, run=run, agent=agent, proposal=proposal,
+                                     status="blocked")
+        action.status = "blocked"
+        action.payload = self._action_record_payload(
+            proposal=proposal, decision=decision, fingerprint=fingerprint, result=None, error=str(decision["reason"]))
+        await self._fail(item=item, run=run, step=step, message=str(decision["reason"]))
+        return RuntimeStepOutcome(state="failed", work_item_id=item.id, run_id=run.id,
+                                  current_step=current_step, summary=str(decision["reason"]))
+
+    async def _hold_for_approval(self, *, item: WorkItem, run: Run, step: RunStep, agent: AgentIdentity,
+                                 proposal: ActionProposal, decision: dict[str, Any], fingerprint: str,
+                                 existing: Action | None, current_step: int) -> RuntimeStepOutcome:
+        """Policy asks a person first: hold the action, open an approval and say plainly what waits.
+        The policy's own reason stays in the step's record (approvalReason)."""
+        action = self._action_record(existing=existing, item=item, run=run, agent=agent, proposal=proposal,
+                                     status="held")
+        await self._session.flush()
+        approval = await self._session.scalar(select(Approval).where(Approval.action_id == action.id))
+        if approval is None:
+            approval = Approval(organization_id=item.organization_id, action_id=action.id, status="pending",
+                                decided_by=None, decision_reason=None)
+            self._session.add(approval)
+            await self._session.flush()
+        action.status = "held"
+        action.payload = self._action_record_payload(
+            proposal=proposal, decision=decision, fingerprint=fingerprint, result=None, error=None)
+        waiting = approval_wait(proposal.scope, proposal.payload,
+                                str((decision.get("request") or {}).get("resourceName") or "") or None)
+        step.status = "waiting_approval"
+        step.output = {
+            "actionId": str(action.id),
+            "approvalId": str(approval.id),
+            "actionFingerprint": fingerprint,
+            "approvalReason": str(decision.get("reason") or "Human approval is required."),
+        }
+        run.status = "waiting_approval"
+        item.status = "waiting_approval"
+        _write_runtime_meta(item, waitingReason=waiting, approvalId=str(approval.id))
+        await self._queue_action_events(item=item, action=action, approval=approval, event="approval.created")
+        await notify_integration_work(self._session, item, key=f"approval:{approval.id}", content=waiting,
+                                      references={"type": "approval", "id": str(approval.id)})
+        await self._session.commit()
+        return RuntimeStepOutcome(state="waiting_approval", work_item_id=item.id, run_id=run.id,
+                                  current_step=current_step, summary=waiting)
 
     async def _resume_approved_action(
         self,
@@ -2384,8 +2289,7 @@ class ManagedRuntimeExecutor:
                 "error": message[:1000],
             },
         )
-        await notify_integration_work(self._session, item, key="failed",
-            content=f"I could not complete the remaining work: {message[:2000]} Already completed actions remain saved; no rollback is claimed.")
+        await notify_integration_work(self._session, item, key="failed", content=refused_write(message[:2000]))
         await self._session.commit()
 
     async def _apply_stop_after_next_run(

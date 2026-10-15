@@ -36,8 +36,15 @@ def test_prompt_preserves_large_complete_tool_catalog() -> None:
         action_count=0, max_actions=20, validation_feedback="",
     )
     serialized = prompt.split("AUTHORIZED TOOLS\n", 1)[1].split("\n\nRECORDED OBSERVATIONS", 1)[0]
-    assert len(serialized) > 12000
-    assert json.loads(serialized) == tools
+    shown = {(resource["resourceId"], tool["scope"]): tool for resource in json.loads(serialized)
+             for tool in resource["tools"]}
+    # Nothing the model needs is lost: every pair, description, input property and required name.
+    assert len(shown) == len(tools)
+    for tool in tools:
+        listed, schema = shown[(tool["resourceId"], tool["scope"])], tool["inputSchema"]
+        assert listed["description"] == tool["description"]
+        assert listed.get("input", {}).get("properties", {}) == schema.get("properties", {})
+        assert listed.get("input", {}).get("required", []) == schema.get("required", [])
 
 
 def test_same_url_text_and_state_changes_are_enter_progress() -> None:

@@ -500,7 +500,8 @@ async def test_planner_follows_observed_search_to_results_without_shortcuts() ->
          "resourceId": "browser-1", "scope": "browser.navigation.follow_link",
          "input": {"locator": {"strategy": "observation_ref", "value": "e70"}}},
         {"decision": "finish", "summary": "The latest dated match and score are visible.",
-         "title": "Result found", "instruction": "Report the observed result."},
+         "title": "Result found", "instruction": "Report the observed result.",
+         "criteria": [{"criterion": "Dated match and score observed on ESPN.", "status": "met", "evidenceSteps": []}]},
     ])
     tools: list[dict[str, object]] = [
         {"resourceId": "browser-1", "scope": scope}
@@ -1384,16 +1385,20 @@ async def test_adaptive_planner_rejects_repeat_scroll_without_new_actionable_sta
 
 
 def test_planner_observation_prioritizes_form_refs_before_page_prose() -> None:
-    source = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
-    browser_block_start = source.index('entry["browserObservation"] = {')
-    browser_block = source[browser_block_start : browser_block_start + 1800]
+    from app.application.context.evidence import browser_evidence
 
-    assert browser_block.index('"formDetails"') < browser_block.index('"visibleText"')
-    assert browser_block.index('"elements"') < browser_block.index('"visibleText"')
-    assert '"value", 240' in source
-    assert '"field_name"' in source
-    assert '"elementReference": action_evidence.get("elementReference")' in source
-    assert "form_refs" in source
+    observation = {
+        "formDetails": [{"fieldRefs": ["e9"], "submitRefs": []}],
+        "elements": [{"ref": "e1", "tag": "p", "text": "prose"}, {"ref": "e2", "tag": "button", "name": "Go"},
+                     {"ref": "e9", "tag": "input", "field_name": "q", "value": "v" * 300}],
+        "visibleText": "page",
+    }
+    shown = browser_evidence(observation, {"elementReference": "e9", "ignored": True})
+    keys = list(shown)
+    assert keys.index("formDetails") < keys.index("visibleText") and keys.index("elements") < keys.index("visibleText")
+    assert [element["ref"] for element in shown["elements"]] == ["e9", "e2", "e1"]  # form field, control, prose
+    assert shown["elements"][0]["field_name"] == "q" and len(shown["elements"][0]["value"]) == 240
+    assert shown["actionEvidence"]["elementReference"] == "e9" and "ignored" not in shown["actionEvidence"]
 
 
 

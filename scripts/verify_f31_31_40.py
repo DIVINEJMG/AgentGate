@@ -120,7 +120,7 @@ if '"trust": "untrusted_external_data"' not in context:
     errors.append("F31.36 attachment context is not explicitly marked untrusted")
 if '"trust": "untrusted_tool_output"' not in managed:
     errors.append("F31.36 runtime tool observations are not explicitly marked untrusted")
-if "outside the resolved allowlist" not in intent and "unavailable resource/capability pair" not in read(
+if "outside the resolved allowlist" not in intent and "Only an authorized tool can be chosen" not in read(
     "backend/app/runtime/planner/adaptive.py"
 ):
     errors.append("F31.36 planner allowlist boundary is missing")

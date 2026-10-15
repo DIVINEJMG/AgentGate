@@ -58,7 +58,11 @@ def ai_gateway_from_settings(
     planner: bool = False,
     workload: str = "interactive",
     purpose: str = "human_request",
+    durable_telemetry: bool = False,
 ) -> AIGateway:
+    """The configured gateway. Invocation records go in the caller's session, or, with
+    `durable_telemetry` (and always for the planner), in their own short transactions, so a caller
+    that releases its transaction before a model call keeps it released."""
     if not config.ai_enabled:
         return UnconfiguredAIGateway("Aduoryn AI is disabled for this environment.")
     legacy_key = _secret_value(config.ai_provider_api_key)
@@ -79,7 +83,7 @@ def ai_gateway_from_settings(
         base_url=config.ai_provider_base_url,
         timeout_seconds=config.runtime_planner_timeout_seconds if planner else config.ai_timeout_seconds,
     )
-    if planner:
+    if planner or durable_telemetry:
         recorder = DurableAIInvocationRecorder()
     else:
         recorder = SQLAlchemyAIInvocationRecorder(session) if session is not None else None

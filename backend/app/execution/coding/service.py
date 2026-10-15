@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import difflib
 import hashlib
 import json
 import logging
@@ -22,7 +21,13 @@ from app.execution.contracts import ExecutionErrorCode, ExecutionProviderError
 from app.execution.providers.integration_hooks import HookUnavailable
 from app.execution.providers.native.github.artifacts import store_task_artifact
 from app.execution.providers.native.github.safety import SECRET, safe_path, validate_changes
-from app.infrastructure.database.models import Artifact, CodingBudget, CodingCommand, CodingSession
+from app.infrastructure.database.models import (
+    Artifact,
+    CodingBudget,
+    CodingCommand,
+    CodingSession,
+    WorkItem,
+)
 from app.infrastructure.database.session import session_factory
 from app.infrastructure.redis.coordination import RedisCoordinator
 from app.infrastructure.storage.provider import object_storage_from_settings
@@ -30,6 +35,7 @@ from app.infrastructure.storage.provider import object_storage_from_settings
 from .bundles import manifest_fingerprint, source_manifest
 from .e2b import E2BCodingRuntime
 from .manifest_export import SCAN_SCRIPT
+from .patch import workspace_patch
 
 logger = logging.getLogger("uvicorn.error")
 _stage = ContextVar("coding_action_stage", default="preparation")
@@ -256,19 +262,66 @@ async def admit_capacity(session, request):
     )
 
 
-async def reserve(session, request):
-    await admit_capacity(session, request)
-    day = datetime.now(UTC).date().isoformat()
+FINISHED_WORK = {"completed", "failed", "cancelled", "partial_completion", "policy_denied"}
+
+
+async def committed_seconds(session, organization_id, day) -> int:
+    """Coding time today's sessions hold: a session still working keeps its whole reservation;
+    one whose task has ended (or whose time was given back) counts only what it used. Worked out
+    from the sessions each time, so a reservation an ended task never gave back, or one left by
+    an attempt that saved no session, cannot hold the budget."""
+    rows = (
+        await session.execute(
+            select(
+                CodingSession.status,
+                CodingSession.active_seconds,
+                CodingSession.evidence,
+                WorkItem.status,
+            )
+            .join(WorkItem, WorkItem.id == CodingSession.work_item_id, isouter=True)
+            .where(
+                CodingSession.organization_id == organization_id,
+                CodingSession.evidence["budgetDay"].astext == day,
+            )
+        )
+    ).all()
+    total = 0
+    for status, active, evidence, item_status in rows:
+        evidence = evidence or {}
+        reserved = int(evidence.get("reservedSeconds") or 0)
+        used = max(0, int(active or 0) - int(evidence.get("budgetActiveBaseline") or 0))
+        ended = (
+            evidence.get("budgetReleased")
+            or status in {"closed", "expired", "failed"}
+            or item_status is None
+            or item_status in FINISHED_WORK
+        )
+        total += (
+            min(used, reserved) if ended and reserved else used if ended else max(reserved, used)
+        )
+    return total
+
+
+async def _daily_budget(session, organization_id, day):
     await session.execute(
         insert(CodingBudget)
-        .values(id=uuid4(), organization_id=request.organization_id, day=day, reserved_seconds=0)
+        .values(id=uuid4(), organization_id=organization_id, day=day, reserved_seconds=0)
         .on_conflict_do_nothing(constraint="uq_coding_daily_budget")
     )
     budget = await session.scalar(
         select(CodingBudget)
-        .where(CodingBudget.organization_id == request.organization_id, CodingBudget.day == day)
+        .where(CodingBudget.organization_id == organization_id, CodingBudget.day == day)
         .with_for_update()
     )
+    # The saved total follows the sessions, so any earlier leak is corrected here.
+    budget.reserved_seconds = await committed_seconds(session, organization_id, day)
+    return budget
+
+
+async def reserve(session, request):
+    await admit_capacity(session, request)
+    day = datetime.now(UTC).date().isoformat()
+    budget = await _daily_budget(session, request.organization_id, day)
     if (
         budget.reserved_seconds + settings.coding_task_active_seconds
         > settings.coding_organization_daily_seconds
@@ -302,16 +355,7 @@ async def rollover_budget(session, row, request, now):
     if row.evidence.get("budgetDay") == day:
         return
     remaining = max(0, settings.coding_task_active_seconds - row.active_seconds)
-    await session.execute(
-        insert(CodingBudget)
-        .values(id=uuid4(), organization_id=row.organization_id, day=day, reserved_seconds=0)
-        .on_conflict_do_nothing(constraint="uq_coding_daily_budget")
-    )
-    budget = await session.scalar(
-        select(CodingBudget)
-        .where(CodingBudget.organization_id == row.organization_id, CodingBudget.day == day)
-        .with_for_update()
-    )
+    budget = await _daily_budget(session, row.organization_id, day)
     if budget.reserved_seconds + remaining > settings.coding_organization_daily_seconds:
         raise coding_error(
             request,
@@ -387,25 +431,7 @@ async def export(runtime, row, request, configuration):
         validate_changes(changes, configuration.get("constraints", {}))
     except ValueError:
         publication_blocker = "Workspace changes exceed the authorized publication paths or limits. Review the diff before publishing."
-    patch = "".join(
-        "".join(
-            difflib.unified_diff(
-                (
-                    original.get(c["path"], "")
-                    if isinstance(original.get(c["path"], ""), str)
-                    else "[Binary content]\n"
-                ).splitlines(keepends=True),
-                (
-                    current.get(c["path"], "")
-                    if isinstance(current.get(c["path"], ""), str)
-                    else "[Binary content changed]\n"
-                ).splitlines(keepends=True),
-                fromfile="a/" + c["path"],
-                tofile="b/" + c["path"],
-            )
-        )
-        for c in changes
-    )
+    patch = workspace_patch((change["path"] for change in changes), original, current)
     # A fresh scan is mandatory even when reusing a saved diff artifact.
     if (
         manifest_mode
@@ -417,6 +443,7 @@ async def export(runtime, row, request, configuration):
         if saved.get("sourceFingerprint") == fingerprint and saved.get("changes") == changes:
             return {
                 **saved,
+                "diff": patch,
                 "artifact": {"artifactId": row.evidence["exportArtifactId"]},
                 "publicationAllowed": publication_blocker is None,
                 "publicationBlocker": publication_blocker,

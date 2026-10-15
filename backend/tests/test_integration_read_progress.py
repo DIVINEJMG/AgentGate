@@ -4,9 +4,9 @@ from typing import cast
 
 import pytest
 
+from app.application.context.evidence import planner_evidence
 from app.application.services.task_activity import action_phase
 from app.domain.ai.providers import AIGateway
-from app.runtime.evidence import planner_evidence
 from app.runtime.planner.adaptive import AdaptiveRuntimePlanner, _repeated_integration_read
 
 

@@ -3,7 +3,7 @@ import type { OrganizationAccess } from '../lib/identityApi';
 import { decideApproval, listApprovals, type ApprovalRecord } from '../lib/approvalApi';
 import type { ApiVersion } from '../lib/systemApi';
 import { loadWorkforce, type ManagedWorker } from '../lib/workforceApi';
-import { confirmConversationCommand, createConversation, getConversation, listConversations, sendConversationMessage, uploadConversationAttachment, type ConversationMessage, type ConversationReceipt, type ConversationThread } from '../lib/conversationApi';
+import { confirmConversationCommand, createConversation, getConversation, listConversations, retryConversationMessage, sendConversationMessage, uploadConversationAttachment, type ConversationMessage, type ConversationReceipt, type ConversationThread } from '../lib/conversationApi';
 import type { AppView } from '../navigation';
 import { subscribeOrganizationRealtime } from '../platform/realtimeClient';
 import { approvalInConversation, latestThreadId, threadsForWorker, type LiveResultReference } from './workerChatModel';
@@ -37,6 +37,8 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [receipt, setReceipt] = useState<ConversationReceipt | null>(null);
+  // The message the receipt belongs under: once a later message arrives, the receipt card is stale.
+  const [receiptAnchor, setReceiptAnchor] = useState<string | null>(null);
   const [approvals, setApprovals] = useState<ApprovalRecord[]>([]);
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState('');
@@ -176,16 +178,27 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
         answering ? { resumeCommandId: answering } : {});
       const result = await getConversation(apiVersion, organization.id, activeThreadId);
       if (createdThreadId) { setThreadId(createdThreadId); navigate({ page: 'conversations', workerId: worker.id, threadId: createdThreadId }, { replace: true }); }
-      setMessages(result.messages);
-      setReceipt(turn.receipt);
+      showTurn(turn.receipt, result.messages);
       setThreads((current) => current.map((item) => item.id === activeThreadId ? result.thread : item));
       setDraft(''); setFiles([]);
       if (fileInput.current) fileInput.current.value = '';
     } catch (caught) {
-      // Not sent: take the message back out and return it to the composer.
-      if (pendingId) { const failed = pendingId; setMessages((current) => current.filter((item) => item.id !== failed)); setDraft(sentDraft); }
+      // The server saves a message before replying; if it was saved, keep it (no resend). Otherwise
+      // take it back out and return it to the composer.
+      const sentThread = createdThreadId ?? threadId;
+      const saved = sentThread ? await getConversation(apiVersion, organization.id, sentThread).catch(() => null) : null;
+      const copies = (list: ConversationMessage[]) => list.filter((item) => item.role === 'human' && item.content === sentDraft.trim()).length;
+      const kept = saved !== null && copies(saved.messages) > copies(messages);
+      if (kept && saved) setMessages(saved.messages);
+      else if (pendingId) { const failed = pendingId; setMessages((current) => current.filter((item) => item.id !== failed)); setDraft(sentDraft); }
       if (createdThreadId) { setThreadId(createdThreadId); navigate({ page: 'conversations', workerId: worker.id, threadId: createdThreadId }, { replace: true }); } setError(errorText(caught));
     } finally { setBusy(false); setResponsePhase(null); }
+  }
+
+  function showTurn(next: ConversationReceipt, thread: ConversationMessage[]) {
+    setMessages(thread);
+    setReceipt(next);
+    setReceiptAnchor(thread[thread.length - 1]?.id ?? null);
   }
 
   async function confirm() {
@@ -194,17 +207,33 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
     try {
       const turn = await confirmConversationCommand(apiVersion, organization.id, threadId, receipt.command_id);
       const result = await getConversation(apiVersion, organization.id, threadId);
-      setMessages(result.messages);
-      setReceipt(turn.receipt);
+      showTurn(turn.receipt, result.messages);
     } catch (caught) { setError(errorText(caught)); } finally { setBusy(false); }
   }
 
-  async function decide(approval: ApprovalRecord, decision: 'approve' | 'reject') {
+  async function decide(approval: ApprovalRecord, decision: 'approve' | 'reject', alwaysAllow = false) {
     setBusy(true); setError(null);
     try {
-      await decideApproval(apiVersion, organization.id, approval.id, decision, 'Decided in the worker conversation.');
+      await decideApproval(apiVersion, organization.id, approval.id, decision, 'Decided in the worker conversation.',
+        alwaysAllow ? { alwaysAllow: true } : {});
       setApprovals((current) => current.filter((item) => item.id !== approval.id));
     } catch (caught) { setError(errorText(caught)); } finally { setBusy(false); }
+  }
+
+  async function refreshThread() {
+    if (!threadId) return;
+    try { setMessages((await getConversation(apiVersion, organization.id, threadId)).messages); }
+    catch (caught) { setError(errorText(caught)); }
+  }
+
+  /** Reply again to a saved message whose reply failed (the message is not sent twice). */
+  async function retryMessage(messageId: string) {
+    if (!threadId || busy) return;
+    setBusy(true); setError(null); setResponsePhase('responding');
+    try {
+      const turn = await retryConversationMessage(apiVersion, organization.id, threadId, messageId);
+      showTurn(turn.receipt, (await getConversation(apiVersion, organization.id, threadId)).messages);
+    } catch (caught) { setError(errorText(caught)); } finally { setBusy(false); setResponsePhase(null); }
   }
 
   function openResult(reference: LiveResultReference) {
@@ -222,8 +251,7 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
         `Explain this specific task result to me: "${reference.name}" (result ID: ${reference.id}). Tell me what was completed, what remains blocked or unverified, what the result means, and anything I should pay attention to.`,
       );
       const result = await getConversation(apiVersion, organization.id, threadId);
-      setMessages(result.messages);
-      setReceipt(turn.receipt);
+      showTurn(turn.receipt, result.messages);
       setThreads((current) => current.map((item) => item.id === threadId ? result.thread : item));
     } catch (caught) {
       setError(errorText(caught));
@@ -242,7 +270,7 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
     workerThreads={workerThreads}
     threadId={threadId}
     messages={messages}
-    receipt={receipt}
+    receipt={receipt && messages[messages.length - 1]?.id === receiptAnchor ? receipt : null}
     pendingApprovals={pendingApprovals}
     query={query}
     draft={draft}
@@ -262,7 +290,9 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
     onNewThread={newThread}
     onSend={send}
     onConfirm={() => void confirm()}
-    onDecide={(approval, decision) => void decide(approval, decision)}
+    onDecide={(approval, decision, alwaysAllow) => void decide(approval, decision, alwaysAllow)}
+    onRetryMessage={(messageId) => void retryMessage(messageId)}
+    onRefresh={() => void refreshThread()}
     onOpenResult={openResult}
     onExplainResult={(reference) => void explainResult(reference)}
     onNavigate={onNavigate}

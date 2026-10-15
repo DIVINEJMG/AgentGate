@@ -40,22 +40,29 @@ def decode_bundle(value: str) -> CredentialBundle:
         scopes=tuple(raw.get("scopes", [])), renewal_metadata=raw.get("renewal_metadata", {}), account_id=raw.get("account_id"))
 
 
+def _reconnect(state, connection, correlation_id: str, reason: str) -> ExecutionProviderError:
+    """Mark the connection as needing reconnection and the error that says so."""
+    if state:
+        state.authorization_state, state.reason = "reconnect_required", reason
+    return ExecutionProviderError(code="authentication_error", retryable=False,
+        provider=connection.provider, operation="credential.resolve", correlation_id=correlation_id,
+        safe_message=reason)
+
+
 class CredentialManager:
     def __init__(self, session, coordinator=None):
         self.session = session
         self.coordinator = coordinator
 
-    async def resolve(self, *, connection, provider, correlation_id: str) -> str | None:
-        state = await self.session.scalar(select(IntegrationConnectionState).where(
+    async def resolve(self, *, connection, provider, correlation_id: str, state=None) -> str | None:
+        """The connection's usable credential, renewed when due (its `state` may be passed when already read)."""
+        state = state or await self.session.scalar(select(IntegrationConnectionState).where(
             IntegrationConnectionState.connection_id == connection.id))
         row = await self.session.scalar(select(IntegrationCredential).where(
             IntegrationCredential.integration_id == connection.id))
+
         def reconnect(reason):
-            if state:
-                state.authorization_state, state.reason = "reconnect_required", reason
-            return ExecutionProviderError(code="authentication_error", retryable=False,
-                provider=connection.provider, operation="credential.resolve", correlation_id=correlation_id,
-                safe_message=reason)
+            return _reconnect(state, connection, correlation_id, reason)
         if state and state.authorization_state in {"reconnect_required", "disconnected"}:
             raise reconnect("Reconnect this integration account to continue the pending action.")
         if row is None:
@@ -78,6 +85,11 @@ class CredentialManager:
             and provider.can_renew_credentials(bundle=bundle))
         if not isinstance(provider, AuthenticationHooks) or not renewable:
             raise reconnect("This credential has expired. Its provider requires reconnection.")
+        return await self._renew(connection, provider, correlation_id, state, lead, reconnect)
+
+    async def _renew(self, connection, provider, correlation_id: str, state, lead: timedelta, reconnect) -> str:
+        """Renew an expiring credential once across workers (a lock, then the row re-read under a
+        row lock, so a renewal another worker just made is used rather than repeated)."""
         coordinator = self.coordinator or RedisCoordinator.from_settings()
         lease = None
         try:
@@ -87,7 +99,6 @@ class CredentialManager:
                     operation="credential.renew", correlation_id=correlation_id,
                     retry_after_seconds=5,
                     safe_message="The account's sign-in is being renewed, so this action is waiting for it")
-            # Row lock and refresh defeat stale in-process bundles after another worker renewed.
             row = await self.session.scalar(select(IntegrationCredential).where(
                 IntegrationCredential.integration_id == connection.id).with_for_update().execution_options(populate_existing=True))
             bundle = decode_bundle(decrypt_integration_secret(row.ciphertext))

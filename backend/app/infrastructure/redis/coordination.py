@@ -179,6 +179,16 @@ class RedisCoordinator:
         ok = await self._client.eval(script, 1, f"slots:{key}", token, limit, ttl_seconds)
         return Lease(key=key, token=token) if ok else None
 
+    async def renew_slot(self, lease: Lease, *, ttl_seconds: int) -> bool:
+        """Extend a held slot (one already released or expired is not brought back)."""
+        script = (
+            "local t=redis.call('TIME'); local now=tonumber(t[1]); "
+            "if not redis.call('ZSCORE',KEYS[1],ARGV[1]) then return 0 end; "
+            "redis.call('ZADD',KEYS[1],'XX',now+tonumber(ARGV[2]),ARGV[1]); "
+            "redis.call('EXPIRE',KEYS[1],ARGV[2]); return 1"
+        )
+        return bool(await self._client.eval(script, 1, f"slots:{lease.key}", lease.token, ttl_seconds))
+
     async def release_slot(self, lease: Lease) -> None:
         await self._client.zrem(f"slots:{lease.key}", lease.token)
 

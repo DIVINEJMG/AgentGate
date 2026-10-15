@@ -22,7 +22,7 @@ from .authentication import GitHubAuthentication
 from .catalog import assembled_catalog
 from .events import EVENT_TRIGGERS, verify_event
 from .resources import GitHubResources, allowed_actions
-from .safety import SECRET, TASK_CONSTRAINT_SCHEMA
+from .safety import SECRET, TASK_CONSTRAINT_SCHEMA, grounded_constraints
 from .transport import GitHubHTTPClient, GitHubResponse, account_context
 
 
@@ -64,6 +64,7 @@ class ExpandedGitHubProvider(NativeProvider):
             return None
 
     task_constraint_schema = TASK_CONSTRAINT_SCHEMA
+    grounded_constraints = staticmethod(grounded_constraints)
     manifest = ProviderManifest(
         provider="github",
         display_name="GitHub",

@@ -689,6 +689,8 @@ class UsageRecord(UUIDPrimaryKeyMixin, Base):
     ai_tokens_in: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     ai_tokens_out: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     ai_models: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    # Characters sent to models per prompt section, e.g. {"planner.PLANNING RULES": 8293}.
+    prompt_chars: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
     duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     __table_args__ = (

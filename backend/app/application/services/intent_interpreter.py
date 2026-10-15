@@ -4,6 +4,8 @@ import json
 import logging
 from typing import Any
 
+from app.application.context.conversation import compact_context
+from app.application.context.sections import Section, assemble
 from app.application.services.conversation_semantics import (
     REPLY_RULES,
     reply_facts,
@@ -31,6 +33,7 @@ class IntentInterpreter:
         invocation_context: AIInvocationContext,
     ) -> WorkerCommandIntent:
         schema = WorkerCommandIntent.model_json_schema()
+        facts = reply_facts(context)
         kwargs: dict[str, Any] = {
             "role": "intent",
             "system": (
@@ -63,7 +66,10 @@ class IntentInterpreter:
                 "whether to add what the human asked as well (name the existing job and how it runs now, and "
                 "say it stays as it is). New work never changes or replaces an existing job unless asked. "
                 "When the human clarifies a pendingIntegrationTasks entry, use integration.execute "
-                "with arguments.resumeCommandId set to that existing command ID. "
+                "with arguments.resumeCommandId set to that existing command ID. When the human's answer "
+                "to a pending question or task declines the new work (keep what exists, cancel, never mind), "
+                "use conversation.answer with arguments.resumeCommandId set to that command ID instead: the "
+                "pending request is closed, nothing new is created, and the reply confirms what stays. "
                 "Reference existing workers, jobs, schedules, policies, work items, runs, results and "
                 "attachments using AUTHORITATIVE_CONTEXT. Account/resource names requested by the human "
                 "can be passed to task preparation for resolution; their absence here is not a tool blocker. "
@@ -113,17 +119,15 @@ class IntentInterpreter:
                 "(answer and factIds) following REPLY_RULES, citing only BACKEND_FACTS IDs. "
                 "For every other family leave `reply` null. REPLY_RULES: " + REPLY_RULES
             ),
-            "prompt": (
-                "AUTHORITATIVE_CONTEXT:\n"
-                + json.dumps(without_repeated_replies(context, message), separators=(",", ":"), default=str)
-                + "\n\nEVENT_TRIGGERS (what this workspace can react to the moment it happens, via "
-                "integration.execute; a scheduled job only checks at its set times):\n"
-                + json.dumps(available_event_triggers())
-                + "\n\nBACKEND_FACTS:\n"
-                + json.dumps(reply_facts(context))
-                + "\n\nHUMAN_MESSAGE:\n"
-                + message.strip()
-            ),
+            "prompt": assemble("interpretation", [
+                Section("AUTHORITATIVE_CONTEXT:", json.dumps(
+                    compact_context(without_repeated_replies(context, message)), separators=(",", ":"), default=str)),
+                Section("EVENT_TRIGGERS (what this workspace can react to the moment it happens, via "
+                        "integration.execute; a scheduled job only checks at its set times):",
+                        json.dumps(available_event_triggers())),
+                Section("BACKEND_FACTS:", json.dumps(facts)),
+                Section("HUMAN_MESSAGE:", message.strip()),
+            ]),
             "schema_name": "worker_command_intent_v1",
             "schema": schema,
             "context": invocation_context,
@@ -136,7 +140,7 @@ class IntentInterpreter:
         logging.getLogger("uvicorn.error").info(
             "AI context selected stage=interpretation context_profile=full_interpretation correlation=%s", invocation_context.correlation_id)
         proposal = await validated_structured(self._gateway, **kwargs,
-            proposal_validator=validate_route_proposal,
+            proposal_validator=lambda proposal: validate_route_proposal(proposal, facts),
             correction_instruction="Correct the WorkerCommandIntent using the full human instruction and context. Choose the supported operation by meaning; examples are guidance. Resolve concrete proposal contradictions while retaining references and uncertainty. Do not execute anything or claim an outcome.")
         intent = WorkerCommandIntent.model_validate(proposal)
         stage = {"conversation.answer": "ordinary_reply", "integration.execute": "task_preparation",

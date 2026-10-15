@@ -1,0 +1,21 @@
+{
+ "step": 1,
+ "status": "failed",
+ "scope": "github.repository.pull_request.ready",
+ "input": {
+  "scope": "github.repository.pull_request.ready",
+  "title": "Mark PR #8 ready",
+  "planStep": 2,
+  "provider": "github",
+  "operation": "repository.pull_request.ready",
+  "resourceId": "f6b836a3-d68a-441c-80ac-ee4938775f94",
+  "actionInput": {
+   "nodeId": "PR_kwDOOnc0lc8AAAABIffk4g"
+  },
+  "instruction": "Mark pull request #8 ready for review.",
+  "planStepDone": true
+ },
+ "output": {
+  "error": "Use this task's branch prefix codex/1e81a73a/ or an explicitly granted branch."
+ }
+}

@@ -13,11 +13,47 @@ SECRET = re.compile(
 TASK_CONSTRAINT_SCHEMA = {
     "type": "object",
     "properties": {
-        key: {"type": "array", "items": {"type": "string"}}
-        for key in ("allowedPaths", "deniedPaths", "branches")
+        "allowedPaths": {"type": "array", "items": {"type": "string"}},
+        "deniedPaths": {"type": "array", "items": {"type": "string"}},
+        "branches": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": (
+                "Existing branches the human named for this task to change, exactly as written. A task "
+                "otherwise writes only to its own new branches."
+            ),
+        },
+        "pullRequests": {
+            "type": "array",
+            "items": {"type": "integer"},
+            "description": (
+                "Numbers of existing pull requests the human named for this task to change (for example "
+                "#8); their head branches may then be written."
+            ),
+        },
     },
     "additionalProperties": False,
 }
+# "#8", "PR 8", "pull request #8": a pull request the person named.
+NAMED_PULL_REQUEST = re.compile(r"(?:#|\bpr\s*#?|\bpull\s+request\s*#?)(\d+)", re.IGNORECASE)
+
+
+def grounded_constraints(constraints: dict, instruction: str) -> dict:
+    """Branch and pull-request grants the person named in their own words; any other is dropped,
+    so model or repository text can never widen what a task may write."""
+    named = {int(number) for number in NAMED_PULL_REQUEST.findall(instruction)}
+    grounded = dict(constraints)
+    if "branches" in grounded:
+        grounded["branches"] = [
+            branch
+            for branch in grounded["branches"]
+            if branch and re.search(rf"(?<![\w/.-]){re.escape(str(branch))}(?![\w/-])", instruction)
+        ]
+    if "pullRequests" in grounded:
+        grounded["pullRequests"] = [
+            number for number in grounded["pullRequests"] if number in named
+        ]
+    return grounded
 
 
 def validate_constraints(constraints):
@@ -78,7 +114,17 @@ def validate_changes(changes: list[dict], constraints: dict | None = None):
         raise ValueError("Commit changes exceed the publication size budget.")
 
 
-def validate_task_branch(branch: str, default_branch: str, work_item_id, constraints=None):
+def task_branch_prefix(work_item_id: object) -> str:
+    """Every branch a task creates starts with this, unless its constraints grant another."""
+    return f"codex/{str(work_item_id)[:8]}/"
+
+
+def validate_task_branch(
+    branch: str, default_branch: str, work_item_id, constraints=None, pull_request=None
+):
+    """A task writes only to its own branches, to branches granted by name, or to the head branch
+    of a granted pull request (`pull_request` is the PR being changed); never to default or
+    protected branches."""
     constraints = constraints or {}
     validate_constraints(constraints)
     if (
@@ -92,6 +138,10 @@ def validate_task_branch(branch: str, default_branch: str, work_item_id, constra
             "Direct writes to default/protected branches and unsafe references are unavailable."
         )
     exact = constraints.get("branches", [])
-    prefix = f"codex/{str(work_item_id)[:8]}/"
-    if branch not in exact and not branch.startswith(prefix):
-        raise ValueError(f"Use this task's branch prefix {prefix} or an explicitly granted branch.")
+    prefix = task_branch_prefix(work_item_id)
+    granted_pr = pull_request is not None and pull_request in constraints.get("pullRequests", [])
+    if branch not in exact and not branch.startswith(prefix) and not granted_pr:
+        raise ValueError(
+            f"Use this task's branch prefix {prefix}, or a branch or pull request the person named "
+            "(granted in task preparation)."
+        )
