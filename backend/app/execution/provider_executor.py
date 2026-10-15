@@ -166,12 +166,20 @@ class DatabaseProviderContextLoader:
         )
         # The rows the authority check just read are used as they are, not read again.
         resource, connection, state, item, grant = (
-            authority.resource, authority.connection, authority.state, authority.item, authority.grant)
+            authority.resource,
+            authority.connection,
+            authority.state,
+            authority.item,
+            authority.grant,
+        )
         if connection is None or connection.provider != proposal.provider:
             raise PermissionError("Connection does not match the requested provider.")
         provider = self._registry.get(connection.provider)
         credential = await CredentialManager(self._session).resolve(
-            connection=connection, provider=provider, correlation_id=proposal.correlation_id, state=state
+            connection=connection,
+            provider=provider,
+            correlation_id=proposal.correlation_id,
+            state=state,
         )
         configuration = {
             str(k): str(v)
@@ -265,8 +273,15 @@ class DatabaseProviderContextLoader:
             configuration=configuration,
             web_url=resource.web_url,
         )
-        row = credential_row if isinstance(provider, ScopedCredentialHooks) else await self._session.scalar(
-            select(IntegrationCredential).where(IntegrationCredential.integration_id == connection.id))
+        row = (
+            credential_row
+            if isinstance(provider, ScopedCredentialHooks)
+            else await self._session.scalar(
+                select(IntegrationCredential).where(
+                    IntegrationCredential.integration_id == connection.id
+                )
+            )
+        )
         return ProviderRuntimeContext(
             configuration=configuration,
             credential=credential,

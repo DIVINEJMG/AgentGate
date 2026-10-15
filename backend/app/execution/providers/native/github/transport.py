@@ -49,7 +49,8 @@ def _redirect_target(response, binary: bool) -> tuple[str, str | None]:
     target = response.headers.get("location", "")
     parts = urlsplit(target)
     allowed = parts.hostname in TRUSTED_DOWNLOAD_HOSTS or (
-        binary and parts.hostname and parts.hostname.endswith(".blob.core.windows.net"))
+        binary and parts.hostname and parts.hostname.endswith(".blob.core.windows.net")
+    )
     if not allowed or parts.scheme != "https" or parts.username:
         raise ProviderTransportError(
             code="policy_blocked",
@@ -76,7 +77,9 @@ async def _read_body(response, max_bytes: int) -> bytearray:
 async def _wait_for_turn(coordinator, key: str):
     """The installation's request lock, waited for up to TURN_WAIT_SECONDS; None if still busy."""
     deadline = time.monotonic() + TURN_WAIT_SECONDS
-    while (lease := await coordinator.acquire_lock(key, ttl_seconds=210)) is None and time.monotonic() < deadline:
+    while (
+        lease := await coordinator.acquire_lock(key, ttl_seconds=210)
+    ) is None and time.monotonic() < deadline:
         await asyncio.sleep(0.25)
     return lease
 
@@ -206,7 +209,9 @@ class GitHubHTTPClient:
                             continue
                         raw = await _read_body(response, max_bytes)
                         if response.status_code >= 400:
-                            await self._raise_for_status(coordinator, key, response.status_code, response_headers, raw)
+                            await self._raise_for_status(
+                                coordinator, key, response.status_code, response_headers, raw
+                            )
                         await coordinator.cache_delete(key + ":failures")
                         decoded = {} if not raw or binary else json.loads(raw)
                         return GitHubResponse(
@@ -245,7 +250,9 @@ class GitHubHTTPClient:
     async def _raise_for_status(self, coordinator, key, status_code, response_headers, raw):
         """Raise the classified error for a failed response, cooling the installation down when GitHub
         limits it and counting a transient failure."""
-        code, retryable, delay = classify_status(status_code, response_headers, bytes(raw).decode(errors="replace")[:1000])
+        code, retryable, delay = classify_status(
+            status_code, response_headers, bytes(raw).decode(errors="replace")[:1000]
+        )
         if code == "rate_limited":
             await coordinator.cache_set(
                 key + ":cooldown",
