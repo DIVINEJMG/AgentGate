@@ -269,6 +269,24 @@ def add_test_site(app: FastAPI) -> None:
             response.set_cookie("test_site_session", "signed-in")
         return response
 
+    # A login form with no method whose script sends it in the background (as many sites do), and a
+    # form that really would send the password in the web address.
+    @app.get("/test-site/js-login", response_class=HTMLResponse)
+    async def js_login_page():
+        return TEST_SITE_PAGE.format(title="Sign in (script) - Test site", body="""<form id="login"><label>Email <input type="email" name="username"></label>
+<label>Password <input type="password" name="password"></label><button type="submit">Sign in</button></form>
+<script>document.getElementById('login').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  await fetch('/test-site/login', {method: 'POST', body: new URLSearchParams(new FormData(event.target))});
+  location.href = '/test-site/home';
+});</script>""")
+
+    @app.get("/test-site/get-login", response_class=HTMLResponse)
+    async def get_login_page():
+        return TEST_SITE_PAGE.format(title="Sign in (GET) - Test site", body="""<form method="get" action="/test-site/ping"><input type="hidden" name="tag" value="get-login">
+<label>Email <input type="email" name="username"></label><label>Password <input type="password" name="password"></label>
+<button type="submit">Sign in</button></form>""")
+
     @app.get("/test-site/code", response_class=HTMLResponse)
     async def code_page(error: str = ""):
         notice = "<p role='alert'>That code was not accepted.</p>" if error else ""

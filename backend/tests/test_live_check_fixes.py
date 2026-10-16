@@ -39,9 +39,10 @@ def _pull_request(item, **changes):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("after_write", [True, False])
 async def test_an_unreadable_result_after_a_write_is_uncertain_not_failed(after_write: bool, caplog) -> None:
-    """F31: GitHub merged the pull request, then reading the result hit a missing key. The write
-    happened, so the outcome is uncertain (and checked again), not failed; before the write is
-    sent, the same error is still a plain failure. The cause is logged without values."""
+    """F31: GitHub merged the pull request, then its result could not be read (an unexpected
+    shape). The write happened, so the outcome is uncertain (and checked again), not failed; before
+    the write is sent, the same kind of error is still a plain failure. The cause is logged without
+    values."""
     from uuid import uuid4
 
     from app.execution.contracts import ExecutionProviderError
@@ -49,8 +50,8 @@ async def test_an_unreadable_result_after_a_write_is_uncertain_not_failed(after_
     from tests.test_github_expanded import ScriptedHTTP, request
 
     item = uuid4()
-    merged = {k: v for k, v in _pull_request(item, merged=True).items() if k != "merge_commit_sha"}  # key missing
-    responses = ([_pull_request(item), {"merged": True, "sha": "b" * 40}, merged] if after_write
+    unreadable = ["not a pull request"]
+    responses = ([_pull_request(item), {"merged": True, "sha": "b" * 40}, unreadable] if after_write
                  else [{k: v for k, v in _pull_request(item).items() if k != "head"}])
     provider = ExpandedGitHubProvider(http=ScriptedHTTP(responses))
     with pytest.raises(ExecutionProviderError) as raised:
@@ -58,8 +59,46 @@ async def test_an_unreadable_result_after_a_write_is_uncertain_not_failed(after_
                                                {"number": 8, "sha": "a" * 40, "merge_method": "merge"}, item),
                                configuration={"repository": "o/r", "defaultBranch": "main"}, credential="token")
     assert raised.value.error.code == ("verification_failed" if after_write else "validation_error")
-    assert f"after_write={after_write}" in caplog.text and "error_type=KeyError" in caplog.text
-    assert "merge_commit_sha" not in caplog.text and "a" * 40 not in caplog.text  # no values
+    error_type = "AttributeError" if after_write else "KeyError"
+    assert f"after_write={after_write}" in caplog.text and f"error_type={error_type}" in caplog.text
+    assert "not a pull request" not in caplog.text and "a" * 40 not in caplog.text  # no values
+
+
+@pytest.mark.asyncio
+async def test_a_merge_is_confirmed_by_github_saying_merged() -> None:
+    """F47: on Oracle a merged pull request was read without `merge_commit_sha`; the merge happened
+    but could never be confirmed. Merged at the approved head is the proof; missing extras are not."""
+    from uuid import uuid4
+
+    from app.execution.providers.native.github.provider import ExpandedGitHubProvider
+    from tests.test_github_expanded import ScriptedHTTP, request
+
+    item = uuid4()
+    merged = {k: v for k, v in _pull_request(item, merged=True).items() if k not in {"merge_commit_sha", "html_url"}}
+    provider = ExpandedGitHubProvider(http=ScriptedHTTP([_pull_request(item), {"merged": True, "sha": "b" * 40}, merged]))
+    result = await provider.execute(request=request(provider, "repository.pull_request.merge",
+                                                    {"number": 8, "sha": "a" * 40, "merge_method": "merge"}, item),
+                                    configuration={"repository": "o/r", "defaultBranch": "main"}, credential="token")
+    assert result.status == "success"
+
+
+@pytest.mark.asyncio
+async def test_a_merge_at_another_head_is_still_not_confirmed() -> None:
+    """F47: the head check stays: a pull request merged at a different commit than approved is a
+    mismatch, never a success."""
+    from uuid import uuid4
+
+    from app.execution.contracts import ExecutionProviderError
+    from app.execution.providers.native.github.provider import ExpandedGitHubProvider
+    from tests.test_github_expanded import ScriptedHTTP, request
+
+    item = uuid4()
+    other = _pull_request(item, merged=True, head={"sha": "c" * 40, "ref": "x", "repo": {"id": 1}})
+    provider = ExpandedGitHubProvider(http=ScriptedHTTP([_pull_request(item), {"merged": True, "sha": "b" * 40}, other]))
+    with pytest.raises(ExecutionProviderError):
+        await provider.execute(request=request(provider, "repository.pull_request.merge",
+                                               {"number": 8, "sha": "a" * 40, "merge_method": "merge"}, item),
+                               configuration={"repository": "o/r", "defaultBranch": "main"}, credential="token")
 
 
 def test_a_write_counts_as_sent_only_when_it_changes_github() -> None:
@@ -747,3 +786,19 @@ def test_a_browser_step_says_what_it_did_not_how_many_results(scope, output, sai
     from app.application.context.narrator import narrate
 
     assert narrate(scope, output) == said
+
+
+def test_a_login_secret_is_never_sent_in_a_web_address() -> None:
+    """F45: any request carrying a typed secret in its address, plain or encoded, is refused; a
+    form's missing method no longer refuses the login. Names (username, email) are not secrets."""
+    from app.execution.browser.credentials import BrowserCredentialBundle
+    from app.execution.browser.runtime import _carries_secret
+
+    assert BrowserCredentialBundle.is_secret("password") and BrowserCredentialBundle.is_secret("oneTimeCode")
+    assert BrowserCredentialBundle.is_secret("pin") and BrowserCredentialBundle.is_secret("apiToken")
+    assert not BrowserCredentialBundle.is_secret("username") and not BrowserCredentialBundle.is_secret("email")
+    secrets = {"s3cret pass!", "123456", "ab"}
+    assert _carries_secret("https://site/login?user=ada&password=s3cret+pass%21", secrets)
+    assert _carries_secret("https://site/verify?code=123456", secrets)
+    assert not _carries_secret("https://site/products?page=ab", secrets)  # too short to tell apart
+    assert not _carries_secret("https://site/account/ada", secrets)

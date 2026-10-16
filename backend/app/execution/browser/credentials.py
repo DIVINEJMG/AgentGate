@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hmac
 import json
+import re
 import struct
 import time
 from dataclasses import dataclass
@@ -12,6 +13,14 @@ from urllib.parse import parse_qs, urlsplit
 OTP_SECRET_FIELD = "otpSecret"
 ONE_TIME_CODE_FIELD = "oneTimeCode"
 _DIGESTS = {"SHA1": "sha1", "SHA256": "sha256", "SHA512": "sha512"}
+
+
+# Stored fields that are secrets (a username or email is not): they must never reach a web address.
+SECRET_FIELD = re.compile(r"pass|otp|secret|token|^pin$", re.IGNORECASE)
+# What a refused sign-in says when the site would have put the secret in a web address (F45).
+LOGIN_IN_ADDRESS = (
+    "The site's login would have sent the password in the web address, so signing in was refused."
+)
 
 
 class BrowserAuthenticationFailure(RuntimeError):
@@ -108,6 +117,11 @@ class BrowserCredentialBundle:
         """Every named field is stored, checked before anything is typed (F35)."""
         for key in keys:
             self.resolve(key)
+
+    @staticmethod
+    def is_secret(key: str) -> bool:
+        """Whether a field holds a secret (a password, a code), not a name like a username."""
+        return key == ONE_TIME_CODE_FIELD or bool(SECRET_FIELD.search(key))
 
     def keys(self) -> tuple[str, ...]:
         """The field names a sign-in can bind (never their values); a stored otpSecret is offered as

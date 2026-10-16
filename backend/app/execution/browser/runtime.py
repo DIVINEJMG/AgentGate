@@ -12,6 +12,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Protocol
+from urllib.parse import quote_plus, unquote_plus
 from uuid import UUID, uuid4
 
 from playwright.async_api import (
@@ -40,6 +41,7 @@ from app.execution.browser.contracts import (
     BrowserVerificationProbe,
 )
 from app.execution.browser.credentials import (
+    LOGIN_IN_ADDRESS,
     BrowserAuthenticationFailure,
     BrowserCredentialBundle,
 )
@@ -75,6 +77,15 @@ logger = logging.getLogger(__name__)
 # How long a submitted form has to start a page request before it counts as same-page. A request
 # starts within milliseconds of a submit, however slowly the site then answers.
 SUBMIT_NAVIGATION_WINDOW_MS = 1_500
+
+
+def _carries_secret(url: str, secrets: set[str]) -> bool:
+    """Whether a web address carries a secret, as typed or encoded. Very short values are skipped,
+    as they would match ordinary addresses."""
+    decoded = unquote_plus(url)
+    return any(
+        len(secret) >= 4 and (secret in decoded or quote_plus(secret) in url) for secret in secrets
+    )
 
 
 def _main_frame_navigation(request: Request) -> bool:
@@ -333,6 +344,8 @@ class _SessionHandle:
         # A page's own requests: each host's answer, and how many were refused (F39).
         self.remembered_hosts: dict[str, BrowserEgressDecision] = {}
         self.refused_requests = 0
+        # Secrets typed into a login, which no request may carry in its web address (F45).
+        self.login_secrets: set[str] = set()
 
 
 class BrowserRuntime:
@@ -775,6 +788,9 @@ class BrowserRuntime:
             handle.keyboard_write_blocked = True
             await route.abort("blockedbyclient")
             return
+        if handle.login_secrets and _carries_secret(request.url, handle.login_secrets):
+            await self._refuse_login_in_address(handle, route, request)
+            return
         if not request.is_navigation_request():
             await self._route_page_request(handle, route, request)
             return
@@ -796,6 +812,29 @@ class BrowserRuntime:
             if not await self._admit(handle, route, redirect, top_level, frame_unavailable):
                 return
         await route.fulfill(response=response)
+
+    @staticmethod
+    async def _refuse_login_in_address(
+        handle: _SessionHandle, route: Route, request: Request
+    ) -> None:
+        """A request that would put a typed secret in a web address is never sent (F45)."""
+        handle.refused_requests += 1
+        logger.warning(
+            "Browser request refused session=%s: a login secret was in its web address",
+            handle.session.id,
+        )
+        if request.is_navigation_request():
+            decision = BrowserNavigationDecision(
+                allowed=False,
+                source_url=None,
+                target_url=redact_url(request.url),
+                target_origin=origin_for_url(request.url),
+                reason=LOGIN_IN_ADDRESS,
+                cross_origin=False,
+            )
+            handle.transition_trail.append(decision)
+            handle.blocked_navigation = decision
+        await route.abort("blockedbyclient")
 
     async def _route_page_request(
         self, handle: _SessionHandle, route: Route, request: Request
@@ -1916,38 +1955,32 @@ class BrowserRuntime:
                 "Browser authentication requires credential field bindings."
             )
 
-        form_method: str | None = None
-        if form_ref is not None:
-            form_method = (
-                await self._form_locator(handle, form_ref).get_attribute("method")
-            ) or "get"
-        elif submit_locator is not None:
-            submit_target = self._locator(handle, submit_locator)
-            raw_method = await submit_target.evaluate(
-                "(el) => el.form ? (el.form.method || 'get') : null"
-            )
-            form_method = str(raw_method) if raw_method is not None else None
-        if form_method is not None and form_method.lower() == "get":
-            raise BrowserAuthenticationFailure(
-                "Browser authentication refuses GET form submission because credentials could enter the URL."
-            )
-
+        # A form's method is not checked: sites that send their login with JavaScript leave it
+        # out. Every request is checked instead, and one carrying a secret in its web address is
+        # refused (F45).
         credentials.require(tuple(key for _, key in bindings))
         handle.sensitive_values.update(credentials.sensitive_values())
         for locator, credential_key in bindings:
             target = self._locator(handle, locator)
             value = credentials.resolve(credential_key)
             handle.sensitive_values.add(value)
+            if credentials.is_secret(credential_key):
+                handle.login_secrets.add(value)
             await self._set_control_value(target, value, timeout_ms=timeout_ms)
 
-        observation = await self.submit_form(
-            session_id,
-            organization_id=organization_id,
-            worker_id=worker_id,
-            form_ref=form_ref,
-            submit_locator=submit_locator,
-            timeout_ms=timeout_ms,
-        )
+        try:
+            observation = await self.submit_form(
+                session_id,
+                organization_id=organization_id,
+                worker_id=worker_id,
+                form_ref=form_ref,
+                submit_locator=submit_locator,
+                timeout_ms=timeout_ms,
+            )
+        except BrowserNavigationBlocked as blocked:
+            if blocked.decision.reason == LOGIN_IN_ADDRESS:
+                raise BrowserAuthenticationFailure(LOGIN_IN_ADDRESS) from blocked
+            raise
         if failure_text and failure_text in observation.visible_text:
             raise BrowserAuthenticationFailure("Browser authentication was rejected.")
         if success_url_contains and success_url_contains not in observation.url:

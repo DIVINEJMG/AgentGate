@@ -1231,6 +1231,84 @@ The setup promises three things. Each was checked with AgentGate's real browser 
     no edit.
 
 
+## Oracle live check after PR #130 (16 October 2026)
+
+All checks worked except the three below.
+
+## F45: Signing in to a site whose login form has no method is refused
+
+- **Severity:** High (no sign-in on such sites: Test sign-in, jobs and chat tasks).
+- **Found in:** Test sign-in on bestworthproductsltd.ng: "Browser authentication refuses GET form
+  submission because credentials could enter the URL."
+- **Why:** `BrowserRuntime.authenticate` reads the form's `method` attribute; with none, a
+  browser's default is GET, so it refuses. Sites whose own JavaScript sends the login form leave
+  `method` out, and their password never goes into a URL. The simulator's test site uses
+  `method="post"`, so this was not caught.
+- **Fix direction:** check what really happens instead of the attribute. Let the submit run, and
+  refuse any request whose URL contains one of the stored login values (the route handler sees
+  every request). That fully stops a real GET login leaking the password, and allows JavaScript
+  logins.
+- **Fixed:**
+  - The form's `method` is no longer checked. The secrets typed into a login (the password, a
+    one-time code, any field named like a pass, otp, secret, token or pin) are remembered for the
+    session.
+  - Every request whose web address carries one of them, plain or encoded, is refused before it
+    is sent. A sign-in refused this way says so plainly. Usernames and emails are not secrets, so
+    a profile address is never refused.
+- **Proved live (Chromium, simulator test site):**
+  - a normal POST login and a script login with no method both reached "Dashboard - Test site";
+  - a real GET login form was refused ("would have sent the password in the web address"), and
+    0 requests reached the site.
+
+## F46: Connecting a browser shows a false "Discovering resources" failure
+
+- **Severity:** Low (alarming, harmless).
+- **What happens:** the setup's live checks call the native-integration discovery
+  (`/integration-connections/{id}/discover`) for every connection. Browser connections are not
+  part of that system, so it answers "This account has not been shared with you".
+- **Fix direction:** skip discovery for browser connections; their site and actions are set when
+  connecting.
+- **Fixed:**
+  - The setup marks discovery as skipped for a browser connection.
+  - The connection's page shows its resources without the Rediscover button.
+
+## F47: A merge GitHub carried out is never confirmed, and the task waits until cancelled
+
+- **Severity:** High (the merge is done, but the task never finishes, and the person sees no
+  outcome).
+- **Found in:** task `a0e9a7b8` (merge PR #13 in DIVINEJMG/school, 01:07 UTC).
+- **What happened:**
+  1. The merge approval was given and GitHub merged the pull request.
+  2. AgentGate's read-back failed: `GitHub action could not be read
+     operation=repository.pull_request.merge error_type=KeyError after_write=True at
+     verification.py:192 _verify_merge`.
+  3. The F31 fix made it "uncertain" (`queueState: checking_outcome`, "I'll look for it again
+     shortly").
+  4. Every new look ran the same failing read-back, so it never settled. Four minutes later the
+     person cancelled the task (`POST …/work-items/a0e9a7b8…/cancel`).
+- **Why the KeyError:** `_verify_merge` compares the pull request's head with `values["sha"]`,
+  the expected head commit. The merge request's `sha` is optional in GitHub's API, and the
+  planner did not send it, so reading `values["sha"]` raised KeyError.
+- **Fix direction:**
+  - Verify the merge by what GitHub reports: the pull request is `merged`, and its head matches
+    `sha` only when one was sent.
+  - Make the "look again" give the person the outcome buttons, instead of repeating a read-back
+    that cannot succeed.
+  - Add a test with a merge that has no `sha`.
+- **Correction after reading the code:** `sha` is required for a merge, so the missing key was
+  `merge_commit_sha` in GitHub's answer (line 192), not `sha`.
+- **Fixed:**
+  - A merge is confirmed by GitHub reporting it merged at the approved head. `merge_commit_sha`,
+    `html_url` and `id` are reported only when sent.
+  - Any response AgentGate cannot read, of whatever shape, is now "uncertain after a write" instead
+    of crashing.
+  - When looking for an uncertain outcome again starts, the chat is told once ("…I'll look for it
+    again shortly. It won't be sent twice.").
+  - Tests cover a merge without those fields (confirmed) and a merge at another head (not
+    confirmed).
+- **Also seen:** two `409 Conflict` answers on approval decisions were double clicks on an
+  approval already decided (harmless).
+
 ## Where the simulator had an advantage
 
 Each row is a point where the simulator used something a live model does not have. Every one

@@ -75,8 +75,10 @@ def main() -> None:
     require("BrowserCredentialBundle" in credentials, "runtime credential bundle missing")
     require("credentialKey" in provider, "credential reference binding contract missing")
     require("credentials.resolve" in runtime, "runtime-only credential injection missing")
+    # F45: every request is checked for a typed login secret in its web address (stronger than
+    # refusing forms whose method attribute is GET, which also refused script-driven logins).
     require(
-        "GET form submission" in runtime,
+        "_carries_secret(request.url, handle.login_secrets)" in runtime and "LOGIN_IN_ADDRESS" in runtime,
         "authentication GET credential-leak protection missing",
     )
     require("authentication_error" in provider, "normalized authentication error missing")

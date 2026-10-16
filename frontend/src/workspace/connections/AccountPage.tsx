@@ -65,7 +65,7 @@ export default function AccountPage({ organization, apiVersion, id }: { organiza
     <nav className='ws-tabs' aria-label='Connection sections'>{TABS.map((item) => <a key={item.id} href={item.id === 'overview' ? base : `${base}?tab=${item.id}`} aria-current={tab === item.id ? 'page' : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey) return; event.preventDefault(); navigate(item.id === 'overview' ? base : `${base}?tab=${item.id}`, { keepScroll: true }); }}>{item.label}</a>)}</nav>
 
     {tab === 'overview' && <Overview data={data} id={connection.id} />}
-    {tab === 'resources' && <Resources data={data} id={connection.id} organization={organization} apiVersion={apiVersion} onRefresh={refresh} />}
+    {tab === 'resources' && <Resources data={data} id={connection.id} discoverable={connection.provider !== 'browser'} organization={organization} apiVersion={apiVersion} onRefresh={refresh} />}
     {tab === 'access' && <Access data={data} id={connection.id} organization={organization} apiVersion={apiVersion} patch={patch} />}
     {tab === 'settings' && <Settings data={data} id={connection.id} organization={organization} apiVersion={apiVersion} onChanged={refresh} />}
   </div>;
@@ -122,8 +122,10 @@ function Overview({ data, id }: { data: ConnectionsData; id: string }) {
 
 /* ---------- Resources ---------- */
 
-function Resources({ data, id, organization, apiVersion, onRefresh }: { data: ConnectionsData; id: string; organization: OrganizationAccess; apiVersion: ApiVersion; onRefresh: () => Promise<void> }) {
+function Resources({ data, id, discoverable, organization, apiVersion, onRefresh }: { data: ConnectionsData; id: string; discoverable: boolean; organization: OrganizationAccess; apiVersion: ApiVersion; onRefresh: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
+  // A browser connection has no resources to discover: its site and actions come from its settings (F46).
+  const foundation = discoverable && data.foundation?.enabled;
   const resources = resourcesFor(data, id);
   const discovered = data.foundation?.resources.filter((resource) => resource.connectionId === id) ?? [];
   const actions = actionsFor(data, id);
@@ -139,8 +141,8 @@ function Resources({ data, id, organization, apiVersion, onRefresh }: { data: Co
     finally { setBusy(false); }
   }
   return <>
-    <Section title={data.foundation?.enabled ? 'Discovered resources' : 'Resources'} count={data.foundation?.enabled ? discovered.length : resources.length} action={data.foundation?.enabled && <button type='button' className='ws-button ws-button-sm' disabled={busy} onClick={() => void rediscover()}>{busy ? <Loader2 size={13} className='cf-spin' /> : <RefreshCw size={13} />}Rediscover</button>}>
-      {data.foundation?.enabled ? (discovered.length ? <ul className='ws-rows'>{discovered.map((resource) => <li key={resource.id} className='ws-row'>
+    <Section title={foundation ? 'Discovered resources' : 'Resources'} count={foundation ? discovered.length : resources.length} action={foundation && <button type='button' className='ws-button ws-button-sm' disabled={busy} onClick={() => void rediscover()}>{busy ? <Loader2 size={13} className='cf-spin' /> : <RefreshCw size={13} />}Rediscover</button>}>
+      {foundation ? (discovered.length ? <ul className='ws-rows'>{discovered.map((resource) => <li key={resource.id} className='ws-row'>
         <Pulse tone={HEALTH_TONE[resource.health] ?? (resource.health === 'ok' ? 'ok' : 'warn')} />
         <span className='ws-row-main'><strong>{resource.name}</strong><small><code>{resource.externalId}</code> · {resource.capabilities.length} action{resource.capabilities.length === 1 ? '' : 's'}</small></span>
         <div className='ws-row-meta'>{resource.webUrl && /^https?:\/\//.test(resource.webUrl) && <a className='ws-link' href={resource.webUrl} target='_blank' rel='noreferrer'>Open<ExternalLink size={11} /></a>}<span>{sentence(resource.health)}</span></div>

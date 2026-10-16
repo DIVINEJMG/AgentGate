@@ -184,13 +184,16 @@ async def _verify_node(provider, mutation, request, credential, data):
 async def _verify_merge(provider, values, configuration, credential):
     repo = provider.repo_path(configuration)
     obj = (await provider.api("GET", f"{repo}/pulls/{values['number']}", credential)).data
-    if not obj.get("merged") or obj["head"]["sha"] != values["sha"]:
+    # Merged, at the approved head, is the proof; the other fields are reported when GitHub sends
+    # them (a merged pull request was read without `merge_commit_sha` on Oracle, F47).
+    head = (obj.get("head") or {}).get("sha")
+    if not obj.get("merged") or (values.get("sha") and head != values["sha"]):
         mismatch()
     return {
-        "externalId": str(obj["id"]),
-        "headSha": values["sha"],
-        "mergeSha": obj["merge_commit_sha"],
-        "webUrl": obj["html_url"],
+        "externalId": str(obj.get("id") or values["number"]),
+        "headSha": head or values.get("sha"),
+        "mergeSha": obj.get("merge_commit_sha"),
+        "webUrl": obj.get("html_url"),
     }
 
 
