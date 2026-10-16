@@ -256,7 +256,10 @@ CAPABILITIES = (
         risk="medium",
         side_effect=True,
         approval="recommended",
-        description="Click a non-submit element selected by a normalized browser locator.",
+        description=(
+            "Click a non-submit element selected by a normalized browser locator. A change the click "
+            "would send to the site is held, not sent; browser.form.submit sends it."
+        ),
         requires_locator=True,
     ),
     _capability(
@@ -383,7 +386,10 @@ CAPABILITIES = (
         risk="high",
         side_effect=True,
         approval="recommended",
-        description="Submit a governed form after higher-risk policy evaluation.",
+        description=(
+            "Submit a governed form after higher-risk policy evaluation, or press a control whose "
+            "click sends a change to the site (submitLocator)."
+        ),
         properties={
             "formRef": {"type": "string"},
             "submitLocator": {"type": "object"},
@@ -1302,6 +1308,93 @@ class PlaywrightBrowserProvider:
             (persisted,),
         )
 
+    def _action_evidence(
+        self,
+        request: ExecutionRequest,
+        session_id: UUID,
+        before_observation: BrowserObservation,
+        observation: BrowserObservation,
+        artifact_references: list[BrowserArtifactReference],
+    ) -> tuple[dict[str, object], str]:
+        """What the action did, as evidence for verification, and its result."""
+        before_fingerprint = self._observation_fingerprint(before_observation)
+        after_fingerprint = self._observation_fingerprint(observation)
+        attempt = observation.page_state.get("actionAttempt")
+        attempt_status = attempt.get("status") if isinstance(attempt, dict) else None
+        timed_out_attempt = attempt_status == "timed_out"
+        # A change the action would have sent was held: nothing reached the site (F50).
+        held_change = attempt_status == "write_held"
+        action_result = (
+            "unconfirmed" if timed_out_attempt else "not_sent" if held_change else "executed"
+        )
+        evidence_locator = self._locator(request.input)
+        evidence_raw: dict[str, object] = {
+            "sessionId": str(session_id),
+            "pageUrl": observation.url,
+            "capability": request.capability.scope,
+            "elementReference": self._element_reference(request.input),
+            "operation": request.operation,
+            "result": action_result,
+            "verification": (
+                "timed_out_reobserved"
+                if timed_out_attempt
+                else "change_held"
+                if held_change
+                else "pending"
+            ),
+            **(
+                {"heldRequest": attempt.get("request")}
+                if held_change and isinstance(attempt, dict)
+                else {}
+            ),
+            "correlationId": request.correlation_id,
+            "beforeUrl": before_observation.url,
+            "afterUrl": observation.url,
+            "beforeObservationId": before_observation.id,
+            "afterObservationId": observation.id,
+            "stateChanged": before_fingerprint != after_fingerprint,
+            "frameOrigin": (
+                evidence_locator.frame_origin if evidence_locator is not None else None
+            ),
+            "artifacts": [item.as_dict() for item in artifact_references],
+        }
+        redacted_evidence = redact_sensitive_structure(evidence_raw)
+        assert isinstance(redacted_evidence, dict)
+        return redacted_evidence, action_result
+
+    async def _action_session(
+        self,
+        request: ExecutionRequest,
+        state: _BrowserExecutionState,
+        realtime_events: list[dict[str, object]],
+    ) -> UUID:
+        """The run's browser session: opened by the first page open, then resumed."""
+        session_id = self._session_id(request.input)
+        if session_id is None:
+            if request.operation != "navigation.open":
+                raise ValueError("A browser session is required for this operation.")
+            session = await self.open_session(request)
+            session_id = session.id
+            state.session_id = session_id
+            state.session_owned = True
+            realtime_events.append(
+                {
+                    "type": "browser.session.created",
+                    "payload": {"sessionId": str(session_id)},
+                }
+            )
+            return session_id
+        state.session_id = session_id
+        session = await self._runtime.resume(
+            session_id,
+            organization_id=request.organization_id,
+            worker_id=request.worker_id,
+        )
+        if session.run_id != request.run_id:
+            raise PermissionError("Browser session belongs to another run.")
+        state.session_owned = True
+        return session_id
+
     async def _execute_authorized(
         self,
         *,
@@ -1322,31 +1415,7 @@ class PlaywrightBrowserProvider:
             }
         ]
 
-        session_id = self._session_id(request.input)
-        if session_id is None:
-            if request.operation != "navigation.open":
-                raise ValueError("A browser session is required for this operation.")
-            session = await self.open_session(request)
-            session_id = session.id
-            state.session_id = session_id
-            state.session_owned = True
-            realtime_events.append(
-                {
-                    "type": "browser.session.created",
-                    "payload": {"sessionId": str(session_id)},
-                }
-            )
-        else:
-            state.session_id = session_id
-            session = await self._runtime.resume(
-                session_id,
-                organization_id=request.organization_id,
-                worker_id=request.worker_id,
-            )
-            if session.run_id != request.run_id:
-                raise PermissionError("Browser session belongs to another run.")
-            state.session_owned = True
-
+        session_id = await self._action_session(request, state, realtime_events)
         before_observation = await self._runtime.current_observation(
             session_id,
             organization_id=request.organization_id,
@@ -1427,33 +1496,9 @@ class PlaywrightBrowserProvider:
             organization_id=request.organization_id,
             worker_id=request.worker_id,
         )
-        before_fingerprint = self._observation_fingerprint(before_observation)
-        after_fingerprint = self._observation_fingerprint(observation)
-        attempt = observation.page_state.get("actionAttempt")
-        timed_out_attempt = isinstance(attempt, dict) and attempt.get("status") == "timed_out"
-        action_result = "unconfirmed" if timed_out_attempt else "executed"
-        evidence_locator = self._locator(request.input)
-        evidence_raw: dict[str, object] = {
-            "sessionId": str(session_id),
-            "pageUrl": observation.url,
-            "capability": request.capability.scope,
-            "elementReference": self._element_reference(request.input),
-            "operation": request.operation,
-            "result": action_result,
-            "verification": "timed_out_reobserved" if timed_out_attempt else "pending",
-            "correlationId": request.correlation_id,
-            "beforeUrl": before_observation.url,
-            "afterUrl": observation.url,
-            "beforeObservationId": before_observation.id,
-            "afterObservationId": observation.id,
-            "stateChanged": before_fingerprint != after_fingerprint,
-            "frameOrigin": (
-                evidence_locator.frame_origin if evidence_locator is not None else None
-            ),
-            "artifacts": [item.as_dict() for item in artifact_references],
-        }
-        redacted_evidence = redact_sensitive_structure(evidence_raw)
-        assert isinstance(redacted_evidence, dict)
+        redacted_evidence, action_result = self._action_evidence(
+            request, session_id, before_observation, observation, artifact_references
+        )
 
         realtime_events.append(
             {
@@ -1763,6 +1808,9 @@ class PlaywrightBrowserProvider:
             "resourceOrigin": request.resource.metadata.get("origin"),
         }
         verified = base_valid
+        held_change = (
+            base_valid and isinstance(evidence, dict) and evidence.get("result") == "not_sent"
+        )
         no_progress_interaction = (
             base_valid
             and request.operation in {"element.click", "element.press_key"}
@@ -1772,7 +1820,10 @@ class PlaywrightBrowserProvider:
         )
 
         expectation = BrowserVerificationExpectation.from_mapping(request.input.get("verify"))
-        if base_valid and expectation is not None:
+        if held_change:
+            # Certain: the change was held and nothing was sent (F50).
+            details["checks"] = {"changeHeld": True}
+        elif base_valid and expectation is not None:
             session_id = self._session_id(request.input)
             if session_id is None:
                 raw_session_id = session.get("id") if isinstance(session, dict) else None
@@ -1847,36 +1898,14 @@ class PlaywrightBrowserProvider:
                     }
                 )
 
-        summary = (
-            "Keyboard attempt timed out; the resulting page was observed. Outcome remains unconfirmed."
-            if request.operation == "element.press_key"
-            and isinstance(evidence, dict)
-            and evidence.get("result") == "unconfirmed"
-            else "Browser interaction executed; no observable page change. Job progress is unverified."
-            if no_progress_interaction
-            else (
-                "Browser outcome verified from observable state."
-                if verified
-                else "Browser outcome could not be verified from observable state."
-            )
+        summary, evidence_with_verification = _outcome(
+            request.operation,
+            evidence,
+            held_change,
+            no_progress_interaction,
+            verified,
+            intended=expectation is not None and verified,
         )
-        evidence_with_verification = {
-            **(evidence if isinstance(evidence, dict) else {}),
-            "outcome": (
-                "unconfirmed"
-                if isinstance(evidence, dict) and evidence.get("result") == "unconfirmed"
-                else "no_observable_change"
-                if no_progress_interaction
-                else "observed_change"
-                if isinstance(evidence, dict) and evidence.get("stateChanged") is True
-                else "unverified"
-            ),
-            "verification": {
-                "verified": verified,
-                "summary": summary,
-                "intendedOutcomeVerified": expectation is not None and verified,
-            },
-        }
         if failure_artifact is not None:
             evidence_artifacts = evidence_with_verification.get("artifacts")
             if not isinstance(evidence_artifacts, list):
@@ -1895,6 +1924,67 @@ class PlaywrightBrowserProvider:
             summary=summary,
             details=details,
         )
+
+
+def _outcome(
+    operation: str,
+    evidence: object,
+    held_change: bool,
+    no_progress_interaction: bool,
+    verified: bool,
+    *,
+    intended: bool,
+) -> tuple[str, dict[str, object]]:
+    """The verification summary, and the evidence with its outcome."""
+    unconfirmed = isinstance(evidence, dict) and evidence.get("result") == "unconfirmed"
+    summary = (
+        _held_change_summary(evidence)
+        if held_change
+        else "Keyboard attempt timed out; the resulting page was observed. Outcome remains unconfirmed."
+        if operation == "element.press_key" and unconfirmed
+        else "Browser interaction executed; no observable page change. Job progress is unverified."
+        if no_progress_interaction
+        else (
+            "Browser outcome verified from observable state."
+            if verified
+            else "Browser outcome could not be verified from observable state."
+        )
+    )
+    outcome = (
+        "change_held"
+        if held_change
+        else "unconfirmed"
+        if unconfirmed
+        else "no_observable_change"
+        if no_progress_interaction
+        else "observed_change"
+        if isinstance(evidence, dict) and evidence.get("stateChanged") is True
+        else "unverified"
+    )
+    return summary, {
+        **(evidence if isinstance(evidence, dict) else {}),
+        "outcome": outcome,
+        "verification": {
+            "verified": verified,
+            "summary": summary,
+            "intendedOutcomeVerified": intended,
+        },
+    }
+
+
+def _held_change_summary(evidence: object) -> str:
+    held = evidence.get("heldRequest") if isinstance(evidence, dict) else None
+    sent = ""
+    if isinstance(held, dict) and held.get("method"):
+        # The address without its query: a query can carry personal data, and in a sentence it
+        # would swallow the words after it when redacted.
+        parts = urlsplit(str(held.get("url") or ""))
+        sent = f" ({held.get('method')} {parts.scheme}://{parts.netloc}{parts.path})"
+    return (
+        f"Nothing was sent: this control sends a change to the site{sent}, which a click may not "
+        "do. To make the change, use browser.form.submit with submitLocator set to this same "
+        "control; it is governed by approval. Do not click it again."
+    )
 
 
 browser_provider = PlaywrightBrowserProvider(

@@ -894,7 +894,10 @@ class ManagedRuntimeExecutor:
             item, run, step = kwargs["item"], kwargs["run"], kwargs["step"]
             if settings.integration_foundation_enabled and (item.payload or {}).get("integrationOrigin") and error.error.code in {"authentication_error", "uncertain_outcome"}:
                 return await self._wait_integration(item, run, step, error.error, kwargs["current_step"])
-            if settings.integration_foundation_enabled and (item.payload or {}).get("integrationOrigin"):
+            # An action refused before anything was sent is replanned in every task, not only
+            # integration ones: a chat browser task would otherwise fail on it (F49).
+            if error.error.code == "validation_error" or (
+                    settings.integration_foundation_enabled and (item.payload or {}).get("integrationOrigin")):
                 wait = _provider_wait(item, error.error, retry_limit=settings.runtime_provider_retry_limit,
                                       backoff_seconds=settings.runtime_provider_retry_backoff_seconds)
                 if wait is not None:

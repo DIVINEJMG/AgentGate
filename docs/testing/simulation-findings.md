@@ -1349,6 +1349,62 @@ All checks worked except the three below.
   - All 143 existing browser tests pass, including the keyboard ones.
 - **Cost:** a page open or action that changes nothing takes about 0.4 s longer.
 
+## F49: An action refused before anything was sent is reported as "Uncertain outcome"
+
+- **Severity:** Medium (the person is asked to check a write that never happened; the task stops).
+- **Found in:** the Oracle re-check after PR #132 (16 October 2026). With Claude out of credits, the
+  fallback model asked to click "Worker Access" and also auto-accept a confirmation. The browser
+  provider refused that input ("Accepting a confirmation/prompt dialog is restricted to high-risk
+  governed operations", `browser.py:910`), as it should.
+- **Why:** the refusal is a plain `ValueError` raised while the action is prepared. Only schema
+  errors were turned into an invalid action, so it reached the general crash handler, which marks
+  the task "Execution was interrupted and its outcome needs verification". Also, only tasks with
+  a chat origin replanned an invalid action; a chat browser task (a one-time job) failed on it.
+- **Fixed:**
+  - A `ValueError` from a provider's input check is an invalid action (`validation_error`):
+    "… Nothing was dispatched; choose an action the tool allows and replan."
+  - Such an action is replanned in every task, within the existing correction budget. Other
+    errors keep their earlier handling.
+- **Proved:** tests (the refusal is `validation_error`; a chat task replans it, other errors do
+  not change; both fail on the old code) and the simulator run below (step 2).
+
+## F50: A click can change a site without approval
+
+- **Severity:** High (a worker could disable, delete or pay on a client's site with nobody signing
+  it off).
+- **Found in:** the Oracle run of 16 October: "Disable account" on Bestworth's Worker Access went
+  through as a plain `browser.element.click`. Its own script sends the change, so it was not a form
+  submit, and no approval was asked for.
+- **Fixed:**
+  - While a click, check or uncheck runs, any change it sends to the site (a page or data request
+    that is not GET, HEAD or OPTIONS) is held: aborted before it leaves the browser and reported.
+    The step reads "Held, nothing sent", and the planner is told to use `browser.form.submit` on
+    the same control. The summary names the address without its query.
+  - `browser.form.submit` accepts any control as `submitLocator`, not only a form's submit button,
+    so it is how such a change is sent. It is high risk, so policy can require approval, and
+    **Always allow** on that approval (existing feature) lets this worker do it on this site
+    without asking again.
+  - Unchanged: reads (GET requests), links, analytics beacons, sign-ins, uploads, typing, and the
+    keyboard's own rule.
+- **Proved:**
+  - Real Chromium tests against a real local web server (`test_browser_write_guard.py`): a
+    click's change is held and nothing reaches the server; the governed submit sends it; a
+    confirmation is accepted only by the submit; a self-saving toggle is held; reads, links and
+    beacons are not; the hold ends with the click. They fail on the old code.
+  - Simulator end to end (chat → one-time task → planner → approval):
+    1. Disable Test (button with a confirmation): the click that auto-accepts was refused and
+       replanned (F49); a plain click opened the confirmation, which was dismissed (nothing sent);
+       the governed submit with the confirmation accepted asked for approval; approved with
+       **Always allow**, the site showed Test disabled, and the chat said so.
+    2. The same request again: the governed submit ran with no approval (Always allow).
+    3. Disable Ada (button with no confirmation, as on Bestworth): the click's change was held
+       ("Held the change this control sends to the site; nothing was sent"; the site still showed
+       Ada active); the governed submit then sent it, and the site showed Ada disabled.
+- **Behaviour change to expect:** a worker that must make such a change needs
+  `browser.form.submit` among its job's capabilities, and the first one may ask for approval.
+- **Simulator note:** the simulation workspace's policies require approval for clicks too;
+  Oracle's allowed them. Approving those clicks in the simulator matched Oracle's behaviour.
+
 ## Where the simulator had an advantage
 
 Each row is a point where the simulator used something a live model does not have. Every one
