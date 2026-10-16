@@ -1309,6 +1309,46 @@ All checks worked except the three below.
 - **Also seen:** two `409 Conflict` answers on approval decisions were double clicks on an
   approval already decided (harmless).
 
+## F48: The page is observed before an action's effect has arrived
+
+- **Severity:** Medium (an extra planning round per affected step, or a sign-in reported as failed).
+- **Found in:** the Oracle re-check after PR #131 (16 October 2026). The Bestworth sign-in worked,
+  but the page seen right after it was empty ("Login succeeded but the post-login page
+  observation is empty"), so the planner added a step to read the dashboard again. With the slow
+  fallback model, that one step cost minutes.
+- **Why:** after an action the page was observed as soon as the action call returned: a click or
+  key after 25 ms, a page open or form submit at `domcontentloaded`. A login sent by script opens
+  the next page only after its own request is answered, and a dashboard drawn by script is empty
+  until its data arrives. Reproduced in the simulator before the fix: the script-drawn dashboard
+  was observed empty, and a slow script login (3 s) was even reported as "still on the login
+  page".
+- **Fixed (every action, not only sign-in):**
+  - After a page open, click, key, hover, scroll, fill, submit, sign-in or upload, the page is
+    observed once it has settled: no page or data request the action started is still waiting for
+    its answer, and the page content is unchanged for 0.4 s. An empty page keeps being waited
+    for, as a script-drawn page is empty until its script runs.
+  - The wait is capped at 5 s; a page that keeps changing is observed as it stands then (logged as
+    "Browser page still busy after an action").
+  - Images, fonts and media never hold an observation; the memory rule that blocks them is
+    unchanged.
+  - The changed-code guard required `BrowserRuntime.interact` to be split: element actions,
+    scrolling and the key-effect wait are now their own methods, with the same behaviour.
+- **Proved:**
+  - Real Chromium tests (`test_browser_action_settle.py`): a script login is observed on the drawn
+    dashboard; a click is observed once its request answered; a quiet action is not slowed, and a
+    page that changes forever is not waited for past the limit. The first two fail on the old code.
+  - Simulator test site (Test sign-in), before → after:
+
+    | Login | Before | After |
+    |---|---|---|
+    | Normal form | Dashboard, 1.3 s | Dashboard, 1.2 s |
+    | Script login | Dashboard, 0.7 s | Dashboard, 0.9 s |
+    | Script-drawn dashboard | **empty page** | "Dashboard Inquiries INBOX EMPTY", 1.9 s |
+    | Script-drawn, slow login (3 s) | **"still on the login page"** | "INBOX EMPTY", 4.8 s |
+
+  - All 143 existing browser tests pass, including the keyboard ones.
+- **Cost:** a page open or action that changes nothing takes about 0.4 s longer.
+
 ## Where the simulator had an advantage
 
 Each row is a point where the simulator used something a live model does not have. Every one
