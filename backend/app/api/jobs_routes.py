@@ -732,7 +732,8 @@ async def queue_job(
     revision = await current_revision(session, job)
     definition = revision.definition if isinstance(revision.definition, dict) else {}
     now = utcnow()
-    if settings.integration_foundation_enabled and definition.get("autonomy", {}).get("oneShot"):
+    if (settings.integration_foundation_enabled and definition.get("autonomy", {}).get("oneShot")
+            and await session.scalar(select(WorkItem.id).where(WorkItem.job_id == job.id).limit(1))):
         raise HTTPException(409, "This job belongs to one chat request. Send a new task in the conversation instead of reusing its request-only authority.")
     dedupe_key = (
         str(trigger.get("dedupeKey"))

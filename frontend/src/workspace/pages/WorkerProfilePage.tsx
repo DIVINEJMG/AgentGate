@@ -19,6 +19,13 @@ const TABS: Array<{ id: WorkerTab; label: string }> = [
   { id: 'results', label: 'Results' }, { id: 'memory', label: 'Memory' }, { id: 'settings', label: 'Settings' },
 ];
 
+// The browser actions a job may take (its granted browser scopes), so a job for a site behind a
+// login visibly has signing in.
+const browserActions = (job: Job) => job.requiredCapabilities
+  .filter((scope) => scope.startsWith('browser.'))
+  .map((scope) => scope === 'browser.auth.login' ? 'sign in' : scope.slice('browser.'.length).replace(/[._]/g, ' '))
+  .join(', ');
+
 type Loaded = { jobs: Job[]; workItems: WorkItem[]; configs: TriggerConfig[]; results: ResultSummary[]; threads: ConversationThread[]; memories: MemoryRecord[] };
 
 export default function WorkerProfilePage({ worker, loading, tab, role, identity, user, organization, apiVersion, canManage, saving, onEdit, onStatus, onDelete }: {
@@ -150,7 +157,7 @@ export default function WorkerProfilePage({ worker, loading, tab, role, identity
       {!data ? <SkeletonLines rows={3} /> : data.jobs.length ? <ul className='ws-rows'>{data.jobs.map((job) => {
         const config = data.configs.find((item) => item.jobId === job.id);
         return <li key={job.id} className='ws-row' style={{ gridTemplateColumns: 'minmax(0,1fr) auto' }}>
-          <a className='ws-row-main ws-row-link' {...linkProps({ page: 'jobs' })}><strong>{job.name}</strong><small>{job.objective || job.description}</small></a>
+          <a className='ws-row-main ws-row-link' {...linkProps({ page: 'jobs' })}><strong>{job.name}</strong><small>{job.objective || job.description}</small>{browserActions(job) && <small>Browser: {browserActions(job)}</small>}</a>
           <div className='ws-row-meta'><span className='ws-hide-sm'>{config?.schedule.enabled ? config.schedule.cadence : 'On demand'}</span><State value={job.status} /></div>
         </li>;
       })}</ul> : <EmptyState title='No jobs yet'>Jobs describe recurring or on-demand work this worker owns.</EmptyState>}

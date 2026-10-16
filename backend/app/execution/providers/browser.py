@@ -517,8 +517,11 @@ class PlaywrightBrowserProvider:
         configuration: dict[str, str],
         credential: str | None,
     ) -> tuple[ResourceDescriptor, ...]:
-        del credential
+        from app.execution.browser.credentials import login_field_names
+
         start_url = configuration.get("startUrl")
+        # The stored login's field names (never values), so planning and drafting know them (F35).
+        configuration = {**configuration, "loginFields": ",".join(login_field_names(credential))}
         policy = self._domain_policy(configuration, fallback_url=start_url)
         primary_origin = policy.primary_origin
         if primary_origin is None:
@@ -573,6 +576,35 @@ class PlaywrightBrowserProvider:
             return self.manifest.capabilities
         allowed = set(resource.available_capabilities)
         return tuple(item for item in self.manifest.capabilities if item.scope in allowed)
+
+    async def probe(
+        self,
+        *,
+        organization_id: UUID,
+        configuration: dict[str, str],
+        credential: str | None,
+        sign_in: bool = False,
+    ) -> ProviderHealth:
+        """The connection's live check: open its start page through its rules and, with `sign_in`,
+        try its stored login (F34)."""
+        from app.execution.browser.probe import probe_connection
+
+        start_url = configuration.get("startUrl")
+        try:
+            policy = self._domain_policy(configuration, fallback_url=start_url)
+        except ValueError:
+            return await self.check_health(configuration=configuration, credential=credential)
+        target = start_url or policy.primary_origin
+        if not target:
+            return await self.check_health(configuration=configuration, credential=credential)
+        return await probe_connection(
+            self._runtime,
+            organization_id=organization_id,
+            policy=policy,
+            start_url=target,
+            credential=credential,
+            sign_in=sign_in,
+        )
 
     async def check_health(
         self,
@@ -1112,108 +1144,13 @@ class PlaywrightBrowserProvider:
             return (observation, {}, ())
 
         if request.operation == "auth.login":
-            credentials = BrowserCredentialBundle.from_secret(credential)
-            observation = await self._runtime.authenticate(
-                session_id,
-                organization_id=request.organization_id,
-                worker_id=request.worker_id,
-                bindings=self._credential_bindings(request.input),
-                credentials=credentials,
-                form_ref=(str(request.input["formRef"]) if request.input.get("formRef") else None),
-                submit_locator=self._locator(request.input, "submitLocator"),
-                failure_text=(
-                    str(request.input["failureText"]) if request.input.get("failureText") else None
-                ),
-                success_url_contains=(
-                    str(request.input["successUrlContains"])
-                    if request.input.get("successUrlContains")
-                    else None
-                ),
-                timeout_ms=timeout_ms,
-            )
-            return (observation, {}, ())
+            return (await self._login(request, credential, session_id, timeout_ms), {}, ())
 
         if request.operation == "file.upload":
-            store = self._require_artifact_store()
-            upload = await store.load_input(
-                organization_id=request.organization_id,
-                worker_id=request.worker_id,
-                run_id=request.run_id,
-                artifact_id=UUID(str(request.input["artifactId"])),
-            )
-            locator = self._locator(request.input)
-            if locator is None:
-                raise ValueError("Browser upload requires a locator.")
-            observation = await self._runtime.upload_file(
-                session_id,
-                organization_id=request.organization_id,
-                worker_id=request.worker_id,
-                locator=locator,
-                name=upload.name,
-                media_type=upload.media_type,
-                content=upload.content,
-                dialog_action=dialog_action,
-                prompt_text=dialog_prompt,
-                timeout_ms=timeout_ms,
-            )
-            return (
-                observation,
-                {
-                    "uploadArtifact": {
-                        "id": str(upload.id),
-                        "name": upload.name,
-                        "mediaType": upload.media_type,
-                        "sizeBytes": len(upload.content),
-                        "checksumSha256": upload.checksum_sha256,
-                    },
-                    "fileUploadVerified": True,
-                },
-                (),
-            )
+            return await self._upload(request, session_id, dialog_action, dialog_prompt, timeout_ms)
 
         if request.operation == "file.download":
-            store = self._require_artifact_store()
-            locator = self._locator(request.input)
-            if locator is None:
-                raise ValueError("Browser download requires a locator.")
-            download, observation = await self._runtime.download_file(
-                session_id,
-                organization_id=request.organization_id,
-                worker_id=request.worker_id,
-                locator=locator,
-                timeout_ms=_bounded_int(
-                    configuration,
-                    "downloadTimeoutMs",
-                    30_000,
-                    minimum=1_000,
-                    maximum=MAX_NAVIGATION_TIMEOUT_MS,
-                ),
-                max_bytes=_bounded_int(
-                    configuration,
-                    "maxDownloadBytes",
-                    MAX_DOWNLOAD_BYTES,
-                    minimum=1,
-                    maximum=MAX_DOWNLOAD_BYTES,
-                ),
-            )
-            persisted = await store.store(
-                organization_id=request.organization_id,
-                worker_id=request.worker_id,
-                run_id=request.run_id,
-                session_id=session_id,
-                correlation_id=request.correlation_id,
-                operation=request.operation,
-                kind="browser_download",
-                name=download.name,
-                media_type=download.media_type,
-                content=download.content,
-                source_url=download.source_url,
-            )
-            return (
-                observation,
-                {"downloadArtifact": persisted.as_dict()},
-                (persisted,),
-            )
+            return await self._download(request, configuration, session_id)
 
         observation = await self._runtime.interact(
             session_id,
@@ -1237,6 +1174,133 @@ class PlaywrightBrowserProvider:
             timeout_ms=timeout_ms,
         )
         return (observation, {}, ())
+
+    async def _login(
+        self,
+        request: ExecutionRequest,
+        credential: str | None,
+        session_id: UUID,
+        timeout_ms: int,
+    ) -> BrowserObservation:
+        credentials = BrowserCredentialBundle.from_secret(credential)
+        bindings = self._credential_bindings(request.input)
+        try:
+            credentials.require(tuple(key for _, key in bindings))
+        except BrowserAuthenticationFailure as error:
+            raise ValueError(str(error)) from error
+        observation = await self._runtime.authenticate(
+            session_id,
+            organization_id=request.organization_id,
+            worker_id=request.worker_id,
+            bindings=bindings,
+            credentials=credentials,
+            form_ref=(str(request.input["formRef"]) if request.input.get("formRef") else None),
+            submit_locator=self._locator(request.input, "submitLocator"),
+            failure_text=(
+                str(request.input["failureText"]) if request.input.get("failureText") else None
+            ),
+            success_url_contains=(
+                str(request.input["successUrlContains"])
+                if request.input.get("successUrlContains")
+                else None
+            ),
+            timeout_ms=timeout_ms,
+        )
+        return observation
+
+    async def _upload(
+        self,
+        request: ExecutionRequest,
+        session_id: UUID,
+        dialog_action: str | None,
+        dialog_prompt: str | None,
+        timeout_ms: int,
+    ) -> tuple[BrowserObservation, dict[str, object], tuple[BrowserArtifactReference, ...]]:
+        store = self._require_artifact_store()
+        upload = await store.load_input(
+            organization_id=request.organization_id,
+            worker_id=request.worker_id,
+            run_id=request.run_id,
+            artifact_id=UUID(str(request.input["artifactId"])),
+        )
+        locator = self._locator(request.input)
+        if locator is None:
+            raise ValueError("Browser upload requires a locator.")
+        observation = await self._runtime.upload_file(
+            session_id,
+            organization_id=request.organization_id,
+            worker_id=request.worker_id,
+            locator=locator,
+            name=upload.name,
+            media_type=upload.media_type,
+            content=upload.content,
+            dialog_action=dialog_action,
+            prompt_text=dialog_prompt,
+            timeout_ms=timeout_ms,
+        )
+        return (
+            observation,
+            {
+                "uploadArtifact": {
+                    "id": str(upload.id),
+                    "name": upload.name,
+                    "mediaType": upload.media_type,
+                    "sizeBytes": len(upload.content),
+                    "checksumSha256": upload.checksum_sha256,
+                },
+                "fileUploadVerified": True,
+            },
+            (),
+        )
+
+    async def _download(
+        self,
+        request: ExecutionRequest,
+        configuration: dict[str, str],
+        session_id: UUID,
+    ) -> tuple[BrowserObservation, dict[str, object], tuple[BrowserArtifactReference, ...]]:
+        store = self._require_artifact_store()
+        locator = self._locator(request.input)
+        if locator is None:
+            raise ValueError("Browser download requires a locator.")
+        download, observation = await self._runtime.download_file(
+            session_id,
+            organization_id=request.organization_id,
+            worker_id=request.worker_id,
+            locator=locator,
+            timeout_ms=_bounded_int(
+                configuration,
+                "downloadTimeoutMs",
+                30_000,
+                minimum=1_000,
+                maximum=MAX_NAVIGATION_TIMEOUT_MS,
+            ),
+            max_bytes=_bounded_int(
+                configuration,
+                "maxDownloadBytes",
+                MAX_DOWNLOAD_BYTES,
+                minimum=1,
+                maximum=MAX_DOWNLOAD_BYTES,
+            ),
+        )
+        persisted = await store.store(
+            organization_id=request.organization_id,
+            worker_id=request.worker_id,
+            run_id=request.run_id,
+            session_id=session_id,
+            correlation_id=request.correlation_id,
+            operation=request.operation,
+            kind="browser_download",
+            name=download.name,
+            media_type=download.media_type,
+            content=download.content,
+            source_url=download.source_url,
+        )
+        return (
+            observation,
+            {"downloadArtifact": persisted.as_dict()},
+            (persisted,),
+        )
 
     async def _execute_authorized(
         self,

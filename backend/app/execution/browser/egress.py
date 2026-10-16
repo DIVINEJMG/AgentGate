@@ -6,6 +6,8 @@ import socket
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from app.execution.browser.policy import normalize_origin
+
 _CLOUD_METADATA_HOSTS = {
     "169.254.169.254",
     "metadata.google.internal",
@@ -87,3 +89,32 @@ async def evaluate_browser_egress(
             "Browser destination resolved to private/internal IP space.",
         )
     return BrowserEgressDecision(True, host, "Browser egress destination is public.")
+
+
+# Hosts remembered per browser session, so each is looked up once (a few KB at most).
+MAX_REMEMBERED_HOSTS = 512
+
+
+async def resource_refusal(
+    url: str,
+    *,
+    denied_origins: tuple[str, ...],
+    allow_private_network: bool,
+    remembered: dict[str, BrowserEgressDecision],
+) -> str | None:
+    """Why a page's own request (a script, style or fetch) is refused, or None (F39).
+
+    Blocked sites and private addresses are refused; other sites a page loads from, such as a
+    CDN, stay allowed. Non-web addresses (data:, blob:) never leave the browser."""
+    parts = urlsplit(url)
+    if parts.scheme not in {"http", "https"}:
+        return None
+    if normalize_origin(url) in denied_origins:
+        return "Browser destination origin is explicitly denied."
+    key = f"{parts.hostname}:{parts.port or ''}"
+    decision = remembered.get(key)
+    if decision is None:
+        decision = await evaluate_browser_egress(url, allow_private_network=allow_private_network)
+        if len(remembered) < MAX_REMEMBERED_HOSTS:
+            remembered[key] = decision
+    return None if decision.allowed else decision.reason

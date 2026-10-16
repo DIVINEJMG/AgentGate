@@ -1016,6 +1016,15 @@ async def _action_public(
     return (await _actions_public(session, [action]))[0]
 
 
+def _recorded_policy(raw: object) -> dict[str, Any]:
+    """An action's policy decision with every field the API promises. The runtime records only
+    the outcome and reason (F30), so the deciding and matched policies default to none."""
+    recorded = raw if isinstance(raw, dict) else {"outcome": "DENY", "reason": "No policy decision recorded."}
+    matched = recorded.get("matchedPolicies")
+    return {**recorded, "winningPolicy": recorded.get("winningPolicy"),
+            "matchedPolicies": matched if isinstance(matched, list) else []}
+
+
 def _action_record(action: Action, agent_name: str, approval_id: str | None) -> dict[str, Any]:
     data: dict[str, Any] = (
         dict(action.payload) if isinstance(action.payload, dict) else {}
@@ -1052,14 +1061,7 @@ def _action_record(action: Action, agent_name: str, approval_id: str | None) -> 
                 hashlib.sha256(action.idempotency_key.encode()).hexdigest(),
             )
         ),
-        "policy": data.get("policy")
-        if isinstance(data.get("policy"), dict)
-        else {
-            "outcome": "DENY",
-            "reason": "No policy decision recorded.",
-            "winningPolicy": None,
-            "matchedPolicies": [],
-        },
+        "policy": _recorded_policy(data.get("policy")),
         "riskAssessment": data.get("riskAssessment"),
         "result": data.get("result"),
         "error": data.get("error"),
@@ -1694,7 +1696,8 @@ async def _decide_approval(
         await _always_allow(session, organization_id, principal, action)
     await session.commit()
 
-    if decision == "approve" and action is not None and action.run_id is not None:
+    # Either decision moves the run on: an approval runs the action, a rejection closes the step (F28).
+    if action is not None and action.run_id is not None:
         run = await session.get(Run, action.run_id)
         item = (
             await session.get(WorkItem, run.work_item_id)

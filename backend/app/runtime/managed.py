@@ -52,6 +52,7 @@ from app.infrastructure.database.models import (
     Action,
     AgentIdentity,
     Approval,
+    Artifact,
     CapabilityProfile,
     Integration,
     Job,
@@ -236,6 +237,28 @@ def _step_output(step: RunStep) -> dict[str, Any]:
     return dict(step.output or {}) if isinstance(step.output, dict) else {}
 
 
+def _completion_summary(job: Job, steps: list[RunStep], given: str | None) -> str:
+    """The given summary, else the completed actions' summaries, else a plain default."""
+    action_summaries = [
+        str(_step_output(step).get("summary") or "").strip()
+        for step in steps
+        if step.kind == "action" and step.status == "completed"
+    ]
+    summary = (given or "").strip()
+    if not summary:
+        summary = " ".join(value for value in action_summaries if value).strip()
+    return summary or f"{job.name} completed by Managed Runtime."
+
+
+# Files a run produced for the person (not its screenshots and other evidence).
+RESULT_FILE_KINDS = frozenset({"browser_download"})
+
+
+def _login_fields(config: dict[str, Any]) -> list[str]:
+    """The stored login's field names (never values) a sign-in may bind (F35)."""
+    return [name for name in str(config.get("loginFields") or "").split(",") if name]
+
+
 def _authorized_browser_origins(definition: dict[str, Any], autonomy: dict[str, Any]) -> tuple[str, ...]:
     """The browser origins the job may use: those authorized on it, else the explicit HTTP origins in
     its objective and instructions."""
@@ -254,6 +277,23 @@ def _browser_resource_admitted(integration: Integration | None, resource_origins
     if not resource_origins or not set(resource_origins).issubset(authorized):
         return False
     return not autonomy.get("createdByAI") or browser_integration_autonomy_suitable(integration, set(authorized))
+
+
+def _superseded_managed_browsers(resources: list[dict[str, Any]], integrations: dict[str, Any]) -> set[str]:
+    """AgentGate's own browser connections whose sites a connection the person set up also covers:
+    the person's, with its login, rules and file actions, is used instead (F43)."""
+    managed: dict[str, set[str]] = {}
+    personal: set[str] = set()
+    for resource in resources:
+        integration = integrations.get(str(resource.get("id", "")))
+        if resource.get("provider") != "browser" or resource.get("status") != "connected" or integration is None:
+            continue
+        origins = set(browser_integration_origins(integration))
+        if _integration_config(integration).get("managedBy") == "worker_autonomy":
+            managed[str(resource["id"])] = origins
+        elif browser_integration_autonomy_suitable(integration, origins):
+            personal |= origins
+    return {resource_id for resource_id, origins in managed.items() if origins and origins <= personal}
 
 
 def _integration_config(integration: Integration | None) -> dict[str, Any]:
@@ -708,9 +748,10 @@ class ManagedRuntimeExecutor:
         preparation_cache: dict[Any, Any] = {(item.organization_id, agent.id, "agent"): agent}
         # Rows the catalog read just now (a legacy resource's id is its integration's id).
         integrations = snapshot_integrations(item.organization_id)
+        superseded = _superseded_managed_browsers(resources, integrations)
 
         for resource in resources:
-            if resource.get("status") != "connected":
+            if resource.get("status") != "connected" or str(resource.get("id", "")) in superseded:
                 continue
             provider_name = str(resource.get("provider", ""))
             try:
@@ -777,6 +818,12 @@ class ManagedRuntimeExecutor:
                             list(resource_browser_origins)
                             if provider_name == "browser"
                             else []
+                        ),
+                        # Only the sign-in tool names the stored fields, so no other tool grows.
+                        **(
+                            {"loginFields": _login_fields(config)}
+                            if scope == "browser.auth.login"
+                            else {}
                         ),
                     }
                 )
@@ -1354,6 +1401,21 @@ class ManagedRuntimeExecutor:
             ),
         )
         return decision
+
+    async def _run_files(self, run_id: UUID) -> list[tuple[str, str]]:
+        """The files a run produced for the person, as (id, name), listed on its result (F41)."""
+        rows = (
+            await self._session.execute(
+                select(Artifact.id, Artifact.metadata_json)
+                .where(Artifact.run_id == run_id)
+                .order_by(Artifact.created_at)
+            )
+        ).all()
+        return [
+            (str(artifact_id), str(meta.get("name") or "file"))
+            for artifact_id, meta in rows
+            if isinstance(meta, dict) and meta.get("kind") in RESULT_FILE_KINDS
+        ]
 
     async def _load_plan(self, run: Run) -> list[RunPlanStep]:
         return list((await self._session.scalars(select(RunPlanStep).where(
@@ -2349,20 +2411,16 @@ class ManagedRuntimeExecutor:
         )
         _write_runtime_meta(item, stopAfterNextRunApplied=True)
 
-    async def _complete(
+    async def _record_finish(
         self,
         item: WorkItem,
         run: Run,
-        job: Job,
-        worker: Worker,
         steps: list[RunStep],
-        *,
-        completion_summary: str | None = None,
-        finish_title: str = "Finish",
-        finish_instruction: str = "Verify completion from recorded execution evidence.",
-        result_status: Literal["completed", "attention"] = "completed",
-        completion_check: list[dict[str, object]] | None = None,
-    ) -> RuntimeStepOutcome:
+        completion_summary: str | None,
+        finish_title: str,
+        finish_instruction: str,
+    ) -> None:
+        """The run's finish step, added or completed with the completion summary."""
         current = max(0, int(_runtime_meta(item).get("currentStep", 0)))
         finish_output = completion_summary or "Runtime completion checkpoint verified."
         if current >= len(steps):
@@ -2395,16 +2453,86 @@ class ManagedRuntimeExecutor:
                     "completedAt": utcnow().isoformat(),
                 }
 
-        action_summaries = [
-            str(_step_output(step).get("summary") or "").strip()
+    async def _result_body(
+        self,
+        item: WorkItem,
+        run: Run,
+        worker: Worker,
+        steps: list[RunStep],
+        *,
+        summary: str,
+        result_status: str,
+        completion_check: list[dict[str, object]] | None,
+        outcome: object,
+        now: datetime,
+    ) -> dict[str, Any]:
+        """The first result version's body, with the files the run downloaded (F41)."""
+        # Only a run that downloaded something has files to list; others add no query.
+        downloaded = any(
+            step.kind == "action"
+            and step.status == "completed"
+            and (step.input or {}).get("scope") == "browser.file.download"
             for step in steps
-            if step.kind == "action" and step.status == "completed"
-        ]
-        summary = (completion_summary or "").strip()
-        if not summary:
-            summary = " ".join(value for value in action_summaries if value).strip()
-        if not summary:
-            summary = f"{job.name} completed by Managed Runtime."
+        )
+        files = await self._run_files(run.id) if downloaded else []
+        return {
+            "summary": summary,
+            "completionCriteriaVerified": result_status == "completed",
+            **({"completionCheck": completion_check} if completion_check else {}),
+            "executionOutcome": outcome,
+            "completedAt": now.isoformat(),
+            "workItemId": str(item.id),
+            "runId": str(run.id),
+            "agentId": str(worker.agent_identity_id),
+            "blocks": [
+                {"type": "paragraph", "text": summary},
+                *(
+                    {"type": "attachment", "artifactId": file_id, "label": name}
+                    for file_id, name in files
+                ),
+            ],
+            "artifactIds": [file_id for file_id, _ in files],
+            "sourceReferences": [reference for step in steps
+                for reference in ((_step_output(step).get("data") or {}).get("externalReferences", []))],
+            "capabilitiesUsed": [
+                str((step.input or {}).get("scope", ""))
+                for step in steps
+                if step.kind == "action" and step.status == "completed"
+            ],
+            "actionIds": [
+                str(_step_output(step).get("actionId"))
+                for step in steps
+                if _step_output(step).get("actionId")
+            ],
+            "approvalIds": [
+                str(_step_output(step).get("approvalId"))
+                for step in steps
+                if _step_output(step).get("approvalId")
+            ],
+            "correlationId": item.correlation_id,
+            "isNew": True,
+            "hasTables": False,
+        }
+
+    async def _complete(
+        self,
+        item: WorkItem,
+        run: Run,
+        job: Job,
+        worker: Worker,
+        steps: list[RunStep],
+        *,
+        completion_summary: str | None = None,
+        finish_title: str = "Finish",
+        finish_instruction: str = "Verify completion from recorded execution evidence.",
+        result_status: Literal["completed", "attention"] = "completed",
+        completion_check: list[dict[str, object]] | None = None,
+    ) -> RuntimeStepOutcome:
+        await self._record_finish(
+            item, run, steps, completion_summary, finish_title, finish_instruction
+        )
+
+        summary = _completion_summary(job, steps, completion_summary)
 
         now = utcnow()
         completed_actions = [step for step in steps if step.kind == "action" and step.status == "completed"]
@@ -2453,45 +2581,12 @@ class ManagedRuntimeExecutor:
             )
             self._session.add(result)
             await self._session.flush()
-            self._session.add(
-                ResultVersion(
-                    result_id=result.id,
-                    version=1,
-                    body={
-                        "summary": summary,
-                        "completionCriteriaVerified": result_status == "completed",
-                        **({"completionCheck": completion_check} if completion_check else {}),
-                        "executionOutcome": runtime["executionOutcome"],
-                        "completedAt": now.isoformat(),
-                        "workItemId": str(item.id),
-                        "runId": str(run.id),
-                        "agentId": str(worker.agent_identity_id),
-                        "blocks": [{"type": "paragraph", "text": summary}],
-                        "artifactIds": [],
-                        "sourceReferences": [reference for step in steps
-                            for reference in ((_step_output(step).get("data") or {}).get("externalReferences", []))],
-                        "capabilitiesUsed": [
-                            str((step.input or {}).get("scope", ""))
-                            for step in steps
-                            if step.kind == "action" and step.status == "completed"
-                        ],
-                        "actionIds": [
-                            str(_step_output(step).get("actionId"))
-                            for step in steps
-                            if _step_output(step).get("actionId")
-                        ],
-                        "approvalIds": [
-                            str(_step_output(step).get("approvalId"))
-                            for step in steps
-                            if _step_output(step).get("approvalId")
-                        ],
-                        "correlationId": item.correlation_id,
-                        "isNew": True,
-                        "hasTables": False,
-                    },
-                    created_at=now,
-                )
+            body = await self._result_body(
+                item, run, worker, steps, summary=summary, result_status=result_status,
+                completion_check=completion_check,
+                outcome=runtime["executionOutcome"], now=now,
             )
+            self._session.add(ResultVersion(result_id=result.id, version=1, body=body, created_at=now))
             _write_runtime_meta(item, resultId=str(result.id))
             memory_service = WorkerMemoryService(self._session)
             await memory_service.record_operational(
@@ -2533,6 +2628,11 @@ class ManagedRuntimeExecutor:
                 worker=worker,
                 result=result,
                 summary=summary,
+                files=[
+                    {"id": block["artifactId"], "name": block["label"]}
+                    for block in body["blocks"]
+                    if block.get("type") == "attachment"
+                ],
             )
 
         await self._close_browser_session(

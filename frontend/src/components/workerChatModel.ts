@@ -24,6 +24,8 @@ export type LiveResultReference = {
   workItemId?: string;
   runId?: string;
   externalReferences?: Array<{ url: string; title: string }>;
+  /** Files the run downloaded; opened with a signed link. */
+  files?: Array<{ id: string; name: string }>;
 };
 
 export function liveResultReference(message: { resultReferences?: Array<Record<string, unknown>> | null }): LiveResultReference | null {
@@ -46,6 +48,9 @@ export function liveResultReference(message: { resultReferences?: Array<Record<s
       ...(Array.isArray(raw.externalReferences) ? { externalReferences: raw.externalReferences.filter(
         (ref): ref is { url: string; title: string } => !!ref && typeof ref.url === 'string' &&
           /^https:\/\//i.test(ref.url) && typeof ref.title === 'string'
+      ) } : {}),
+      ...(Array.isArray(raw.files) ? { files: raw.files.filter(
+        (file): file is { id: string; name: string } => !!file && typeof file.id === 'string' && typeof file.name === 'string'
       ) } : {}),
     };
   }

@@ -4,6 +4,7 @@ import json
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from typing import Any
 
 import httpx
 
@@ -188,6 +189,33 @@ class NvidiaNimProvider:
             body["chat_template_kwargs"] = template_kwargs
         return place_schema(body, request)
 
+    def _completed(self, payload: object, model: str) -> tuple[str, Any]:
+        """The text and usage of a non-streamed answer, after its envelope, refusal, finish and model
+        checks."""
+        if not isinstance(payload, dict):
+            raise AIProviderError(
+                "invalid_provider_response",
+                "NVIDIA NIM returned an invalid response envelope.",
+                retryable=False,
+                rejection_reason="invalid_envelope",
+            )
+        choices = payload.get("choices")
+        first = choices[0] if isinstance(choices, list) and choices else {}
+        finish = first.get("finish_reason") if isinstance(first, dict) else None
+        message = first.get("message", {}) if isinstance(first, dict) else {}
+        if isinstance(message, dict) and message.get("refusal"):
+            raise AIProviderError("content_rejected", "Planner declined this request.", retryable=False)
+        if finish in {"length", "error", "content_filter"}:
+            raise AIProviderError(
+                "content_rejected" if finish == "content_filter" else "invalid_provider_response",
+                "Planner response was incomplete or refused.", retryable=False,
+                rejection_reason="truncated_output" if finish == "length" else "incomplete_output",
+                finish_reason=finish)
+        if self.planner_profile and payload.get("model", model) != model:
+            raise AIProviderError("invalid_provider_response", "Unexpected planner model identity.",
+                retryable=False, rejection_reason="model_mismatch")
+        return _content_from_payload(payload), _usage_from_payload(payload)
+
     async def _raise_for_error(self, response: httpx.Response) -> None:
         raw = await response.aread()
         detail = _detail_from_bytes(raw)
@@ -283,29 +311,7 @@ class NvidiaNimProvider:
                     if response.status_code >= 400:
                         await self._raise_for_error(response)
                     payload = response.json()
-                    if not isinstance(payload, dict):
-                        raise AIProviderError(
-                            "invalid_provider_response",
-                            "NVIDIA NIM returned an invalid response envelope.",
-                            retryable=False,
-                            rejection_reason="invalid_envelope",
-                        )
-                    choices = payload.get("choices")
-                    first = choices[0] if isinstance(choices, list) and choices else {}
-                    finish = first.get("finish_reason") if isinstance(first, dict) else None
-                    message = first.get("message", {}) if isinstance(first, dict) else {}
-                    if isinstance(message, dict) and message.get("refusal"):
-                        raise AIProviderError("content_rejected", "Planner declined this request.", retryable=False)
-                    if finish in {"length", "error", "content_filter"}:
-                        raise AIProviderError(
-                            "content_rejected" if finish == "content_filter" else "invalid_provider_response",
-                            "Planner response was incomplete or refused.", retryable=False,
-                            rejection_reason="truncated_output" if finish == "length" else "incomplete_output")
-                    if self.planner_profile and payload.get("model", model) != model:
-                        raise AIProviderError("invalid_provider_response", "Unexpected planner model identity.",
-                            retryable=False, rejection_reason="model_mismatch")
-                    text = _content_from_payload(payload)
-                    usage = _usage_from_payload(payload)
+                    text, usage = self._completed(payload, model)
                     request_id = response.headers.get("x-request-id")
                     if not request_id and isinstance(payload.get("id"), str):
                         request_id = str(payload["id"])

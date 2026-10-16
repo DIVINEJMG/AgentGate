@@ -87,6 +87,17 @@ class AIResponse:
     usage: dict[str, int] = field(default_factory=dict)
 
 
+FINISH_REASONS = frozenset({"stop", "length", "tool_calls", "function_call", "content_filter", "end_turn", "max_tokens"})
+
+
+def finish_code(value: object) -> str:
+    """A model answer's finish reason as a fixed code: `none` when the answer ended without one
+    (a cut connection), `other` for anything unknown; never provider text."""
+    if not value:
+        return "none"
+    return str(value) if str(value) in FINISH_REASONS else "other"
+
+
 class AIProviderError(RuntimeError):
     def __init__(
         self,
@@ -102,8 +113,11 @@ class AIProviderError(RuntimeError):
         budget_scope: str | None = None,
         model_called: bool | None = None,
         validation_rule: str | None = None,
+        finish_reason: object = None,
     ) -> None:
         super().__init__(message)
+        # How the model's answer ended, as a fixed code (F33); None when the answer was not cut short.
+        self.finish_reason = finish_code(finish_reason) if rejection_reason in {"incomplete_output", "truncated_output"} else None
         self.category: AIErrorCategory = category
         self.retryable = retryable
         self.status_code = status_code

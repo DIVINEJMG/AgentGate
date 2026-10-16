@@ -70,13 +70,15 @@ def install_fault_injection() -> None:
 
     `dropped`: the request never reaches GitHub and the call times out.
     `lost_response`: GitHub performs the request, then the response is lost (a timeout).
+    `missing_field`: GitHub performs the request, then the rule's `field` is missing from the
+    response (an unreadable result after a write).
     Each firing lowers `times`; a rule at 0 is spent."""
     from app.execution.providers.native.github.provider import ExpandedGitHubProvider
     from app.execution.providers.native.http import ProviderTransportError
 
     real_api = ExpandedGitHubProvider.api
 
-    def matching_rule(method: str, path: str) -> str | None:
+    def matching_rule(method: str, path: str) -> dict | None:
         if not FAULTS.exists():
             return None
         data = json.loads(FAULTS.read_text(encoding="utf-8"))
@@ -85,11 +87,18 @@ def install_fault_injection() -> None:
                     and path.split("?")[0].endswith(rule.get("path_suffix", ""))):
                 rule["times"] -= 1
                 FAULTS.write_text(json.dumps(data, indent=1), encoding="utf-8")
-                return str(rule.get("mode"))
+                return rule
         return None
 
     async def api(self, method, path, credential, payload=None, **kwargs):
-        mode = matching_rule(method, path)
+        rule = matching_rule(method, path) or {}
+        mode = rule.get("mode")
+        if mode == "missing_field":
+            response = await real_api(self, method, path, credential, payload, **kwargs)
+            if isinstance(response.data, dict):
+                response.data.pop(str(rule.get("field")), None)
+            print(f"[faults] removed {rule.get('field')} from the response of {method} {path}", flush=True)
+            return response
         if mode == "dropped":
             print(f"[faults] dropped {method} {path}", flush=True)
         elif mode == "lost_response":

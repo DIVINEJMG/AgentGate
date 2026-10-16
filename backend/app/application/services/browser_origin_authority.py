@@ -123,7 +123,12 @@ def browser_integration_autonomy_suitable(
     integration: Integration | None,
     required_origins: Iterable[str],
 ) -> bool:
-    """Return whether a Browser resource is safe to reuse for AI-managed web work."""
+    """Return whether a Browser resource is safe to reuse for AI-managed web work.
+
+    `required_origins` are the sites the person named for this work (F43). Their own connection
+    for exactly those sites is reused, private-network ones included, so its login, rules and
+    file actions apply; AgentGate's own managed connections never reach private addresses.
+    """
 
     if integration is None or integration.provider != "browser":
         return False
@@ -138,14 +143,13 @@ def browser_integration_autonomy_suitable(
         return False
 
     config = integration.config if isinstance(integration.config, dict) else {}
-    if str(config.get("allowPrivateNetwork", "false")).strip().lower() == "true":
-        return False
-
-    # Managed worker resources are lean by contract. A manually configured Browser
-    # resource is reusable only when its owner explicitly made it lean as well.
     managed = str(config.get("managedBy", "")).strip() == "worker_autonomy"
-    lean = str(config.get("loadVisualResources", "")).strip().lower() == "false"
-    return managed or lean
+    private = str(config.get("allowPrivateNetwork", "false")).strip().lower() == "true"
+    if private and managed:
+        return False
+    # Lean (no images, media or fonts) is the browser's default when the key is absent, which
+    # is how the Connections setup saves it; only a connection that turned them on is refused.
+    return managed or str(config.get("loadVisualResources", "false")).strip().lower() != "true"
 
 
 def browser_origins_covered(
@@ -206,6 +210,8 @@ async def ensure_managed_browser_origins(
     resolved: list[Integration] = []
     covered: dict[str, Integration] = {}
     requested_set = set(requested)
+    # A connection the person set up is preferred to AgentGate's own for the same site (F43).
+    existing.sort(key=lambda row: (row.config or {}).get("managedBy") == "worker_autonomy")
     for integration in existing:
         if not browser_integration_autonomy_suitable(integration, requested_set):
             continue

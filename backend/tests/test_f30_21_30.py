@@ -792,8 +792,9 @@ class RecordingRoute:
 
 
 class StaticResourceRequest:
-    def __init__(self, resource_type: str) -> None:
+    def __init__(self, resource_type: str, url: str = "https://93.184.216.34/static/asset") -> None:
         self.resource_type = resource_type
+        self.url = url  # a public address, so the page-request check (F39) needs no DNS
 
     def is_navigation_request(self) -> bool:
         return False

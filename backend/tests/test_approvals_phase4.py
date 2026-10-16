@@ -241,3 +241,54 @@ async def test_the_runtime_runs_an_edit_only_while_it_matches_what_was_approved(
             await resume(executor, item=item, run=SimpleNamespace(id=uuid4()),
                 step=step, job=None, worker=None, agent=SimpleNamespace(id=uuid4()), current_step=0)
         assert cast(Any, executor._universal_request.await_args).kwargs["proposal"].payload == approved
+
+
+def _waiting_task(approvals: Approvals, approval: m.Approval) -> m.WorkItem:
+    """A task paused at step 0 on this approval (its run and step point at the approval)."""
+    item = approvals.db.add(m.WorkItem, organization_id=ORG, job_id=uuid4(), job_revision_id=uuid4(), status="waiting_approval",
+                            priority=0, correlation_id=f"c-{uuid4()}", idempotency_key=f"i-{uuid4()}",
+                            scheduled_at=datetime.now(UTC) - timedelta(minutes=1), payload={"runtime": {"currentStep": 0}})
+    run = approvals.db.add(m.Run, organization_id=ORG, work_item_id=item.id, status="waiting_approval", correlation_id="c")
+    approvals.db.add(m.RunStep, run_id=run.id, step_index=0, kind="action", status="waiting_approval",
+                     input={}, output={"approvalId": str(approval.id)})
+    with Session(approvals.db.engine) as session:
+        action = session.get(m.Action, approval.action_id)
+        assert action is not None
+        action.run_id = run.id
+        session.commit()
+    return item
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("decision", ["approve", "reject"])
+async def test_either_decision_wakes_the_waiting_task(monkeypatch: pytest.MonkeyPatch, decision: str) -> None:
+    """F28: a rejection must wake the task too, so the runtime closes the step instead of the task
+    waiting for good."""
+    approvals = Approvals(monkeypatch)
+    approval = approvals.pending()
+    item = _waiting_task(approvals, approval)
+    await approvals.decide(approval, {"decision": decision})
+    assert [wake["work_item_id"] for wake in approvals.woken] == [item.id]
+
+
+@pytest.mark.asyncio
+async def test_the_sweep_resumes_tasks_whose_approval_was_decided(monkeypatch: pytest.MonkeyPatch) -> None:
+    """F28: the sweep resumes an approved or a rejected task (in three queries for all of them),
+    and leaves one still waiting for a decision."""
+    from app.api.internal.runtime import _decided_approval_items
+
+    approvals = Approvals(monkeypatch)
+    tasks = {}
+    for status in ("approved", "rejected", "pending"):
+        approval = approvals.pending()
+        tasks[status] = _waiting_task(approvals, approval)
+        with Session(approvals.db.engine) as session:
+            row = session.get(m.Approval, approval.id)
+            assert row is not None
+            row.status = status
+            session.commit()
+    with _aware_sqlite_datetimes():
+        session = BenchSession(Session(approvals.db.engine, expire_on_commit=False))
+        waiting = list(await session.scalars(select(m.WorkItem)))
+        assert await _decided_approval_items(session, waiting) == {tasks["approved"].id, tasks["rejected"].id}
+        assert await _decided_approval_items(session, []) == set()

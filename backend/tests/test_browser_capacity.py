@@ -61,6 +61,9 @@ class FakeContext:
     async def route(self, *_args):
         pass
 
+    async def route_web_socket(self, *_args):
+        pass
+
     async def close(self):
         pass
 

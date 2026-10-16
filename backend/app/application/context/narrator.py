@@ -76,16 +76,18 @@ def _noun(scope: str) -> str:
 
 def _found(scope: str, output: object) -> str | None:
     """A read: how many items and the first few names, or the one object it read."""
-    items = list_of(output)
+    items, noun, state = list_of(output), _noun(scope), None
     if (record := map_of(output)) is not None:
-        lists = [found for value in record.values() if (found := list_of(value)) is not None]
+        lists = [(key, found) for key, value in record.items() if (found := list_of(value)) is not None]
         if len(lists) != 1:
             return f"Read {_name(record)}." if _title(record, 80) else None
-        items = lists[0]
+        (key, items), state = lists[0], record.get("state")
+        noun = key.replace("_", " ")
     if items is None:
         return None
     if not items:
-        return "Found nothing: the result is empty."
+        # Say what was empty, and keep a state the record carries (F32).
+        return (f"State: {state}; no {noun}." if isinstance(state, str) and state else f"No {noun}.")
     names = _names(items)
     return f"Found {_count(len(items), _noun(scope))}" + (f": {names}" if names else "") + "."
 
@@ -138,10 +140,37 @@ SPECIAL: dict[str, Narrator] = {
 }
 
 
+# What a browser step did, before saying which page it is on (F44).
+BROWSER_VERBS = {
+    "navigation.open": "Opened", "navigation.follow_link": "Followed a link to",
+    "navigation.back": "Went back to", "navigation.forward": "Went forward to",
+    "navigation.reload": "Reloaded", "page.read": "Read", "auth.login": "Signed in; now on",
+    "form.submit": "Submitted the form; now on",
+}
+
+
+def _browser(scope: str, record: Mapping[str, object]) -> str | None:
+    """A browser step: the file it downloaded or chose (with the file's id, so a later step can use
+    it), or the page it is on now. A page observation is never counted as results."""
+    if download := as_map(record.get("downloadArtifact")):
+        return (f"Downloaded {download.get('name') or 'a file'} ({download.get('sizeBytes')} bytes; "
+                f"file id {download.get('id')}).")
+    if upload := as_map(record.get("uploadArtifact")):
+        return f"Chose {upload.get('name') or 'the file'} ({upload.get('sizeBytes')} bytes) in the upload field."
+    page = as_map(record.get("observation"))
+    title, url = str(page.get("title") or "").strip()[:120], str(page.get("url") or "")
+    where = f"{title} ({url})" if title and url else title or url
+    if not where:
+        return None
+    return f"{BROWSER_VERBS.get(scope.split('.', 1)[-1], 'Now on')} {where}."
+
+
 def narrate(scope: str, output: object, action_input: Mapping[str, object] | None = None) -> str | None:
     """One sentence for a completed step, or None when there is nothing plain to say (the
     caller then uses the provider's verification note)."""
     request = action_input or {}
+    if scope.startswith("browser."):
+        return _browser(scope, as_map(output))
     special = SPECIAL.get(".".join(scope.split(".")[-2:]))
     if special is not None:
         return special(as_map(output), request)

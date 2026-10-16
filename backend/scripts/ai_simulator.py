@@ -10,6 +10,7 @@ exists. The exchange is then moved to `.sim/log/` and appended to `.sim/transcri
 Answer file (one JSON object):
   {"content": {...} or "text"}             the model's reply (an object is sent as JSON text)
   {"content": "...", "finish_reason": "length"}   a cut-off reply
+  {"content": "...", "finish_reason": "none"}     a reply whose stream ends with no finish reason
   {"refusal": "..."}                       the model declines
   {"status": 429, "retry_after": 30}       an HTTP error from the endpoint (any status)
   {"hang": true}                           never reply, so AgentGate's timeout is tested
@@ -34,9 +35,16 @@ import uuid
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 
 ROOT = Path(__file__).resolve().parents[1] / ".sim"
 PENDING, ANSWERS, LOG = ROOT / "pending", ROOT / "answers", ROOT / "log"
@@ -69,12 +77,14 @@ def _schema_of(body: dict[str, Any]) -> tuple[str | None, Any]:
 USAGE = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
 
-def reply_of(answer: dict[str, Any]) -> tuple[str, str, str | None]:
-    """The reply text, finish reason and refusal an answer file describes."""
+def reply_of(answer: dict[str, Any]) -> tuple[str, str | None, str | None]:
+    """The reply text, finish reason and refusal an answer file describes ("none": no finish
+    reason at all, as when a stream is cut)."""
     content = answer.get("content", "")
     text = content if isinstance(content, str) else json.dumps(content)
     refusal = answer.get("refusal")
-    return text, answer.get("finish_reason") or ("content_filter" if refusal else "stop"), refusal
+    finish = answer.get("finish_reason") or ("content_filter" if refusal else "stop")
+    return text, None if finish == "none" else finish, refusal
 
 
 def completion(model: str, answer: dict[str, Any]) -> dict[str, Any]:
@@ -184,9 +194,115 @@ class Simulator:
         yield "data: [DONE]\n\n"
 
 
+# A small website the governed browser can be tested against (live checks, sign-in, product
+# pages): /test-site/login signs in with the test login below and leads to /test-site/home. The
+# second login also asks for a one-time code from TEST_SITE_OTP_SECRET on /test-site/code.
+TEST_SITE_LOGIN = {"username": "sim@example.com", "password": "sim-password"}
+TEST_SITE_2FA_LOGIN = {"username": "sim2fa@example.com", "password": "sim-password"}
+# Answers after SLOW_LOGIN_SECONDS, like a busy real site.
+TEST_SITE_SLOW_LOGIN = {"username": "slow@example.com", "password": "sim-password"}
+SLOW_LOGIN_SECONDS = 3.0
+TEST_SITE_OTP_SECRET = "JBSWY3DPEHPK3PXP"
+TEST_SITE_PAGE = """<!doctype html><html><head><title>{title}</title></head><body><main>{body}</main></body></html>"""
+
+
+def add_rule_pages(app: FastAPI) -> None:
+    # Pages for checking a browser connection's rules: a redirect out of the allowed sites, a
+    # counter that shows whether a hidden request got through, and file download and upload.
+    hits: dict[str, int] = {}
+
+    @app.get("/test-site/bounce")
+    async def bounce(to: str):
+        return RedirectResponse(to, status_code=302)
+
+    @app.get("/test-site/ping")
+    async def ping(tag: str = "any"):
+        hits[tag] = hits.get(tag, 0) + 1
+        return JSONResponse({"ok": True})
+
+    @app.get("/test-site/hits")
+    async def read_hits():
+        return JSONResponse(hits)
+
+    @app.get("/test-site/files", response_class=HTMLResponse)
+    async def files_page():
+        return TEST_SITE_PAGE.format(title="Files - Test site", body="""<a href="/test-site/report.csv" download>Download report</a>
+<form method="post" action="/test-site/upload" enctype="multipart/form-data"><label>Document <input type="file" name="document"></label>
+<button type="submit">Upload</button></form>""")
+
+    @app.get("/test-site/report.csv")
+    async def report():
+        return Response("product,stock\nSteel nails,40\n", media_type="text/csv",
+                        headers={"Content-Disposition": 'attachment; filename="report.csv"'})
+
+    @app.post("/test-site/upload", response_class=HTMLResponse)
+    async def upload(request: Request):
+        body = await request.body()
+        name = body.split(b'filename="', 1)[1].split(b'"', 1)[0].decode() if b'filename="' in body else "nothing"
+        return TEST_SITE_PAGE.format(title="Uploaded - Test site", body=f"<p>Received {name} ({len(body)} bytes).</p>")
+
+
+def add_test_site(app: FastAPI) -> None:
+    @app.get("/test-site/login", response_class=HTMLResponse)
+    async def login_page(error: str = ""):
+        notice = "<p role='alert'>That login was not accepted.</p>" if error else ""
+        return TEST_SITE_PAGE.format(title="Sign in - Test site", body=f"""{notice}
+<form method="post" action="/test-site/login"><label>Email <input type="email" name="username"></label>
+<label>Password <input type="password" name="password"></label><button type="submit">Sign in</button></form>""")
+
+    async def posted(request: Request) -> dict[str, str]:
+        return {key: values[0] for key, values in parse_qs((await request.body()).decode()).items()}
+
+    @app.post("/test-site/login")
+    async def sign_in(request: Request):
+        form = await posted(request)
+        given = {"username": form.get("username"), "password": form.get("password")}
+        if given == TEST_SITE_2FA_LOGIN:
+            response = RedirectResponse("/test-site/code", status_code=303)
+            response.set_cookie("test_site_session", "needs-code")
+            return response
+        if given == TEST_SITE_SLOW_LOGIN:
+            await asyncio.sleep(SLOW_LOGIN_SECONDS)
+        accepted = given in (TEST_SITE_LOGIN, TEST_SITE_SLOW_LOGIN)
+        response = RedirectResponse("/test-site/home" if accepted else "/test-site/login?error=1", status_code=303)
+        if accepted:
+            response.set_cookie("test_site_session", "signed-in")
+        return response
+
+    @app.get("/test-site/code", response_class=HTMLResponse)
+    async def code_page(error: str = ""):
+        notice = "<p role='alert'>That code was not accepted.</p>" if error else ""
+        return TEST_SITE_PAGE.format(title="Two-step check - Test site", body=f"""{notice}
+<form method="post" action="/test-site/code"><label>Authentication code <input type="text" name="otp" inputmode="numeric"></label>
+<button type="submit">Verify</button></form>""")
+
+    @app.post("/test-site/code")
+    async def check_code(request: Request):
+        from app.execution.browser.credentials import one_time_code
+
+        now = time.time()
+        expected = {one_time_code(TEST_SITE_OTP_SECRET, at=now + step * 30) for step in (-1, 0, 1)}
+        accepted = request.cookies.get("test_site_session") == "needs-code" and (await posted(request)).get("otp") in expected
+        response = RedirectResponse("/test-site/home" if accepted else "/test-site/code?error=1", status_code=303)
+        if accepted:
+            response.set_cookie("test_site_session", "signed-in")
+        return response
+
+    add_rule_pages(app)
+
+    @app.get("/test-site/home", response_class=HTMLResponse)
+    async def home(request: Request):
+        if request.cookies.get("test_site_session") != "signed-in":
+            return RedirectResponse("/test-site/login", status_code=303)
+        products = "".join(f"<li>{name}</li>" for name in ("Steel nails", "Roofing nails", "Binding wire"))
+        return TEST_SITE_PAGE.format(title="Dashboard - Test site",
+                                     body=f"<h1>Dashboard</h1><h2>Products</h2><ul>{products}</ul>")
+
+
 def build_app(replay: Path | None, hold_seconds: float = HOLD_SECONDS) -> FastAPI:
     app = FastAPI(title="AgentGate AI simulator")
     simulator = Simulator(replay, hold_seconds)
+    add_test_site(app)
 
     @app.post("/v1/chat/completions")
     async def chat(request: Request):

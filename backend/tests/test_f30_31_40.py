@@ -80,6 +80,9 @@ class IsolationContext:
     async def route(self, pattern: str, callback) -> None:
         del pattern, callback
 
+    async def route_web_socket(self, pattern: str, callback) -> None:
+        del pattern, callback
+
     def on(self, event: str, callback) -> None:
         self.handlers[event] = callback
 

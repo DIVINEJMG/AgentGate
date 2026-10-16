@@ -85,6 +85,18 @@ class CountedProvider:
         self.name, self.capabilities = provider.name, provider.capabilities
 
     async def generate_text(self, *, model, request):
+        """One planner call; an answer cut off with no finish reason (a dropped stream, F33) is asked
+        of the same model once more, within the attempt's two calls, before any fallback."""
+        try:
+            return await self._call(model, request)
+        except AIProviderError as error:
+            if error.finish_reason != "none" or self.attempt.call_count >= 2:
+                raise
+            logger.warning("Planner answer was cut off; asking the same model again attempt=%s model=%s",
+                           self.attempt.id, model)
+            return await self._call(model, request)
+
+    async def _call(self, model, request):
         if self.attempt.call_count >= 2:
             raise AIProviderError(
                 "invalid_provider_response", "Planner correction budget exhausted.", retryable=False
@@ -441,7 +453,7 @@ class SmartPlanner:
         attempt.status = "blocked" if not_called else "failed"
         attempt.failure_details = {"budgetScope": exc.budget_scope, "organizationScoped": exc.organization_scoped,
             "accountScoped": exc.account_scoped, "modelCalled": exc.model_called if exc.model_called is not None else not not_called,
-            "httpStatus": exc.status_code, "rejectionReason": exc.rejection_reason}
+            "httpStatus": exc.status_code, "rejectionReason": exc.rejection_reason, "finishReason": exc.finish_reason}
         logger.warning(
             "Planner %s work_item=%s run=%s decision=%s attempt=%s model=%s connection=%s category=%s http_status=%s "
             "retryable=%s account_scoped=%s organization_scoped=%s retry_after_seconds=%s error_type=%s",

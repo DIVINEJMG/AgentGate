@@ -137,6 +137,18 @@ export function ConnectFlow({ tool, organization, apiVersion, data, open, onClos
   const index = steps.indexOf(step);
   const finished = step === 'checks' && !busy;
   const succeeded = finished && created && !error;
+  // A browser login can be tried for real once connected (F34): the result is a line of its own.
+  const canTestSignIn = Boolean(succeeded && tool.provider === 'browser' && credential);
+  async function testSignIn() {
+    const line: Check = { id: 'signin', label: 'Signing in with the stored login', state: 'running' };
+    setChecks((current) => [...current.filter((item) => item.id !== 'signin'), line]);
+    const set = (state: Check['state'], detail: string) => setChecks((current) => current.map((item) => item.id === 'signin' ? { ...item, state, detail } : item));
+    try {
+      const checked = await checkIntegration(apiVersion, organization.id, created!.id, true);
+      setCreated(checked);
+      set(checked.metadata?.signIn === 'signed_in' ? 'done' : 'failed', checked.health.message);
+    } catch (caught) { set('failed', errorText(caught)); }
+  }
 
   return <dialog ref={dialog} className='ws-modal ws-connect' aria-labelledby='connect-title' onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}>
     {open && <>
@@ -162,7 +174,7 @@ export function ConnectFlow({ tool, organization, apiVersion, data, open, onClos
             <label className='ws-field'>Username or email<input autoComplete='off' value={login.username} disabled={!vault} onChange={(event) => setLogin({ ...login, username: event.target.value })} placeholder='user@example.com' /></label>
             <label className='ws-field'>Password<input type='password' autoComplete='new-password' value={login.password} disabled={!vault} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>
           </div>
-          <details className='ws-technical'><summary>Other login fields</summary><label className='ws-field'>Login as JSON<textarea rows={3} value={login.extra} disabled={!vault} onChange={(event) => setLogin({ ...login, extra: event.target.value })} placeholder='{"username":"…","password":"…","otpSecret":"…"}' /><small>Replaces the two fields above when filled. {loginJsonValid ? '' : 'This is not valid JSON.'}</small></label></details>
+          <details className='ws-technical'><summary>Other login fields</summary><label className='ws-field'>Login as JSON<textarea rows={3} value={login.extra} disabled={!vault} onChange={(event) => setLogin({ ...login, extra: event.target.value })} placeholder='{"username":"…","password":"…","otpSecret":"…"}' /><small>Replaces the two fields above when filled. An otpSecret (the base32 key or otpauth:// link from the site's authenticator setup) signs in with the current one-time code. {loginJsonValid ? '' : 'This is not valid JSON.'}</small></label></details>
         </Panel> : <Panel title={tool.provider === 'github' ? 'GitHub access token' : `${tool.name} access token`} lead={tool.credential === 'required' ? `Audoryn checks the token with ${tool.name}, then keeps only an encrypted copy and its fingerprint.` : 'Optional for public repositories. Private repositories need a token.'}>
           {!vault && <Notice tone={tool.credential === 'required' ? 'danger' : 'warn'}><LockKeyhole size={14} /> The credential vault is not set up{tool.credential === 'required' ? `, so ${tool.name} can’t connect yet.` : '. Only public repositories can connect.'}</Notice>}
           <label className='ws-field'>Token<span className='ws-input-row'><KeyRound size={15} className='ws-input-icon' /><input type='password' autoComplete='off' spellCheck={false} value={token} disabled={!vault} onChange={(event) => setToken(event.target.value)} placeholder={vault ? 'Paste the token' : 'Vault not configured'} /></span><small>Validated once against {tool.name}. It is never shown again.</small></label>
@@ -212,6 +224,7 @@ export function ConnectFlow({ tool, organization, apiVersion, data, open, onClos
         {step === 'account' && !githubApp && <button type='button' className='ws-button ws-button-primary' disabled={!accountValid || !loginJsonValid} onClick={() => setStep('reach')}>Continue<ArrowRight size={14} /></button>}
         {step === 'reach' && <button type='button' className='ws-button ws-button-primary' disabled={!reachValid || busy} onClick={() => setStep('review')}>Continue<ArrowRight size={14} /></button>}
         {step === 'review' && <button type='button' className='ws-button ws-button-primary' onClick={() => void run()}><ShieldCheck size={14} />Connect {tool.name}</button>}
+        {canTestSignIn && <button type='button' className='ws-button' disabled={checks.some((item) => item.id === 'signin' && item.state === 'running')} onClick={() => void testSignIn()}><LockKeyhole size={14} />Test sign-in</button>}
         {succeeded && <button type='button' className='ws-button ws-button-primary' onClick={() => { onClose(); navigate({ page: 'connections', view: 'account', id: created!.id }); }}>Open connection<ArrowRight size={14} /></button>}
         {finished && !succeeded && <button type='button' className='ws-button' onClick={onClose}>Close</button>}
       </footer>
