@@ -1,8 +1,7 @@
 # Oracle handoff: Oracle live-check findings F28–F44 (browser end to end, chat browser tasks)
 
-Written 16 October 2026, for the branch `fix/rejected-approval-finishes` (commit `f0452dd`),
-the release after PR #129 (`0b5d503`). Fill in the merge commit once the pull request is
-merged; the commands below call it `<MERGE>`.
+Written 16 October 2026, for pull request #130 (`fix/rejected-approval-finishes`, merge
+`d3257e0`), the release after PR #129 (`0b5d503`).
 
 It follows *Audoryn Oracle Update and Deployment Rules — Illustrated Edition*: inspect first,
 change only what this release needs, and verify the outcome.
@@ -64,12 +63,12 @@ setting. Before, these tasks always made their own bare "Managed web · …" con
 ## 3. Steps (each one only after approval)
 
 1. **Inspect:** block A. Note whether `audoryn-api.service` is running.
-2. **Pull:** block B (`git pull --ff-only origin main`); `HEAD` becomes `<MERGE>`.
+2. **Pull:** block B (`git pull --ff-only origin main`); `HEAD` becomes `d3257e0`.
 3. **Disk:** `df -h /`. If less than 4 GB is free, run `podman image prune -f` first.
 4. **Tag, then rebuild:** block C.
 5. **Read-only checks with the new image:** block D.
 6. **Restart and verify:** block E, with `sleep 20` after the restart.
-7. **Vercel:** deploy the frontend at `<MERGE>` (separate approval; auto-deploy is off).
+7. **Vercel:** deploy the frontend at `d3257e0` (separate approval; auto-deploy is off).
 8. **Live checks:** section 4.
 
 ## 4. Live checks with the real model
@@ -145,7 +144,7 @@ systemctl --user is-active audoryn-api.service
 df -h /
 ```
 
-- **Expected:** branch `main`, a clean tree, `Current` starting `0b5d503`, `Remote` = `<MERGE>`.
+- **Expected:** branch `main`, a clean tree, `Current` starting `0b5d503`, `Remote` = `d3257e0`.
 
 **B. Checkpoint B: the approved fast-forward**
 
@@ -165,7 +164,7 @@ else
 fi
 ```
 
-- **Expected:** `After` = `<MERGE>`, and **no files listed** (no dependency, image or migration
+- **Expected:** `After` = `d3257e0`, and **no files listed** (no dependency, image or migration
   change).
 
 **C. Tag the rollback image, then rebuild (approved)**
@@ -219,6 +218,6 @@ podman logs --since 5m audoryn-api 2>&1 | grep -E "Traceback|ERROR|startup compl
 ```
 
 **G. Vercel (separate approval; auto-deploy is off)**
-- Deploy project `audoryn` at exactly `<MERGE>` (`main`).
+- Deploy project `audoryn` at exactly `d3257e0` (`main`).
 - Wait for `READY`.
 - Check that `https://audoryn.vercel.app` serves that SHA.

@@ -112,8 +112,11 @@ async def test_an_uncertain_write_is_looked_for_again_then_waits_for_a_person(mo
     assert delays == sorted(delays) and delays[0] > 0
     outcome = await _wait(executor, item, run, step)
     assert outcome.state == "noop" and item.status == "uncertain_outcome"
-    managed.notify_integration_work.assert_awaited_once()  # type: ignore[attr-defined]
-    told = managed.notify_integration_work.await_args.kwargs  # type: ignore[attr-defined]
+    # Twice: once when the looking starts (F47: the chat is told it is still being checked), once
+    # when it waits for the person.
+    calls = managed.notify_integration_work.await_args_list  # type: ignore[attr-defined]
+    assert len(calls) == 2 and "look for it again shortly" in calls[0].kwargs["content"]
+    told = calls[1].kwargs
     # F21: the write is named, with where to look and the three answers offered in the chat.
     assert told["content"].startswith("I couldn't confirm whether the issue “Uncertain write test” was created in DIVINEJMG/school.")
     assert "It happened, It didn't happen, or Check again" in told["content"]

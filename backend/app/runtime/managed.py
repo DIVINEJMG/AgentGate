@@ -1011,8 +1011,13 @@ class ManagedRuntimeExecutor:
             delay = settings.integration_outcome_check_seconds * 2**checks
             item.status, run.status = "queued", "running"
             item.scheduled_at = utcnow() + timedelta(seconds=delay)
+            reason = "I couldn't confirm whether the last write went through, so I'll look for it again shortly."
             _write_runtime_meta(item, queueState="checking_outcome", outcomeChecks={"step": current_step, "count": checks + 1},
-                waitingReason="I couldn't confirm whether the last write went through, so I'll look for it again shortly.")
+                waitingReason=reason)
+            if checks == 0:
+                # Said once in the chat, so the person knows the task is still working on it (F47).
+                await notify_integration_work(self._session, item, key=f"checking_outcome:{current_step}",
+                    content=reason + " It won't be sent twice.")
             await self._session.commit()
             return RuntimeStepOutcome("continue", item.id, run.id, current_step, "Looking for the write's outcome again.")
         item.status, run.status = state, state

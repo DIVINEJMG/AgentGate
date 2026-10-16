@@ -500,7 +500,8 @@ class ExpandedGitHubProvider(NativeProvider):
             raise self._transport_error(
                 error, operation=request.operation, correlation_id=request.correlation_id
             ) from error
-        except (ValueError, KeyError) as error:
+        # Any response AgentGate could not read, whatever its shape (F31, F47).
+        except (ValueError, KeyError, TypeError, AttributeError, IndexError) as error:
             raise self._unreadable_outcome(request, error) from error
         finally:
             _WRITE_SENT.reset(sent)

@@ -116,7 +116,9 @@ export function ConnectFlow({ tool, organization, apiVersion, data, open, onClos
       mark('connect', 'done', connection ? connection.displayName : undefined);
       if (!connection) { mark('discover', 'skipped', 'Open the connection to see its resources'); mark('health', 'skipped'); }
       else {
-        if (data.foundation?.enabled) {
+        // A browser connection's site and actions are set when it connects; it has nothing to discover (F46).
+        if (tool.provider === 'browser') mark('discover', 'skipped', 'Its site and actions come from the settings above');
+        else if (data.foundation?.enabled) {
           mark('discover', 'running');
           try { await discoverConnectionResources(apiVersion, organization.id, connection.id); mark('discover', 'done'); }
           catch (caught) { mark('discover', 'failed', `${errorText(caught)} You can rediscover from the connection page.`); }
