@@ -77,6 +77,59 @@ logger = logging.getLogger(__name__)
 # How long a submitted form has to start a page request before it counts as same-page. A request
 # starts within milliseconds of a submit, however slowly the site then answers.
 SUBMIT_NAVIGATION_WINDOW_MS = 1_500
+# After an action, how long the page may take to finish what the action started (its requests, a
+# page change sent by script, content drawn after load) before it is observed as it stands (F48).
+ACTION_SETTLE_MAX_SECONDS = 5.0
+# The page has settled once its content is unchanged, and no request the action started is still
+# open, for this long.
+ACTION_QUIET_SECONDS = 0.4
+_SETTLE_POLL_SECONDS = 0.1
+# Requests that bring the page or its data; images, fonts and media never hold an observation.
+_SETTLE_REQUEST_TYPES = frozenset({"document", "xhr", "fetch"})
+_ELEMENT_OPERATIONS = frozenset(
+    {
+        "element.click",
+        "element.type",
+        "element.clear",
+        "element.select",
+        "element.check",
+        "element.uncheck",
+        "element.press_key",
+        "element.hover",
+    }
+)
+# Scroll the first scrollable container in the section under the heading that names it.
+_SECTION_SCROLL_SCRIPT = """({query, axis, amount}) => {
+    const heading = Array.from(document.querySelectorAll(
+      'h1,h2,h3,h4,h5,h6,[role="heading"]'
+    )).find(el => (el.innerText || '').trim().toLowerCase()
+      .includes(query.trim().toLowerCase()));
+    const section = heading?.closest('section,[role="region"],article')
+      || heading?.parentElement;
+    if (!section) return false;
+    const container = [section, ...section.querySelectorAll('*')]
+      .find(el => {
+        const style = getComputedStyle(el);
+        const overflow = axis === 'horizontal'
+          ? style.overflowX : style.overflowY;
+        return ['auto', 'scroll', 'hidden'].includes(overflow)
+          && (axis === 'horizontal'
+            ? el.scrollWidth > el.clientWidth + 2
+            : el.scrollHeight > el.clientHeight + 2);
+      });
+    if (!container) return false;
+    container.scrollBy({
+      left: axis === 'horizontal' ? amount : 0,
+      top: axis === 'vertical' ? amount : 0
+    });
+    return true;
+  }"""
+# A cheap measure of the page's content (no layout); null while the page is still loading.
+_PAGE_SIGNATURE_SCRIPT = (
+    "() => document.readyState === 'loading' ? null : "
+    "[document.body ? document.body.textContent.trim().length : 0, "
+    "document.getElementsByTagName('*').length]"
+)
 
 
 def _carries_secret(url: str, secrets: set[str]) -> bool:
@@ -346,6 +399,8 @@ class _SessionHandle:
         self.refused_requests = 0
         # Secrets typed into a login, which no request may carry in its web address (F45).
         self.login_secrets: set[str] = set()
+        # Each page's open page and data requests, with when they started (F48).
+        self.open_requests: dict[Page, dict[Request, float]] = {}
 
 
 class BrowserRuntime:
@@ -694,9 +749,25 @@ class BrowserRuntime:
             lambda dialog: asyncio.create_task(self._handle_dialog(handle, dialog)),
         )
         page.on("close", lambda _page: self._page_closed(handle, page))
+        opened = handle.open_requests.setdefault(page, {})
+
+        def request_started(request: Request) -> None:
+            if request.resource_type in _SETTLE_REQUEST_TYPES:
+                opened[request] = time.monotonic()
+
+        def request_ended(request: Request) -> None:
+            opened.pop(request, None)
+
+        # A request ends when its answer arrives: a script that got its answer may move to another
+        # page without reading the body, and that request then never finishes. What the page draws
+        # from the answer afterwards is waited for by watching the page itself.
+        page.on("request", request_started)
+        page.on("response", lambda response: request_ended(response.request))
+        page.on("requestfailed", request_ended)
 
     @staticmethod
     def _page_closed(handle: _SessionHandle, page: Page) -> None:
+        handle.open_requests.pop(page, None)
         for key, candidate in tuple(handle.pages.items()):
             if candidate is page:
                 handle.pages.pop(key, None)
@@ -1533,6 +1604,35 @@ class BrowserRuntime:
         await handle.page.wait_for_timeout(200)
 
     @staticmethod
+    async def _settle_page(handle: _SessionHandle, began: float) -> None:
+        """Wait, briefly, for what an action started to finish before the page is observed (F48):
+        the requests it opened, a page it moved to, and content the page draws after loading. The
+        page has settled once nothing changed and none of those requests was open for a short
+        while; a page still busy at the limit is observed as it stands. An empty page keeps being
+        waited for, as a page drawn by script is empty until its script runs."""
+        deadline = time.monotonic() + ACTION_SETTLE_MAX_SECONDS
+        previous: object = None
+        quiet_since = time.monotonic()
+        while time.monotonic() < deadline:
+            page = handle.page  # a popup the action opened becomes the active page
+            if page.is_closed():
+                return
+            try:
+                signature = await page.evaluate(_PAGE_SIGNATURE_SCRIPT)
+            except PlaywrightError:  # the page is moving to another one
+                signature = None
+            busy = any(started >= began for started in handle.open_requests.get(page, {}).values())
+            if busy or signature is None or signature != previous or not signature[0]:
+                previous, quiet_since = signature, time.monotonic()
+            elif time.monotonic() - quiet_since >= ACTION_QUIET_SECONDS:
+                return
+            await asyncio.sleep(_SETTLE_POLL_SECONDS)
+        telemetry_logger.info(
+            "Browser page still busy after an action session=%s; observing it as it stands",
+            handle.session.id,
+        )
+
+    @staticmethod
     async def _raise_blocked(
         handle: _SessionHandle,
         error: PlaywrightError,
@@ -1570,6 +1670,7 @@ class BrowserRuntime:
         )
         handle.blocked_navigation = None
         follow_link_timed_out = False
+        began = time.monotonic()
         try:
             if operation == "navigation.open":
                 if not url:
@@ -1617,6 +1718,7 @@ class BrowserRuntime:
             follow_link_timed_out = True
         except PlaywrightError as error:
             await self._raise_blocked(handle, error)
+        await self._settle_page(handle, began)
         await self._raise_if_blocked(handle)
         self._raise_if_limit(handle)
         observation_started = time.monotonic()
@@ -1681,6 +1783,7 @@ class BrowserRuntime:
         )
         before_interaction = handle.last_observation
         key_timed_out = False
+        began = time.monotonic()
         target = self._locator(handle, locator) if locator is not None else None
         self._set_dialog_policy(
             handle,
@@ -1688,25 +1791,74 @@ class BrowserRuntime:
             prompt_text=prompt_text,
         )
 
-        if operation == "element.click" and target is not None:
+        if operation == "page.scroll":
+            await self._scroll(handle, target, value, axis, focus_text)
+        elif target is not None and operation in _ELEMENT_OPERATIONS:
+            key_timed_out = await self._act_on_element(handle, target, operation, value, timeout_ms)
+        else:
+            raise ValueError("Unsupported browser interaction operation.")
+
+        await self._settle_page(handle, began)
+        handle.dialog_action = None
+        handle.dialog_prompt_text = None
+        await self._raise_if_blocked(handle)
+        observation = await self.observe(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+        if operation == "element.press_key" and before_interaction is not None:
+            observation = await self._await_key_effect(
+                session_id,
+                organization_id,
+                worker_id,
+                handle,
+                before_interaction,
+                observation,
+                timeout_ms,
+            )
+        if key_timed_out:
+            observation = replace(
+                observation,
+                page_state={
+                    **observation.page_state,
+                    "actionAttempt": {"status": "timed_out", "operation": operation},
+                },
+            )
+            handle.last_observation = observation
+        return observation
+
+    async def _act_on_element(
+        self,
+        handle: _SessionHandle,
+        target: Locator,
+        operation: str,
+        value: object,
+        timeout_ms: int,
+    ) -> bool:
+        """Perform one element action; whether a key press timed out (it may still have
+        reached the page, so it is observed and never replayed)."""
+        if operation == "element.click":
             if await self._is_submit_control(target):
                 raise ValueError(
                     "Submit controls must use the governed browser.form.submit capability."
                 )
             await target.click(timeout=timeout_ms)
-        elif operation == "element.type" and target is not None:
+        elif operation == "element.type":
             await self._assert_not_sensitive_target(target)
             await target.fill(str(value or ""), timeout=timeout_ms)
-        elif operation == "element.clear" and target is not None:
+        elif operation == "element.clear":
             await target.fill("", timeout=timeout_ms)
-        elif operation == "element.select" and target is not None:
+        elif operation == "element.select":
             await self._assert_not_sensitive_target(target)
             await target.select_option(str(value or ""), timeout=timeout_ms)
-        elif operation == "element.check" and target is not None:
+        elif operation == "element.check":
             await target.check(timeout=timeout_ms)
-        elif operation == "element.uncheck" and target is not None:
+        elif operation == "element.uncheck":
             await target.uncheck(timeout=timeout_ms)
-        elif operation == "element.press_key" and target is not None:
+        elif operation == "element.hover":
+            await target.hover(timeout=timeout_ms)
+        else:  # element.press_key
             metadata = await target.evaluate(KEYBOARD_METADATA_SCRIPT)
             if not read_only_key(metadata, str(value or "")):
                 raise ValueError(
@@ -1721,114 +1873,86 @@ class BrowserRuntime:
             except PlaywrightTimeoutError:
                 # The key may already have reached the page. Observe and replan;
                 # replaying it could activate a second action.
-                key_timed_out = True
-        elif operation == "element.hover" and target is not None:
-            await target.hover(timeout=timeout_ms)
-        elif operation == "page.scroll":
-            if axis not in {"vertical", "horizontal"}:
-                raise ValueError("Browser scroll axis must be vertical or horizontal.")
-            if isinstance(value, str) and value.strip().lower() in {"top", "bottom"}:
-                if locator is not None or focus_text or axis != "vertical":
-                    raise ValueError("Top and bottom apply only to vertical page scrolling.")
-                position = value.strip().lower()
-                await handle.page.evaluate(
-                    "position => window.scrollTo(0, position === 'bottom' "
-                    "? document.documentElement.scrollHeight : 0)",
-                    position,
-                )
-            else:
-                try:
-                    amount = int(value) if isinstance(value, (int, float, str)) else 0
-                except (TypeError, ValueError) as error:
-                    raise ValueError(
-                        "Browser page.scroll value must be an integer, top, or bottom."
-                    ) from error
-                if focus_text and target is not None:
-                    raise ValueError("Choose either a locator or focusText for browser scrolling.")
-                if focus_text:
-                    did_scroll = await handle.page.evaluate(
-                        """({query, axis, amount}) => {
-                          const heading = Array.from(document.querySelectorAll(
-                            'h1,h2,h3,h4,h5,h6,[role="heading"]'
-                          )).find(el => (el.innerText || '').trim().toLowerCase()
-                            .includes(query.trim().toLowerCase()));
-                          const section = heading?.closest('section,[role="region"],article')
-                            || heading?.parentElement;
-                          if (!section) return false;
-                          const container = [section, ...section.querySelectorAll('*')]
-                            .find(el => {
-                              const style = getComputedStyle(el);
-                              const overflow = axis === 'horizontal'
-                                ? style.overflowX : style.overflowY;
-                              return ['auto', 'scroll', 'hidden'].includes(overflow)
-                                && (axis === 'horizontal'
-                                  ? el.scrollWidth > el.clientWidth + 2
-                                  : el.scrollHeight > el.clientHeight + 2);
-                            });
-                          if (!container) return false;
-                          container.scrollBy({
-                            left: axis === 'horizontal' ? amount : 0,
-                            top: axis === 'vertical' ? amount : 0
-                          });
-                          return true;
-                        }""",
-                        {"query": focus_text[:160], "axis": axis, "amount": amount},
-                    )
-                    if not did_scroll:
-                        raise ValueError("No scrollable container was found in the named section.")
-                elif target is not None:
-                    await target.evaluate(
-                        "(el, delta) => el.scrollBy({left: delta.x, top: delta.y})",
-                        {
-                            "x": amount if axis == "horizontal" else 0,
-                            "y": amount if axis == "vertical" else 0,
-                        },
-                    )
-                else:
-                    await handle.page.mouse.wheel(
-                        amount if axis == "horizontal" else 0,
-                        amount if axis == "vertical" else 0,
-                    )
-        else:
-            raise ValueError("Unsupported browser interaction operation.")
+                return True
+        return False
 
-        await asyncio.sleep(0.025)
-        handle.dialog_action = None
-        handle.dialog_prompt_text = None
-        await self._raise_if_blocked(handle)
-        observation = await self.observe(
-            session_id,
-            organization_id=organization_id,
-            worker_id=worker_id,
-        )
-        if operation == "element.press_key" and before_interaction is not None:
-            # Keyboard handlers often update the page after the key event returns.
-            # Give those changes a bounded chance to appear before the planner sees
-            # a no-progress observation; never replay the key to wait for them.
-            deadline = time.monotonic() + min(5.0, timeout_ms / 1000)
-            while time.monotonic() < deadline:
-                await asyncio.sleep(0.2)
-                await self._raise_if_blocked(handle)
-                next_observation = await self.observe(
-                    session_id,
-                    organization_id=organization_id,
-                    worker_id=worker_id,
-                )
-                settled = self._interaction_content_changed(
-                    before_interaction, next_observation
-                ) and not self._interaction_content_changed(observation, next_observation)
-                observation = next_observation
-                if settled:
-                    break
-        if key_timed_out:
-            observation = replace(
-                observation,
-                page_state={
-                    **observation.page_state,
-                    "actionAttempt": {"status": "timed_out", "operation": operation},
+    @staticmethod
+    async def _scroll(
+        handle: _SessionHandle,
+        target: Locator | None,
+        value: object,
+        axis: str,
+        focus_text: str | None,
+    ) -> None:
+        if axis not in {"vertical", "horizontal"}:
+            raise ValueError("Browser scroll axis must be vertical or horizontal.")
+        if isinstance(value, str) and value.strip().lower() in {"top", "bottom"}:
+            if target is not None or focus_text or axis != "vertical":
+                raise ValueError("Top and bottom apply only to vertical page scrolling.")
+            position = value.strip().lower()
+            await handle.page.evaluate(
+                "position => window.scrollTo(0, position === 'bottom' "
+                "? document.documentElement.scrollHeight : 0)",
+                position,
+            )
+            return
+        try:
+            amount = int(value) if isinstance(value, (int, float, str)) else 0
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                "Browser page.scroll value must be an integer, top, or bottom."
+            ) from error
+        if focus_text and target is not None:
+            raise ValueError("Choose either a locator or focusText for browser scrolling.")
+        if focus_text:
+            did_scroll = await handle.page.evaluate(
+                _SECTION_SCROLL_SCRIPT,
+                {"query": focus_text[:160], "axis": axis, "amount": amount},
+            )
+            if not did_scroll:
+                raise ValueError("No scrollable container was found in the named section.")
+        elif target is not None:
+            await target.evaluate(
+                "(el, delta) => el.scrollBy({left: delta.x, top: delta.y})",
+                {
+                    "x": amount if axis == "horizontal" else 0,
+                    "y": amount if axis == "vertical" else 0,
                 },
             )
-            handle.last_observation = observation
+        else:
+            await handle.page.mouse.wheel(
+                amount if axis == "horizontal" else 0,
+                amount if axis == "vertical" else 0,
+            )
+
+    async def _await_key_effect(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        worker_id: UUID | None,
+        handle: _SessionHandle,
+        before: BrowserObservation,
+        observation: BrowserObservation,
+        timeout_ms: int,
+    ) -> BrowserObservation:
+        """Keyboard handlers often update the page after the key event returns. Give those
+        changes a bounded chance to appear before the planner sees a no-progress observation;
+        never replay the key to wait for them."""
+        deadline = time.monotonic() + min(5.0, timeout_ms / 1000)
+        while time.monotonic() < deadline:
+            await asyncio.sleep(0.2)
+            await self._raise_if_blocked(handle)
+            next_observation = await self.observe(
+                session_id,
+                organization_id=organization_id,
+                worker_id=worker_id,
+            )
+            settled = self._interaction_content_changed(
+                before, next_observation
+            ) and not self._interaction_content_changed(observation, next_observation)
+            observation = next_observation
+            if settled:
+                break
         return observation
 
     async def fill_form(
@@ -1847,12 +1971,14 @@ class BrowserRuntime:
         )
         if not fields:
             raise ValueError("At least one form field is required.")
+        began = time.monotonic()
         for locator, value in fields:
             target = self._locator(handle, locator)
             if await self._is_submit_control(target):
                 raise ValueError("Form fill cannot target a submit control.")
             await self._assert_not_sensitive_target(target)
             await self._set_control_value(target, value, timeout_ms=timeout_ms)
+        await self._settle_page(handle, began)
         return await self.observe(
             session_id,
             organization_id=organization_id,
@@ -1888,12 +2014,16 @@ class BrowserRuntime:
         # Listen before submitting, so a submit that opens the next page is observed once that page
         # has loaded rather than mid-load (seen as a "Loading <url>" title in the simulator).
         watch = _SubmitWatch.begin(handle.page, timeout_ms)
+        began = time.monotonic()
         try:
             await self._submit(handle, form_ref, submit_locator, timeout_ms)
             await self._raise_if_blocked(handle)
             await watch.settle(handle.page, timeout_ms)
         finally:
             watch.close()
+        # A script may send the form in the background and open the next page only afterwards
+        # (F48), so the page's own work is waited for too.
+        await self._settle_page(handle, began)
         await self._raise_if_blocked(handle)
         return await self.observe(
             session_id,
@@ -2071,6 +2201,7 @@ class BrowserRuntime:
         input_type = await target.get_attribute("type")
         if (input_type or "").lower() != "file":
             raise ValueError("Browser upload target must be a file input.")
+        began = time.monotonic()
         try:
             await target.set_input_files(
                 {
@@ -2089,6 +2220,7 @@ class BrowserRuntime:
             handle.dialog_prompt_text = None
         if uploaded_name != name:
             raise RuntimeError("Browser upload input did not retain the authorized artifact.")
+        await self._settle_page(handle, began)
         return await self.observe(
             session_id,
             organization_id=organization_id,

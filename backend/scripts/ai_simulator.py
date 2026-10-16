@@ -202,6 +202,8 @@ TEST_SITE_2FA_LOGIN = {"username": "sim2fa@example.com", "password": "sim-passwo
 # Answers after SLOW_LOGIN_SECONDS, like a busy real site.
 TEST_SITE_SLOW_LOGIN = {"username": "slow@example.com", "password": "sim-password"}
 SLOW_LOGIN_SECONDS = 3.0
+# How long the script-drawn dashboard takes to fetch its content (F48).
+APP_DATA_SECONDS = 0.8
 TEST_SITE_OTP_SECRET = "JBSWY3DPEHPK3PXP"
 TEST_SITE_PAGE = """<!doctype html><html><head><title>{title}</title></head><body><main>{body}</main></body></html>"""
 
@@ -242,6 +244,49 @@ def add_rule_pages(app: FastAPI) -> None:
         return TEST_SITE_PAGE.format(title="Uploaded - Test site", body=f"<p>Received {name} ({len(body)} bytes).</p>")
 
 
+def add_script_pages(app: FastAPI) -> None:
+    """Logins and pages driven by script, as on many real sites (F45, F48)."""
+    # A login form with no method whose script sends it in the background (as many sites do), and a
+    # form that really would send the password in the web address.
+    def script_login(destination: str) -> str:
+        return TEST_SITE_PAGE.format(title="Sign in (script) - Test site", body="""<form id="login"><label>Email <input type="email" name="username"></label>
+<label>Password <input type="password" name="password"></label><button type="submit">Sign in</button></form>
+<script>document.getElementById('login').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  await fetch('/test-site/login', {method: 'POST', body: new URLSearchParams(new FormData(event.target))});
+  location.href = 'DESTINATION';
+});</script>""".replace("DESTINATION", destination))
+
+    @app.get("/test-site/js-login", response_class=HTMLResponse)
+    async def js_login_page():
+        return script_login("/test-site/home")
+
+    # A script-drawn site, like many dashboards: its login is sent in the background, and its page
+    # is empty until its script has fetched and drawn the content (F48).
+    @app.get("/test-site/app-login", response_class=HTMLResponse)
+    async def app_login_page():
+        return script_login("/test-site/app")
+
+    @app.get("/test-site/app", response_class=HTMLResponse)
+    async def app_page():
+        return TEST_SITE_PAGE.format(title="Dashboard - Test site", body="""<div id="app"></div>
+<script>fetch('/test-site/app-data').then((response) => response.json()).then((data) => {
+  document.getElementById('app').innerHTML = '<h1>Dashboard</h1><h2>Inquiries</h2><p>' + data.inquiries + '</p>';
+});</script>""")
+
+    @app.get("/test-site/app-data")
+    async def app_data(request: Request):
+        await asyncio.sleep(APP_DATA_SECONDS)
+        signed_in = request.cookies.get("test_site_session") == "signed-in"
+        return {"inquiries": "INBOX EMPTY" if signed_in else "Please sign in."}
+
+    @app.get("/test-site/get-login", response_class=HTMLResponse)
+    async def get_login_page():
+        return TEST_SITE_PAGE.format(title="Sign in (GET) - Test site", body="""<form method="get" action="/test-site/ping"><input type="hidden" name="tag" value="get-login">
+<label>Email <input type="email" name="username"></label><label>Password <input type="password" name="password"></label>
+<button type="submit">Sign in</button></form>""")
+
+
 def add_test_site(app: FastAPI) -> None:
     @app.get("/test-site/login", response_class=HTMLResponse)
     async def login_page(error: str = ""):
@@ -269,23 +314,7 @@ def add_test_site(app: FastAPI) -> None:
             response.set_cookie("test_site_session", "signed-in")
         return response
 
-    # A login form with no method whose script sends it in the background (as many sites do), and a
-    # form that really would send the password in the web address.
-    @app.get("/test-site/js-login", response_class=HTMLResponse)
-    async def js_login_page():
-        return TEST_SITE_PAGE.format(title="Sign in (script) - Test site", body="""<form id="login"><label>Email <input type="email" name="username"></label>
-<label>Password <input type="password" name="password"></label><button type="submit">Sign in</button></form>
-<script>document.getElementById('login').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  await fetch('/test-site/login', {method: 'POST', body: new URLSearchParams(new FormData(event.target))});
-  location.href = '/test-site/home';
-});</script>""")
-
-    @app.get("/test-site/get-login", response_class=HTMLResponse)
-    async def get_login_page():
-        return TEST_SITE_PAGE.format(title="Sign in (GET) - Test site", body="""<form method="get" action="/test-site/ping"><input type="hidden" name="tag" value="get-login">
-<label>Email <input type="email" name="username"></label><label>Password <input type="password" name="password"></label>
-<button type="submit">Sign in</button></form>""")
+    add_script_pages(app)
 
     @app.get("/test-site/code", response_class=HTMLResponse)
     async def code_page(error: str = ""):
