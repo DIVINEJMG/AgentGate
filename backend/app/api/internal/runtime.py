@@ -929,6 +929,34 @@ async def sweep(
     return await run_sweep()
 
 
+async def _decided_approval_items(session, waiting: list[WorkItem]) -> set[UUID]:
+    """The waiting tasks whose current step's approval has been decided (approved, or rejected so
+    the step can close; F28), read in three queries for all of them."""
+    if not waiting:
+        return set()
+    runs = (await session.scalars(select(Run).where(Run.work_item_id.in_([item.id for item in waiting]))
+                                  .order_by(Run.created_at.desc()))).all()
+    latest: dict[UUID, Run] = {}
+    for run in runs:
+        latest.setdefault(run.work_item_id, run)
+    steps = (await session.scalars(select(RunStep).where(
+        RunStep.run_id.in_([run.id for run in latest.values()])))).all() if latest else []
+    by_step = {(step.run_id, step.step_index): step for step in steps}
+    approval_of: dict[UUID, UUID] = {}
+    for item in waiting:
+        run = latest.get(item.id)
+        step = by_step.get((run.id, _runtime_step(item))) if run else None
+        raw = step.output.get("approvalId") if step and isinstance(step.output, dict) else None
+        with suppress(ValueError):
+            if raw:
+                approval_of[item.id] = UUID(str(raw))
+    if not approval_of:
+        return set()
+    statuses = dict((await session.execute(select(Approval.id, Approval.status).where(
+        Approval.id.in_(set(approval_of.values()))))).all())
+    return {item_id for item_id, approval in approval_of.items() if statuses.get(approval) in {"approved", "rejected"}}
+
+
 async def run_sweep() -> dict[str, object]:
     """Recovers due work: the scheduled sweep, and the backend's own delivery watchdog."""
     # Housekeeping that used to run on every outbox drain.
@@ -972,39 +1000,10 @@ async def run_sweep() -> dict[str, object]:
             ).all()
         )
 
-        candidates: list[tuple[UUID, UUID, int]] = []
-        for item in items:
-            if item.status == "waiting_approval":
-                run = await session.scalar(
-                    select(Run)
-                    .where(Run.work_item_id == item.id)
-                    .order_by(Run.created_at.desc())
-                    .limit(1)
-                )
-                if run is None:
-                    continue
-                step = await session.scalar(
-                    select(RunStep).where(
-                        RunStep.run_id == run.id,
-                        RunStep.step_index == _runtime_step(item),
-                    )
-                )
-                output = (
-                    dict(step.output or {})
-                    if step is not None and isinstance(step.output, dict)
-                    else {}
-                )
-                raw_approval_id = output.get("approvalId")
-                if not raw_approval_id:
-                    continue
-                try:
-                    approval_id = UUID(str(raw_approval_id))
-                except ValueError:
-                    continue
-                approval = await session.get(Approval, approval_id)
-                if approval is None or approval.status != "approved":
-                    continue
-            candidates.append((item.organization_id, item.id, _runtime_step(item)))
+        decided = await _decided_approval_items(
+            session, [item for item in items if item.status == "waiting_approval"])
+        candidates = [(item.organization_id, item.id, _runtime_step(item)) for item in items
+                      if item.status != "waiting_approval" or item.id in decided]
 
     queued = 0
     for organization_id, work_item_id, expected_step in candidates:

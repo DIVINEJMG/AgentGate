@@ -38,6 +38,7 @@ def live_result_reference(
     job: Job,
     worker: Worker,
     summary: str,
+    files: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     return {
         "type": "result",
@@ -51,6 +52,8 @@ def live_result_reference(
         "jobId": str(job.id),
         "workItemId": str(item.id),
         "runId": str(run.id),
+        # Files the run downloaded, opened from the chat with a signed link (F41).
+        **({"files": files} if files else {}),
     }
 
 
@@ -147,6 +150,7 @@ async def append_live_result_message(
     worker: Worker,
     result: Result,
     summary: str,
+    files: list[dict[str, str]] | None = None,
 ) -> ConversationMessage | None:
     if (item.payload or {}).get("integrationOrigin"):
         from app.application.services.integration_foundation import notify_integration_work
@@ -164,8 +168,8 @@ async def append_live_result_message(
             content += "\nProvider references:\n" + "\n".join(links[:20])
         refs = [ref for step in evidence for ref in (step.output or {}).get("data", {}).get("externalReferences", [])]
         await notify_integration_work(session, item, key="completed", content=content,
-            references={**live_result_reference(result=result, run=run, item=item, job=job, worker=worker, summary=summary),
-                "summary": content, "externalReferences": refs})
+            references={**live_result_reference(result=result, run=run, item=item, job=job, worker=worker,
+                summary=summary, files=files), "summary": content, "externalReferences": refs})
         return None
     thread = await _delivery_thread(
         session,
@@ -199,6 +203,7 @@ async def append_live_result_message(
         job=job,
         worker=worker,
         summary=summary,
+        files=files,
     )
     message = ConversationMessage(
         organization_id=item.organization_id,

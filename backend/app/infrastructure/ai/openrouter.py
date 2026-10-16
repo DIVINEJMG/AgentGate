@@ -169,6 +169,7 @@ class OpenRouterPlannerProvider:
                     "Planner response was incomplete or refused.",
                     retryable=False,
                     rejection_reason="truncated_output" if choice["finish_reason"] == "length" else "incomplete_output",
+                    finish_reason=choice["finish_reason"],
                 )
             if choice["message"].get("refusal"):
                 raise AIProviderError("content_rejected", "Planner declined this request.", retryable=False)

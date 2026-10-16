@@ -7,7 +7,10 @@ for the task to settle. A request with no recorded answer is reported and left f
 `python scripts/ai_simulator.py`). Steps only a person takes (approving, pressing an outcome
 button, opening a GitHub issue) are announced; `--approve` approves the task's approvals.
 `--resume WORK_ITEM` attaches to a task already under way (after the replay itself was stopped)
-and continues with the recorded answers its earlier requests did not use.
+and continues with the recorded answers its earlier requests did not use. `--faults JSON` replaces
+the scenario's GitHub faults (see run_simulation.install_fault_injection), and `--cut-planning N`
+first answers the Nth planning request as a dropped stream (no finish reason), giving the
+recorded answer to the request that follows.
 
 Needs the simulation stack running (ai-simulator, agentgate-sim, the local QStash). Scenarios
 that write to GitHub need `--allow-writes`.
@@ -82,9 +85,11 @@ def adapted(answer: dict[str, Any], record: dict[str, Any]) -> dict[str, Any]:
 
 
 async def answer_from_recording(queues: dict[str, list[dict[str, Any]]], stop: asyncio.Event,
-                                focus: dict[str, str | None]) -> None:
-    """Answer each new pending request of this scenario with the next recorded answer for its schema."""
+                                focus: dict[str, str | None], cut_planning: int = 0) -> None:
+    """Answer each new pending request of this scenario with the next recorded answer for its schema
+    (the `cut_planning`th planning request first gets that answer as a dropped stream)."""
     seen: set[str] = set()
+    planning = 0
     while not stop.is_set():
         for path in sorted((SIM / "pending").glob("*.json")):
             if path.name in seen:
@@ -104,6 +109,11 @@ async def answer_from_recording(queues: dict[str, list[dict[str, Any]]], stop: a
                       "answer it with scripts/ai_simulator.py", flush=True)
                 continue
             target = SIM / "answers" / path.name
+            planning += record["schema_name"] == "audoryn_next_action"
+            if record["schema_name"] == "audoryn_next_action" and planning == cut_planning:
+                target.write_text(json.dumps({**adapted(queue[0], record), "finish_reason": "none"}), encoding="utf-8")
+                print(f"[replay] answered {path.stem} as a dropped stream (no finish reason)", flush=True)
+                continue
             target.write_text(json.dumps(adapted(queue.pop(0), record)), encoding="utf-8")
             print(f"[replay] answered {path.stem} ({record['schema_name']})", flush=True)
         await asyncio.sleep(1)
@@ -228,9 +238,10 @@ def answered_for(work_item: str) -> int:
 
 
 async def replay(scenario: dict[str, Any], thread_id: str, approve: bool, timeout: float,
-                 resume: str | None = None) -> str | None:
+                 resume: str | None = None, faults_override: list | None = None, cut_planning: int = 0) -> str | None:
     faults = SIM / "faults.json"
-    faults.write_text(json.dumps({"rules": scenario.get("faults", [])}), encoding="utf-8")
+    rules = scenario.get("faults", []) if faults_override is None else faults_override
+    faults.write_text(json.dumps({"rules": rules}), encoding="utf-8")
     if scenario.get("humanSteps"):
         print("[replay] this scenario needs a person for: " + "; ".join(scenario["humanSteps"]), flush=True)
     stop = asyncio.Event()
@@ -238,7 +249,7 @@ async def replay(scenario: dict[str, Any], thread_id: str, approve: bool, timeou
     queues = recorded_answers(scenario["id"])
     if resume:  # the task exists: only its remaining planning answers are needed
         queues = {"audoryn_next_action": queues.get("audoryn_next_action", [])[answered_for(resume):]}
-    answering = asyncio.create_task(answer_from_recording(queues, stop, focus))
+    answering = asyncio.create_task(answer_from_recording(queues, stop, focus, cut_planning))
     started = time.time()
     try:
         if not resume:
@@ -258,6 +269,9 @@ def main() -> None:
     parser.add_argument("--approve", action="store_true")
     parser.add_argument("--timeout", type=float, default=1800)
     parser.add_argument("--resume", metavar="WORK_ITEM", help="attach to this task instead of sending the message")
+    parser.add_argument("--faults", type=json.loads, help="GitHub fault rules (JSON list) instead of the scenario's")
+    parser.add_argument("--cut-planning", type=int, default=0, metavar="N",
+                        help="answer the Nth planning request as a dropped stream first")
     args = parser.parse_args()
     catalogue = {item["id"]: item for item in json.loads((FIXTURES / "scenarios.json").read_text(encoding="utf-8"))}
     scenario = catalogue.get(args.scenario)
@@ -270,7 +284,8 @@ def main() -> None:
     from scripts.run_simulation import _read_env_file, simulation_environment
 
     os.environ.update(simulation_environment(_read_env_file(BACKEND / ".env.sim"), 8788))
-    status = asyncio.run(replay(scenario, args.thread, args.approve, args.timeout, args.resume))
+    status = asyncio.run(replay(scenario, args.thread, args.approve, args.timeout, args.resume,
+                                args.faults, args.cut_planning))
     raise SystemExit(0 if status is not None else 1)
 
 

@@ -118,3 +118,11 @@ test('a worker message offers only the controls it carries', () => {
   assert.deepEqual(messageControls(references).map((control) => control.id), ['w1', 'w2', 'm1']);
   assert.deepEqual(messageControls(), []);
 });
+
+test('a live result carries the files its run downloaded, and only well-formed ones', () => {
+  const live = liveResultReference({ resultReferences: [{ type: 'result', id: 'r', presentation: 'live_result', status: 'completed',
+    files: [{ id: 'a1', name: 'report.csv' }, { id: 7, name: 'broken' }, null] }] });
+  assert.deepEqual(live?.files, [{ id: 'a1', name: 'report.csv' }]);
+  const without = liveResultReference({ resultReferences: [{ type: 'result', id: 'r', presentation: 'live_result', status: 'completed' }] });
+  assert.equal(without?.files, undefined);
+});

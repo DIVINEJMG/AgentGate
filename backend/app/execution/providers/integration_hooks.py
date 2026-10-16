@@ -9,11 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol, runtime_checkable
+from uuid import UUID
 
 from app.execution.contracts import (
     CapabilityDescriptor,
     ExecutionRequest,
     ExecutionResult,
+    ProviderHealth,
     ResourceDescriptor,
 )
 
@@ -55,6 +57,21 @@ class AuthenticationHooks(Protocol):
     async def complete_authorization(self, *, code: str, callback_url: str) -> CredentialBundle: ...
     async def renew_credentials(self, *, bundle: CredentialBundle) -> CredentialBundle: ...
     async def revoke_credentials(self, *, bundle: CredentialBundle) -> None: ...
+
+
+@runtime_checkable
+class ProbeHooks(Protocol):
+    """A provider whose connection check really reaches its target (the browser's start page),
+    optionally signing in with the stored login (F34)."""
+
+    async def probe(
+        self,
+        *,
+        organization_id: UUID,
+        configuration: dict[str, str],
+        credential: str | None,
+        sign_in: bool = False,
+    ) -> ProviderHealth: ...
 
 
 @runtime_checkable

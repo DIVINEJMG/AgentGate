@@ -34,7 +34,7 @@ from tests.test_integration_preparation_gaps import preparation_session
 
 
 @pytest.mark.parametrize(("scope", "output", "expected"), [
-    ("github.repository.issues.list", [], "Found nothing: the result is empty."),
+    ("github.repository.issues.list", [], "No issues."),
     ("github.repository.issues.list", [{"number": 3, "title": "Aud"}, {"number": 2, "title": "TE"}],
      "Found 2 issues: #3 Aud; #2 TE."),
     ("github.repository.code.search", {"items": [{"name": "a"}, {"name": "b"}, {"name": "c"}, {"name": "d"}]},

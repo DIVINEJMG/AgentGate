@@ -98,7 +98,7 @@ def test_workspace_export_lists_changes_without_repeating_their_content():
     ("github.repository.pull_request.ready", {}, {"number": 8}, "Marked pull request #8 ready for review."),
     ("github.repository.branch.create", {"ref": "refs/heads/codex/1/x", "object": {"sha": "abcdef123"}}, {},
      "Created branch codex/1/x at abcdef1."),
-    ("browser.page.read", {"observation": {"url": "https://example.com"}}, {}, None),
+    ("browser.page.read", {"observation": {"url": "https://example.com"}}, {}, "Read https://example.com."),  # F44
 ])
 def test_a_step_is_described_by_what_it_did(scope, output, action_input, expected):  # F5
     assert narrate(scope, output, action_input) == expected

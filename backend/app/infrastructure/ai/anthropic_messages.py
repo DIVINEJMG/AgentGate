@@ -288,7 +288,8 @@ class AnthropicMessagesProvider(ConfiguredChatProvider):
                 "context_too_large" if stop == "model_context_window_exceeded" else "invalid_provider_response",
                 "Text response was empty or incomplete.", retryable=False,
                 rejection_reason=("truncated_output" if stop == "max_tokens" else "empty_output" if not text
-                                  else "incomplete_output"))
+                                  else "incomplete_output"),
+                finish_reason=stop)
         logger.info("AI transport received connection=%s hosting_provider=%s returned_model=%s",
                     self.name, self.connection.hosting_provider, payload.get("model"))
         return AIResponse(text=text, provider=self.name, model=model,

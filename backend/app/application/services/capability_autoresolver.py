@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.services.browser_origin_authority import (
+    browser_integration_autonomy_suitable,
     browser_integration_origins,
     browser_origins_covered,
 )
@@ -37,6 +38,26 @@ def _provider_id(value: str) -> str:
     return aliases.get(normalized, normalized)
 
 
+def _stored_logins(
+    connected: list[Integration], credentialed: set[UUID]
+) -> list[dict[str, object]]:
+    """The browser connections that hold a login, with its field names (never values) (F37)."""
+    logins: list[dict[str, object]] = []
+    for integration in connected:
+        if integration.id not in credentialed:
+            continue
+        config = integration.config if isinstance(integration.config, dict) else {}
+        fields = [name for name in str(config.get("loginFields") or "").split(",") if name]
+        logins.append(
+            {
+                "connection": integration.display_name,
+                "origins": list(browser_integration_origins(integration)),
+                "loginFields": fields,
+            }
+        )
+    return logins
+
+
 class SemanticCapabilityResolver:
     """Map semantic AI needs onto the exact live Aduoryn capability catalog.
 
@@ -59,24 +80,7 @@ class SemanticCapabilityResolver:
         required_browser_origins: tuple[str, ...] = (),
         require_browser_origin_authority: bool = False,
     ) -> CapabilityResolution:
-        integrations = list(
-            (
-                await self._session.scalars(
-                    select(Integration).where(
-                        Integration.organization_id == organization_id,
-                        Integration.status == "connected",
-                    )
-                )
-            ).all()
-        )
-        by_provider: dict[str, list[Integration]] = {}
-        for integration in integrations:
-            by_provider.setdefault(integration.provider, []).append(integration)
-        # Stored credentials for every connection in one query.
-        credentialed = set((await self._session.scalars(
-            select(IntegrationCredential.integration_id).where(
-                IntegrationCredential.integration_id.in_([integration.id for integration in integrations]))
-        )).all()) if integrations else set()
+        by_provider, credentialed = await self._connected(organization_id)
 
         missing: set[str] = set()
         candidates: dict[str, dict[str, object]] = {}
@@ -117,12 +121,15 @@ class SemanticCapabilityResolver:
                     required_browser_origins,
                 )
                 required_origin_set = set(required_browser_origins)
+                # Only connections the run will admit for this AI-managed work (F43), so the job
+                # is never granted actions its run cannot see.
                 connected = [
                     integration
                     for integration in connected
                     if (
                         (resource_origins := set(browser_integration_origins(integration)))
                         and resource_origins.issubset(required_origin_set)
+                        and browser_integration_autonomy_suitable(integration, required_origin_set)
                     )
                 ]
             if not connected:
@@ -194,9 +201,52 @@ class SemanticCapabilityResolver:
                         if available
                         else "missing_usable_capability"
                     ),
+                    "storedLogins": (
+                        _stored_logins(connected, credentialed) if provider_id == "browser" else []
+                    ),
                 }
             )
 
+        return await self._select(
+            candidates=candidates,
+            missing=missing,
+            semantic=semantic,
+            invocation_context=invocation_context,
+        )
+
+    async def _connected(
+        self, organization_id: UUID
+    ) -> tuple[dict[str, list[Integration]], set[UUID]]:
+        """The organization's connected integrations by provider, and which hold a credential."""
+        integrations = list(
+            (
+                await self._session.scalars(
+                    select(Integration).where(
+                        Integration.organization_id == organization_id,
+                        Integration.status == "connected",
+                    )
+                )
+            ).all()
+        )
+        by_provider: dict[str, list[Integration]] = {}
+        for integration in integrations:
+            by_provider.setdefault(integration.provider, []).append(integration)
+        # Stored credentials for every connection in one query.
+        credentialed = set((await self._session.scalars(
+            select(IntegrationCredential.integration_id).where(
+                IntegrationCredential.integration_id.in_([integration.id for integration in integrations]))
+        )).all()) if integrations else set()
+        return by_provider, credentialed
+
+    async def _select(
+        self,
+        *,
+        candidates: dict[str, dict[str, object]],
+        missing: set[str],
+        semantic: list[dict[str, object]],
+        invocation_context: AIInvocationContext,
+    ) -> CapabilityResolution:
+        """The smallest scope set: the only candidate, or the model's pick from the live catalog."""
         if not candidates:
             return CapabilityResolution(
                 scopes=(),
@@ -231,7 +281,12 @@ class SemanticCapabilityResolver:
                 "capability scopes needed for the job. You may select ONLY values from the "
                 "provided candidateScopes enum. Capabilities are permissions/tools, not steps. "
                 "Prefer read/observe scopes when the objective only requires checking status. "
-                "Select write/action scopes only when explicitly required by the job."
+                "Select write/action scopes only when explicitly required by the job. "
+                "storedLogins lists the browser connections that hold a login (field names only). "
+                "When the job's work on such a site is behind its login (an account, a dashboard, "
+                "orders, anything a signed-out visitor cannot see), select browser.auth.login: it "
+                "fills and submits that login form itself, so signing in needs no typing or submit "
+                "scope."
             ),
             prompt=(
                 "SEMANTIC_NEEDS:\n"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import mimetypes
 import os
@@ -14,6 +15,7 @@ from typing import Protocol
 from uuid import UUID, uuid4
 
 from playwright.async_api import (
+    APIResponse,
     Browser,
     BrowserContext,
     Dialog,
@@ -23,6 +25,7 @@ from playwright.async_api import (
     Playwright,
     Request,
     Route,
+    WebSocketRoute,
     async_playwright,
 )
 from playwright.async_api import Error as PlaywrightError
@@ -40,7 +43,11 @@ from app.execution.browser.credentials import (
     BrowserAuthenticationFailure,
     BrowserCredentialBundle,
 )
-from app.execution.browser.egress import evaluate_browser_egress
+from app.execution.browser.egress import (
+    BrowserEgressDecision,
+    evaluate_browser_egress,
+    resource_refusal,
+)
 from app.execution.browser.errors import (
     BrowserCapacityUnavailable,
     BrowserDetachedFrame,
@@ -64,6 +71,66 @@ from app.execution.redaction import redact_sensitive_structure, redact_url
 from app.infrastructure.redis.coordination import Lease, RedisCoordinator
 
 logger = logging.getLogger(__name__)
+
+# How long a submitted form has to start a page request before it counts as same-page. A request
+# starts within milliseconds of a submit, however slowly the site then answers.
+SUBMIT_NAVIGATION_WINDOW_MS = 1_500
+
+
+def _main_frame_navigation(request: Request) -> bool:
+    try:
+        return request.is_navigation_request() and request.frame.parent_frame is None
+    except PlaywrightError:  # a popup's first request can come before its frame exists
+        return False
+
+
+class _SubmitWatch:
+    """What a form submit did to the page (F38): whether it started opening a new page, and when
+    that page committed or failed."""
+
+    def __init__(self, page: Page, timeout_ms: int) -> None:
+        self.started = asyncio.ensure_future(
+            page.wait_for_event(
+                "request", predicate=_main_frame_navigation, timeout=SUBMIT_NAVIGATION_WINDOW_MS
+            )
+        )
+        self.committed = asyncio.ensure_future(
+            page.wait_for_event(
+                "framenavigated",
+                predicate=lambda frame: frame.parent_frame is None,
+                timeout=timeout_ms,
+            )
+        )
+        self.failed = asyncio.ensure_future(
+            page.wait_for_event(
+                "requestfailed", predicate=_main_frame_navigation, timeout=timeout_ms
+            )
+        )
+
+    @classmethod
+    def begin(cls, page: Page, timeout_ms: int) -> _SubmitWatch:
+        return cls(page, timeout_ms)
+
+    async def settle(self, page: Page, timeout_ms: int) -> None:
+        """Wait for the page a submit opened to load; a same-page form has nothing to wait for. A
+        slow or failed page is observed as it stands."""
+        try:
+            await self.started
+        except PlaywrightError:
+            return
+        await asyncio.wait({self.committed, self.failed}, return_when=asyncio.FIRST_COMPLETED)
+        if self.committed.done() and self.committed.exception() is None:
+            with contextlib.suppress(PlaywrightError):
+                await page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+
+    def close(self) -> None:
+        for waiter in (self.started, self.committed, self.failed):
+            if not waiter.done():
+                waiter.cancel()
+            elif not waiter.cancelled():
+                waiter.exception()  # retrieved, so an expected timeout is never logged as lost
+
+
 telemetry_logger = logging.getLogger("uvicorn.error")
 
 
@@ -263,6 +330,9 @@ class _SessionHandle:
         self.dialog_prompt_text: str | None = None
         self.keyboard_read_only_until = 0.0
         self.keyboard_write_blocked = False
+        # A page's own requests: each host's answer, and how many were refused (F39).
+        self.remembered_hosts: dict[str, BrowserEgressDecision] = {}
+        self.refused_requests = 0
 
 
 class BrowserRuntime:
@@ -667,6 +737,30 @@ class BrowserRuntime:
             handle.limit_error = None
             raise BrowserRuntimeLimitExceeded(message)
 
+    async def _route_web_socket(self, handle: _SessionHandle, socket: WebSocketRoute) -> None:
+        """A page's WebSocket follows the same rule as its other requests (F39)."""
+        url = socket.url
+        refusal = await resource_refusal(
+            "http" + url[2:] if url.startswith("ws") else url,
+            denied_origins=handle.navigation_policy.denied_origins
+            if handle.navigation_policy is not None
+            else (),
+            allow_private_network=handle.navigation_policy is not None
+            and handle.navigation_policy.allow_private_network,
+            remembered=handle.remembered_hosts,
+        )
+        if refusal is None:
+            socket.connect_to_server()
+            return
+        handle.refused_requests += 1
+        logger.info(
+            "Browser request refused session=%s type=websocket url=%s reason=%s",
+            handle.session.id,
+            redact_url(url),
+            refusal,
+        )
+        await socket.close(code=1008, reason="Refused by the connection's rules.")
+
     async def _route_request(
         self,
         handle: _SessionHandle,
@@ -682,75 +776,129 @@ class BrowserRuntime:
             await route.abort("blockedbyclient")
             return
         if not request.is_navigation_request():
-            policy = handle.navigation_policy
-            if (
-                policy is not None
-                and not policy.load_visual_resources
-                and request.resource_type in {"image", "media", "font"}
-            ):
-                await route.abort("blockedbyclient")
-                return
-            await route.continue_()
+            await self._route_page_request(handle, route, request)
             return
 
-        source_url: str | None = None
-        frame_unavailable = False
+        source_url, frame_unavailable = self._navigation_source(handle, request)
+        decision = await self._governed_decision(handle, request.url, source_url)
+        # A popup's initial navigation can arrive before its Frame exists. Treat it as top-level
+        # so a denied popup is surfaced to the governed action instead of becoming a silent
+        # side channel.
+        top_level = frame_unavailable or request.frame == request.frame.page.main_frame
+        if not await self._admit(handle, route, decision, top_level, frame_unavailable):
+            return
+        response = await self._fetch_navigation(handle, route, request)
+        if response is None:
+            return
+        location = response.headers.get("location") if 300 <= response.status < 400 else None
+        if location:
+            redirect = await self._governed_decision(handle, location, request.url)
+            if not await self._admit(handle, route, redirect, top_level, frame_unavailable):
+                return
+        await route.fulfill(response=response)
+
+    async def _route_page_request(
+        self, handle: _SessionHandle, route: Route, request: Request
+    ) -> None:
+        """A page's own request: the RAM rule first, then blocked sites and private addresses."""
+        policy = handle.navigation_policy
+        if (
+            policy is not None
+            and not policy.load_visual_resources
+            and request.resource_type in {"image", "media", "font"}
+        ):
+            await route.abort("blockedbyclient")
+            return
+        refusal = await resource_refusal(
+            request.url,
+            denied_origins=policy.denied_origins if policy is not None else (),
+            allow_private_network=policy is not None and policy.allow_private_network,
+            remembered=handle.remembered_hosts,
+        )
+        if refusal is not None:
+            handle.refused_requests += 1
+            logger.info(
+                "Browser request refused session=%s type=%s url=%s reason=%s",
+                handle.session.id,
+                request.resource_type,
+                redact_url(request.url),
+                refusal,
+            )
+            await route.abort("blockedbyclient")
+            return
+        await route.continue_()
+
+    @staticmethod
+    def _navigation_source(handle: _SessionHandle, request: Request) -> tuple[str | None, bool]:
+        """The page a navigation starts from, and whether its frame did not exist yet."""
         try:
             source_url = request.frame.url or None
         except PlaywrightError:
             # A popup's initial navigation request can arrive before Chromium has
             # created its Frame object. The destination must still pass policy.
-            frame_unavailable = True
             current_url = handle.page.url
-            source_url = current_url if current_url not in {"", "about:blank"} else None
+            return (current_url if current_url not in {"", "about:blank"} else None), True
+        if source_url == "about:blank":
+            source_url = handle.page.url if handle.page.url != "about:blank" else None
+        return source_url, False
 
+    @staticmethod
+    async def _governed_decision(
+        handle: _SessionHandle, target_url: str, source_url: str | None
+    ) -> BrowserNavigationDecision:
+        """The connection's site rules, then its private-network rule, for a page opening."""
         policy = handle.navigation_policy
         if policy is None:
-            decision = BrowserNavigationDecision(
+            return BrowserNavigationDecision(
                 allowed=False,
                 source_url=source_url,
-                target_url=request.url,
-                target_origin=origin_for_url(request.url),
+                target_url=target_url,
+                target_origin=origin_for_url(target_url),
                 reason="Browser session has no authorized destination policy.",
                 cross_origin=False,
             )
-        else:
-            if source_url == "about:blank":
-                source_url = handle.page.url if handle.page.url != "about:blank" else None
-            decision = policy.permits(request.url, source_url=source_url)
+        decision = policy.permits(target_url, source_url=source_url)
+        if not decision.allowed:
+            return decision
+        egress = await evaluate_browser_egress(
+            decision.target_url,
+            allow_private_network=policy.allow_private_network,
+        )
+        if egress.allowed:
+            return decision
+        return BrowserNavigationDecision(
+            allowed=False,
+            source_url=source_url,
+            target_url=decision.target_url,
+            target_origin=decision.target_origin,
+            reason=egress.reason,
+            cross_origin=decision.cross_origin,
+        )
 
-        if decision.allowed and policy is not None:
-            egress = await evaluate_browser_egress(
-                request.url,
-                allow_private_network=policy.allow_private_network,
-            )
-            if not egress.allowed:
-                decision = BrowserNavigationDecision(
-                    allowed=False,
-                    source_url=source_url,
-                    target_url=request.url,
-                    target_origin=origin_for_url(request.url),
-                    reason=egress.reason,
-                    cross_origin=decision.cross_origin,
-                )
-
+    @staticmethod
+    async def _admit(
+        handle: _SessionHandle,
+        route: Route,
+        decision: BrowserNavigationDecision,
+        top_level: bool,
+        frame_unavailable: bool,
+    ) -> bool:
+        """Record the decision; a refused one is aborted (and surfaced when top-level)."""
         handle.transition_trail.append(decision)
         del handle.transition_trail[:-50]
-        if frame_unavailable:
-            # Popup initial navigation can arrive before its Frame exists.
-            # Treat that navigation as top-level so a denied popup is surfaced
-            # to the governed action instead of becoming a silent side channel.
-            top_level_navigation = True
-        else:
-            frame = request.frame
-            top_level_navigation = frame == frame.page.main_frame
-        if not decision.allowed:
-            if top_level_navigation:
-                handle.blocked_navigation = decision
-                handle.blocked_popup_initial_navigation = frame_unavailable
-            await route.abort("blockedbyclient")
-            return
+        if decision.allowed:
+            return True
+        if top_level:
+            handle.blocked_navigation = decision
+            handle.blocked_popup_initial_navigation = frame_unavailable
+        await route.abort("blockedbyclient")
+        return False
 
+    @staticmethod
+    async def _fetch_navigation(
+        handle: _SessionHandle, route: Route, request: Request
+    ) -> APIResponse | None:
+        """Fetch an admitted page without following redirects, so each one is checked."""
         fetch_started = time.monotonic()
         telemetry_logger.info(
             "Browser navigation fetch started run=%s session=%s url=%s",
@@ -772,7 +920,7 @@ class BrowserRuntime:
                 type(error).__name__,
             )
             await route.abort("timedout")
-            return
+            return None
         telemetry_logger.info(
             "Browser navigation fetch completed run=%s session=%s status=%s elapsed=%.3fs",
             handle.session.run_id,
@@ -780,47 +928,26 @@ class BrowserRuntime:
             response.status,
             time.monotonic() - fetch_started,
         )
-        if 300 <= response.status < 400:
-            location = response.headers.get("location")
-            if location:
-                redirect_decision = (
-                    handle.navigation_policy.permits(
-                        location,
-                        source_url=request.url,
-                    )
-                    if handle.navigation_policy is not None
-                    else BrowserNavigationDecision(
-                        allowed=False,
-                        source_url=request.url,
-                        target_url=location,
-                        target_origin=origin_for_url(location),
-                        reason="Browser session has no authorized destination policy.",
-                        cross_origin=False,
-                    )
-                )
-                if redirect_decision.allowed and handle.navigation_policy is not None:
-                    redirect_egress = await evaluate_browser_egress(
-                        redirect_decision.target_url,
-                        allow_private_network=handle.navigation_policy.allow_private_network,
-                    )
-                    if not redirect_egress.allowed:
-                        redirect_decision = BrowserNavigationDecision(
-                            allowed=False,
-                            source_url=request.url,
-                            target_url=redirect_decision.target_url,
-                            target_origin=redirect_decision.target_origin,
-                            reason=redirect_egress.reason,
-                            cross_origin=redirect_decision.cross_origin,
-                        )
-                handle.transition_trail.append(redirect_decision)
-                del handle.transition_trail[:-50]
-                if not redirect_decision.allowed:
-                    if top_level_navigation:
-                        handle.blocked_navigation = redirect_decision
-                        handle.blocked_popup_initial_navigation = frame_unavailable
-                    await route.abort("blockedbyclient")
-                    return
-        await route.fulfill(response=response)
+        return response
+
+    def _check_local_capacity(self, organization_id: UUID) -> None:
+        """Memory pressure and this server's session limits, before any lease is taken."""
+        current_memory = self._memory_snapshot()
+        if (
+            current_memory.cgroup_percent is not None
+            and current_memory.cgroup_percent >= self._memory_soft_limit_percent
+        ):
+            raise BrowserCapacityUnavailable("Browser capacity is paused by memory pressure.")
+        if len(self._sessions) >= self._max_active_sessions:
+            raise BrowserCapacityUnavailable("Waiting for browser capacity.")
+        if (
+            sum(
+                handle.session.organization_id == organization_id
+                for handle in self._sessions.values()
+            )
+            >= self._max_sessions_per_organization
+        ):
+            raise BrowserCapacityUnavailable("Organization browser capacity is in use.")
 
     async def create_session(
         self,
@@ -832,22 +959,7 @@ class BrowserRuntime:
         navigation_policy: BrowserDomainPolicy | None = None,
     ) -> BrowserSession:
         async with self._capacity_lock:
-            current_memory = self._memory_snapshot()
-            if (
-                current_memory.cgroup_percent is not None
-                and current_memory.cgroup_percent >= self._memory_soft_limit_percent
-            ):
-                raise BrowserCapacityUnavailable("Browser capacity is paused by memory pressure.")
-            if len(self._sessions) >= self._max_active_sessions:
-                raise BrowserCapacityUnavailable("Waiting for browser capacity.")
-            if (
-                sum(
-                    handle.session.organization_id == organization_id
-                    for handle in self._sessions.values()
-                )
-                >= self._max_sessions_per_organization
-            ):
-                raise BrowserCapacityUnavailable("Organization browser capacity is in use.")
+            self._check_local_capacity(organization_id)
             lease_ttl = max(120, min(ttl_seconds, 900) + 120)
             capacity_lease: Lease | None = None
             organization_lease: Lease | None = None
@@ -925,6 +1037,9 @@ class BrowserRuntime:
                     await context.route(
                         "**/*",
                         lambda route, request: self._route_request(handle, route, request),
+                    )
+                    await context.route_web_socket(
+                        "**/*", lambda socket: self._route_web_socket(handle, socket)
                     )
                     self._log_memory("after_browser_context")
                     return session
@@ -1112,6 +1227,7 @@ class BrowserRuntime:
         page_state = {
             **observation.page_state,
             "keyboardWriteBlocked": handle.keyboard_write_blocked,
+            "refusedPageRequests": handle.refused_requests,
             "navigationPolicy": {
                 "lastTransitions": [
                     self._redact_metadata(item.as_dict(), handle.sensitive_values)
@@ -1730,6 +1846,29 @@ class BrowserRuntime:
         if form_ref is None and submit_locator is None:
             raise ValueError("Form submission requires formRef or submitLocator.")
 
+        # Listen before submitting, so a submit that opens the next page is observed once that page
+        # has loaded rather than mid-load (seen as a "Loading <url>" title in the simulator).
+        watch = _SubmitWatch.begin(handle.page, timeout_ms)
+        try:
+            await self._submit(handle, form_ref, submit_locator, timeout_ms)
+            await self._raise_if_blocked(handle)
+            await watch.settle(handle.page, timeout_ms)
+        finally:
+            watch.close()
+        await self._raise_if_blocked(handle)
+        return await self.observe(
+            session_id,
+            organization_id=organization_id,
+            worker_id=worker_id,
+        )
+
+    async def _submit(
+        self,
+        handle: _SessionHandle,
+        form_ref: str | None,
+        submit_locator: BrowserLocator | None,
+        timeout_ms: int,
+    ) -> None:
         try:
             if submit_locator is not None:
                 target = self._locator(handle, submit_locator)
@@ -1752,13 +1891,6 @@ class BrowserRuntime:
         finally:
             handle.dialog_action = None
             handle.dialog_prompt_text = None
-
-        await self._raise_if_blocked(handle)
-        return await self.observe(
-            session_id,
-            organization_id=organization_id,
-            worker_id=worker_id,
-        )
 
     async def authenticate(
         self,
@@ -1800,14 +1932,13 @@ class BrowserRuntime:
                 "Browser authentication refuses GET form submission because credentials could enter the URL."
             )
 
+        credentials.require(tuple(key for _, key in bindings))
         handle.sensitive_values.update(credentials.sensitive_values())
         for locator, credential_key in bindings:
             target = self._locator(handle, locator)
-            await self._set_control_value(
-                target,
-                credentials.resolve(credential_key),
-                timeout_ms=timeout_ms,
-            )
+            value = credentials.resolve(credential_key)
+            handle.sensitive_values.add(value)
+            await self._set_control_value(target, value, timeout_ms=timeout_ms)
 
         observation = await self.submit_form(
             session_id,

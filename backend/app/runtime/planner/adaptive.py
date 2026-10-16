@@ -12,6 +12,8 @@ from jsonschema import ValidationError, validate
 
 from app.application.context.corrections import schema_correction, unknown_value
 from app.application.context.evidence import (
+    as_list,
+    as_map,
     bounded_evidence,
     planned_action_fingerprint,
     planner_evidence,
@@ -662,6 +664,17 @@ def _follow_link_fresh(proposal: Proposal, context: RuleContext) -> None:
                            "content, a different observed control, or finish; do not reopen the same result.")
 
 
+def _login_fields(proposal: Proposal, context: RuleContext) -> None:
+    """A sign-in binds only fields the stored login has (F35)."""
+    stored = [str(name) for name in as_list(context.tool.get("loginFields"))]
+    if proposal.scope != "browser.auth.login" or not stored:
+        return
+    bindings = [as_map(item) for item in as_list(proposal.action_input.get("bindings"))]
+    unknown = sorted({str(item.get("credentialKey")) for item in bindings} - set(stored))
+    if unknown:
+        raise RuntimeError(f"The stored login has no field {unknown[0]!r}; bind only these fields: {', '.join(stored)}.")
+
+
 def _type_once(proposal: Proposal, context: RuleContext) -> None:
     if proposal.scope != "browser.element.type" or context.browser is None:
         return
@@ -772,7 +785,7 @@ def _label_observed(locator: dict[str, object], visible_text: str) -> None:
 
 # Checked in this order; the first broken rule is the correction the model receives.
 ACTION_RULES = (_no_settled_repeat, _no_challenge_retry, _browser_progress, _browser_session_open,
-                _navigation_origin, _input_contract, _scroll_progress, _follow_link_fresh, _type_once,
+                _navigation_origin, _input_contract, _login_fields, _scroll_progress, _follow_link_fresh, _type_once,
                 _key_press, _click_target, _observed_locators)
 
 

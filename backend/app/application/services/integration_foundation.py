@@ -92,6 +92,13 @@ def provider_label(provider_name: str) -> str:
         return provider_name
 
 
+def _names_provider(instruction: str, provider_name: str) -> bool:
+    """Whether the person's words name the provider (its id or display name)."""
+    words = instruction.casefold()
+    names = {provider_name, provider_name.replace("_", " "), provider_label(provider_name)}
+    return any(name.casefold() in words for name in names if name)
+
+
 def capability_gap_message(resource: dict, scopes) -> str:
     connection = resource.get("account") or resource["name"]
     return (f"{resource['name']} can't do what this task needs yet: {describe_capabilities(resource['provider'], scopes)}. "
@@ -531,7 +538,7 @@ class IntegrationFoundation:
             need = _checked_need(raw_need, instruction)
             selected = select_resource(catalog, need)
             if selected is None:
-                await self._explain_unresolved(need, catalog, gone)
+                await self._explain_unresolved(need, catalog, gone, instruction)
             bindings.append({**selected, "scopes": need.scopes, "destinations": need.destinations, "constraints": need.constraints})
         _check_named_resources(bindings, catalog, instruction)
         return _merged_bindings(bindings)
@@ -547,7 +554,9 @@ class IntegrationFoundation:
                 raise AIProviderError("invalid_provider_response",
                     f"The plan requested {name} but omitted its workspace capabilities. Retry preparation; no authority was granted.", retryable=True)
 
-    async def _explain_unresolved(self, need, catalog: list[dict], gone: list[dict]) -> NoReturn:
+    async def _explain_unresolved(
+        self, need, catalog: list[dict], gone: list[dict], instruction: str = ""
+    ) -> NoReturn:
         """Why no resource could be bound to the need, as the person's next step."""
         if need.resource_hint and (vanished := select_resource([{**r, "capabilities": need.scopes} for r in gone], need)):
             raise IntegrationRequirementError(
@@ -562,6 +571,12 @@ class IntegrationFoundation:
                 await self._raise_if_disconnected(need, original)
             raise IntegrationRequirementError(capability_gap_message(original, sorted(set(need.scopes) - set(original["capabilities"]))), missing=True)
         if not any(r["provider"] == need.provider for r in catalog):
+            if instruction and not _names_provider(instruction, need.provider):
+                # Never ask for an account of a provider the person did not name (F29).
+                raise IntegrationRequirementError(
+                    f"This task would need a {provider_label(need.provider)} account, which you didn't "
+                    "mention, so I won't ask you to connect one. Tell me which connection or website "
+                    "it should use.")
             raise IntegrationRequirementError(
                 f"Connect or share the {provider_label(need.provider)} account this task should use, "
                 "then reply here to continue.", missing=True)

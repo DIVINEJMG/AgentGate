@@ -337,8 +337,23 @@ def test_browser_integration_origin_is_read_from_governed_resource_metadata() ->
     )
 
 
-def test_browser_autonomy_suitability_requires_lean_public_exact_origin() -> None:
+def test_browser_autonomy_suitability_requires_lean_exact_origin() -> None:
+    """F43: a connection the person set up for the named site is reused (the setup saves no
+    loadVisualResources, which is lean by default); one that loads images is not; AgentGate's own
+    managed connections never reach private addresses."""
     organization_id = uuid4()
+    from_setup = Integration(
+        id=uuid4(),
+        organization_id=organization_id,
+        provider="browser",
+        display_name="Browser from the Connections setup",
+        status="connected",
+        config={
+            "allowPrivateNetwork": "false",
+            "metadata": {"allowedOrigins": ["https://example.com"]},
+        },
+    )
+    assert browser_integration_autonomy_suitable(from_setup, ("https://example.com",))
     full_manual = Integration(
         id=uuid4(),
         organization_id=organization_id,
@@ -347,6 +362,7 @@ def test_browser_autonomy_suitability_requires_lean_public_exact_origin() -> Non
         status="connected",
         config={
             "allowPrivateNetwork": "false",
+            "loadVisualResources": "true",
             "metadata": {"allowedOrigins": ["https://example.com"]},
         },
     )
@@ -357,6 +373,16 @@ def test_browser_autonomy_suitability_requires_lean_public_exact_origin() -> Non
         )
         is False
     )
+    own_private = Integration(
+        id=uuid4(),
+        organization_id=organization_id,
+        provider="browser",
+        display_name="Internal portal",
+        status="connected",
+        config={"allowPrivateNetwork": "true", "allowedOrigins": "http://10.0.0.5:8080"},
+    )
+    assert browser_integration_autonomy_suitable(own_private, ("http://10.0.0.5:8080",))
+    assert not browser_integration_autonomy_suitable(own_private, ("https://example.com",))
 
     lean_manual = Integration(
         id=uuid4(),

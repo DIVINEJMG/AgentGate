@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 from collections import OrderedDict
 from contextlib import AsyncExitStack
+from contextvars import ContextVar
 from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -17,6 +19,7 @@ from app.bootstrap.settings import settings
 from app.execution.contracts import ProviderHealth, ProviderManifest, VerificationResult
 from app.execution.providers.native.base import NativeProvider
 from app.execution.providers.native.http import ProviderTransportError
+from app.observability.frames import app_frames
 
 from .authentication import GitHubAuthentication
 from .catalog import assembled_catalog
@@ -24,6 +27,21 @@ from .events import EVENT_TRIGGERS, verify_event
 from .resources import GitHubResources, allowed_actions
 from .safety import SECRET, TASK_CONSTRAINT_SCHEMA, grounded_constraints
 from .transport import GitHubHTTPClient, GitHubResponse, account_context
+
+logger = logging.getLogger(__name__)
+# Set once this action has sent GitHub a request that changes something (F31): an error after
+# that point leaves the write's outcome uncertain rather than failed.
+_WRITE_SENT: ContextVar[bool] = ContextVar("github_write_sent", default=False)
+
+
+def _changes_github(method: str, path: str, payload: object) -> bool:
+    """Whether a request changes GitHub: anything but a read, or a GraphQL mutation."""
+    if method in {"GET", "HEAD"}:
+        return False
+    if path == "/graphql":
+        query = payload.get("query", "") if isinstance(payload, dict) else ""
+        return str(query).lstrip().startswith("mutation")
+    return True
 
 
 def operation_missing_content(operation, output):
@@ -136,6 +154,8 @@ class ExpandedGitHubProvider(NativeProvider):
         )
 
     async def api(self, method, path, credential, payload=None, **kwargs) -> GitHubResponse:
+        if _changes_github(method, path, payload):
+            _WRITE_SENT.set(True)
         return await self._github_http.request(
             provider="GitHub",
             method=method,
@@ -369,6 +389,7 @@ class ExpandedGitHubProvider(NativeProvider):
         action = self.actions[request.operation]
         started = datetime.now(UTC)
         token = account_context.set(configuration.get("installationId", request.resource.id))
+        sent = _WRITE_SENT.set(False)
         try:
             authority = request.resource.metadata.get("authorityVersion")
             revision = request.input.get("sha", request.input.get("ref"))
@@ -480,17 +501,40 @@ class ExpandedGitHubProvider(NativeProvider):
                 error, operation=request.operation, correlation_id=request.correlation_id
             ) from error
         except (ValueError, KeyError) as error:
-            raise self._execution_error(
+            raise self._unreadable_outcome(request, error) from error
+        finally:
+            _WRITE_SENT.reset(sent)
+            account_context.reset(token)
+
+    def _unreadable_outcome(self, request, error):
+        """The error for a check or response AgentGate could not read. Once a change was sent, the
+        write may have happened, so its outcome is uncertain (and is checked again), not failed (F31).
+        The error's type and AgentGate lines are logged, never its values."""
+        after_write = _WRITE_SENT.get()
+        logger.warning(
+            "GitHub action could not be read operation=%s error_type=%s after_write=%s at=%s",
+            request.operation,
+            type(error).__name__,
+            after_write,
+            app_frames(error),
+        )
+        if after_write:
+            return self._execution_error(
                 operation=request.operation,
                 correlation_id=request.correlation_id,
-                code="validation_error",
+                code="verification_failed",
                 retryable=False,
-                safe_message=str(error)
-                if isinstance(error, ValueError)
-                else "GitHub returned incomplete action evidence.",
-            ) from error
-        finally:
-            account_context.reset(token)
+                safe_message="GitHub accepted the change, but its result could not be confirmed.",
+            )
+        return self._execution_error(
+            operation=request.operation,
+            correlation_id=request.correlation_id,
+            code="validation_error",
+            retryable=False,
+            safe_message=str(error)
+            if isinstance(error, ValueError)
+            else "GitHub returned incomplete action evidence.",
+        )
 
     @staticmethod
     def _sanitize(value):

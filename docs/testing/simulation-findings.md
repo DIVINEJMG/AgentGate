@@ -59,6 +59,16 @@ earlier scenarios; a live model sees only its prompt. So:
 | F25 | A model-call slot left by a stopped process blocks planning for up to half an hour | Medium | Phase 5 replay | **Fixed in Phase 5** |
 | F26 | A task whose automatic planning retries ran out says it is "waiting for capacity" but nothing wakes it | Low | Phase 5 replay | **Fixed in Phase 5** |
 | F27 | A task waiting for another task's planning slot uses up its retries and pauses | Medium | Phase 5 replay | **Fixed in Phase 5** |
+| F28 | Rejecting an approval leaves its task "waiting for approval" for good | Medium | Oracle deploy check | **Fixed**, proved in the simulator |
+| F29 | A one-off browser task asked for in chat asks for a GitHub account instead | High | Oracle live check | Open |
+| F30 | The Activity page crashes when it opens an action recorded by the runtime | High | Oracle live check | **Fixed** (Phase A of the Oracle findings plan) |
+| F31 | A merge GitHub carried out is reported as failed ("incomplete action evidence"); the cause is not logged | High | Oracle live check | **Fixed** (Phase A of the Oracle findings plan) |
+| F32 | Empty reads all say "Found nothing: the result is empty", hiding what was read | Low | Oracle live check | **Fixed** (Phase A of the Oracle findings plan) |
+| F33 | A cut-off planner answer moves straight to a slower fallback model, and the reason is not recorded | Medium | Oracle live check | **Fixed** (Phase A of the Oracle findings plan) |
+| F34 | A browser connection's "Live checks" never open the site or try the login | High | Browser setup review | Open |
+| F35 | The planner is not told which login fields a browser connection stores | High | Browser setup review | Open |
+| F36 | The setup suggests a one-time-code secret, but nothing turns it into a code | Medium | Browser setup review | Open |
+| F37 | A job for a site that needs a login is created without the sign-in actions | High | Browser setup review | Open |
 | Q1 | An explicitly requested issue was created without an approval card; confirm this is the intended policy | Question | Scenario 2 | Needs your decision |
 
 ---
@@ -702,6 +712,524 @@ creating exactly one issue (#9). Both choices are in the audit log
 - **Fixed in Phase 5:** AgentGate's own slot rejections are marked (`budget_scope="concurrency"`)
   and the runtime waits for its turn ("Waiting for its turn to plan: another task is planning
   now.") without spending a retry; F25 guarantees a slot cannot stay taken by a stopped process.
+
+## F28: A rejected approval leaves its task waiting for good
+
+- **Severity:** Medium (the task never reaches a final state, and the chat never says the action
+  was rejected).
+- **Found in:** the read-only check of Oracle's database before deploying PR #129: three tasks
+  (`ac73fcb3`, `53fe95b9`, and `fed7ea24`, the PR #8 merge) still showed "waiting for approval",
+  although all three approvals had been rejected on 15 October.
+- **What happened:**
+  - Deciding an approval (`governance_routes._decide_approval`) woke the task only for
+    **approve**.
+  - The recovery sweep (`run_sweep`) resumed a waiting task only when its approval was
+    **approved**.
+  - The runtime already closes a rejected step ("Human approval rejected the action."), but
+    nothing ever ran it.
+- **Fix:**
+  - Either decision wakes the task.
+  - The sweep also resumes tasks whose approval was rejected, so the runtime closes the step.
+  - The sweep's approval check now reads the runs, steps and approvals in three queries for all
+    waiting tasks, instead of three queries per task.
+  - Once deployed, the sweep closes the three tasks above with "Human approval rejected the
+    action."; nothing is performed.
+- **Proved in the simulator (15 October):** the watchdog's sweep closed the three tasks whose
+  approvals had been rejected (`ac73fcb3`, `fed7ea24`, `53fe95b9`) with "Human approval rejected
+  the action."
+
+## F29: A browser task asked for in chat asks for a GitHub account
+
+- **Severity:** High (a one-off browser task from the chat cannot run at all).
+- **Found in:** the Oracle live check, worker "Bestworth Admin", 15 October 18:25 UTC: *"Using
+  the browser integration Navigate to the bestworthproductsltd.ng. Read out all products in the
+  product section"*.
+- **What happened:**
+  1. Interpretation was right: `integration.execute` with `integrationProvider: "browser"`.
+  2. Task preparation only lets the model choose native integrations: browser and web research
+     are left out of its catalog and schema (`IntegrationFoundation.interpret`:
+     `if m.provider not in {"browser", "web_research"}`, there since 10 October). The model had to
+     write a GitHub need (`github.repository.metadata.read`) and said so in the objective: "The
+     browser integration is not a declared capability in the catalog".
+  3. That worker has no GitHub account shared with it, so the chat asked to "Connect or share the
+     GitHub account", twice (once more after the reply).
+- **Why the same work ran from Runs/Jobs:** the worker "Aud", created with `worker.create`, has a
+  saved job whose revision carries the browser capability; scheduled and manual runs use the
+  legacy browser path, which works ("Daily Product Catalog Readout" completed).
+- **Not a regression** of the context and quality plan; this path never supported the browser.
+- **Fix direction (to plan):** let one-off chat tasks use the browser (preparation offers the
+  browser resources and their origins), or route such a request to a saved job for the worker
+  instead of a native integration task; and never ask for an account of a provider the person
+  did not name.
+- **Fixed (Phase C, decision D3):**
+  - The interpreter is told that a one-off website task is `integration.execute` with
+    `integrationProvider: "browser"`.
+  - Such a task becomes a one-time job of the worker that starts at once. It goes through the
+    existing job path (sites, browser actions and approvals as for any job), reports its progress
+    and result in the conversation, and is archived when done. A one-time job runs only once.
+  - Preparation never asks to connect an account of a provider the request did not name. It asks
+    which connection or website to use instead.
+- **Proved in the simulator** (scenario s8, below): the request "Use the browser: go to
+  …/test-site/files …" was accepted as "I started a one-time task for Repo Issue Monitor on
+  127.0.0.1", with no GitHub question.
+
+## F30: The Activity page crashes on an action recorded by the runtime
+
+- **Severity:** High (the page is unusable on wide screens).
+- **Found in:** the Oracle live check: `Uncaught TypeError: Cannot read properties of undefined
+  (reading 'length')`.
+- **What happened:**
+  - On wide screens the page opens the newest action (`ActivityPage.tsx`, "open the newest action
+    so the detail pane is never empty").
+  - The detail reads `item.policy.matchedPolicies.length` (line 137).
+  - Actions the runtime records keep only `{outcome, reason}` as their policy
+    (`ManagedRuntimeExecutor._action_record_payload`), and the API passes it through unchanged
+    (`governance_routes._action_record`), so `matchedPolicies` is missing.
+  - Today's newest actions (the merge and the coding task) are runtime actions, so the page
+    crashes as it loads.
+- **Long-standing:** both shapes were the same before PR #129.
+- **Unconfirmed:** a 404 in the same console log; which request it was is not yet known.
+- **Fix direction:** the API returns a complete policy for every action (`winningPolicy: null`,
+  `matchedPolicies: []` when not recorded), and the page treats a missing list as empty.
+- **Fixed:**
+  - Every action and approval the API returns carries the full policy
+    (`governance_routes._recorded_policy`: `winningPolicy` and `matchedPolicies` default to none).
+  - The Activity and Inbox pages treat a missing list as empty.
+  - On the simulation database, all 133 actions (every one recorded by the runtime) now come back
+    complete.
+  - The 404 was not one of the page's requests: actions, agents and the capability catalog all
+    have their routes.
+
+## F31: A merge GitHub carried out is reported as failed
+
+- **Severity:** High (the person is told the task failed although the pull request was merged;
+  the result says "needs attention").
+- **Found in:** the Oracle live check, task `ed774388` (merge PR #8), 15 October.
+- **What happened:**
+  - The merge was approved and **GitHub merged it** at 17:50:33 UTC (`merged_by: audoryn[bot]`).
+  - One second later the step failed with "GitHub returned incomplete action evidence.": the
+    message the GitHub provider gives any `KeyError` raised during an action.
+  - The action was recorded as `failed`, with `result: null`.
+- **Why the cause is unknown:** the provider turns the `KeyError` into that message and keeps the
+  original only as the error's cause; nothing logs the key or the line.
+- **What was ruled out:**
+  - Replayed locally with GitHub's real responses for this pull request and this task's grant
+    (`branches: [codex/55ea0379/readme-setup]`, `pullRequests: [8]`), the merge and its
+    verification succeed.
+  - That held both with the test HTTP double and through the real HTTP client and transport.
+  - So the missing key is in something the replay does not cover: most likely a response GitHub
+    returned at that moment (for example the pull request read straight after the merge), or the
+    installation-token path.
+- **Oracle's log** (`podman logs`, 15 October): the approved merge ran in the `resume` step, which
+  ended `failed` after 8.1 s with no warning or error line at all; the cause cannot be recovered
+  from this occurrence. The merge itself had been planned by the fallback model (see F33).
+- **Two problems:**
+  1. A write that may have happened is marked failed instead of "outcome uncertain" with the
+     existing checks (It happened / It didn't happen / Check again) and reconciliation.
+  2. The real cause is not logged.
+- **Fix direction:** an error raised after a write was sent is treated as an uncertain outcome
+  and reconciled (the merge would then be found merged); provider errors log the cause's type
+  and AgentGate frames (`app_frames`), never values; then find the key from the next occurrence.
+- **Fixed:**
+  - The GitHub provider notes when it has sent a request that changes GitHub
+    (`provider._changes_github`).
+  - A missing key or an unreadable value after that point is "verification failed", which a
+    durable write turns into "outcome uncertain" with the existing re-check. Before it, it is a
+    plain failure.
+  - Either way the log names the error type and the AgentGate lines, never values.
+- **Proved in the simulator:** a new fault (`missing_field`) let GitHub create an issue and then
+  dropped `number` from the response. The log read `GitHub action could not be read
+  operation=repository.issue.create error_type=KeyError after_write=True
+  at=execution/providers/native/github/execution.py:297 canonical_path < …`. The step paused as
+  uncertain, the re-check found the real issue #14, and the task completed.
+
+## F32: Empty reads all say "Found nothing: the result is empty"
+
+- **Severity:** Low (wording; the evidence itself is complete).
+- **Found in:** the same merge task: reviews, check runs and the commit status were each shown
+  as "Found nothing: the result is empty."
+- **What happened:** the step narrator (`app/application/context/narrator.py`, Phase 1) gives
+  every empty list the same sentence. For the commit status it also hides that the state was
+  `pending` with no checks.
+- **Fix direction:** name what was empty ("No reviews", "No check runs") and keep a state the
+  record carries ("Status pending; no checks reported").
+- **Fixed:** the narrator names what was empty from the record's own field or the scope ("No
+  reviews.", "No check runs.") and keeps a state ("State: pending; no statuses."). Tested on the
+  three reads of the merge task.
+
+## F33: A cut-off planner answer moves straight to the fallback model
+
+- **Severity:** Medium (that step took 64 s instead of about 5 s; repeated, it slows every task and
+  shifts work to a weaker model).
+- **Found in:** the Oracle live check, task `ed774388`, step 4 (planning the merge).
+- **What happened:**
+  - Sonnet (`openrouter_claude`) answered, but the answer was rejected as `incomplete_output`
+    after one call (planner attempt `225a7bf8`).
+  - The planner moved to the next route: Nemotron (`nvidia_nim`), which took two calls and 60 s
+    and planned the merge.
+  - Every other planning step of this task was accepted from Sonnet in 2–5 s.
+- **Why `incomplete_output`:** the stream ended with a finish reason other than `stop` or
+  `length` (`app/infrastructure/ai/streaming.py`), for example no finish reason at all if the
+  stream was cut. That reason is treated as final for the route, so the same model is not asked
+  again. The finish reason itself is not recorded, so which case it was is unknown.
+- **Fix direction:** record the finish reason (a fixed code, never the text) on the attempt; treat
+  an answer cut off without a finish reason as a retryable transport fault on the same model,
+  once, before falling back.
+- **Fixed:**
+  - Every provider reports how a cut-short answer ended, as a fixed code (`finish_code`: `none`
+    when there was no finish reason, `other` for anything unknown).
+  - The code is kept on the planner attempt (`failureDetails.finishReason`).
+  - An answer with no finish reason is asked of the same model once more, within the attempt's
+    two calls, before any fallback.
+- **Proved in the simulator:**
+  - A new simulator answer (`"finish_reason": "none"`, `sim_replay --cut-planning 1`) sent a
+    dropped stream.
+  - AgentGate asked the same model again at once, and the planner attempt was accepted after 2
+    calls with no fallback.
+
+## Browser setup review (15 October 2026)
+
+The browser connection's settings were traced from the setup form (Connections → Directory →
+Governed Browser) to where the browser uses them.
+
+**Already real end to end (keep as is):**
+- start page and name;
+- allowed and blocked sites, allowed and blocked paths: checked on every page opened and every
+  direct page read (`app/execution/browser/policy.py`);
+- the private network switch: when off, localhost, internal and cloud metadata addresses are
+  refused (`egress.py`);
+- the file upload and download switch: those actions exist only when on;
+- the login: stored encrypted, filled into the form at the browser by `browser.auth.login` and
+  hidden from page reads.
+
+Tests cover the site, path and network rules (`test_f30_11_20.py`, `test_f30_31_40.py`,
+`test_f31_21_30.py`). The gaps are around them.
+
+## F34: A browser connection's "Live checks" never open the site or try the login
+
+- **Severity:** High (a broken connection shows as "Connected").
+- **What happens:**
+  - For a browser, the check (`PlaywrightBrowserProvider.check_health`) only parses the site rules and
+    asks whether the browser engine is running.
+  - It never opens the start page, never confirms the page is inside the allowed sites, and
+    never tries the stored login.
+  - So a wrong address, an unreachable site, a start page the rules block, or a wrong password
+    all pass. The screen says each line completes "when Audoryn gets a real answer", which is
+    not true for the browser.
+- **Fix direction:** the check opens the start page through the same site rules, reports the page
+  it reached, and when a login is stored tries it (with the person watching the result), never
+  showing the values.
+- **Fixed:**
+  - The check opens the start page in a short browser session through the connection's own site
+    rules, and reports the page it reached, whether it is inside the allowed sites, and how long
+    it took.
+  - A new **Test sign-in** button tries the stored login on that page. It reports one of these:
+    signed in, login form still showing, no login stored, no login form, or fields that do not
+    fit. Values never leave the browser.
+  - The check result is now saved; before, it was never written back to the connection.
+- **Proved in the simulator** (a new test site on the simulator, real Chromium):
+  - The right login gave "Signed in: reached Dashboard - Test site." (Connected).
+  - A wrong password gave "After signing in, the login form is still showing…" (Degraded).
+
+## F35: The planner is not told which login fields a connection stores
+
+- **Severity:** High (a sign-in can only work by guessing).
+- **What happens:**
+  - `browser.auth.login` asks the planner to say which stored field goes into which box
+    (`bindings[].credentialKey`).
+  - The planner is never told the field names. It can guess `username` and `password` (what the
+    two boxes save), but anything entered under "Other login fields" can never be used.
+- **Fix direction:** give the planner the stored field names (never their values) with the
+  connection's tools, and check a chosen field exists before the action runs.
+- **Fixed:**
+  - Connecting, and every check, records the stored login's field names (never the values) as
+    the connection's `loginFields`.
+  - The planner's sign-in tool lists them. A proposal that binds another field is corrected at
+    planning time with the real names.
+  - The browser checks every bound field exists before typing anything; a missing one names the
+    fields the login has.
+- **Proved in the simulator:** both test-site connections were checked and recorded
+  `loginFields = username,password`.
+
+## F38: After a form is submitted, the next page is read while it is still loading
+
+- **Severity:** Medium (the model can be shown a half-loaded page after any form submit, a sign-in
+  included).
+- **Found in:** the simulator, while proving F35. The same successful Test sign-in reported
+  "reached Loading http://127.0.0.1:8788/test-site/home" instead of "Dashboard - Test site".
+- **Why:** `submit_form` waited a fixed 50 ms after submitting, then read the page. A submit that
+  opens the next page (a POST, then a redirect) is often not finished by then.
+- **Fixed:**
+  - Before submitting, the browser starts watching for a page request from the main frame. A
+    request starts within milliseconds of a submit, however slowly the site then answers.
+  - If one starts within 1.5 s, the browser waits for that page to load, or for the request to
+    fail, within the action's own timeout. Otherwise the form is treated as same-page, which costs
+    at most 1.5 s.
+  - A slow page is still read as it stands, and a blocked page is still refused.
+- **First version, replaced:** it waited at most 1.5 s for the next page to *commit*. Under load
+  (the full test suite running alongside), the two-step sign-in read "Loading …/test-site/code"
+  again.
+- **Proved in the simulator:**
+  - The Test sign-in reports "Signed in: reached Dashboard - Test site." again. Three repeated
+    runs with the full test suite running alongside were all correct.
+  - A new slow test login (`slow@example.com`) answers after 3 s. With the new wait it reached
+    "Dashboard - Test site". With the first version's wait it read "Loading …/test-site/login" and
+    still reported *signed in*, which was a false success.
+
+## F36: The setup suggests a one-time-code secret, but nothing turns it into a code
+
+- **Severity:** Medium (a login with two-factor codes fails, after the setup implied it would
+  work).
+- **What happens:**
+  - The "Other login fields" example shows `otpSecret`.
+  - Nothing generates a time-based code from it; the sign-in would type the secret itself, and
+    the login would fail.
+- **Fix direction:** generate the current code from a stored secret at the browser when a binding
+  asks for it (the code, like the secret, never reaches the model), or remove the example until
+  that exists.
+- **Fixed:**
+  - A stored `otpSecret` is offered to sign-ins as the field `oneTimeCode`. It can be a base32
+    key or an `otpauth://` link with its algorithm, digits and period.
+  - When `oneTimeCode` is bound, the browser types the current code (RFC 6238, Python's standard
+    library, no new dependency). The secret itself can never be bound, and the code is hidden
+    from page text like the stored values.
+  - A secret that is not valid is refused when the login is read.
+  - Test sign-in fills a code box on the login form, or on a code page after it. It reports:
+    a code is needed but no secret is stored, or the code was not accepted.
+- **Proved:**
+  - The RFC 6238 test vectors (SHA1, SHA256, SHA512) all pass.
+  - The simulator's test site now has a two-step login (password, then a code page). With the
+    right secret it gave "Signed in: reached Dashboard - Test site.", with a wrong secret "The
+    one-time code was not accepted", and with none "The site asks for a one-time code".
+
+## F37: A job for a site that needs a login is created without the sign-in actions
+
+- **Severity:** High (the task stops at the login page).
+- **Found in:** the Bestworth job (15 October): it reached the login page and stopped: "The
+  dashboard was not reached… This needs the typing and submit capabilities enabled, or an
+  already authenticated session."
+- **What happens:** when a worker or job is drafted, its browser actions come from what the model
+  asks for (`worker_autonomy`). It is not told the connection has a stored login, so a job for
+  a site that needs signing in can be created read-only, without `browser.auth.login`, typing
+  or submit.
+- **Fix direction:** tell the drafting step which browser connections have a stored login; a job
+  whose work starts behind that login gets the sign-in action (with approval as the policies
+  say); and the job's page shows which browser actions it has.
+- **Fixed:**
+  - Choosing a job's browser actions now sees which browser connections hold a login, with the
+    connection, its sites and the field names (never values).
+  - The resolver is told that work behind such a login gets `browser.auth.login`, which fills and
+    submits the login form itself. The model still chooses: no rule forces sign-in onto every
+    job for that site.
+  - A worker's Jobs tab lists each job's browser actions ("Browser: sign in, navigation open…").
+  - Once granted, the job's planner gets the login's field names (F35) and any one-time code
+    (F36).
+- **Proved:**
+  - A test checks both cases: the resolver is shown the stored login when there is one, and
+    nothing when there is none.
+  - On the simulation database, the real test-site connection reached the resolver as
+    `storedLogins: [{connection: "Test site (right login)", origins: [127.0.0.1:8788],
+    loginFields: [username, password]}]`, with `browser.auth.login` offered and kept. No value
+    was in the prompt.
+
+Related: F29 (one-off browser tasks from chat cannot run) and F30 (the Activity page crash, which
+also hits browser actions).
+
+## Browser rules and file actions, checked live (15 October 2026)
+
+The setup promises three things. Each was checked with AgentGate's real browser runtime
+(Chromium) against new pages on the simulator's test site (`/test-site/bounce`, `/ping`,
+`/hits`, `/files`, `/report.csv`, `/upload`), plus a public site (example.com).
+
+| Promise | Result |
+|---|---|
+| Allowed and blocked sites: opening a blocked site, an unlisted site or a blocked path | Refused, with the rule's reason |
+| A redirect from an allowed page to a blocked or unlisted site | Refused |
+| A direct page read, including through such a redirect | Refused |
+| Private network off: opening 127.0.0.1 or 169.254.169.254, or a direct read of 127.0.0.1 | Refused |
+| A page's own background requests (scripts, images, `fetch`) | **Not checked by AgentGate** (F39) |
+| File switch off / on | No file actions / upload and download offered |
+| Download and upload in the browser | Work: report.csv downloaded, uploaded back, "Received report.csv" |
+| A download saved, loaded back by the same worker, refused for another | Works |
+| A person's own file uploaded by a task | **Not possible** (F40) |
+| The person opening a file a task downloaded | **Not possible** (F41) |
+
+## F39: A page's own requests skip the site rules and the private-network rule
+
+- **Severity:** High (the private-network promise is not kept by AgentGate itself).
+- **What happens:**
+  - The browser checks every page it opens: pages, frames, popups and redirects.
+  - Every other request goes straight out (`route.continue_()` in `_route_request`). That covers
+    a page's scripts, images, styles and `fetch` calls.
+  - Live: a script on the allowed test page reached an unlisted site (example.org).
+  - A public page's requests to 127.0.0.1 failed, but because Chromium's own local-network
+    protection stopped them, not AgentGate. That depends on the Chromium version and its
+    settings.
+- **Fix direction:**
+  - Apply the private-network rule and the blocked-sites list to every request. Keep a
+    per-session cache of each host's answer, so each host is looked up once.
+  - Keep a page's own resources from unlisted sites (fonts, scripts from a CDN) allowed; refusing
+    them would break most sites.
+  - Make the setup text say precisely what is checked.
+- **Also noted (low):** each check looks up the address, then the browser connects with its own
+  lookup. A host that changes its answer in between could still get through.
+- **Fixed:**
+  - Every request a page makes now gets a check: scripts, styles, `fetch` and WebSockets (newly
+    routed). It refuses blocked sites and, when private network is off, private and cloud
+    metadata addresses.
+  - Each host is looked up once per session and remembered (up to 512 hosts, a few KB).
+  - The RAM rule runs first, unchanged: images, media and fonts are still cancelled before any
+    check.
+  - Other sites a page loads from stay allowed. Refusals are logged and counted in the page
+    state (`refusedPageRequests`).
+- **Proved live (Chromium):**
+  - A public page's `fetch` and WebSockets to 127.0.0.1 and localhost were refused by AgentGate
+    (4 refusals); nothing reached the server.
+  - On the allowed page, the blocked site's `fetch` and WebSocket were refused. The unlisted
+    site and the allowed site went through, and the allowed request reached the server.
+  - Every image was still cancelled by the RAM rule.
+
+## F40: A person's file cannot be given to a task to upload
+
+- **Severity:** High for upload work (the upload action exists, but there is nothing to upload).
+- **What happens:**
+  - An upload needs the file's `artifactId`.
+  - The task's planner is given the job, worker, trigger, tools and observations, but never the
+    files attached to the request. No job or trigger carries them.
+  - So a task can only upload a file it downloaded itself in the same run.
+- **Fix direction:**
+  - The files attached to a chat request travel with the task (name, type, size and id, never
+    the contents). The planner sees them as files it may upload.
+  - The existing rules still apply: the file belongs to that worker or run.
+  - This links to Phase C (chat tasks).
+- **Fixed (Phase C):**
+  - The files attached to a chat request travel with the task in its trigger (name, type, size
+    and id, never the contents), and the planner sees them as files it may upload.
+  - An attached file is bound to the worker that will use it. A file another worker holds is
+    left out.
+- **Proved in the simulator (s8):** the attached `stock-update.csv` was uploaded with the
+  upload form, and the site replied "Received stock-update.csv (237 bytes)".
+
+## F41: A file a task downloads cannot be opened by the person
+
+- **Severity:** Medium.
+- **What happens:**
+  - The download is saved with the run.
+  - The result saved at the end always has `artifactIds: []` and one text paragraph.
+  - The Runs page shows only a count ("1 artifact").
+  - The Results page has an "open attachment" button, but nothing ever fills it.
+- **Fix direction:** the result lists the run's files as attachments (name, type, size), opened
+  with the existing signed link.
+- **Fixed:**
+  - A run that downloaded files lists them on its result, as attachment blocks and
+    `artifactIds`. Screenshots and other evidence are left out.
+  - The lookup runs only when the run had a download step, so other runs add no database query
+    (the runtime benchmark is unchanged).
+- **Proved on the simulation database:**
+  - A download saved with a real run was listed and the screenshot was not.
+  - The Results page's signed link opened the file's real contents.
+- **Also in chat (Phase C):** the result message in the conversation carries the files, and the
+  chat's result card shows a button per file that opens it with a signed link. Proved in s8:
+  the chat message carried `files: [report.csv]`.
+
+## F42: The simulator writes files to production's object storage
+
+- **Severity:** Medium (simulation must not touch production).
+- **Found while proving F41.**
+- **What happens:** `.env.sim` sets only the database. Object storage
+  (`OBJECT_STORAGE_PROVIDER`, `UPSTASH_BLOB_BUCKET`) comes from `backend/.env`, which is
+  production. So files the simulation saves (browser downloads and screenshots) go to the
+  production bucket, while their database rows go to the sim branch.
+- **Written by the checks on 15 October:** three test files of 29 bytes each, under
+  `org/650c94c4…/browser/…` (report.csv twice, page.png once). They have no production database
+  rows. They are not deleted yet; that needs approval.
+- **Fix direction:**
+  - The simulation uses its own storage: a separate bucket or folder, set in `.env.sim`.
+  - The simulation start refuses to run when storage is production's, as it already refuses a
+    missing sim database.
+- **Decision (16 October 2026):** keep the shared storage for now. Clean up the simulation's
+  files in the production bucket, and give the simulation its own storage, before the app is
+  released.
+
+## F43: AI-managed browser work never uses a connection the person set up
+
+- **Severity:** High (sign-in, login fields, one-time codes and file actions from F34–F37 and F40
+  cannot reach chat tasks or AI-created jobs).
+- **Found in:** the Phase C simulation (scenario s4, 16 October): a chat task on the test site.
+- **What happened:**
+  - The chat task became a one-time job as intended.
+  - But the run's tools came from a new "Managed web · 127.0.0.1" connection (private network
+    off, file actions off), not the person's "Test site (right login)" connection (login stored,
+    file actions on). So the planner had no download or upload action.
+- **Why:** `browser_integration_autonomy_suitable` lets AI-managed work reuse a connection only
+  when:
+  1. It does not allow private network addresses (a deliberate safety rule).
+  2. It is AgentGate's own managed connection, or its owner set `loadVisualResources` to
+     `"false"` explicitly.
+
+  The Connections setup never sets that key. When it is missing the browser already blocks
+  images (the policy's default), so these connections are lean in practice but never count as
+  lean. Every chat task and AI-created job therefore gets its own managed connection, with no
+  login and no file actions.
+- **Also:** the capability resolver offers scopes from every connection covering the site,
+  including ones the runtime will not admit for AI work. The job can be granted actions (here,
+  download and upload) that its run never sees.
+- **This is likely why the Bestworth login job stopped at its login page (F37):** its run used a
+  managed connection without the stored login.
+- **Fixed (decision, 16 October):**
+  - A connection the person set up is reused for AI-managed work on exactly the sites their
+    message names. It counts as lean when it does not turn on images (the setup's default).
+  - A person's private-network connection is reused only for a site the person named;
+    AgentGate's own managed connections never reach private addresses.
+  - When both cover the same sites, the person's connection is used and AgentGate's own one is
+    skipped. This applies at connect time and when the planner's tools are built.
+  - The capability resolver offers only connections the run will admit, so a job is never
+    granted actions its run cannot see.
+- **Proved in the simulator (s8):** the run's tools came from "Test site (right login)", with
+  download and upload.
+
+## F44: A browser step is described as "Found 6 results"
+
+- **Severity:** Medium (the planner and the person read a wrong summary; a download's file is
+  not named).
+- **Found in:** the Phase C simulation (s8). Opening the files page was described as "Found 6
+  results." and the download as "Found 3 results.".
+- **Why:** the narrator counted the one list in a browser step's output (`realtimeEvents`), as
+  for a read of records. The download's file never appeared in what the planner saw.
+- **Fixed:**
+  - Browser steps have their own wording: "Opened Files - Test site (…).", "Downloaded
+    report.csv (29 bytes; file id …).", "Chose stock.csv (45 bytes) in the upload field.", and
+    for other steps "Now on <page>.".
+  - The download's file id lets a later step use the file.
+
+## Scenario s8: a browser task from chat, with a file to upload and a file to download (16 October 2026)
+
+- **Request:** "Use the browser: go to http://127.0.0.1:8788/test-site/files, download the
+  report, then upload the attached stock-update.csv with the upload form and tell me what the
+  page says." The CSV was attached through the real attachment service, and the test site's
+  connection was reconnected with file actions on.
+- **Path, all through AgentGate's real services, with the model's answers given through the
+  simulator:**
+  1. Interpretation chose `integration.execute` with the browser.
+  2. The one-time job was created, its actions resolved from the person's connection, and it
+     started.
+  3. The run opened the page.
+  4. It downloaded report.csv (approved).
+  5. It chose the attached file (approved).
+  6. It submitted the form (approved).
+  7. It finished.
+- **Outcome:**
+  - The site replied "Received stock-update.csv (237 bytes)".
+  - The run completed, and the one-time job was archived.
+  - The result lists report.csv, and the chat message carries it as a file to open.
+- **Found while running it:** F43 and F44.
+- **Noted, to check on Oracle:**
+  - While an earlier task was planning, a new chat message was refused with "local AI request
+    capacity is busy … try again shortly". The message was kept. It is not known yet whether
+    production's concurrency setting makes this likely.
+  - Opening a test-site connection's settings again needs a disconnect and reconnect; there is
+    no edit.
+
 
 ## Where the simulator had an advantage
 

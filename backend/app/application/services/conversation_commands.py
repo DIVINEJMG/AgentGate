@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -57,6 +59,7 @@ from app.domain.conversation.intent import (
 from app.domain.identity.principals import HumanPrincipal
 from app.domain.workforce.drafts import CapabilityNeed
 from app.infrastructure.database.models import (
+    Artifact,
     ConversationCommand,
     ConversationMessage,
     ConversationThread,
@@ -73,6 +76,15 @@ from app.infrastructure.database.models import (
     WorkItem,
 )
 from app.infrastructure.database.outbox import TransactionalOutbox
+
+# What a request may name as the tool for a website task.
+BROWSER_PROVIDERS = frozenset({"browser", "web", "website", "chrome"})
+
+
+def _is_browser_task(intent: WorkerCommandIntent) -> bool:
+    """A task the interpreter assigned to the browser (F29)."""
+    return any(str(intent.arguments.get(key) or "").strip().casefold() in BROWSER_PROVIDERS
+               for key in ("integrationProvider", "provider", "integration"))
 
 
 class _AnsweredMessage:
@@ -430,6 +442,9 @@ class ConversationCommandCompiler:
         worker = await self._resolve_worker_for_job(organization_id, intent.worker, thread)
         if worker is None:
             raise CommandResolutionError("Which worker should handle this integration task?")
+        if _is_browser_task(intent):
+            return await self._run_browser_task(organization_id=organization_id, principal=principal,
+                thread=thread, source_message=source_message, worker=worker, command=command)
         from app.application.services.integration_request_context import (
             integration_request_context,
         )
@@ -1890,6 +1905,71 @@ class ConversationCommandCompiler:
             references=[self._ref("run", run.id, None)],
             command_id=command.id,
         )
+
+    async def _run_browser_task(self, *, organization_id: UUID, principal: HumanPrincipal,
+            thread: ConversationThread, source_message: ConversationMessage, worker: Worker,
+            command: ConversationCommand) -> CommandReceipt:
+        """A one-off website task from chat, carried out as a one-time job of the worker that
+        starts now (F29): the job path already gives the browser its sites and actions. Its
+        result is posted back to this conversation."""
+        origins = explicit_http_origins(source_message.content)
+        if not origins:
+            raise CommandResolutionError("Which website should I open for this task?")
+        host = urlsplit(origins[0]).hostname or origins[0]
+        files = await self._task_files(organization_id, worker, source_message)
+        payload, browser_scopes = await self._prepare_existing_worker_job_payload(
+            organization_id=organization_id, principal=principal, worker=worker,
+            source_message=source_message, source_thread_id=thread.id, name=f"One-time task: {host}",
+            arguments={"description": source_message.content[:500],
+                       "objective": source_message.content[:4000],
+                       "instructions": source_message.content[:4000],
+                       "autonomy": {"oneShot": True}})
+        job = await create_job(self._session, organization_id, principal, payload)
+        if browser_scopes:
+            await _provision_managed_job_authority(self._session, organization_id, worker, principal,
+                list(browser_scopes))
+        await job_status_v1(organization_id, job.id, {"status": "active"}, principal, self._session)
+        now = datetime.now(UTC).isoformat()
+        item = await queue_job(self._session, organization_id, job, principal, trigger={
+            "type": "manual", "requestedByType": "human", "requestedBy": str(principal.user_id),
+            "requestedAt": now, "key": None, "eventId": None,
+            # The files attached to the request, which the task may upload (never their contents).
+            "payload": {"files": files} if files else None,
+            "scheduledFor": None, "dedupeKey": None, "sourceJobId": None, "sourceWorkItemId": None,
+            "configId": None})
+        item.payload = {**(item.payload or {}), "conversationOrigin": {
+            "threadId": str(thread.id), "messageId": str(source_message.id), "commandId": str(command.id)}}
+        command.target_type, command.target_id = "job", str(job.id)
+        return CommandReceipt(status="accepted",
+            message=f"I started a one-time task for {worker.name} on {host}. I'll post the result here.",
+            references=[self._ref("worker", worker.id, worker.name), self._ref("job", job.id, job.name),
+                        self._ref("work_item", item.id, None)],
+            command_id=command.id)
+
+    async def _task_files(self, organization_id: UUID, worker: Worker,
+            source_message: ConversationMessage) -> list[dict[str, object]]:
+        """The files attached to a request, bound to the worker that will use them (F40). A file
+        another worker already holds is left out."""
+        ids = []
+        for reference in list(source_message.artifact_references or []):
+            raw = reference.get("id") if isinstance(reference, dict) else reference
+            with suppress(TypeError, ValueError):
+                ids.append(UUID(str(raw)))
+        if not ids:
+            return []
+        artifacts = (await self._session.scalars(select(Artifact).where(
+            Artifact.organization_id == organization_id, Artifact.id.in_(ids)))).all()
+        files: list[dict[str, object]] = []
+        for artifact in artifacts:
+            meta = dict(artifact.metadata_json or {})
+            owner = str(meta.get("workerId") or "")
+            if owner and owner != str(worker.id):
+                continue
+            if not owner:
+                artifact.metadata_json = {**meta, "workerId": str(worker.id)}
+            files.append({"artifactId": str(artifact.id), "name": str(meta.get("name") or "file"),
+                          "mediaType": artifact.media_type, "sizeBytes": artifact.size_bytes})
+        return files
 
     async def _worker_event(self, worker: Worker, status: str) -> None:
         await TransactionalOutbox(self._session).enqueue(

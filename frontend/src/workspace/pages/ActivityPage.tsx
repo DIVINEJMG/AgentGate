@@ -134,7 +134,7 @@ function ActionDetail({ item }: { item: ActionRecord }) {
     <ol className='ws-path' aria-label='Gateway path'>{steps.map((step, index) => <li key={step.label} data-tone={step.tone}><span className='ws-path-dot'>{index + 1}</span><strong>{step.label}</strong><small>{step.value}</small></li>)}</ol>
     <dl className='ws-facts'>
       <div><dt>Deciding policy</dt><dd>{item.policy.winningPolicy ? <>{item.policy.winningPolicy.name}<small>{humanize(item.policy.winningPolicy.effect)} · priority {item.policy.winningPolicy.priority}</small></> : 'Default deny or precondition'}</dd></div>
-      <div><dt>Policies matched</dt><dd>{item.policy.matchedPolicies.length || 'None'}</dd></div>
+      <div><dt>Policies matched</dt><dd>{item.policy.matchedPolicies?.length || 'None'}</dd></div>
       <div><dt>Completed</dt><dd>{item.completedAt ? new Date(item.completedAt).toLocaleString() : '—'}</dd></div>
     </dl>
     {item.result && <section className='ws-section'>

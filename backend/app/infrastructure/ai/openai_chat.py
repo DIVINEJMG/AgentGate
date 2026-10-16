@@ -213,6 +213,7 @@ class ConfiguredChatProvider:
                         retryable=False,
                         rejection_reason=("truncated_output" if first.get("finish_reason") == "length"
                             else "empty_output" if not text else "incomplete_output"),
+                        finish_reason=first.get("finish_reason"),
                     )
                 logger.info(
                     "AI transport received connection=%s hosting_provider=%s returned_model=%s",

@@ -8,7 +8,7 @@ from contextvars import ContextVar
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
 from app.execution.bootstrap import execution_provider_registry
 from app.execution.contracts import ExecutionProviderError, ResourceDescriptor
+from app.execution.providers.integration_hooks import ProbeHooks
 from app.infrastructure.database.models import (
     AgentIdentity,
     CapabilityProfile,
@@ -271,6 +272,7 @@ async def _health(
     organization_id: UUID,
     principal: HumanPrincipal,
     integration_id: UUID,
+    sign_in: bool = False,
 ) -> Integration:
     require_permission(principal, "integrations.read")
     integration = await session.scalar(
@@ -314,19 +316,28 @@ async def _health(
                 credential = decrypt_integration_secret(credential_row.ciphertext)
         except IntegrationCipherError as error:
             raise HTTPException(503, str(error)) from error
-    raw_config = _config(integration)
+    # A copy: a JSON column only saves a new value, so editing the stored dict in place was lost.
+    raw_config = dict(_config(integration))
     config = {
         str(key): str(value)
         for key, value in raw_config.items()
         if isinstance(value, (str, int, float, bool))
     }
     try:
-        health = await provider.check_health(
-            configuration=config,
-            credential=credential,
-        )
+        # A provider that can really reach its target (the browser's start page) is probed (F34).
+        if isinstance(provider, ProbeHooks):
+            health = await provider.probe(
+                organization_id=organization_id,
+                configuration=config,
+                credential=credential,
+                sign_in=sign_in,
+            )
+        else:
+            health = await provider.check_health(configuration=config, credential=credential)
         integration.status = "connected" if health.state == "healthy" else "degraded"
         raw_config["metadata"] = health.metadata
+        if isinstance(fields := health.metadata.get("loginFields"), list):
+            raw_config["loginFields"] = ",".join(str(field) for field in fields)
         raw_config["healthMessage"] = health.message
         raw_config["lastCheckedAt"] = health.checked_at.isoformat()
     except ExecutionProviderError as error:
@@ -510,8 +521,11 @@ async def check_v1(
     integration_id: UUID,
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
+    sign_in: Annotated[bool, Query(alias="signIn")] = False,
 ) -> dict[str, Any]:
-    integration = await _health(session, organization_id, principal, integration_id)
+    integration = await _health(
+        session, organization_id, principal, integration_id, sign_in=sign_in
+    )
     return {"integration": await integration_public(session, integration)}
 
 
@@ -521,8 +535,11 @@ async def check_v2(
     integration_id: UUID,
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
+    sign_in: Annotated[bool, Query(alias="signIn")] = False,
 ) -> dict[str, Any]:
-    integration = await _health(session, organization_id, principal, integration_id)
+    integration = await _health(
+        session, organization_id, principal, integration_id, sign_in=sign_in
+    )
     return {"data": {"integration": integration_v2(await integration_public(session, integration))}}
 
 
