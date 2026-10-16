@@ -137,14 +137,16 @@ function RunDetail({ run, workerName, steps, canRun, saving, onResume }: { run: 
         const state = planStepState(step.status);
         const browser = ['browser.element.press_key', 'browser.element.click'].includes(step.scope);
         const noChange = step.actionOutcome === 'no_observable_change';
-        const label = noChange ? 'Ran, no page change' : step.status === 'completed' && browser ? (step.actionOutcome === 'observed_change' ? 'Ran, page changed' : 'Ran, outcome unconfirmed') : sentence(step.status === 'pending' ? 'waiting' : step.status);
+        const changeHeld = step.actionOutcome === 'change_held';
+        const label = changeHeld ? 'Held, nothing sent' : noChange ? 'Ran, no page change' : step.status === 'completed' && browser ? (step.actionOutcome === 'observed_change' ? 'Ran, page changed' : 'Ran, outcome unconfirmed') : sentence(step.status === 'pending' ? 'waiting' : step.status);
         return <li key={step.id} data-state={noChange ? 'held' : state}>
           <span className='ws-timeline-icon' aria-hidden='true'><StepIcon state={noChange ? 'held' : state} /></span>
           <div className='ws-timeline-body'>
             <div className='ws-timeline-head'><strong>{step.title}</strong><span className='ws-timeline-state'>{label}</span><time className='ws-mono'>{took(step.startedAt, step.completedAt)}</time></div>
             <p>{step.instruction}</p>
             {noChange && <small>The action ran but its intended result was not seen. The worker decides the next step from what it observed.</small>}
-            {!noChange && step.status === 'completed' && browser && <small>The interaction ran. The worker checks the page before treating the task as done.</small>}
+            {changeHeld && <small>This control sends a change to the site, so nothing was sent. The worker can make the change only through a governed submit, which can ask for approval.</small>}
+            {!noChange && !changeHeld && step.status === 'completed' && browser && <small>The interaction ran. The worker checks the page before treating the task as done.</small>}
             <small className='ws-timeline-meta'>{humanize(step.kind)}{step.scope ? <> · <code>{step.scope}</code></> : null}{step.actionId && <> · <a className='ws-link' {...linkProps({ page: 'activity', actionId: step.actionId })}>Gateway decision</a></>}{step.approvalId && <> · <a className='ws-link' {...linkProps({ page: 'inbox', kind: 'approval', id: step.approvalId })}>Approval</a></>}</small>
             {step.error && <p className='ws-timeline-error'>{step.error}</p>}
             {step.output && <details className='ws-timeline-output'><summary>Step output</summary><pre className='ws-code'>{step.output}</pre></details>}

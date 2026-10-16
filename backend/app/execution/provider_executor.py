@@ -505,6 +505,17 @@ class UniversalProviderExecutor:
                 correlation_id=proposal.correlation_id,
                 safe_message=f"The proposed {path} violates the tool's {error.validator} constraint. Nothing was dispatched; inspect the required value and replan.",
             ) from error
+        except ValueError as error:
+            # The provider refused the input before anything was sent (F49): an invalid action to
+            # replan, never an interrupted one whose outcome needs checking.
+            raise ExecutionProviderError(
+                code="validation_error",
+                retryable=False,
+                provider=proposal.provider,
+                operation=capability.operation,
+                correlation_id=proposal.correlation_id,
+                safe_message=f"{error} Nothing was dispatched; choose an action the tool allows and replan.",
+            ) from error
         from app.execution.providers.integration_hooks import ActionPolicyHooks
 
         if isinstance(provider, ActionPolicyHooks):

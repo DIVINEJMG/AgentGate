@@ -86,6 +86,11 @@ ACTION_QUIET_SECONDS = 0.4
 _SETTLE_POLL_SECONDS = 0.1
 # Requests that bring the page or its data; images, fonts and media never hold an observation.
 _SETTLE_REQUEST_TYPES = frozenset({"document", "xhr", "fetch"})
+# Activating a control can send a change to the site (its script may post it). These operations
+# never send one: a change is stopped and reported, and is sent only by the governed form submit,
+# which asks for approval (F50).
+WRITE_GUARDED_OPERATIONS = frozenset({"element.click", "element.check", "element.uncheck"})
+_READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _ELEMENT_OPERATIONS = frozenset(
     {
         "element.click",
@@ -399,6 +404,9 @@ class _SessionHandle:
         self.refused_requests = 0
         # Secrets typed into a login, which no request may carry in its web address (F45).
         self.login_secrets: set[str] = set()
+        # While a click, check or uncheck runs, a change it sends is stopped and remembered (F50).
+        self.write_guarded = False
+        self.blocked_write: dict[str, str] | None = None
         # Each page's open page and data requests, with when they started (F48).
         self.open_requests: dict[Page, dict[Request, float]] = {}
 
@@ -859,6 +867,13 @@ class BrowserRuntime:
             handle.keyboard_write_blocked = True
             await route.abort("blockedbyclient")
             return
+        if (
+            handle.write_guarded
+            and request.method not in _READ_METHODS
+            and request.resource_type in _SETTLE_REQUEST_TYPES
+        ):
+            await self._refuse_unapproved_write(handle, route, request)
+            return
         if handle.login_secrets and _carries_secret(request.url, handle.login_secrets):
             await self._refuse_login_in_address(handle, route, request)
             return
@@ -883,6 +898,23 @@ class BrowserRuntime:
             if not await self._admit(handle, route, redirect, top_level, frame_unavailable):
                 return
         await route.fulfill(response=response)
+
+    @staticmethod
+    async def _refuse_unapproved_write(
+        handle: _SessionHandle, route: Route, request: Request
+    ) -> None:
+        """A change sent by a click, check or uncheck is never sent; the first is remembered so the
+        planner can send it through the governed form submit (F50)."""
+        handle.refused_requests += 1
+        if handle.blocked_write is None:
+            handle.blocked_write = {"method": request.method, "url": redact_url(request.url)}
+        telemetry_logger.info(
+            "Browser change held for approval session=%s method=%s url=%s",
+            handle.session.id,
+            request.method,
+            redact_url(request.url),
+        )
+        await route.abort("blockedbyclient")
 
     @staticmethod
     async def _refuse_login_in_address(
@@ -1791,14 +1823,20 @@ class BrowserRuntime:
             prompt_text=prompt_text,
         )
 
-        if operation == "page.scroll":
-            await self._scroll(handle, target, value, axis, focus_text)
-        elif target is not None and operation in _ELEMENT_OPERATIONS:
-            key_timed_out = await self._act_on_element(handle, target, operation, value, timeout_ms)
-        else:
-            raise ValueError("Unsupported browser interaction operation.")
-
-        await self._settle_page(handle, began)
+        handle.blocked_write = None
+        handle.write_guarded = operation in WRITE_GUARDED_OPERATIONS
+        try:
+            if operation == "page.scroll":
+                await self._scroll(handle, target, value, axis, focus_text)
+            elif target is not None and operation in _ELEMENT_OPERATIONS:
+                key_timed_out = await self._act_on_element(
+                    handle, target, operation, value, timeout_ms
+                )
+            else:
+                raise ValueError("Unsupported browser interaction operation.")
+            await self._settle_page(handle, began)
+        finally:
+            handle.write_guarded = False
         handle.dialog_action = None
         handle.dialog_prompt_text = None
         await self._raise_if_blocked(handle)
@@ -1817,13 +1855,18 @@ class BrowserRuntime:
                 observation,
                 timeout_ms,
             )
-        if key_timed_out:
+        attempt: dict[str, object] | None = None
+        if handle.blocked_write is not None:
+            attempt = {
+                "status": "write_held",
+                "operation": operation,
+                "request": handle.blocked_write,
+            }
+        elif key_timed_out:
+            attempt = {"status": "timed_out", "operation": operation}
+        if attempt is not None:
             observation = replace(
-                observation,
-                page_state={
-                    **observation.page_state,
-                    "actionAttempt": {"status": "timed_out", "operation": operation},
-                },
+                observation, page_state={**observation.page_state, "actionAttempt": attempt}
             )
             handle.last_observation = observation
         return observation
@@ -2040,9 +2083,9 @@ class BrowserRuntime:
     ) -> None:
         try:
             if submit_locator is not None:
+                # A form's submit button, or any control whose own script sends a change (a
+                # "Disable account" button): the governed submit is how such a change is sent (F50).
                 target = self._locator(handle, submit_locator)
-                if not await self._is_submit_control(target):
-                    raise ValueError("submitLocator does not identify a form submit control.")
                 form_action = await target.evaluate("(el) => el.form ? el.form.action : null")
                 if form_action:
                     self._preflight(handle, str(form_action), source_url=handle.page.url)

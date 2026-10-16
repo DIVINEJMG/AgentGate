@@ -157,6 +157,9 @@ def _browser(scope: str, record: Mapping[str, object]) -> str | None:
                 f"file id {download.get('id')}).")
     if upload := as_map(record.get("uploadArtifact")):
         return f"Chose {upload.get('name') or 'the file'} ({upload.get('sizeBytes')} bytes) in the upload field."
+    if as_map(record.get("actionEvidence")).get("result") == "not_sent":
+        # A click whose change was held for a governed submit (F50).
+        return "Held the change this control sends to the site; nothing was sent."
     page = as_map(record.get("observation"))
     title, url = str(page.get("title") or "").strip()[:120], str(page.get("url") or "")
     where = f"{title} ({url})" if title and url else title or url

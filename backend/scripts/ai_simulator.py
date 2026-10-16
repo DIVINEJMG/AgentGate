@@ -274,6 +274,32 @@ def add_script_pages(app: FastAPI) -> None:
   document.getElementById('app').innerHTML = '<h1>Dashboard</h1><h2>Inquiries</h2><p>' + data.inquiries + '</p>';
 });</script>""")
 
+    # A worker list whose "Disable account" buttons send the change by script: Test's asks for
+    # confirmation first, Ada's does not (as on Bestworth). The page shows what the server holds, so
+    # a change that never arrived is visible (F50).
+    workers = {"Test": "Active", "Ada": "Active"}
+
+    @app.get("/test-site/workers", response_class=HTMLResponse)
+    async def workers_page():
+        def button(name: str) -> str:
+            send = f"fetch('/test-site/workers/disable?name={name}', {{method: 'POST'}}).then(() => location.reload())"
+            action = f"if (confirm('Disable {name}?')) {send}" if name == "Test" else send
+            return f'<button type="button" aria-label="Disable account for {name}" onclick="{action}">Disable account</button>'
+
+        rows = "".join(f"<li><span>{name} - IT - {state}</span> {button(name)}</li>" for name, state in workers.items())
+        return TEST_SITE_PAGE.format(title="Worker Access - Test site", body=f"<h1>Worker Access</h1><ul>{rows}</ul>")
+
+    @app.post("/test-site/workers/disable")
+    async def disable_worker(name: str):
+        workers[name] = "Disabled"
+        return JSONResponse({"ok": True})
+
+    @app.get("/test-site/workers/state")
+    async def workers_state(reset: bool = False):
+        if reset:
+            workers.update(dict.fromkeys(workers, "Active"))
+        return JSONResponse(workers)
+
     @app.get("/test-site/app-data")
     async def app_data(request: Request):
         await asyncio.sleep(APP_DATA_SECONDS)
