@@ -295,3 +295,33 @@ AgentGate (Oracle blocks A–F, then Vercel `audoryn`).
 - **Later the same day (UI only):** the media fields moved into the announcement form itself
   (New and Edit), and one Save publishes them. The Plans page's large banner was replaced by the
   standard page header, with the Monthly/Annual and currency controls on its right.
+- **Worker branch names (branch `fix/announcement-media-form`):** new GitHub branches start with
+  `audoryn/<task>/` instead of `codex/<task>/`. The prefix stays fixed in AgentGate, not set in the
+  Console, so running work never depends on the Console. A task can still write to its own older
+  `codex/` branches. The conversation page also keeps the plan banner compact.
+
+## Usage resets (branch `feat/usage-reset` in both repos, 17 October 2026)
+
+- **AgentGate migration `0023_usage_resets`:** a new `usage_resets` table. **Applied from the laptop on 17 October 2026 to the sim branch (`ep-twilight-surf`) and the Oracle database (`ep-long-glitter`).** It is run from the
+  laptop (sim database, then Neon), never on Oracle, and only after approval.
+- **AgentGate:**
+  - `POST /internal/console/entitlements/v1/usage-resets` on the existing entitlements channel
+    (scope `entitlements.write`). It takes `grantId`, `mode` (`now`/`banked`), `target`
+    (`everyone` / `organizationIds` / `planCodes`), and optional `expiresAt` and `note`.
+  - A repeated `grantId` changes nothing.
+  - `now` zeroes the current period's usage counters. Plans, periods, workers and members are
+    never changed.
+  - Workspace route `POST /organizations/{id}/plan/usage-resets/use` (`organizations.manage`)
+    uses the banked reset that expires soonest.
+  - The usage summary now carries `resets`, so Settings → Usage & billing shows "Use a reset".
+  - Every reset is audited as `commercial.usage.reset`, with the usage it cleared.
+- **Console:**
+  - `POST /api/v1/commercial/usage-resets` (`billing.subscriptions.manage`), audited as
+    `commercial.usage.reset`.
+  - A "Give a usage reset" control on Commercial → Subscriptions.
+- **Also on this branch:** the `audoryn/` worker branch prefix and the compact plan banner on
+  conversation pages (both described above).
+- **Not changed:** no new dependencies, keys, scopes or settings.
+- **Deploy:** migrate `0023`, then AgentGate (Oracle A–F, then Vercel `audoryn`), then the
+  Console (Oracle A–F, then Vercel `audoryn-console`). AgentGate goes first so the Console's
+  call finds the route.

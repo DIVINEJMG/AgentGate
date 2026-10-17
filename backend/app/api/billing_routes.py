@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth_dependencies import organization_principal
 from app.api.product_common import append_audit, require_permission
 from app.application.console_billing import BillingUnavailable, ConsoleBilling, load_channel
-from app.application.services import entitlements, plan_prompts
+from app.application.services import entitlements, plan_prompts, usage_resets
 from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.database.models import HumanIdentity
@@ -182,6 +182,18 @@ async def checkout_status_v2(organization_id: UUID, checkout_id: UUID,
     return {"data": await checkout_status_v1(organization_id, checkout_id, principal)}
 
 
+@v1_router.post("/organizations/{organization_id}/plan/usage-resets/use")
+async def use_reset_v1(organization_id: UUID, principal: Annotated[HumanPrincipal, Depends(organization_principal)],
+                       session: Annotated[AsyncSession, Depends(database_session)]) -> dict[str, Any]:
+    """Uses one of the workspace's banked usage resets: this period's usage starts again from zero."""
+    require_permission(principal, "organizations.manage")
+    used = await usage_resets.use(session, organization_id, principal)
+    if used is None:
+        raise HTTPException(409, "This workspace has no usage reset to use.")
+    await session.commit()
+    return {"used": True, **used, "resets": await usage_resets.banked(session, organization_id)}
+
+
 @v2_router.post("/organizations/{organization_id}/billing/manage")
 async def manage_v2(organization_id: UUID,
                     principal: Annotated[HumanPrincipal, Depends(organization_principal)]) -> dict[str, Any]:
@@ -206,3 +218,9 @@ async def upgrade_request_v2(organization_id: UUID, payload: PromptKey,
                              principal: Annotated[HumanPrincipal, Depends(organization_principal)],
                              session: Annotated[AsyncSession, Depends(database_session)]) -> dict[str, Any]:
     return {"data": await upgrade_request_v1(organization_id, payload, principal, session)}
+
+
+@v2_router.post("/organizations/{organization_id}/plan/usage-resets/use")
+async def use_reset_v2(organization_id: UUID, principal: Annotated[HumanPrincipal, Depends(organization_principal)],
+                       session: Annotated[AsyncSession, Depends(database_session)]) -> dict[str, Any]:
+    return {"data": await use_reset_v1(organization_id, principal, session)}

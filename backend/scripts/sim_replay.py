@@ -59,8 +59,8 @@ def writes_github(scenario: dict[str, Any]) -> bool:
 
 # The planner prompt gives the task's own branch prefix (Phase 2, F7). A live model uses it; a
 # recorded answer still carries the original task's, so it is swapped for the one the prompt gives.
-TASK_BRANCH = re.compile(r"branches start with (codex/[0-9a-f]{8}/)")
-RECORDED_BRANCH = re.compile(r"codex/[0-9a-f]{8}/")
+TASK_BRANCH = re.compile(r"branches start with ((?:audoryn|codex)/[0-9a-f]{8}/)")
+RECORDED_BRANCH = re.compile(r"(?:audoryn|codex)/[0-9a-f]{8}/")
 
 
 # Planning requests carry their task's work item; one from another task (a scheduled job that wakes

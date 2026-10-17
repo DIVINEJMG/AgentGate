@@ -19,7 +19,7 @@ from app.api.product_common import (
     require_permission,
     utcnow,
 )
-from app.application.services import entitlements
+from app.application.services import entitlements, usage_resets
 from app.domain.identity.permissions import permissions_for_role
 from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.auth.service import AuthenticatedUser
@@ -171,6 +171,8 @@ async def _commercial(
 ) -> dict[str, Any]:
     organization = await _org(session, organization_id)
     plan = await entitlements.summary(session, organization_id)
+    if plan:
+        plan["resets"] = await usage_resets.banked(session, organization_id)
     since = (
         datetime.fromisoformat(plan["periodStart"])
         if plan

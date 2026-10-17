@@ -37,10 +37,10 @@ GITHUB_TOOLS: list[dict[str, object]] = [
 
 def test_rules_follow_the_authorized_tools() -> None:  # F7, A6
     github = planning_rules(PlanningFacts.of(GITHUB_TOOLS, browser_open=False, work_item_id=WORK_ITEM))
-    assert "codex/55ea0379/<short-task-name>" in github  # the task's own prefix, not a description of it
+    assert "audoryn/55ea0379/<short-task-name>" in github  # the task's own prefix, not a description of it
     assert "browser" not in github.replace("Browser sessionId", "")  # no browser rules without a browser tool
     read_only = planning_rules(PlanningFacts.of(GITHUB_TOOLS[:1], browser_open=False, work_item_id=WORK_ITEM))
-    assert "codex/" not in read_only  # a task that cannot write gets no branch rule
+    assert "audoryn/" not in read_only  # a task that cannot write gets no branch rule
     browser = planning_rules(PlanningFacts.of([{"scope": "browser.page.read"}], browser_open=True))
     assert "A browser page is available" in browser and "browser.element.press_key" in browser
     assert "No external tools are available" in planning_rules(PlanningFacts.of([], browser_open=False))
@@ -169,14 +169,14 @@ def test_the_recorded_scenario_7_finish_is_asked_for_its_criteria() -> None:  # 
 def test_a_replayed_answer_uses_the_branch_prefix_its_prompt_gives() -> None:
     from scripts.sim_replay import adapted
 
-    record = {"messages": [{"content": "- This task's GitHub branches start with codex/ac73fcb3/: name ..."}]}
-    answer = {"content": {"input": {"branch": "codex/55ea0379/readme-setup"}}}
-    assert adapted(answer, record) == {"content": {"input": {"branch": "codex/ac73fcb3/readme-setup"}}}
+    record = {"messages": [{"content": "- This task's GitHub branches start with audoryn/ac73fcb3/: name ..."}]}
+    answer = {"content": {"input": {"branch": "codex/55ea0379/readme-setup"}}}  # recorded before the rename
+    assert adapted(answer, record) == {"content": {"input": {"branch": "audoryn/ac73fcb3/readme-setup"}}}
     assert adapted(answer, {"messages": []}) == answer
 
 
 def test_constraints_every_tool_shares_are_shown_once_per_resource() -> None:
-    granted = {"branches": ["codex/55ea0379/readme-setup"], "pullRequests": [8]}
+    granted = {"branches": ["audoryn/55ea0379/readme-setup"], "pullRequests": [8]}
     [resource] = authorized_tools([{**tool, "authorityConstraints": granted} for tool in GITHUB_TOOLS])
     assert resource["authorityConstraints"] == granted
     assert all("authorityConstraints" not in tool for tool in resource["tools"])

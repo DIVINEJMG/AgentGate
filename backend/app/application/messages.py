@@ -20,7 +20,7 @@ SAVED = "Completed steps are saved; nothing was rolled back."
 
 def write_object(scope: str, request: Mapping[str, object]) -> str:
     """What a write acts on: 'the issue “Simulation test”', 'pull request #8',
-    'branch codex/55ea0379/readme-setup', 'a comment on #7'."""
+    'branch audoryn/55ea0379/readme-setup', 'a comment on #7'."""
     noun = noun_of(scope) or "change"
     title = request.get("title") or request.get("name")
     named = next((request[key] for key in ("branch", "head", "path", "tag_name") if request.get(key)), None)
@@ -39,7 +39,7 @@ def _where(resource: str | None) -> str:
 
 
 def approval_wait(scope: str, request: Mapping[str, object], resource: str | None) -> str:
-    """F10: 'Waiting for your approval to create branch codex/… in DIVINEJMG/school.'"""
+    """F10: 'Waiting for your approval to create branch audoryn/… in DIVINEJMG/school.'"""
     action = scope.rsplit(".", 1)[-1]
     template = "open {o} as a draft" if scope.endswith("pull_request.create") else TO_DO.get(action, f"{action} {{o}}")
     return f"Waiting for your approval to {template.format(o=write_object(scope, request))}{_where(resource)}."

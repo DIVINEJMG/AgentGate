@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
-from uuid import UUID
+from typing import Any
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
     BigInteger,
@@ -759,6 +760,23 @@ class UserContentState(Base):
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+
+class UsageReset(Base):
+    """A usage reset given from the Console: `now` is applied when it arrives, `banked` waits for
+    the workspace to use it. `cleared` keeps the usage it set back to zero."""
+    __tablename__ = "usage_resets"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    grant_id: Mapped[UUID] = mapped_column(nullable=False)
+    organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    mode: Mapped[str] = mapped_column(String(12), nullable=False)
+    note: Mapped[str | None] = mapped_column(String(200))
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    used_by: Mapped[UUID | None] = mapped_column(ForeignKey("human_identities.id", ondelete="SET NULL"))
+    period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cleared: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+
 
 class QueueDeliveryFailure(TenantModel, Base):
     __tablename__ = "queue_delivery_failures"

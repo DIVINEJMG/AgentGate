@@ -3,6 +3,7 @@
 
 - ``POST /snapshots``: apply one organisation's plan (newer versions only).
 - ``POST /template``: replace the plan new workspaces start on.
+- ``POST /usage-resets``: give workspaces a usage reset, applied now or banked (phase 6).
 - ``GET /status``: organisations, paged by id, with the plan applied and this period's usage, so
   the Console can confirm delivery, show usage and find new workspaces.
 
@@ -36,6 +37,7 @@ from app.application.console_entitlements import (
 )
 from app.application.console_reads.signing import ReplayStoreUnavailable, ServiceRequestRejected
 from app.application.services import entitlements as plans
+from app.application.services import usage_resets
 from app.infrastructure.database.models import (
     EntitlementTemplate,
     Organization,
@@ -163,6 +165,16 @@ async def apply_template(request: Request, runtime: Runtime, session: Session) -
         return {"result": result, "appliedVersion": await _template_version(session)}
 
     return await _serve(request, runtime, operation="template", scope=WRITE_SCOPE, handle=handle)
+
+
+@router.post("/usage-resets")
+async def grant_usage_reset(request: Request, runtime: Runtime, session: Session) -> JSONResponse:
+    async def handle(body: bytes, _: dict[str, str]) -> object:
+        result = await usage_resets.grant(session, usage_resets.GrantDocument.model_validate_json(body))
+        await session.commit()
+        return result
+
+    return await _serve(request, runtime, operation="usage_reset", scope=WRITE_SCOPE, handle=handle)
 
 
 @router.get("/status")
