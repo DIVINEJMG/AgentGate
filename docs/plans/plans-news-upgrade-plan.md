@@ -225,3 +225,7 @@ media only when an image was chosen, so a video on its own was skipped without a
 image, a video or both are accepted, in the Console, in AgentGate's check and in the window. A
 video with no image plays muted and looping. Under reduced motion it shows its first frame,
 paused. No migration and no settings.
+
+**Fix (branch `fix/news-panel-video`):** the "What's new" panel showed a picture only for an
+image. An entry with only a video now shows the video's first frame at 16:9. It plays, muted, only
+while the pointer is over it, and never under reduced motion. UI only.

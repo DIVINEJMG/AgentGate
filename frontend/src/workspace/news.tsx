@@ -129,7 +129,11 @@ function NewsItem({ entry, unread, onDismiss, onLeave }: { entry: Entry; unread:
         {onDismiss && <button type='button' className='nw-dismiss' aria-label={`Dismiss ${entry.title}`} onClick={onDismiss}><X size={13} /></button>}
       </header>
       <h3>{entry.title}</h3>
-      {entry.image && <img className='nw-thumb' src={entry.image} alt='' loading='lazy' />}
+      {entry.image ? <img className='nw-thumb' src={entry.image} alt='' loading='lazy' />
+        // A video without a still frame: its first frame, playing (muted) only while pointed at.
+        : entry.media?.video && <video className='nw-thumb' src={entry.media.video} muted loop playsInline preload='metadata' aria-label={entry.media.alt}
+          onMouseEnter={(event) => { if (!reducedMotion()) void event.currentTarget.play().catch(() => {}); }}
+          onMouseLeave={(event) => event.currentTarget.pause()} />}
       <p>{entry.body}</p>
       <Actions entry={entry} onLeave={onLeave} />
     </article>

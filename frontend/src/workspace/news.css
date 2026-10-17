@@ -66,5 +66,6 @@
 .nw-dots button[aria-current='true'] { width: 20px; background: var(--ws-accent); }
 .nw-dots button:focus-visible { outline: 2px solid var(--ws-focus); outline-offset: 2px; }
 .nw-thumb { aspect-ratio: 16 / 9; }
+video.nw-thumb { display: block; width: 100%; max-height: 180px; margin: 8px 0; border-radius: 8px; object-fit: cover; background: var(--ws-s2); }
 .nw-major .up-modal-foot a.pl-cta { text-decoration: none; }
 @media (prefers-reduced-motion: reduce) { .nw-item article, .nw-dots button { transition: none; } }
