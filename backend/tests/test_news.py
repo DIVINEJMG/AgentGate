@@ -52,6 +52,16 @@ def test_only_well_formed_announcements_with_safe_links_are_shown() -> None:
     assert news._clean({**ANNOUNCEMENT, "severity": "loud"})["severity"] == "info"  # type: ignore[index]
 
 
+def test_media_only_from_one_origin_and_published_asset_keys() -> None:
+    asset = f"https://media.example/cms-public/assets/{'a' * 64}/{uuid4()}"
+    media = {"image": asset, "imageDark": asset, "video": asset, "alt": " A cover ", "width": 1600, "height": 900}
+    assert news._clean({**ANNOUNCEMENT, "media": media})["media"] == {**media, "alt": "A cover"}  # type: ignore[index]
+    for bad in ({"image": None}, {"alt": ""}, {"image": asset.replace("https", "http")}, {"video": asset + "?x=1"},
+                {"imageDark": asset.replace("media.example", "other.example")}, {"image": "https://media.example/x.png"}):
+        assert news._clean({**ANNOUNCEMENT, "media": {**media, **bad}})["media"] is None  # type: ignore[index]
+    assert news._clean(ANNOUNCEMENT)["media"] is None  # type: ignore[index]
+
+
 def test_announcements_reach_everyone_unless_limited_to_plans_or_roles() -> None:
     items = [cast(dict[str, Any], news._clean({**ANNOUNCEMENT, "id": str(uuid4()), **limits})) for limits in (
         {}, {"planCodes": ["free"]}, {"roles": ["owner", "admin"]}, {"planCodes": ["team"], "roles": ["viewer"]})]

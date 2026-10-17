@@ -113,7 +113,7 @@ change only what the release needs, and verify the outcome.
 
 ## 3. Cutover order
 
-1. Migrations `0020` and `0021` on production (below), from the laptop, with approval.
+1. Migrations `0020`, `0021` and `0022` on production (below), from the laptop, with approval.
 2. Deploy AgentGate with `CONSOLE_ENTITLEMENTS_*` and `CONSOLE_READS_*` set and enabled, and
    `ENTITLEMENTS_ENFORCEMENT` **absent** (off).
 3. Deploy the Console with `AGENTGATE_ENTITLEMENTS_*` (origin: AgentGate's internal address) and
@@ -266,4 +266,28 @@ cd backend && .venv/Scripts/python.exe -m alembic current && .venv/Scripts/pytho
 
 ## 7. Oracle commands
 
-Written when the whole piece of work is done (later phases add their own steps).
+Step by step, for each VM: `docs/deploy/oracle-commands-commercial-plans.md` (17 October 2026).
+
+## Announcement media (branches `feat/announcement-media` in both repos, 17 October 2026)
+
+What changed:
+- **Console migration `0012_announcement_media`:** adds a nullable `media` jsonb column to
+  `console.public_announcements`. It is run from the laptop against the Console database (Neon),
+  never on Oracle. **Applied from the laptop on 17 October 2026** (`0011_plan_pages` → `0012_announcement_media`).
+- **Console API:** `PUT /api/v1/announcements/{id}/media` (permission `platform.announcements.manage`)
+  takes verified CMS assets (an image, plus an optional dark-mode image and MP4/WebM video) and alt
+  text. It copies them to public storage under the same immutable keys a site release uses
+  (`cms-public/assets/<sha256>/<id>`), checks each one is reachable, and stores the addresses.
+  Sending no image clears the media. The CMS and its releases are unchanged.
+- **Console content feed:** each announcement now carries `media`.
+- **AgentGate:** `news._media` keeps media only from one HTTPS origin and the published asset keys.
+  The window now has 16:9 media on top, with the app's own cover when there is no media. Several
+  major announcements share one window, with pages, dots, Back and Next.
+
+Not changed:
+- No new dependencies and no environment changes.
+- Uploading media needs the Console's existing public storage settings (`CMS_PUBLIC_ORIGIN`,
+  `CMS_PUBLIC_STORAGE_BUCKET`); without them the media route answers 409.
+
+Deploy: migrate `0012`, then the Console (Oracle blocks A–F, then Vercel `audoryn-console`), then
+AgentGate (Oracle blocks A–F, then Vercel `audoryn`).

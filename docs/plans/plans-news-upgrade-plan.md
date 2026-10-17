@@ -171,3 +171,51 @@ entitlements (for the comparison table), so the Plans page needs one request.
   modal, and the Plans page with a sandbox checkout.
 - The existing suites, verify scripts and the reads/CMS tests unchanged.
 - Handoff updated with the migrations and settings.
+
+## 7. Announcement media (owner's request, 17 October 2026)
+
+The major-announcement window looked like a template: an empty grid band above the text. The
+owner wants it to read like the product announcements at mature tech companies.
+
+**Research.**
+- Linear's changelog leads each entry with a wide hero image (about 16:9).
+- Vercel's changelog covers have light and dark variants.
+- ChatGPT's launch window is one short message, one primary action and media on top.
+- GitHub labels entries Release, Improvement or Retired.
+- Common guidance: a modal only for big news, one primary action, an easy close, a muted looping
+  video with a still poster instead of a GIF (the still when reduced motion is preferred), and
+  "seen" recorded once per person.
+
+**Owner's decisions.**
+
+| # | Decision |
+|---|---|
+| 1 | Media comes from the Console's **CMS asset library** (already uploaded and verified). The CMS is only read, never changed |
+| 2 | **Media on top**: a full-width 16:9 picture or video, then tag, date, title, short text and buttons |
+| 3 | **Still image, short looping video (with a poster), and an optional dark-mode image** |
+| 4 | Several unread major announcements show as **one window with pages and dots** (Next / Back) |
+
+**What gets built.**
+- **Console, Announcements screen:** a "Media" section that chooses from verified assets: image,
+  dark-mode image (optional), video (optional) with its poster, and alt text (required when media
+  is set). A live preview of the window.
+- **Console, publishing the media:** the chosen assets are copied to public storage under
+  `announcements/` (the same way releases publish site media, with the checksum checked). The
+  content read sends their https addresses, size and type, and the alt text. Media is kept in a
+  new `media` field on announcements (migration `0012`, owner's approval).
+- **AgentGate checks:** it shows media only from the Console's public storage address, only images
+  and MP4/WebM, and only within size limits; anything else falls back.
+- **Workspace window:** 16:9 media on top (`object-fit: cover`, no layout jump):
+  - the video is muted and loops; it plays only while the window is open and shows the poster when
+    reduced motion is preferred;
+  - the dark-mode image is shown in dark theme;
+  - pages with dots, plus Next and Back (arrow keys too), for several major announcements; closing
+    marks every page read;
+  - one primary action, an optional "Learn more" and "Not now".
+- **Fallback when no media is set:** a designed cover instead of the empty band: the Audoryn mark,
+  the tag (New / Event / Notice / Offer) in large type over the grid, and a soft accent. It is
+  drawn by the app, so it needs no file.
+- **Panel:** entries with media show a 16:9 thumbnail; the changelog uses the CMS entry's image.
+- **Proof:** Console tests (asset must be verified, image or video type, alt text required,
+  published copy checksum), AgentGate tests (only the storage origin and allowed types), and
+  browser checks at desktop and phone widths, light and dark, with reduced motion.

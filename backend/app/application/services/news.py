@@ -20,6 +20,8 @@ CACHE_SECONDS = 60.0
 PREFIX = "news:"
 KEY = re.compile(r"^news:(changelog|announcement):[A-Za-z0-9-]{1,64}$")
 _SEVERITIES = frozenset({"info", "success", "warning", "critical"})
+# Published media sits under the CMS's immutable public keys: /cms-public/assets/<sha256>/<asset id>.
+_MEDIA_PATH = re.compile(r"^/cms-public/assets/[a-f0-9]{64}/[0-9a-f-]{36}$")
 _cache: tuple[float, list[dict[str, Any]]] | None = None
 
 
@@ -36,6 +38,28 @@ def _link(value: object) -> str | None:
         return value
     target = urlparse(value)
     return value if target.scheme == "https" and target.hostname else None
+
+
+def _media(value: object) -> dict[str, Any] | None:
+    """The window's media, only from one HTTPS origin and the CMS's published asset keys; anything
+    else is dropped and the app draws its own cover."""
+    if not isinstance(value, dict) or not isinstance(value.get("alt"), str) or not value["alt"].strip():
+        return None
+    media: dict[str, Any] = {"alt": value["alt"].strip()[:300]}
+    origins = set()
+    for field in ("image", "imageDark", "video"):
+        url = value.get(field)
+        if url is None and field != "image":
+            continue
+        target = urlparse(url) if isinstance(url, str) and len(url) <= 500 else None
+        if target is None or target.scheme != "https" or not target.hostname or target.query or target.fragment                 or target.username or not _MEDIA_PATH.fullmatch(target.path):
+            return None
+        origins.add(target.netloc)
+        media[field] = url
+    for size in ("width", "height"):
+        if isinstance(value.get(size), int) and 0 < value[size] <= 10_000:
+            media[size] = value[size]
+    return media if len(origins) == 1 else None
 
 
 def _clean(item: Any) -> dict[str, Any] | None:
@@ -62,6 +86,7 @@ def _clean(item: Any) -> dict[str, Any] | None:
         "cta": {"label": label[:120], "url": link} if isinstance(label, str) and label.strip() and link else None,
         "dismissible": item.get("dismissible") is not False, "major": item.get("major") is True,
         "upgrade": item.get("upgrade") is True,
+        "media": _media(item.get("media")),
         "planCodes": [str(code) for code in codes], "roles": [str(role) for role in roles],
     }
 
