@@ -325,3 +325,15 @@ AgentGate (Oracle blocks A–F, then Vercel `audoryn`).
 - **Deploy:** migrate `0023`, then AgentGate (Oracle A–F, then Vercel `audoryn`), then the
   Console (Oracle A–F, then Vercel `audoryn-console`). AgentGate goes first so the Console's
   call finds the route.
+- **Fix (Console branch `fix/usage-reset-shared-client`, 17 October 2026):** the Console's reset
+  route closed the entitlements client that it shares with plan delivery. Only the first reset
+  went through; after that, both resets and plan delivery failed until the Console restarted. The
+  route no longer closes it. Deploy is the Console only: Oracle blocks A, B, C, E, F; no migration
+  and no settings.
+- **Fix (same Console branch): asset uploads were blocked by the Console's own security policy**
+  (`connect-src 'self'`). The browser uploads straight to object storage, so the policy now
+  allows one storage origin. That origin comes from a new **Vercel build variable** on
+  `audoryn-console`: `CONSOLE_STORAGE_ORIGIN=https://br-green-field-b2p7so44.storage.c-6.eu-central-1.aws.neon.tech`
+  (origin only; not a secret). The same origin is allowed for `media-src`, so announcement
+  videos play in the editor preview. Without the variable, the policy is as before. Redeploy
+  Vercel `audoryn-console` after setting it; no Oracle change is needed for this part.
