@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowRight, Bell, CalendarDays, ExternalLink, Megaphone, Sparkles, Wrench, X, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bell, CalendarDays, ExternalLink, Megaphone, Sparkles, Wrench, X, Zap } from 'lucide-react';
 import type { OrganizationAccess } from '../lib/identityApi';
 import type { ApiVersion } from '../lib/systemApi';
-import { loadChangelog, loadNews, markNews, type ChangelogEntry, type NewsAnnouncement, type NewsFeed } from '../lib/newsApi';
+import { loadChangelog, loadNews, markNews, type ChangelogEntry, type NewsAnnouncement, type NewsFeed, type NewsMedia } from '../lib/newsApi';
 import { formatDate } from '../lib/planFormat';
 import { navigate } from './routes';
 import { Ago, Sheet } from './ui';
@@ -13,7 +13,7 @@ import './news.css';
  *  timeline panel, and a one-time window for announcements marked major. */
 type Tone = 'new' | 'improvement' | 'fix' | 'event' | 'notice' | 'warning';
 type Entry = {
-  key: string; tone: Tone; tag: string; title: string; body: string; at: string; image: string | null;
+  key: string; tone: Tone; tag: string; title: string; body: string; at: string; image: string | null; media: NewsMedia | null;
   link: { label: string; url: string } | null; upgrade: boolean; major: boolean; dismissible: boolean;
 };
 type News = { entries: Entry[]; unread: number; open: () => void };
@@ -33,7 +33,7 @@ function changelogTone(tag: string | null): [Tone, string] {
 
 function fromChangelog(item: ChangelogEntry): Entry {
   const [tone, tag] = changelogTone(item.tag);
-  return { key: `news:changelog:${item.id}`, tone, tag, title: item.title, body: item.summary, at: item.published, image: item.image,
+  return { key: `news:changelog:${item.id}`, tone, tag, title: item.title, body: item.summary, at: item.published, image: item.image, media: null,
     link: { label: 'Read more', url: item.path }, upgrade: false, major: false, dismissible: false };
 }
 
@@ -41,7 +41,7 @@ function fromAnnouncement(item: NewsAnnouncement): Entry {
   const event = item.kind === 'event' || item.kind.includes('webinar');
   const tone: Tone = item.severity === 'warning' || item.severity === 'critical' ? 'warning' : event ? 'event' : item.kind.includes('launch') ? 'new' : 'notice';
   const tag = tone === 'warning' ? 'Notice' : event ? 'Event' : tone === 'new' ? 'New' : item.upgrade ? 'Offer' : 'Notice';
-  return { key: `news:announcement:${item.id}`, tone, tag, title: item.title, body: item.body, at: item.publishedAt, image: null,
+  return { key: `news:announcement:${item.id}`, tone, tag, title: item.title, body: item.body, at: item.publishedAt, image: item.media?.image ?? null, media: item.media ?? null,
     link: item.cta, upgrade: item.upgrade, major: item.major, dismissible: item.dismissible };
 }
 
@@ -51,7 +51,8 @@ export function NewsProvider({ organization, apiVersion, children }: { organizat
   const [feed, setFeed] = useState<NewsFeed | null>(null);
   const [changelog, setChangelog] = useState<ChangelogEntry[]>([]);
   const [panel, setPanel] = useState(false);
-  const [shown, setShown] = useState<string | null>(null);
+  // The major announcements in the open window; 'closed' once seen on this visit.
+  const [shown, setShown] = useState<string[] | 'closed' | null>(null);
   // What was unread when the panel opened keeps its accent while the panel stays open.
   const [fresh, setFresh] = useState<string[]>([]);
 
@@ -71,7 +72,7 @@ export function NewsProvider({ organization, apiVersion, children }: { organizat
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at)), [feed, changelog]); // eslint-disable-line react-hooks/exhaustive-deps
   const recent = Date.now() - UNREAD_DAYS * 86_400_000;
   const unreadKeys = entries.filter((entry) => !state[entry.key]?.readAt && Date.parse(entry.at) >= recent).map((entry) => entry.key);
-  const major = feed ? entries.find((entry) => entry.major && !state[entry.key]?.readAt) : undefined;
+  const majors = feed ? entries.filter((entry) => entry.major && !state[entry.key]?.readAt).map((entry) => entry.key) : [];
 
   const mark = useCallback((keys: string[], how: 'read' | 'dismissed') => {
     if (!keys.length) return;
@@ -80,16 +81,17 @@ export function NewsProvider({ organization, apiVersion, children }: { organizat
     void markNews(apiVersion, organization.id, keys, how).catch(() => {});
   }, [apiVersion, organization.id]);
 
-  // A major announcement opens once for each person, a moment after the app settles.
+  // Major announcements open once for each person, a moment after the app settles: one window
+  // with a page for each.
   useEffect(() => {
-    if (!major || shown || panel) return;
-    const timer = window.setTimeout(() => setShown(major.key), 1500);
+    if (!majors.length || shown || panel) return;
+    const timer = window.setTimeout(() => setShown(majors), 1500);
     return () => window.clearTimeout(timer);
-  }, [major?.key, shown, panel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [majors.join(), shown, panel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = useCallback(() => { setFresh(unreadKeys); setPanel(true); mark(unreadKeys, 'read'); }, [mark, unreadKeys.join()]); // eslint-disable-line react-hooks/exhaustive-deps
   const value = useMemo(() => ({ entries, unread: unreadKeys.length, open }), [entries, unreadKeys.length, open]);
-  const modal = entries.find((entry) => entry.key === shown);
+  const pages = Array.isArray(shown) ? entries.filter((entry) => shown.includes(entry.key)) : [];
 
   return <NewsContext.Provider value={value}>
     {children}
@@ -98,7 +100,7 @@ export function NewsProvider({ organization, apiVersion, children }: { organizat
         : <ol className='nw-timeline'>{entries.map((entry) => <NewsItem key={entry.key} entry={entry} unread={fresh.includes(entry.key)}
           onDismiss={entry.dismissible ? () => mark([entry.key], 'dismissed') : undefined} onLeave={() => setPanel(false)} />)}</ol>}
     </Sheet>
-    <MajorWindow entry={modal ?? null} onClose={() => { if (modal) mark([modal.key], 'read'); setShown('closed'); }} />
+    <MajorWindow pages={pages} onClose={() => { mark(pages.map((entry) => entry.key), 'read'); setShown('closed'); }} />
   </NewsContext.Provider>;
 }
 
@@ -127,35 +129,77 @@ function NewsItem({ entry, unread, onDismiss, onLeave }: { entry: Entry; unread:
         {onDismiss && <button type='button' className='nw-dismiss' aria-label={`Dismiss ${entry.title}`} onClick={onDismiss}><X size={13} /></button>}
       </header>
       <h3>{entry.title}</h3>
-      {entry.image && <img src={entry.image} alt='' loading='lazy' />}
+      {entry.image && <img className='nw-thumb' src={entry.image} alt='' loading='lazy' />}
       <p>{entry.body}</p>
       <Actions entry={entry} onLeave={onLeave} />
     </article>
   </li>;
 }
 
-function MajorWindow({ entry, onClose }: { entry: Entry | null; onClose: () => void }) {
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+
+/** The window's media at 16:9: the published video (muted and looping, only while the window is
+ *  open; its still frame under reduced motion), the image with its dark-mode version, or the app's
+ *  own cover when there is none or it fails to load. */
+function Cover({ entry }: { entry: Entry }) {
+  const [broken, setBroken] = useState<string | null>(null);
+  const media = entry.media && broken !== entry.key ? entry.media : null;
+  if (!media) {
+    const Icon = ICONS[entry.tone];
+    return <div className='nw-cover' data-tone={entry.tone} aria-hidden='true'>
+      <img className='nw-cover-mark' src='/audoryn-mark.png' alt='' />
+      <span className='nw-cover-word'>{entry.tag}</span>
+      <span className='nw-cover-icon'><Icon size={22} /></span>
+    </div>;
+  }
+  const failed = () => setBroken(entry.key);
+  return <div className='nw-cover nw-cover-media'>
+    {media.video && !reducedMotion()
+      ? <video key={media.video} src={media.video} poster={media.image} muted loop autoPlay playsInline aria-label={media.alt} onError={failed} />
+      : <>
+        <img className={media.imageDark ? 'nw-media-light' : undefined} src={media.image} alt={media.alt} onError={failed} />
+        {media.imageDark && <img className='nw-media-dark' src={media.imageDark} alt={media.alt} onError={failed} />}
+      </>}
+  </div>;
+}
+
+function MajorWindow({ pages, onClose }: { pages: Entry[]; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const [page, setPage] = useState(0);
+  const open = pages.length > 0;
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (entry && !dialog.open) dialog.showModal();
-    if (!entry && dialog.open) dialog.close();
-  }, [entry]);
-  return <dialog ref={ref} className='up-modal nw-major' aria-labelledby='nw-major-title' onCancel={(event) => { event.preventDefault(); onClose(); }} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    if (open && !dialog.open) { setPage(0); dialog.showModal(); }
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+  const entry = pages[Math.min(page, pages.length - 1)];
+  const last = page >= pages.length - 1;
+  const go = (step: number) => setPage((current) => Math.max(0, Math.min(pages.length - 1, current + step)));
+  return <dialog ref={ref} className='up-modal nw-major' aria-labelledby='nw-major-title'
+    onCancel={(event) => { event.preventDefault(); onClose(); }}
+    onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
+    onKeyDown={(event) => { if (pages.length > 1 && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) { event.preventDefault(); go(event.key === 'ArrowRight' ? 1 : -1); } }}>
     {entry && <>
-      <div className='nw-major-art' aria-hidden='true'><span><Sparkles size={22} /></span></div>
-      <header className='up-modal-head'>
-        <div><p className='pl-eyebrow'>{entry.tag} · {formatDate(entry.at)}</p><h2 id='nw-major-title'>{entry.title}</h2></div>
-        <button type='button' className='up-banner-close' aria-label='Close' onClick={onClose}><X size={16} /></button>
-      </header>
-      <div className='up-modal-body'><p>{entry.body}</p></div>
-      <footer className='up-modal-foot'>
-        <button type='button' className='pl-cta pl-cta-quiet' onClick={onClose}>Got it</button>
-        {entry.upgrade && <button type='button' className='pl-cta' onClick={() => { onClose(); navigate({ page: 'plans' }); }}>See plans<ArrowRight size={15} /></button>}
-        {!entry.upgrade && entry.link && (entry.link.url.startsWith('/app')
-          ? <button type='button' className='pl-cta' autoFocus onClick={() => { onClose(); navigate(entry.link!.url); }}>{entry.link.label}<ArrowRight size={15} /></button>
-          : <a className='pl-cta' href={entry.link.url} target='_blank' rel='noopener noreferrer' onClick={onClose}>{entry.link.label}<ExternalLink size={15} /></a>)}
+      <Cover entry={entry} />
+      <button type='button' className='up-banner-close nw-major-close' aria-label='Close' onClick={onClose}><X size={16} /></button>
+      <div className='nw-major-text' aria-live='polite'>
+        <p className='pl-eyebrow'>{entry.tag} · {formatDate(entry.at)}{pages.length > 1 && ` · ${page + 1} of ${pages.length}`}</p>
+        <h2 id='nw-major-title'>{entry.title}</h2>
+        <p className='nw-major-body'>{entry.body}</p>
+      </div>
+      <footer className='up-modal-foot nw-major-foot'>
+        {pages.length > 1 && <div className='nw-dots' role='group' aria-label='Announcements'>
+          {pages.map((item, index) => <button key={item.key} type='button' aria-label={`${index + 1} of ${pages.length}: ${item.title}`} aria-current={index === page ? 'true' : undefined} onClick={() => setPage(index)} />)}
+        </div>}
+        {page > 0 && <button type='button' className='pl-cta pl-cta-quiet' onClick={() => go(-1)}><ArrowLeft size={15} />Back</button>}
+        {!last ? <button type='button' className='pl-cta' autoFocus onClick={() => go(1)}>Next<ArrowRight size={15} /></button> : <>
+          <button type='button' className='pl-cta pl-cta-quiet' onClick={onClose}>{entry.upgrade || entry.link ? 'Not now' : 'Got it'}</button>
+          {entry.upgrade && <button type='button' className='pl-cta' autoFocus onClick={() => { onClose(); navigate({ page: 'plans' }); }}>See plans<ArrowRight size={15} /></button>}
+          {!entry.upgrade && entry.link && (entry.link.url.startsWith('/app')
+            ? <button type='button' className='pl-cta' autoFocus onClick={() => { onClose(); navigate(entry.link!.url); }}>{entry.link.label}<ArrowRight size={15} /></button>
+            : <a className='pl-cta' href={entry.link.url} target='_blank' rel='noopener noreferrer' onClick={onClose}>{entry.link.label}<ExternalLink size={15} /></a>)}
+        </>}
       </footer>
     </>}
   </dialog>;

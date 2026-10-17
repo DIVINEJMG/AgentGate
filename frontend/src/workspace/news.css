@@ -35,14 +35,36 @@
 .nw-link:hover { border-color: var(--ws-accent); background: var(--ws-accent-soft); }
 :is(.nw-cta, .nw-link, .nw-dismiss):focus-visible { outline: 2px solid var(--ws-focus); outline-offset: 2px; }
 
-.nw-major { width: min(560px, calc(100vw - 32px)); }
-.nw-major-art { position: relative; display: grid; place-items: center; height: 120px; overflow: hidden; border-bottom: 1px solid var(--ws-line);
+.nw-major { width: min(600px, calc(100vw - 32px)); padding: 0; overflow: hidden; }
+.nw-major-close { position: absolute; top: 12px; right: 12px; z-index: 1; background: color-mix(in srgb, var(--ws-surface) 80%, transparent); backdrop-filter: blur(6px); }
+.nw-cover { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 9; overflow: hidden; border-bottom: 1px solid var(--ws-line);
   background:
-    radial-gradient(60% 120% at 50% 100%, color-mix(in srgb, var(--ws-accent) 35%, transparent) 0%, transparent 70%),
-    linear-gradient(var(--ws-line) 1px, transparent 1px) 0 0 / 22px 22px,
-    linear-gradient(90deg, var(--ws-line) 1px, transparent 1px) 0 0 / 22px 22px,
+    radial-gradient(70% 90% at 80% 110%, color-mix(in srgb, var(--ws-accent) 38%, transparent) 0%, transparent 70%),
+    radial-gradient(50% 60% at 10% -10%, color-mix(in srgb, var(--ws-accent) 18%, transparent) 0%, transparent 70%),
+    linear-gradient(var(--ws-line) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(90deg, var(--ws-line) 1px, transparent 1px) 0 0 / 28px 28px,
     var(--ws-s2); }
-.nw-major-art span { display: inline-grid; place-items: center; width: 56px; height: 56px; border: 1px solid color-mix(in srgb, var(--ws-accent) 50%, var(--ws-line)); border-radius: 16px; background: var(--ws-surface); color: var(--ws-accent-text); box-shadow: 0 0 40px color-mix(in srgb, var(--ws-accent) 35%, transparent); }
-.nw-major .up-modal-body p { white-space: pre-line; }
+.nw-cover-mark { position: absolute; top: 16px; left: 18px; width: 34px; height: 34px; padding: 6px; border: 1px solid var(--ws-line); border-radius: 10px; background: var(--ws-surface); }
+.nw-cover-word { font-size: clamp(44px, 11vw, 76px); font-weight: 700; letter-spacing: -0.04em; line-height: 1; color: var(--ws-text);
+  background: linear-gradient(180deg, var(--ws-text) 30%, color-mix(in srgb, var(--ws-text) 35%, transparent)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.nw-cover-icon { position: absolute; right: 20px; bottom: 18px; display: inline-grid; place-items: center; width: 44px; height: 44px; border: 1px solid color-mix(in srgb, var(--ws-accent) 50%, var(--ws-line)); border-radius: 12px; background: var(--ws-surface); color: var(--ws-accent-text); box-shadow: 0 0 36px color-mix(in srgb, var(--ws-accent) 35%, transparent); }
+.nw-cover-media { background: var(--ws-s2); }
+.nw-cover-media :is(img, video) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.nw-media-dark { display: none; }
+:root[data-ws-theme='dark'] .nw-media-dark { display: block; }
+:root[data-ws-theme='dark'] .nw-media-light { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-ws-theme='light']) .nw-media-dark { display: block; }
+  :root:not([data-ws-theme='light']) .nw-media-light { display: none; }
+}
+.nw-major-text { padding: 20px 24px 4px; }
+.nw-major-text h2 { margin: 6px 0 8px; font-size: 20px; letter-spacing: -0.01em; }
+.nw-major-body { margin: 0; color: var(--ws-text-2); white-space: pre-line; }
+.nw-major-foot { align-items: center; padding: 16px 24px 20px; }
+.nw-dots { display: flex; gap: 6px; margin-right: auto; }
+.nw-dots button { width: 7px; height: 7px; padding: 0; border: 0; border-radius: 999px; background: var(--ws-line-strong); cursor: pointer; transition: width .2s ease, background .2s ease; }
+.nw-dots button[aria-current='true'] { width: 20px; background: var(--ws-accent); }
+.nw-dots button:focus-visible { outline: 2px solid var(--ws-focus); outline-offset: 2px; }
+.nw-thumb { aspect-ratio: 16 / 9; }
 .nw-major .up-modal-foot a.pl-cta { text-decoration: none; }
-@media (prefers-reduced-motion: reduce) { .nw-item article { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .nw-item article, .nw-dots button { transition: none; } }
