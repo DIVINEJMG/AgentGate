@@ -498,3 +498,132 @@ podman logs --since 5m audoryn-api 2>&1 | grep -E "Traceback|ERROR|startup compl
   - Console: `podman tag "localhost/audoryn-console-api:rollback-$(cut -c1-7 "$HOME/console-rollback.sha")" localhost/audoryn-console-api:latest`, then Console block F.
   - AgentGate: `podman tag "localhost/audoryn-api:rollback-$(cut -c1-7 "$HOME/agentgate-rollback.sha")" localhost/audoryn-api:latest`, then AgentGate block F.
   - The old code ignores the new `media` column.
+
+---
+
+# Usage reset deploy (17 October 2026)
+
+Run this after both `feat/usage-reset` PRs are merged into `main`. AgentGate goes first, so the
+Console's reset call finds its route. There are no settings to add (no block D). AgentGate
+migration `0023_usage_resets` is already applied from the laptop, so nothing is migrated on Oracle.
+
+This branch also carries the `audoryn/` worker branch names and the compact plan banner.
+
+## 10. AgentGate VM (`130.61.104.247`)
+
+**A. Read-only inspection**
+
+```bash
+cd /opt/audoryn/AgentGate && git branch --show-current && git status --short && git fetch origin main && printf 'Current: %s\nRemote:  %s\n' "$(git rev-parse HEAD)" "$(git rev-parse origin/main)"
+systemctl --user is-active audoryn-api.service
+df -h / /var/tmp
+```
+
+- **Expected:** branch `main`, a clean tree, `Remote` = the merge SHA, 4 GB or more free.
+
+**B. Fast-forward**
+
+```bash
+cd /opt/audoryn/AgentGate && if [ "$(git branch --show-current)" != main ] || [ -n "$(git status --porcelain)" ]; then echo 'STOP: wrong branch or dirty working tree'; else OLD="$(git rev-parse HEAD)" && echo "$OLD" > "$HOME/agentgate-rollback.sha" && git pull --ff-only origin main && printf 'Before: %s\nAfter:  %s\n' "$OLD" "$(git rev-parse HEAD)" && git -c core.pager=cat diff --name-only "$OLD" HEAD -- backend/Containerfile backend/pyproject.toml backend/migrations; fi
+```
+
+- **Expected:** `After` = the merge SHA. The only file listed is
+  `backend/migrations/versions/0023_usage_resets.py`.
+
+**C. Tag the rollback image, then rebuild**
+
+```bash
+cd /opt/audoryn/AgentGate && podman tag localhost/audoryn-api:latest "localhost/audoryn-api:rollback-$(cut -c1-7 "$HOME/agentgate-rollback.sha")" && podman build -f backend/Containerfile -t localhost/audoryn-api:latest . && podman image inspect localhost/audoryn-api:latest --format '{{.Id}} {{.Created}}'
+```
+
+**E. Read-only checks with the new image**
+
+```bash
+podman run --rm -i --env-file /etc/audoryn/audoryn.env localhost/audoryn-api:latest alembic current
+podman run --rm -i --env-file /etc/audoryn/audoryn.env localhost/audoryn-api:latest python - <<'PY'
+from app.api.internal import console_entitlements
+from app.execution.providers.native.github.safety import task_branch_prefix
+print("reset route:", any(getattr(r, "path", "").endswith("/usage-resets") for r in console_entitlements.router.routes))
+print("branch prefix:", task_branch_prefix("12345678-0000"))
+PY
+```
+
+- **Expected:** `0023_usage_resets (head)`, `reset route: True`, `branch prefix: audoryn/12345678/`.
+  If `alembic current` shows `0022`, stop and send me the output: do not restart.
+
+**F. Restart and verify**
+
+```bash
+systemctl --user restart audoryn-api.service
+sleep 20
+systemctl --user is-active audoryn-api.service
+curl -sS --max-time 20 http://127.0.0.1:8000/health/ready; echo
+curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
+[ "$(podman image inspect localhost/audoryn-api:latest --format '{{.Id}}')" = "$(podman inspect --type container audoryn-api --format '{{.Image}}')" ] && echo 'PASS: running the new image' || echo 'FAIL: different image running'
+podman logs --since 5m audoryn-api 2>&1 | grep -E "Traceback|ERROR|startup complete"
+```
+
+## 11. Console VM (`130.61.172.186`)
+
+**A. Read-only inspection**
+
+```bash
+cd /opt/audoryn-console/Audoryn-Console && git branch --show-current && git status --short && git fetch origin main && printf 'Current: %s\nRemote:  %s\n' "$(git rev-parse HEAD)" "$(git rev-parse origin/main)"
+systemctl --user is-active audoryn-console-api.service
+df -h / /var/tmp
+curl -sS -o /dev/null -w 'agentgate over https: %{http_code}\n' --max-time 15 https://130.61.104.247/health/ready
+```
+
+- **Expected:** branch `main`, a clean tree, `Remote` = the merge SHA, `agentgate over https: 200`.
+
+**B. Fast-forward**
+
+```bash
+cd /opt/audoryn-console/Audoryn-Console && if [ "$(git branch --show-current)" != main ] || [ -n "$(git status --porcelain)" ]; then echo 'STOP: wrong branch or dirty working tree'; else OLD="$(git rev-parse HEAD)" && echo "$OLD" > "$HOME/console-rollback.sha" && git pull --ff-only origin main && printf 'Before: %s\nAfter:  %s\n' "$OLD" "$(git rev-parse HEAD)" && git -c core.pager=cat diff --name-only "$OLD" HEAD -- backend/Containerfile backend/pyproject.toml backend/migrations; fi
+```
+
+- **Expected:** `After` = the merge SHA, and no files listed (the Console has no migration this
+  time).
+
+**C. Tag the rollback image, then rebuild**
+
+```bash
+cd /opt/audoryn-console/Audoryn-Console && podman tag localhost/audoryn-console-api:latest "localhost/audoryn-console-api:rollback-$(cut -c1-7 "$HOME/console-rollback.sha")" && podman build -f backend/Containerfile -t localhost/audoryn-console-api:latest . && podman image inspect localhost/audoryn-console-api:latest --format '{{.Id}} {{.Created}}'
+```
+
+**E. Read-only checks with the new image**
+
+```bash
+podman run --rm -i --env-file /etc/audoryn-console/audoryn-console.env localhost/audoryn-console-api:latest alembic current
+podman run --rm -i --env-file /etc/audoryn-console/audoryn-console.env localhost/audoryn-console-api:latest python - <<'PY'
+from app.api.v1 import commercial
+from app.bootstrap.entitlement_delivery import agentgate_entitlements
+print("reset route:", any(getattr(r, "path", "").endswith("/usage-resets") for r in commercial.router.routes))
+print("entitlements channel set up:", agentgate_entitlements() is not None)
+PY
+```
+
+- **Expected:** `0012_announcement_media (head)`, `reset route: True`,
+  `entitlements channel set up: True`.
+
+**F. Restart and verify**
+
+```bash
+systemctl --user restart audoryn-console-api.service
+sleep 20
+systemctl --user is-active audoryn-console-api.service
+curl -sS --max-time 20 http://127.0.0.1:8001/health/ready; echo
+[ "$(podman image inspect localhost/audoryn-console-api:latest --format '{{.Id}}')" = "$(podman inspect --type container audoryn-console-api --format '{{.Image}}')" ] && echo 'PASS: running the new image' || echo 'FAIL: different image running'
+podman logs --since 5m audoryn-console-api 2>&1 | grep -E "Traceback|ERROR|startup complete"
+```
+
+## 12. Vercel, check, then rollback
+
+- **Vercel:** deploy `audoryn` at the AgentGate merge SHA, then `audoryn-console` at the Console
+  merge SHA. There are no new variables.
+- **Check:** in the Console, go to Commercial → Subscriptions → **Give a usage reset**. Bank one
+  for a test workspace; that workspace's Settings → Usage & billing then shows **Use a reset**.
+- **Rollback (only with your confirmation):**
+  - AgentGate: `podman tag "localhost/audoryn-api:rollback-$(cut -c1-7 "$HOME/agentgate-rollback.sha")" localhost/audoryn-api:latest`, then AgentGate block F.
+  - Console: `podman tag "localhost/audoryn-console-api:rollback-$(cut -c1-7 "$HOME/console-rollback.sha")" localhost/audoryn-console-api:latest`, then Console block F.
+  - The old code ignores the `usage_resets` table.
