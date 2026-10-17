@@ -298,7 +298,7 @@ export const previewChangelog = [
 
 const commercialFixture = {
   organization: { id: org, name: 'Sample workspace' },
-  billing: { plan: { code: 'free', name: 'Free', version: 0, status: 'active', allowsNewWork: true, enforced: true, periodStart: time, periodEnd: new Date(Date.parse(time) + 30 * 86_400_000).toISOString(), validUntil: null,
+  billing: { plan: { code: 'free', name: 'Free', version: 0, status: 'active', allowsNewWork: true, enforced: true, periodStart: time, periodEnd: new Date(Date.parse(time) + 30 * 86_400_000).toISOString(), validUntil: null, resets: { available: 1, nextExpiresAt: new Date(Date.parse(time) + 14 * 86_400_000).toISOString() },
     limits: [
       { key: 'workers.max', name: 'workers', used: 2, limit: 2, period: false, state: 'reached' },
       { key: 'jobs.per_worker.max', name: 'standing jobs per worker', used: 1, limit: 3, period: false, state: 'ok' },

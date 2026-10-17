@@ -19,9 +19,9 @@
 .ws-crumb-sep { flex-shrink: 0; color: var(--ws-line-strong); }
 /* Pages begin below the bar, so they need less top padding. */
 .ws-app .ws-topbar ~ .ws-page { padding-top: 16px; }
-/* The conversation scene keeps its full height under the bar. */
-.ws-main:has(> .cf-scene) { display: grid; grid-template-rows: auto minmax(0, 1fr); }
-.ws-main:has(> .cf-scene) > .cf-scene { height: 100%; }
+/* The conversation scene keeps its full height under the bar (and a plan banner, when one shows). */
+.ws-main:has(> .cf-scene) { display: flex; flex-direction: column; }
+.ws-main:has(> .cf-scene) > .cf-scene { flex: 1; min-height: 0; }
 .ws-mobile-bar .ws-history { margin-left: -2px; }
 .ws-mobile-bar .ws-history .ws-icon-button { width: 32px; height: 32px; }
 @media (max-width: 860px) {

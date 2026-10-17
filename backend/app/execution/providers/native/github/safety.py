@@ -115,7 +115,13 @@ def validate_changes(changes: list[dict], constraints: dict | None = None):
 
 
 def task_branch_prefix(work_item_id: object) -> str:
-    """Every branch a task creates starts with this, unless its constraints grant another."""
+    """Every branch a task creates starts with this, unless its constraints grant another. Fixed
+    here, not a Console setting, so running work never depends on the Console."""
+    return f"audoryn/{str(work_item_id)[:8]}/"
+
+
+def _legacy_branch_prefix(work_item_id: object) -> str:
+    """Branches made before the rename (17 October 2026) stay writable by their own task."""
     return f"codex/{str(work_item_id)[:8]}/"
 
 
@@ -140,7 +146,8 @@ def validate_task_branch(
     exact = constraints.get("branches", [])
     prefix = task_branch_prefix(work_item_id)
     granted_pr = pull_request is not None and pull_request in constraints.get("pullRequests", [])
-    if branch not in exact and not branch.startswith(prefix) and not granted_pr:
+    own = branch.startswith((prefix, _legacy_branch_prefix(work_item_id)))
+    if branch not in exact and not own and not granted_pr:
         raise ValueError(
             f"Use this task's branch prefix {prefix}, or a branch or pull request the person named "
             "(granted in task preparation)."

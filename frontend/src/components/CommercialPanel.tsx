@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, RefreshCw } from 'lucide-react';
 import { SettingsHeader } from '../workspace/pages/LegacyPage';
-import { Notice, Section, SkeletonLines, State, sentence } from '../workspace/ui';
+import { Confirm, Notice, Section, SkeletonLines, State, sentence } from '../workspace/ui';
 import type { OrganizationAccess } from '../lib/identityApi';
 import type { ApiVersion } from '../lib/systemApi';
 import { loadCommercial, type CommercialSnapshot, type PlanLimit } from '../lib/commercialApi';
+import { redeemUsageReset } from '../lib/billingApi';
 import { navigate } from '../workspace/routes';
 import { capitalise, formatAmount, formatDate, shortName } from '../lib/planFormat';
 
@@ -12,6 +13,8 @@ export default function CommercialPanel({ organization, apiVersion }: { organiza
   const [data, setData] = useState<CommercialSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resetting, setResetting] = useState<'ask' | 'busy' | null>(null);
+  const [resetDone, setResetDone] = useState(false);
   async function refresh() {
     setLoading(true);
     setError(null);
@@ -23,6 +26,14 @@ export default function CommercialPanel({ organization, apiVersion }: { organiza
   const plan = data?.billing.plan ?? null;
   const reached = plan?.limits.filter(item => item.state === 'reached') ?? [];
   const near = plan?.limits.filter(item => item.state === 'near') ?? [];
+  const resets = plan?.resets?.available ?? 0;
+  const canReset = organization.permissions.includes('organizations.manage');
+  async function useReset() {
+    setResetting('busy'); setError(null);
+    try { await redeemUsageReset(apiVersion, organization.id); setResetDone(true); await refresh(); }
+    catch (caught) { setError(messageFor(caught)); }
+    finally { setResetting(null); }
+  }
   return <div className='ws-page'>
     <SettingsHeader active='billing' actions={<button type='button' className='ws-button' onClick={() => void refresh()} disabled={loading}><RefreshCw size={15} className={loading ? 'cf-spin' : ''} />Refresh</button>} />
     {error && <Notice tone='danger' action={<button type='button' className='ws-button ws-button-sm' onClick={() => void refresh()}>Try again</button>}>{error}</Notice>}
@@ -32,6 +43,12 @@ export default function CommercialPanel({ organization, apiVersion }: { organiza
       {!plan.allowsNewWork && <Notice tone='danger'>This workspace's plan is {plan.status === 'active' || plan.status === 'trialing' || plan.status === 'past_due' ? 'over' : humanize(plan.status)}, so new work can't start. Running tasks finish and your results stay available. Ask your administrator to renew the plan.</Notice>}
       {plan.allowsNewWork && reached.length > 0 && <Notice tone='danger'>You've reached your plan's limit for {list(reached)}. New work that needs more waits{reached.every(item => item.period) && plan.periodEnd ? ` until ${formatDate(plan.periodEnd)}` : ''}; ask your administrator to upgrade the plan.</Notice>}
       {plan.allowsNewWork && near.length > 0 && <Notice tone='warn'>You've used over 80% of your plan's {list(near)}.</Notice>}
+      {resetDone && <Notice tone='ok'>This period's usage starts again from zero. Your plan and its renewal date are unchanged.</Notice>}
+      {resets > 0 && <Notice tone='info' action={canReset ? <button type='button' className='ws-button ws-button-sm' disabled={resetting === 'busy'} onClick={() => setResetting('ask')}>Use a reset</button> : undefined}>
+        You have {resets === 1 ? 'a usage reset' : `${resets} usage resets`}{plan.resets?.nextExpiresAt ? ` (${resets === 1 ? 'use it' : 'the next one expires'} by ${formatDate(plan.resets.nextExpiresAt)})` : ''}. Using one starts this period's usage again from zero; your plan stays the same.{canReset ? '' : ' Ask your administrator to use it.'}
+      </Notice>}
+      <Confirm open={resetting === 'ask'} title='Use a usage reset?' confirmLabel='Reset usage' onCancel={() => setResetting(null)} onConfirm={() => void useReset()}
+        body={<p>Tasks, AI tokens, coding time and web searches used this period go back to zero. Your plan, workers and renewal date don't change, and the reset can't be undone.</p>} />
       <section className='ws-plan'>
         <div className='ws-plan-main'>
           <div className='ws-muted ws-small'>Your plan</div>

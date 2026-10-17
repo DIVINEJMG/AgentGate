@@ -39,6 +39,8 @@ export async function manageBilling(v: ApiVersion, o: string) { return unwrap<{ 
 
 export async function loadPrompts(v: ApiVersion, o: string) { return unwrap<PlanPrompts>(v, (await api.get(`/api/${v}/organizations/${o}/plan/prompts`)).data); }
 export async function dismissPrompt(v: ApiVersion, o: string, key: string) { await api.post(`/api/${v}/organizations/${o}/plan/prompts/dismiss`, { key }); }
+/** Uses one of the workspace's banked usage resets: this period's usage starts again from zero. */
+export async function redeemUsageReset(v: ApiVersion, o: string) { return unwrap<{ used: boolean; resets: { available: number; nextExpiresAt: string | null } }>(v, (await api.post(`/api/${v}/organizations/${o}/plan/usage-resets/use`)).data); }
 export async function requestUpgrade(v: ApiVersion, o: string, key: string) { return unwrap<{ sent: boolean; requestedAt: string }>(v, (await api.post(`/api/${v}/organizations/${o}/plan/upgrade-requests`, { key })).data); }
 
 /** Leave for a provider's page only when its address is one the catalogue named (or Paystack/Paddle's own). */

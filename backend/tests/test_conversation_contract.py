@@ -18,7 +18,11 @@ from app.application.services.conversation_semantics import reply_facts, validat
 from app.application.services.conversations import ConversationService
 from app.domain.ai.providers import AIProviderError
 from app.domain.conversation.intent import WorkerCommandIntent
-from app.execution.providers.native.github.safety import grounded_constraints, validate_task_branch
+from app.execution.providers.native.github.safety import (
+    grounded_constraints,
+    task_branch_prefix,
+    validate_task_branch,
+)
 from app.observability.frames import app_frames
 
 
@@ -113,6 +117,17 @@ def test_only_branches_and_pull_requests_the_person_named_are_granted() -> None:
         validate_task_branch("codex/55ea0379/readme-setup", "main", item, {"pullRequests": [8]}, pull_request=9)
     with pytest.raises(ValueError, match="default/protected"):
         validate_task_branch("main", "main", item, {"pullRequests": [8]}, pull_request=8)
+
+
+def test_a_task_writes_to_its_audoryn_branches_and_keeps_its_older_codex_ones() -> None:
+    item = uuid4()
+    own = str(item)[:8]
+    assert task_branch_prefix(item) == f"audoryn/{own}/"
+    validate_task_branch(f"audoryn/{own}/fix", "main", item)
+    validate_task_branch(f"codex/{own}/fix", "main", item)  # made before the rename
+    for other in ("audoryn/00000000/fix", "codex/00000000/fix", "feature/fix"):
+        with pytest.raises(ValueError, match="branch prefix"):
+            validate_task_branch(other, "main", item)
 
 
 def test_the_context_is_references_not_pasted_bodies() -> None:  # F4

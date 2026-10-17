@@ -262,6 +262,26 @@ see `docs/plans/commercial-payments-plan.md`.
 Manual usage reset, top-up, temporary extension: scoped, audited commands under Decision 0001's
 command rules.
 
+**Usage reset (owner's request, 17 October 2026; built on `feat/usage-reset`, see the handoff):** a separate, one-off reset given
+from the Console, like a provider granting an extra reset. It sets the workspace's usage for the
+current period back to zero. It does not change the plan, the period or its dates, and the normal
+reset at the end of the period still happens.
+- **Console:** a "Reset usage" action on the workspace's plan screen, with a required reason and
+  a confirmation. It is audited as `commercial.usage.reset` and needs the permission that manages
+  plans.
+- **Channel:** a signed `POST` on the existing entitlements channel under its `entitlements.write`
+  scope, carrying the organization, the period start it applies to and a request key so a retry
+  never resets twice. There is no new key, scope or setting.
+- **AgentGate:** zeroes that period's counters in `organization_usage` (tasks, AI tokens, browser
+  and coding time, web research) only if the period is still the current one. It records the
+  values before the reset in its audit log (`commercial.usage.reset`) and clears the entitlement
+  cache, so the 80% banner and any block clear at once. Workers and other standing counts are not
+  usage, so they are untouched.
+- **Owner's additions:** the Console chooses who (every workspace with a plan, chosen workspaces,
+  or workspaces on chosen plans) and when: **now**, or **banked** for the workspace's managers to
+  use when they choose, with an optional expiry. A banked reset needs AgentGate migration `0023`
+  (`usage_resets`), which also keeps each reset's cleared usage.
+
 ## 5. Where AgentGate checks
 
 | Entitlement | Checked at | Points |
