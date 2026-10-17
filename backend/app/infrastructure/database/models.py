@@ -765,6 +765,11 @@ class UsageReset(Base):
     """A usage reset given from the Console: `now` is applied when it arrives, `banked` waits for
     the workspace to use it. `cleared` keeps the usage it set back to zero."""
     __tablename__ = "usage_resets"
+    __table_args__ = (
+        CheckConstraint("mode IN ('now','banked')", name="usage_reset_mode"),
+        UniqueConstraint("grant_id", "organization_id", name="uq_usage_reset_grant_organization"),
+        Index("ix_usage_resets_available", "organization_id", "used_at"),
+    )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     grant_id: Mapped[UUID] = mapped_column(nullable=False)
     organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
