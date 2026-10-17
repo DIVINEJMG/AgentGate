@@ -20,8 +20,9 @@ CACHE_SECONDS = 60.0
 PREFIX = "news:"
 KEY = re.compile(r"^news:(changelog|announcement):[A-Za-z0-9-]{1,64}$")
 _SEVERITIES = frozenset({"info", "success", "warning", "critical"})
-# Published media sits under the CMS's immutable public keys: /cms-public/assets/<sha256>/<asset id>.
-_MEDIA_PATH = re.compile(r"^/cms-public/assets/[a-f0-9]{64}/[0-9a-f-]{36}$")
+# Published media sits under the CMS's immutable public keys, after the storage origin's own path
+# (such as a bucket): .../cms-public/assets/<sha256>/<asset id>.
+_MEDIA_PATH = re.compile(r"^(/(?!\.\.?/)[A-Za-z0-9._-]+)*/cms-public/assets/[a-f0-9]{64}/[0-9a-f-]{36}$")
 _cache: tuple[float, list[dict[str, Any]]] | None = None
 
 

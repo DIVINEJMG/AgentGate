@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CreditCard, ExternalLink, Minus, ShieldCheck, Sparkles } from 'lucide-react';
-import { Notice, SkeletonLines } from '../ui';
+import { Notice, PageHeader, SkeletonLines } from '../ui';
 import { routeBase } from '../routes';
 import type { OrganizationAccess } from '../../lib/identityApi';
 import type { ApiVersion } from '../../lib/systemApi';
@@ -94,13 +94,8 @@ export default function PlansPage({ organization, apiVersion }: { organization: 
   const featured = plans.find((plan) => plan.badge)?.code ?? null;
 
   return <div className='ws-page pl-page'>
-    <header className='pl-hero'>
-      <div className='pl-hero-copy'>
-        <span className='pl-eyebrow'><Sparkles size={13} aria-hidden='true' />Plans</span>
-        <h1>Capacity for your AI workforce</h1>
-        <p>Every plan runs the same models with the same governance and approvals. Choose the capacity your team needs; change it any time.</p>
-      </div>
-      {catalog && plans.length > 1 && <div className='pl-controls'>
+    <PageHeader title='Plans' description='Every plan runs the same models, governance and approvals. Change your plan any time.'
+      actions={catalog && plans.length > 1 && <div className='pl-controls'>
         <div className='pl-cycle' role='radiogroup' aria-label='Billing period'>
           {(['monthly', 'annual'] as const).map((value) => <button key={value} type='button' role='radio' aria-checked={cycle === value} onClick={() => setCycle(value)}>
             {value === 'monthly' ? 'Monthly' : 'Annual'}{value === 'annual' && saving > 0 && <span className='pl-save'>Save {saving}%</span>}
@@ -109,8 +104,7 @@ export default function PlansPage({ organization, apiVersion }: { organization: 
         {currencies.length > 1 && <label className='pl-currency'><span className='sr-only'>Currency</span>
           <select value={currency} onChange={(event) => setCurrency(event.target.value)}>{currencies.map((code) => <option key={code} value={code}>{code}</option>)}</select>
         </label>}
-      </div>}
-    </header>
+      </div>} />
 
     {message && <Notice tone={message.tone}>{message.text}</Notice>}
     {current?.cancelAtPeriodEnd && current.periodEnd && <Notice tone='warn'>Your {current.planName} plan ends on {formatDate(current.periodEnd)}. The workspace then returns to the free plan.</Notice>}

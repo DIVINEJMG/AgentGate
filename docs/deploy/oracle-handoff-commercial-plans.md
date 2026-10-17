@@ -280,7 +280,8 @@ What changed:
   (`cms-public/assets/<sha256>/<id>`), checks each one is reachable, and stores the addresses.
   Sending no image clears the media. The CMS and its releases are unchanged.
 - **Console content feed:** each announcement now carries `media`.
-- **AgentGate:** `news._media` keeps media only from one HTTPS origin and the published asset keys.
+- **AgentGate:** `news._media` keeps media only from one HTTPS origin and the published asset keys
+  (a storage path in front of them, such as the bucket, is allowed).
   The window now has 16:9 media on top, with the app's own cover when there is no media. Several
   major announcements share one window, with pages, dots, Back and Next.
 
@@ -291,3 +292,6 @@ Not changed:
 
 Deploy: migrate `0012`, then the Console (Oracle blocks A–F, then Vercel `audoryn-console`), then
 AgentGate (Oracle blocks A–F, then Vercel `audoryn`).
+- **Later the same day (UI only):** the media fields moved into the announcement form itself
+  (New and Edit), and one Save publishes them. The Plans page's large banner was replaced by the
+  standard page header, with the Monthly/Annual and currency controls on its right.

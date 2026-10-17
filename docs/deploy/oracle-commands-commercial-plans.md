@@ -373,3 +373,128 @@ replaced by `VALUES = {"ENTITLEMENTS_ENFORCEMENT": "true"}` (nothing to paste), 
 - **Image:** `podman tag localhost/audoryn-api:rollback-fdf4402 localhost/audoryn-api:latest` (Console:
   its `rollback-<sha>` tag), then block F. The old code runs with the new tables.
 - **Enforcement only:** remove the `ENTITLEMENTS_ENFORCEMENT` line (restore block H's backup), then block F.
+
+---
+
+# Announcement media deploy (17 October 2026)
+
+Run this after both `feat/announcement-media` PRs are merged into `main`. There are no settings to add
+(no block D). Console migration `0012` is already applied from the laptop. Console goes first, then
+AgentGate.
+
+## 7. Console VM (`130.61.172.186`)
+
+**A. Read-only inspection**
+
+```bash
+cd /opt/audoryn-console/Audoryn-Console && git branch --show-current && git status --short && git fetch origin main && printf 'Current: %s\nRemote:  %s\n' "$(git rev-parse HEAD)" "$(git rev-parse origin/main)"
+systemctl --user is-active audoryn-console-api.service
+df -h / /var/tmp
+for k in CMS_PUBLIC_ORIGIN CMS_PUBLIC_STORAGE_BUCKET; do printf '%s: %s line(s)\n' "$k" "$(sudo grep -cE "^\s*$k=" /etc/audoryn-console/audoryn-console.env)"; done
+```
+
+- **Expected:** branch `main`, a clean tree, `Remote` = the merge SHA, 4 GB or more free. Each
+  `CMS_PUBLIC_*` key shows `1 line(s)`. If either shows `0`, the deploy is still safe, but
+  "Publish media" will answer "Public storage for media is not set up": send me the output.
+
+**B. Fast-forward**
+
+```bash
+cd /opt/audoryn-console/Audoryn-Console && if [ "$(git branch --show-current)" != main ] || [ -n "$(git status --porcelain)" ]; then echo 'STOP: wrong branch or dirty working tree'; else OLD="$(git rev-parse HEAD)" && echo "$OLD" > "$HOME/console-rollback.sha" && git pull --ff-only origin main && printf 'Before: %s\nAfter:  %s\n' "$OLD" "$(git rev-parse HEAD)" && git -c core.pager=cat diff --name-only "$OLD" HEAD -- backend/Containerfile backend/pyproject.toml backend/migrations; fi
+```
+
+- **Expected:** `After` = the merge SHA. The only file listed is
+  `backend/migrations/versions/0012_announcement_media.py`.
+
+**C. Tag the rollback image, then rebuild**
+
+```bash
+cd /opt/audoryn-console/Audoryn-Console && podman tag localhost/audoryn-console-api:latest "localhost/audoryn-console-api:rollback-$(cut -c1-7 "$HOME/console-rollback.sha")" && podman build -f backend/Containerfile -t localhost/audoryn-console-api:latest . && podman image inspect localhost/audoryn-console-api:latest --format '{{.Id}} {{.Created}}'
+```
+
+**E. Read-only checks with the new image**
+
+```bash
+podman run --rm -i --env-file /etc/audoryn-console/audoryn-console.env localhost/audoryn-console-api:latest alembic current
+podman run --rm -i --env-file /etc/audoryn-console/audoryn-console.env localhost/audoryn-console-api:latest python - <<'PY'
+from app.bootstrap.settings import get_settings
+from app.api.v1 import platform_admin
+settings = get_settings()
+print("environment:", settings.environment)
+print("public media origin:", settings.cms_public_origin or "NOT SET", "| bucket set:", bool(settings.cms_public_storage_bucket))
+print("media route:", any(getattr(r, "path", "").endswith("/announcements/{announcement_id}/media") for r in platform_admin.router.routes))
+PY
+```
+
+- **Expected:** `0012_announcement_media (head)` and `media route: True`. The public media origin
+  is an `https://` address.
+
+**F. Restart and verify**
+
+```bash
+systemctl --user restart audoryn-console-api.service
+sleep 20
+systemctl --user is-active audoryn-console-api.service
+curl -sS --max-time 20 http://127.0.0.1:8001/health/ready; echo
+[ "$(podman image inspect localhost/audoryn-console-api:latest --format '{{.Id}}')" = "$(podman inspect --type container audoryn-console-api --format '{{.Image}}')" ] && echo 'PASS: running the new image' || echo 'FAIL: different image running'
+podman logs --since 5m audoryn-console-api 2>&1 | grep -E "Traceback|ERROR|startup complete"
+```
+
+## 8. AgentGate VM (`130.61.104.247`)
+
+**A. Read-only inspection**
+
+```bash
+cd /opt/audoryn/AgentGate && git branch --show-current && git status --short && git fetch origin main && printf 'Current: %s\nRemote:  %s\n' "$(git rev-parse HEAD)" "$(git rev-parse origin/main)"
+systemctl --user is-active audoryn-api.service
+df -h / /var/tmp
+```
+
+- **Expected:** branch `main`, a clean tree, `Remote` = the merge SHA, 4 GB or more free.
+
+**B. Fast-forward**
+
+```bash
+cd /opt/audoryn/AgentGate && if [ "$(git branch --show-current)" != main ] || [ -n "$(git status --porcelain)" ]; then echo 'STOP: wrong branch or dirty working tree'; else OLD="$(git rev-parse HEAD)" && echo "$OLD" > "$HOME/agentgate-rollback.sha" && git pull --ff-only origin main && printf 'Before: %s\nAfter:  %s\n' "$OLD" "$(git rev-parse HEAD)" && git -c core.pager=cat diff --name-only "$OLD" HEAD -- backend/Containerfile backend/pyproject.toml backend/migrations; fi
+```
+
+- **Expected:** `After` = the merge SHA, and no files listed (AgentGate has no migration this time).
+
+**C. Tag the rollback image, then rebuild**
+
+```bash
+cd /opt/audoryn/AgentGate && podman tag localhost/audoryn-api:latest "localhost/audoryn-api:rollback-$(cut -c1-7 "$HOME/agentgate-rollback.sha")" && podman build -f backend/Containerfile -t localhost/audoryn-api:latest . && podman image inspect localhost/audoryn-api:latest --format '{{.Id}} {{.Created}}'
+```
+
+**E. Read-only checks with the new image**
+
+```bash
+podman run --rm -i --env-file /etc/audoryn/audoryn.env localhost/audoryn-api:latest alembic current
+podman run --rm -i --env-file /etc/audoryn/audoryn.env localhost/audoryn-api:latest python - <<'PY'
+from app.application.services import news
+print("media check present:", hasattr(news, "_media"))
+PY
+```
+
+- **Expected:** `0022_user_content_state (head)` and `media check present: True`.
+
+**F. Restart and verify**
+
+```bash
+systemctl --user restart audoryn-api.service
+sleep 20
+systemctl --user is-active audoryn-api.service
+curl -sS --max-time 20 http://127.0.0.1:8000/health/ready; echo
+curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
+[ "$(podman image inspect localhost/audoryn-api:latest --format '{{.Id}}')" = "$(podman inspect --type container audoryn-api --format '{{.Image}}')" ] && echo 'PASS: running the new image' || echo 'FAIL: different image running'
+podman logs --since 5m audoryn-api 2>&1 | grep -E "Traceback|ERROR|startup complete"
+```
+
+## 9. Vercel, then rollback
+
+- **Vercel:** deploy `audoryn-console` at the Console merge SHA, then `audoryn` at the AgentGate
+  merge SHA. There are no new variables.
+- **Rollback (only with your confirmation):**
+  - Console: `podman tag "localhost/audoryn-console-api:rollback-$(cut -c1-7 "$HOME/console-rollback.sha")" localhost/audoryn-console-api:latest`, then Console block F.
+  - AgentGate: `podman tag "localhost/audoryn-api:rollback-$(cut -c1-7 "$HOME/agentgate-rollback.sha")" localhost/audoryn-api:latest`, then AgentGate block F.
+  - The old code ignores the new `media` column.
