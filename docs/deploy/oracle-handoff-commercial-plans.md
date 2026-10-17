@@ -337,3 +337,20 @@ AgentGate (Oracle blocks A–F, then Vercel `audoryn`).
   (origin only; not a secret). The same origin is allowed for `media-src`, so announcement
   videos play in the editor preview. Without the variable, the policy is as before. Redeploy
   Vercel `audoryn-console` after setting it; no Oracle change is needed for this part.
+- **Storage setting changed (17 October 2026, from the laptop):** the private CMS bucket
+  `audoryn-console-cms-staging` upload (CORS) rule now allows `https://audoryn-console.vercel.app`
+  as well as `http://localhost:3000` (GET, PUT, HEAD; any header; `ETag` exposed). A browser
+  preflight from the Vercel Console now answers 200. If the Console moves to its own domain, add
+  that origin the same way.
+- **Console branch `feat/remove-unfinished-upload` (17 October 2026):** the asset library shows
+  **Remove unfinished upload** on assets still `uploading` (their file never reached storage).
+  Route `POST /api/v1/cms/assets/{id}/remove-unfinished` (`cms.assets.manage`), audited as
+  `cms.asset.removed_unfinished`. It refuses verified assets and any asset content refers to. No
+  migration and no settings. Deploy: Console Oracle blocks A, B, C, E, F (section 11; in B no files
+  listed), then Vercel `audoryn-console`.
+- **Same Console branch: upload guards.**
+  - The Console's video limit is now 150 MB, down from 250 MB. Storage refused a 235 MB single
+    upload but took 150 MB, so a too-large video is now refused with a clear message before
+    anything uploads.
+  - If a file still fails to reach storage, the asset library removes the unfinished record
+    itself and shows the storage status code, so no stuck "uploading" asset is left behind.
