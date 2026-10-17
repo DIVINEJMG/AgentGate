@@ -50,7 +50,7 @@ def _media(value: object) -> dict[str, Any] | None:
     origins = set()
     for field in ("image", "imageDark", "video"):
         url = value.get(field)
-        if url is None and field != "image":
+        if url is None:
             continue
         target = urlparse(url) if isinstance(url, str) and len(url) <= 500 else None
         if target is None or target.scheme != "https" or not target.hostname or target.query or target.fragment                 or target.username or not _MEDIA_PATH.fullmatch(target.path):
@@ -60,7 +60,8 @@ def _media(value: object) -> dict[str, Any] | None:
     for size in ("width", "height"):
         if isinstance(value.get(size), int) and 0 < value[size] <= 10_000:
             media[size] = value[size]
-    return media if len(origins) == 1 else None
+    # An image, a video or both, all from one origin.
+    return media if len(origins) == 1 and ("image" in media or "video" in media) else None
 
 
 def _clean(item: Any) -> dict[str, Any] | None:

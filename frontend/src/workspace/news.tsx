@@ -154,8 +154,9 @@ function Cover({ entry }: { entry: Entry }) {
   }
   const failed = () => setBroken(entry.key);
   return <div className='nw-cover nw-cover-media'>
-    {media.video && !reducedMotion()
-      ? <video key={media.video} src={media.video} poster={media.image} muted loop autoPlay playsInline aria-label={media.alt} onError={failed} />
+    {media.video && (!reducedMotion() || !media.image)
+      // Under reduced motion a video without a still frame shows its first frame, paused.
+      ? <video key={media.video} src={media.video} poster={media.image} muted loop autoPlay={!reducedMotion()} playsInline preload='metadata' aria-label={media.alt} onError={failed} />
       : <>
         <img className={media.imageDark ? 'nw-media-light' : undefined} src={media.image} alt={media.alt} onError={failed} />
         {media.imageDark && <img className='nw-media-dark' src={media.imageDark} alt={media.alt} onError={failed} />}
