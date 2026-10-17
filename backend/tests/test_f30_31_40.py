@@ -131,8 +131,9 @@ class HardeningRuntime:
         run_id: UUID | None,
         ttl_seconds: int = 1800,
         navigation_policy: BrowserDomainPolicy | None = None,
+        organization_sessions: int | None = None,
     ) -> BrowserSession:
-        del navigation_policy
+        del navigation_policy, organization_sessions
         now = datetime.now(UTC)
         session = BrowserSession(
             id=uuid4(),

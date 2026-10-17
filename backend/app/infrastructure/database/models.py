@@ -6,6 +6,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -691,6 +692,9 @@ class UsageRecord(UUIDPrimaryKeyMixin, Base):
     ai_models: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     # Characters sent to models per prompt section, e.g. {"planner.PLANNING RULES": 8293}.
     prompt_chars: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    # Time in browser actions and running coding sandboxes (commercial plan, phase 1).
+    browser_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0, server_default="0")
+    coding_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0, server_default="0")
     duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     __table_args__ = (
@@ -698,6 +702,63 @@ class UsageRecord(UUIDPrimaryKeyMixin, Base):
         Index("ix_usage_records_org_created", "organization_id", "created_at"),
     )
 
+
+
+class OrganizationEntitlement(Base):
+    """The plan the Console last sent for an organisation: its status, period and limits
+    (commercial plan, phase 2). Version 0 is the new-workspace template applied at sign-up."""
+    __tablename__ = "organization_entitlements"
+    organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True)
+    version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    plan_code: Mapped[str | None] = mapped_column(String(64))
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    entitlements: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+
+
+class EntitlementSnapshot(UUIDPrimaryKeyMixin, Base):
+    """Every plan document applied to an organisation, newest version last (audit)."""
+    __tablename__ = "entitlement_snapshots"
+    organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    document: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    __table_args__ = (UniqueConstraint("organization_id", "version", name="uq_entitlement_snapshot_version"),)
+
+
+class EntitlementTemplate(UUIDPrimaryKeyMixin, Base):
+    """The plan a new workspace starts on, as the Console sent it; the highest version applies."""
+    __tablename__ = "entitlement_templates"
+    version: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
+    document: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+
+
+class OrganizationUsage(Base):
+    """What an organisation used in one plan period, counted as it happens."""
+    __tablename__ = "organization_usage"
+    organization_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True)
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    tasks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ai_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    browser_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    coding_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    web_research: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+
+
+class UserContentState(Base):
+    """What one person has read or dismissed in the app. A workspace's own items (its upgrade
+    prompts) carry the workspace in their key; news entries are the same for every workspace."""
+    __tablename__ = "user_content_state"
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("human_identities.id", ondelete="CASCADE"), primary_key=True)
+    item_key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
 class QueueDeliveryFailure(TenantModel, Base):
     __tablename__ = "queue_delivery_failures"

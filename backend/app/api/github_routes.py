@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_dependencies import organization_principal
 from app.api.product_common import require_permission
+from app.application.services import entitlements
 from app.application.services.integration_credentials import decode_bundle, encode_bundle
 from app.application.services.integration_foundation import IntegrationFoundation
 from app.bootstrap.settings import settings
@@ -320,6 +321,8 @@ async def authorize(
     enabled()
     require_permission(principal, "integrations.manage")
     require_credential_vault()
+    if connection_id is None:
+        await entitlements.require_room(session, organization_id, "connections.max")
     if connection_id:
         from app.api.integration_foundation_routes import owned
 

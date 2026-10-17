@@ -10,12 +10,14 @@ from uuid import UUID
 
 import httpx
 
+from app.application.services import entitlements
 from app.bootstrap.settings import settings
 from app.domain.ai.providers import AIGateway, AIInvocationContext, AIProviderError
 from app.execution.browser.egress import evaluate_browser_egress
 from app.execution.browser.http_reader import fetch_http_page
 from app.execution.browser.policy import BrowserDomainPolicy, normalize_origin
 from app.infrastructure.redis.coordination import RedisCoordinator
+from app.observability.usage import count_plan_usage
 
 
 @dataclass(frozen=True)
@@ -161,6 +163,17 @@ def _challenge(text: str, title: str) -> bool:
 
 
 async def _reserve_search_budget(organization_id: UUID) -> bool:
+    try:
+        await entitlements.require_allowance(None, organization_id, "web_research.monthly")
+    except entitlements.EntitlementDenied:
+        return False
+    if not await _reserve_rate(organization_id):
+        return False
+    count_plan_usage(web_searches=1)  # saved into the plan period with the message's or step's usage
+    return True
+
+
+async def _reserve_rate(organization_id: UUID) -> bool:
     coordinator = RedisCoordinator.from_settings()
     try:
         hourly = await coordinator.reserve_limit(

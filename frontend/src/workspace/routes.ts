@@ -20,7 +20,8 @@ export type WorkspaceRoute =
   | { page: 'incidents' }
   | { page: 'audit' }
   | { page: 'connections'; view: ConnectionsView; id?: string }
-  | { page: 'settings'; section: 'workspace' | 'billing' | 'developer' };
+  | { page: 'settings'; section: 'workspace' | 'billing' | 'developer' }
+  | { page: 'plans' };
 
 /** home: connected accounts · directory/tool: catalog and one tool · account: one connection · identities · access: the access map */
 export type ConnectionsView = 'home' | 'directory' | 'tool' | 'account' | 'identities' | 'access';
@@ -65,6 +66,7 @@ export function parseRoute(pathname: string, search = ''): WorkspaceRoute {
       if (a === 'access' || a === 'capabilities') return { page: 'connections', view: 'access' };
       return { page: 'connections', view: 'account', id: decode(a) };
     case 'settings': return { page: 'settings', section: a === 'billing' || a === 'developer' ? a : 'workspace' };
+    case 'plans': return { page: 'plans' };
     default: return { page: 'home' };
   }
 }

@@ -14,8 +14,8 @@ import re
 import sys
 import time
 from collections import Counter
-from collections.abc import Iterator
-from contextlib import contextmanager
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
@@ -46,6 +46,12 @@ class Usage:
     ai_models: Counter[str] = field(default_factory=Counter)
     # Characters sent to models, per prompt section ("planner.RECORDED OBSERVATIONS").
     prompt_chars: Counter[str] = field(default_factory=Counter)
+    # Time spent in browser actions and in running coding sandboxes, the two metered tools.
+    browser_seconds: float = 0.0
+    coding_seconds: float = 0.0
+    # Counted against the organisation's plan: new tasks admitted, web searches made.
+    tasks: int = 0
+    web_searches: int = 0
     seconds: float = 0.0
     # Set by the measured code, for example the runtime phase and run.
     labels: dict[str, Any] = field(default_factory=dict)
@@ -63,6 +69,10 @@ class Usage:
         self.ai_tokens_out += other.ai_tokens_out
         self.ai_models.update(other.ai_models)
         self.prompt_chars.update(other.prompt_chars)
+        self.browser_seconds += other.browser_seconds
+        self.coding_seconds += other.coding_seconds
+        self.tasks += other.tasks
+        self.web_searches += other.web_searches
         self.seconds += other.seconds
 
     def as_dict(self) -> dict[str, Any]:
@@ -77,6 +87,10 @@ class Usage:
             "aiTokensOut": self.ai_tokens_out,
             "aiModels": dict(sorted(self.ai_models.items())),
             "promptChars": dict(sorted(self.prompt_chars.items())),
+            "browserSeconds": round(self.browser_seconds, 3),
+            "codingSeconds": round(self.coding_seconds, 3),
+            "tasks": self.tasks,
+            "webSearches": self.web_searches,
             "seconds": round(self.seconds, 3),
             **({"statementSources": dict(self.statements.most_common(60))} if self.statements else {}),
         }
@@ -137,6 +151,29 @@ def count_ai_call(*, model: str, usage: dict[str, Any] | None, success: bool) ->
 def count_prompt(role: str, sections: dict[str, int]) -> None:
     if (meter := _CURRENT.get()) is not None:
         meter.prompt_chars.update({f"{role}.{name}": size for name, size in sections.items()})
+
+
+def count_plan_usage(*, tasks: int = 0, web_searches: int = 0) -> None:
+    if (meter := _CURRENT.get()) is not None:
+        meter.tasks += tasks
+        meter.web_searches += web_searches
+
+
+def count_tool_seconds(*, browser: float = 0.0, coding: float = 0.0) -> None:
+    if (meter := _CURRENT.get()) is not None:
+        meter.browser_seconds += max(0.0, browser)
+        meter.coding_seconds += max(0.0, coding)
+
+
+@asynccontextmanager
+async def browser_time() -> AsyncIterator[None]:
+    """Count the time spent inside this block, or a call of the async function it decorates, as
+    browser time."""
+    started = time.monotonic()
+    try:
+        yield
+    finally:
+        count_tool_seconds(browser=time.monotonic() - started)
 
 
 def _after_cursor_execute(conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, executemany: bool) -> None:

@@ -14,6 +14,7 @@ from pypdf import PdfReader
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.services import entitlements
 from app.bootstrap.settings import settings
 from app.domain.ai.providers import (
     AIGateway,
@@ -117,6 +118,7 @@ class AttachmentIngestionService:
         suffix = PurePath(safe_name).suffix[:20]
         key = f"conversation/{thread_id}/{artifact_id.hex}{suffix or '.bin'}"
         tenant_storage = TenantObjectStorage(object_storage_from_settings(), organization_id)
+        await entitlements.require_room(self._session, organization_id, "storage.bytes", adding=len(content))
         stored = await tenant_storage.put(
             key=key,
             content=content,

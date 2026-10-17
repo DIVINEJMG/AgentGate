@@ -1,0 +1,15 @@
+{
+  "description": "Test-only vector for audoryn-billing-v1. This key must never be configured anywhere.",
+  "label": "audoryn-billing-v1",
+  "keyId": "billing-vector",
+  "secretBase64url": "YmlsbGluZy12ZWN0b3ItdGVzdC1vbmx5LWtleS0wMDA",
+  "audience": "console",
+  "scope": "billing.checkout",
+  "method": "POST",
+  "target": "/api/v1/internal/agentgate/billing/v1/checkouts",
+  "timestamp": "1792152000",
+  "nonce": "0123456789abcdef0123456789abcdef",
+  "body": "{\"organizationId\":\"650c94c4-b642-4767-b9a9-6b56a0f53e83\",\"planCode\":\"team\"}",
+  "canonical": "audoryn-billing-v1\nbilling-vector\nconsole\nbilling.checkout\nPOST\n/api/v1/internal/agentgate/billing/v1/checkouts\n1792152000\n0123456789abcdef0123456789abcdef\n7f5f1ec849cf5071852c5f8340f831294e0dfbb9501375016941c636359e0165",
+  "signature": "v1=fc630dda892718a7c5c0f5e5faea56bef5b49267aa4e43d0b7b41edd1a8376a5"
+}

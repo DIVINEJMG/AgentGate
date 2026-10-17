@@ -15,11 +15,13 @@ from sqlalchemy import select
 
 from app.api.jobs_routes import current_revision, queue_due_schedules, queue_job
 from app.application.messages import planning_paused
+from app.application.services import entitlements
 from app.application.services.browser_origin_authority import (
     reconcile_ai_job_browser_origins,
 )
 from app.application.services.cutover import CutoverController
 from app.application.services.integration_foundation import notify_integration_work
+from app.application.services.live_results import notify_task_conversation
 from app.bootstrap.settings import settings
 from app.domain.ai.providers import AIProviderError
 from app.domain.identity.principals import HumanPrincipal
@@ -41,7 +43,7 @@ from app.infrastructure.qstash.verifier import QStashSignatureVerifier
 from app.infrastructure.redis.coordination import Lease, RedisCoordinator
 from app.infrastructure.storage.provider import object_storage_from_settings
 from app.observability.frames import app_frames
-from app.observability.usage import Usage, metered
+from app.observability.usage import Usage, count_plan_usage, metered
 from app.runtime.admission import admit_due_item
 from app.runtime.managed import ManagedRuntimeExecutor, RuntimeStepOutcome
 from app.runtime.qstash_trigger import request_runtime_execution
@@ -634,10 +636,20 @@ async def _not_runnable(session, item: WorkItem, message: "ExecutePayload") -> d
         return None
     payload = dict(item.payload or {})
     runtime = dict(payload.get("runtime") or {})
+    # Only a task that has never run is new work: one already under way is never stopped by a limit.
+    first = not runtime.get("startedAt") and not runtime.get("admittedAt")
+    if first:
+        try:
+            await entitlements.require_allowance(session, item.organization_id, *entitlements.TASK_ALLOWANCES)
+        except entitlements.EntitlementDenied as denied:
+            return await _not_started(session, item, denied.message)
     if await admit_due_item(session, item, now=datetime.now(UTC)):
         runtime["queueState"] = "admitted"
         runtime["waitingReason"] = None
         runtime.pop("admissionWaits", None)
+        if first:
+            runtime["admittedAt"] = datetime.now(UTC).isoformat()
+            count_plan_usage(tasks=1)  # saved into the plan period with the step's usage
         item.payload = {**payload, "runtime": runtime}
         await session.commit()
         return None
@@ -658,6 +670,20 @@ async def _not_runnable(session, item: WorkItem, message: "ExecutePayload") -> d
                                     delay_seconds=wait_seconds)
     return {"status": "queued", "workItemId": str(item.id), "state": "queued", "currentStep": message.expected_step,
             "summary": runtime["waitingReason"]}
+
+
+async def _not_started(session, item: WorkItem, reason: str) -> dict[str, object]:
+    """The organisation's plan does not allow this new task: it ends without running, saying why."""
+    item.status = "failed"
+    payload = dict(item.payload or {})
+    runtime = dict(payload.get("runtime") or {})
+    runtime.update(queueState="not_started", failureCategory="plan_limit", waitingReason=reason)
+    payload.update(runtime=runtime, lastError=reason, completedAt=datetime.now(UTC).isoformat())
+    item.payload = payload
+    await notify_task_conversation(session, item, key="plan-limit", content=reason)
+    await session.commit()
+    return {"status": "failed", "workItemId": str(item.id), "state": "failed", "currentStep": 0,
+            "summary": reason, "failureCategory": "plan_limit"}
 
 
 async def _execute_runtime_message(message: ExecutePayload, coordinator: RedisCoordinator,

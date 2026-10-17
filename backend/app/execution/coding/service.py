@@ -13,9 +13,10 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 from redis.exceptions import RedisError
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 from sqlalchemy.dialects.postgresql import insert
 
+from app.application.services import entitlements
 from app.bootstrap.settings import settings
 from app.execution.contracts import ExecutionErrorCode, ExecutionProviderError
 from app.execution.providers.integration_hooks import HookUnavailable
@@ -29,8 +30,10 @@ from app.infrastructure.database.models import (
     WorkItem,
 )
 from app.infrastructure.database.session import session_factory
+from app.infrastructure.database.usage_records import record_usage
 from app.infrastructure.redis.coordination import RedisCoordinator
 from app.infrastructure.storage.provider import object_storage_from_settings
+from app.observability.usage import count_tool_seconds, metered
 
 from .bundles import manifest_fingerprint, source_manifest
 from .e2b import E2BCodingRuntime
@@ -265,6 +268,13 @@ async def admit_capacity(session, request):
 FINISHED_WORK = {"completed", "failed", "cancelled", "partial_completion", "policy_denied"}
 
 
+@event.listens_for(CodingSession.active_seconds, "set", active_history=True)
+def _meter_running_time(target, value, oldvalue, initiator) -> None:
+    """Running time added to a session, wherever it is added, is coding time on the current meter."""
+    if isinstance(value, int) and isinstance(oldvalue, int):
+        count_tool_seconds(coding=value - oldvalue)
+
+
 async def committed_seconds(session, organization_id, day) -> int:
     """Coding time today's sessions hold: a session still working keeps its whole reservation;
     one whose task has ended (or whose time was given back) counts only what it used. Worked out
@@ -319,6 +329,13 @@ async def _daily_budget(session, organization_id, day):
 
 
 async def reserve(session, request):
+    try:
+        await entitlements.require_feature(session, request.organization_id, "coding.enabled")
+        await entitlements.require_allowance(
+            session, request.organization_id, "coding.seconds.monthly"
+        )
+    except entitlements.EntitlementDenied as denied:
+        raise coding_error(request, denied.message, "policy_blocked", False) from denied
     await admit_capacity(session, request)
     day = datetime.now(UTC).date().isoformat()
     budget = await _daily_budget(session, request.organization_id, day)
@@ -1057,6 +1074,30 @@ async def inspect_command(
     }
 
 
+async def _pause_idle_sandbox(runtime, row, request, now) -> None:
+    """Export and pause an idle sandbox, adding its last running time to the session."""
+    try:
+        await runtime.connect(row.sandbox_id, 120)
+        if row.evidence.get("baselineArtifactId"):
+            await export(runtime, row, request, {"constraints": {}})
+    except Exception:  # noqa: BLE001 - cleanup must continue when evidence export fails
+        row.evidence = {
+            **row.evidence,
+            "cleanupWarning": "Workspace changes could not be exported; inspect retained evidence before publication.",
+        }
+    finally:
+        await runtime.pause(row.sandbox_id)
+    if row.active_since:
+        row.active_seconds += min(
+            settings.coding_idle_seconds,
+            max(0, int((now - row.active_since).total_seconds())),
+        )
+    row.status, row.active_since = (
+        ("creating_uncertain" if row.status == "creating" else "paused"),
+        None,
+    )
+
+
 async def maintain_coding_sessions(runtime=None):
     """Run on the existing outbox recovery tick; paused E2B state needs deletion."""
     if not settings.coding_execution_enabled:
@@ -1100,30 +1141,11 @@ async def maintain_coding_sessions(runtime=None):
                     )
                     if row.status == "creating" and not row.sandbox_id:
                         row.sandbox_id = await runtime.find(str(row.id))
+                    idle = None
                     if row.sandbox_id and row.status in {"running", "creating"}:
-                        try:
-                            await runtime.connect(row.sandbox_id, 120)
-                            if row.evidence.get("baselineArtifactId"):
-                                await export(runtime, row, request, {"constraints": {}})
-                        except Exception:  # noqa: BLE001 - cleanup must continue when evidence export fails
-                            row.evidence = {
-                                **row.evidence,
-                                "cleanupWarning": "Workspace changes could not be exported; inspect retained evidence before publication.",
-                            }
-                        finally:
-                            await runtime.pause(row.sandbox_id)
-                        row.active_seconds += (
-                            min(
-                                settings.coding_idle_seconds,
-                                max(0, int((now - row.active_since).total_seconds())),
-                            )
-                            if row.active_since
-                            else 0
-                        )
-                        row.status, row.active_since = (
-                            ("creating_uncertain" if row.status == "creating" else "paused"),
-                            None,
-                        )
+                        # The sweep belongs to no task, so this work is recorded on its own.
+                        with metered() as idle:
+                            await _pause_idle_sandbox(runtime, row, request, now)
                     elif row.status == "creating":
                         row.status, row.active_since = "creating_uncertain", None
                     if row.expires_at <= now:
@@ -1132,6 +1154,13 @@ async def maintain_coding_sessions(runtime=None):
                         row.status = "expired"
                         await release_unused_budget(session, row)
                     await session.commit()
+                    if idle is not None:
+                        await record_usage(
+                            idle,
+                            kind="coding.idle",
+                            organization_id=request.organization_id,
+                            work_item_id=request.work_item_id,
+                        )
                 except Exception:  # noqa: BLE001 - one unavailable sandbox must not prevent cleanup of other sessions
                     await session.rollback()
                 finally:

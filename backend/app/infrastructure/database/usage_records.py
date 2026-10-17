@@ -45,12 +45,14 @@ async def record_usage(
               "run_id": str(run_id) if run_id else None, "step": step, "phase": phase,
               "outcome": outcome, **usage.as_dict()}
     structured_event(logger, "usage", fields=fields)
-    if not settings.usage_records_enabled or _uuid(organization_id) is None:
+    organization = _uuid(organization_id)
+    if not settings.usage_records_enabled or organization is None:
         return
+    from app.application.services.entitlements import count_usage
     from app.infrastructure.database.session import session_factory
 
     row = UsageRecord(
-        organization_id=_uuid(organization_id), work_item_id=_uuid(work_item_id),
+        organization_id=organization, work_item_id=_uuid(work_item_id),
         run_id=_uuid(run_id), thread_id=_uuid(thread_id), kind=kind, step=step,
         phase=phase, outcome=(outcome or "")[:32] or None,
         db_statements=usage.db_statements, db_rows=usage.db_rows,
@@ -58,12 +60,18 @@ async def record_usage(
         ai_calls=usage.ai_calls, ai_failed_calls=usage.ai_failed_calls,
         ai_tokens_in=usage.ai_tokens_in, ai_tokens_out=usage.ai_tokens_out,
         ai_models=dict(usage.ai_models), prompt_chars=dict(usage.prompt_chars),
+        browser_seconds=round(usage.browser_seconds, 3), coding_seconds=round(usage.coding_seconds, 3),
         duration_ms=int(usage.seconds * 1000),
     )
     try:
         async with asyncio.timeout(5):
             async with session_factory() as session:
                 session.add(row)
+                await session.commit()
+                # Counted into the plan period separately, so a failure here never loses the record.
+                await count_usage(session, organization, tasks=usage.tasks, web_research=usage.web_searches,
+                                  ai_tokens=usage.ai_tokens_in + usage.ai_tokens_out,
+                                  browser_seconds=usage.browser_seconds, coding_seconds=usage.coding_seconds)
                 await session.commit()
     except asyncio.CancelledError:
         raise

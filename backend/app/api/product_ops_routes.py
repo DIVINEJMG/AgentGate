@@ -8,7 +8,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_dependencies import authenticated_user, organization_principal
@@ -19,20 +19,18 @@ from app.api.product_common import (
     require_permission,
     utcnow,
 )
+from app.application.services import entitlements
 from app.domain.identity.permissions import permissions_for_role
 from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.auth.service import AuthenticatedUser
 from app.infrastructure.database.models import (
     Action,
-    AgentIdentity,
     AuditEvent,
     HumanIdentity,
     Incident,
-    Integration,
     Job,
     Organization,
     OrganizationMembership,
-    Policy,
     Run,
     Worker,
     WorkItem,
@@ -41,42 +39,6 @@ from app.infrastructure.database.session import database_session
 
 v1_router = APIRouter(tags=["product", "commercial", "supervision", "performance"])
 v2_router = APIRouter(tags=["product", "commercial", "supervision", "performance"])
-
-PLANS = (
-    {
-        "id": "free",
-        "name": "Free",
-        "priceMonthlyUsd": 0,
-        "workerLimit": 3,
-        "agentLimit": 3,
-        "positioning": "Explore Aduoryn with a small supervised workforce.",
-    },
-    {
-        "id": "team",
-        "name": "Team",
-        "priceMonthlyUsd": 49,
-        "workerLimit": 15,
-        "agentLimit": 15,
-        "positioning": "Coordinate a growing AI workforce across a team.",
-    },
-    {
-        "id": "business",
-        "name": "Business",
-        "priceMonthlyUsd": 199,
-        "workerLimit": 75,
-        "agentLimit": 75,
-        "positioning": "Govern production AI workers with stronger controls.",
-    },
-    {
-        "id": "scale",
-        "name": "Scale",
-        "priceMonthlyUsd": 499,
-        "workerLimit": 250,
-        "agentLimit": 250,
-        "positioning": "Operate a larger governed autonomous workforce.",
-    },
-)
-
 
 async def _org(session: AsyncSession, organization_id: UUID) -> Organization:
     organization = await session.get(Organization, organization_id)
@@ -103,54 +65,10 @@ async def _workspace_settings(
     }
 
 
-async def _usage(session: AsyncSession, organization_id: UUID) -> dict[str, Any]:
-    agents = list(
-        (await session.scalars(select(AgentIdentity).where(AgentIdentity.organization_id == organization_id))).all()
-    )
-    integrations = list(
-        (await session.scalars(select(Integration).where(Integration.organization_id == organization_id))).all()
-    )
-    policies = list(
-        (await session.scalars(select(Policy).where(Policy.organization_id == organization_id))).all()
-    )
-    actions = list(
-        (
-            await session.scalars(
-                select(Action)
-                .where(Action.organization_id == organization_id)
-                .order_by(desc(Action.created_at))
-                .limit(1000)
-            )
-        ).all()
-    )
-    incidents = list(
-        (await session.scalars(select(Incident).where(Incident.organization_id == organization_id))).all()
-    )
-    workers = list(
-        (await session.scalars(select(Worker).where(Worker.organization_id == organization_id))).all()
-    )
-    return {
-        "registeredAgents": len(agents),
-        "activeAgents": sum(item.status == "active" for item in agents),
-        "connectedIntegrations": sum(item.status == "connected" for item in integrations),
-        "enabledPolicies": sum(item.status == "enabled" for item in policies),
-        "actions30d": len(actions),
-        "heldActions": sum(item.status == "held" for item in actions),
-        "blocked30d": sum(item.status == "blocked" for item in actions),
-        "failed30d": sum(item.status == "failed" for item in actions),
-        "activeIncidents": sum(item.status != "resolved" for item in incidents),
-        "agentLimitAdvisory": PLANS[0]["agentLimit"],
-        "agentLimitState": "within_limit" if len(agents) <= PLANS[0]["agentLimit"] else "over_limit",
-        "windowTruncated": len(actions) >= 1000,
-        "workers": len(workers),
-    }
-
-
 async def _productization(
     session: AsyncSession, organization_id: UUID
 ) -> dict[str, Any]:
     workspace = await _workspace_settings(session, organization_id)
-    usage = await _usage(session, organization_id)
     # The same getting-started steps new workspaces see on their home page.
     from app.application.services.onboarding import checklist
     from app.infrastructure.database.models import OrganizationOnboarding
@@ -161,24 +79,6 @@ async def _productization(
     complete = sum(step["complete"] for step in steps)
     return {
         "workspace": workspace,
-        "plans": [
-            {
-                "id": plan["id"],
-                "name": plan["name"],
-                "priceMonthlyUsd": plan["priceMonthlyUsd"],
-                "agentLimit": plan["agentLimit"],
-                "positioning": plan["positioning"],
-            }
-            for plan in PLANS
-        ],
-        "subscription": {
-            "planId": "free",
-            "status": "active",
-            "billingProvider": "none",
-            "enforcement": "advisory",
-            "canCheckout": False,
-        },
-        "usage": {key: value for key, value in usage.items() if key != "workers"},
         "onboarding": {
             "steps": steps,
             "complete": complete,
@@ -192,11 +92,6 @@ async def _productization(
 def _product_v2(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "workspace": result["workspace"],
-        "commercial": {
-            "plans": result["plans"],
-            "subscription": result["subscription"],
-        },
-        "operations": {"usage": result["usage"]},
         "readiness": result["onboarding"],
         "generatedAt": result["generatedAt"],
     }
@@ -275,35 +170,19 @@ async def _commercial(
     session: AsyncSession, organization_id: UUID
 ) -> dict[str, Any]:
     organization = await _org(session, organization_id)
-    workers = list(
-        (await session.scalars(select(Worker).where(Worker.organization_id == organization_id))).all()
+    plan = await entitlements.summary(session, organization_id)
+    since = (
+        datetime.fromisoformat(plan["periodStart"])
+        if plan
+        else utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     )
-    jobs = list(
-        (await session.scalars(select(Job).where(Job.organization_id == organization_id))).all()
-    )
-    runs = list(
-        (
-            await session.scalars(
-                select(Run)
-                .where(Run.organization_id == organization_id)
-                .order_by(desc(Run.created_at))
-                .limit(1000)
-            )
-        ).all()
-    )
-    incidents = list(
-        (await session.scalars(select(Incident).where(Incident.organization_id == organization_id))).all()
-    )
-    actions = list(
-        (
-            await session.scalars(
-                select(Action)
-                .where(Action.organization_id == organization_id)
-                .order_by(desc(Action.created_at))
-                .limit(1000)
-            )
-        ).all()
-    )
+    failed_runs = int(await session.scalar(select(func.count()).select_from(Run).where(
+        Run.organization_id == organization_id, Run.status == "failed", Run.created_at >= since)) or 0)
+    failed_actions = int(await session.scalar(select(func.count()).select_from(Action).where(
+        Action.organization_id == organization_id, Action.status == "failed", Action.created_at >= since)) or 0)
+    open_incidents, critical_incidents = (await session.execute(select(
+        func.count(), func.count().filter(Incident.severity == "critical")).where(
+        Incident.organization_id == organization_id, Incident.status != "resolved"))).one()
     invite_events = list(
         (
             await session.scalars(
@@ -362,13 +241,6 @@ async def _commercial(
                 ),
             }
         )
-    plan = PLANS[0]
-    failed_runs = sum(run.status == "failed" for run in runs)
-    failed_actions = sum(action.status == "failed" for action in actions)
-    critical_incidents = sum(
-        incident.severity == "critical" and incident.status != "resolved"
-        for incident in incidents
-    )
     state = (
         "critical"
         if critical_incidents
@@ -376,74 +248,13 @@ async def _commercial(
         if failed_runs or failed_actions
         else "healthy"
     )
-    onboarding = await _productization(session, organization_id)
     return {
         "organization": {
             "id": str(organization.id),
             "name": organization.name,
         },
-        "billing": {
-            "subscription": {
-                "planId": "free",
-                "provider": "none",
-                "verified": True,
-                "source": "default",
-            },
-            "adapter": {
-                "key": "none",
-                "checkoutAvailable": False,
-                "providerConnected": False,
-                "verified": True,
-            },
-            "plan": {
-                "id": plan["id"],
-                "name": plan["name"],
-                "priceMonthlyUsd": plan["priceMonthlyUsd"],
-                "workerLimit": plan["workerLimit"],
-                "positioning": plan["positioning"],
-            },
-            "plans": [
-                {
-                    "id": item["id"],
-                    "name": item["name"],
-                    "priceMonthlyUsd": item["priceMonthlyUsd"],
-                    "workerLimit": item["workerLimit"],
-                    "positioning": item["positioning"],
-                }
-                for item in PLANS
-            ],
-            "enforcement": "worker_limit_active",
-        },
-        "entitlements": {
-            "workerLimit": plan["workerLimit"],
-            "currentWorkers": len(workers),
-            "remainingWorkers": max(0, plan["workerLimit"] - len(workers)),
-            "features": {
-                "governance": True,
-                "results": True,
-                "integrations": True,
-            },
-        },
-        "usage": {
-            "periodStart": utcnow().replace(day=1).date().isoformat(),
-            "workers": len(workers),
-            "jobsTotal": len(jobs),
-            "jobsCreatedThisMonth": len(jobs),
-            "runsThisMonth": len(runs),
-            "runsCompletedThisMonth": sum(run.status == "completed" for run in runs),
-            "runsFailedThisMonth": failed_runs,
-            "accountingEventsThisMonth": len(actions),
-            "windowTruncated": len(runs) >= 1000 or len(actions) >= 1000,
-        },
-        "onboarding": {
-            **onboarding["onboarding"],
-            "steps": [
-                {**step, "required": True}
-                for step in onboarding["onboarding"]["steps"]
-            ],
-            "commercialReady": onboarding["onboarding"]["percent"] >= 50,
-        },
-        "templates": {"available": 6, "applied": len(workers) > 0},
+        # The plan the Console sent and this period's use of it (buying a plan: billing_routes).
+        "billing": {"plan": plan},
         "invitations": {
             "canInvite": True,
             "recent": invitations,
@@ -451,13 +262,11 @@ async def _commercial(
         },
         "production": {
             "state": state,
-            "deadLetterWorkItems": 0,
-            "failedRunsThisMonth": failed_runs,
-            "failedActionsThisMonth": failed_actions,
-            "openEscalations": sum(incident.status != "resolved" for incident in incidents),
-            "criticalEscalations": critical_incidents,
+            "since": since.isoformat(),
+            "failedRuns": failed_runs,
+            "failedActions": failed_actions,
+            "openEscalations": open_incidents,
             "criticalIncidents": critical_incidents,
-            "windowTruncated": False,
             "checkedAt": utcnow().isoformat(),
         },
         "generatedAt": utcnow().isoformat(),
@@ -485,10 +294,6 @@ async def commercial_v2(
         "data": {
             "workspace": result["organization"],
             "billing": result["billing"],
-            "entitlements": result["entitlements"],
-            "usage": result["usage"],
-            "readiness": result["onboarding"],
-            "templates": result["templates"],
             "invitations": result["invitations"],
             "production": result["production"],
             "generatedAt": result["generatedAt"],
@@ -626,6 +431,7 @@ async def join_invite_v1(
     )
     role = str(metadata.get("role", "viewer"))
     if existing is None:
+        await entitlements.require_room(session, event.organization_id, "members.max")
         existing = OrganizationMembership(
             organization_id=event.organization_id,
             user_id=user.id,

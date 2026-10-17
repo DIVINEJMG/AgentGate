@@ -153,6 +153,8 @@ export async function previewResponse(method: string, path: string, _body?: unkn
   const pathname = path.split('?')[0];
   // These two Results calls are automatic refresh housekeeping. They remain local no-ops.
   if (method === 'POST' && /\/results\/(backfill|seen)$/.test(pathname)) return { data: {}, status: 200, headers: new Headers() };
+  // Dismissing a prompt is a personal preference; the sample workspace just hides it.
+  if (method === 'POST' && (pathname.endsWith('/plan/prompts/dismiss') || pathname.endsWith('/news/state'))) return { data: { dismissed: true }, status: 200, headers: new Headers() };
   if (method !== 'GET') throw new Error('Workspace preview is read-only. No change was sent.');
   if (!pathname.startsWith('/api/v1/')) throw new Error('Workspace preview shows the API v1 layout only.');
   const endpoint = pathname.replace(/^\/api\/v1\/organizations\/[^/]+/, '');
@@ -216,6 +218,9 @@ function fixtureFor(endpoint: string, fullPath: string, search: URLSearchParams)
   if (endpoint === '/artifacts') return { artifacts: previewArtifacts, summary: { total: previewArtifacts.length }, window: { limit: 100, truncated: false } };
   if (endpoint === '/product') return productFixture;
   if (endpoint === '/commercial') return commercialFixture;
+  if (endpoint === '/billing/catalog') return previewCatalog;
+  if (endpoint === '/plan/prompts') return previewPrompts;
+  if (endpoint === '/news') return previewNews;
   if (endpoint === '/ai/operations') return { configuration: { enabled: true, configured: true, provider: 'Sample provider', providerHealth: 'operational', coordinatorModel: 'Sample planner', visionModel: 'Sample vision' }, invocations: { sampleSize: 28, successes: 26, failures: 2, successRate: 92.9, averageLatencyMs: 850, errorsByCategory: {}, roleRouting: {}, window: { limit: 100, truncated: false } }, planner: { waitingCount: 0, waitingConfiguration: 0, waitingProvider: 0, window: { limit: 100, truncated: false } } };
   throw new Error(`No local preview fixture for ${fullPath}. No network request was made.`);
 }
@@ -237,18 +242,72 @@ const previewOnboarding = {
 
 const productFixture = {
   workspace: { organizationId: org, name: 'Sample workspace', securityContactEmail: 'security@example.invalid', companyUrl: '', updatedBy: null, updatedAt: null },
-  plans: [{ id: 'free', name: 'Free', priceMonthlyUsd: 0, agentLimit: 3, positioning: 'Explore with a small workforce.' }],
-  subscription: { planId: 'free', status: 'active', billingProvider: 'none', enforcement: 'advisory', canCheckout: false },
-  usage: { registeredAgents: 2, activeAgents: 2, connectedIntegrations: 1, enabledPolicies: 1, actions30d: 18, heldActions: 1, blocked30d: 3, failed30d: 2, activeIncidents: 0, agentLimitAdvisory: 3, agentLimitState: 'within_limit', windowTruncated: false },
   onboarding: { steps: [], complete: 3, total: 4, percent: 75 }, generatedAt: time,
 };
 
+const previewLimits = (workers: number, tasks: number, tokens: number, coding: number, storageGb: number) => ({
+  'workers.max': workers, 'jobs.per_worker.max': workers, 'members.max': workers, 'connections.max': workers + 1, 'storage.bytes': storageGb * 1024 ** 3,
+  'tasks.monthly': tasks, 'ai.tokens.monthly': tokens, 'coding.seconds.monthly': coding, 'web_research.monthly': tasks / 4,
+  'browser.enabled': true, 'coding.enabled': true, 'events.enabled': true, 'browser.sessions.concurrent': Math.max(1, workers / 5), 'schedules.min_interval_minutes': 60 / workers,
+});
+const previewCatalog = {
+  plans: [
+    { code: 'free', name: 'Free', description: '', tagline: 'Every capability in small amounts, to see it work.', free: true, prices: [], limits: { ...previewLimits(2, 200, 3000000, 3600, 1), 'coding.enabled': false } },
+    { code: 'starter', name: 'Starter', description: '', tagline: 'For one team putting its first workers to use.', free: false, highlights: [], prices: [{ currency: 'USD', monthly: 1900, annual: 19000, provider: 'paddle' }, { currency: 'NGN', monthly: 1500000, annual: 15000000, provider: 'paystack' }], limits: previewLimits(3, 1000, 10000000, 7200, 5) },
+    { code: 'team', name: 'Team', description: '', tagline: 'More workers, tasks and AI for a growing team.', badge: 'Most popular', free: false, highlights: ['Priority email support'], prices: [{ currency: 'USD', monthly: 4900, annual: 49000, provider: 'paddle' }, { currency: 'NGN', monthly: 4000000, annual: 40000000, provider: 'paystack' }], limits: previewLimits(10, 5000, 40000000, 36000, 25) },
+    { code: 'business', name: 'Business', description: '', tagline: 'Governed autonomy at scale, for several teams.', free: false, prices: [{ currency: 'USD', monthly: 19900, annual: 199000, provider: 'paddle' }, { currency: 'NGN', monthly: 16000000, annual: 160000000, provider: 'paystack' }], limits: previewLimits(30, 20000, 150000000, 144000, 100) },
+  ],
+  comparison: [
+    ['workers.max', 'workers', 'count'], ['jobs.per_worker.max', 'standing jobs per worker', 'count'], ['members.max', 'members', 'count'], ['connections.max', 'connections', 'count'], ['storage.bytes', 'bytes of storage', 'count'],
+    ['tasks.monthly', 'tasks', 'period'], ['ai.tokens.monthly', 'AI tokens', 'period'], ['coding.seconds.monthly', 'seconds of coding time', 'period'], ['web_research.monthly', 'web searches', 'period'],
+    ['browser.enabled', 'browser work', 'feature'], ['coding.enabled', 'coding work', 'feature'], ['events.enabled', 'reacting to events', 'feature'],
+    ['browser.sessions.concurrent', 'browser sessions at once', 'setting'], ['schedules.min_interval_minutes', 'minutes between scheduled runs, at least', 'setting'],
+  ].map(([key, name, kind]) => ({ key, name, kind })),
+  providers: [{ name: 'paddle', currencies: ['USD'], checkoutHosts: ['localhost'], clientToken: null }, { name: 'paystack', currencies: ['NGN'], checkoutHosts: ['checkout.paystack.com'], clientToken: null }],
+  current: { planCode: 'free', planName: 'Free', status: 'active', billingCycle: 'monthly', provider: null, periodEnd: null, cancelAtPeriodEnd: false, manageable: false },
+};
+
+// A workspace at its worker limit and near its tasks, with a member's request for coding work.
+const previewPrompts = {
+  plan: { code: 'free', name: 'Free', status: 'active', periodEnd: new Date(Date.parse(time) + 30 * 86_400_000).toISOString(), enforced: true },
+  canUpgrade: true,
+  limits: [
+    { key: 'workers.max', name: 'workers', used: 2, limit: 2, period: false, state: 'reached' },
+    { key: 'tasks.monthly', name: 'tasks', used: 168, limit: 200, period: true, state: 'near' },
+  ],
+  banner: 'workers.max',
+  features: { 'browser.enabled': true, 'coding.enabled': false, 'events.enabled': true },
+  requests: [{ id: '7d1c2f0e-4b8a-4c3e-9a51-2f6b8d0e1a77', limit: 'coding.enabled', name: 'coding work', requestedBy: 'Grace Hopper', requestedAt: recent(3) }],
+};
+
+// "What's new": a major launch, an event, a promotion for Free workspaces and three changelog entries.
+const previewNews = {
+  canUpgrade: true,
+  state: { 'news:changelog:preview-change-3': { readAt: recent(4), dismissedAt: null } },
+  announcements: [
+    { id: '0b9f6d8e-1c2a-4e5b-8f3d-7a6c5b4e3d21', kind: 'product_launch', title: 'Workers can now run in parallel', body: 'A worker can now work on up to three tasks at once. Each task keeps its own approvals and record, and your policies apply to every one of them.', severity: 'success', publishedAt: recent(0.2), endsAt: null, cta: { label: 'See how it works', url: 'https://audoryn.com/resources' }, dismissible: true, major: true, upgrade: false },
+    { id: '5c4b3a29-8d7e-4f6a-9b1c-2d3e4f5a6b7c', kind: 'event', title: 'Live session: governing autonomous work', body: 'Thursday 23 October, 15:00 UTC. A 30-minute walkthrough of policies, approvals and the audit record, with time for questions.', severity: 'info', publishedAt: recent(1), endsAt: null, cta: { label: 'Save a seat', url: 'https://audoryn.com/company' }, dismissible: true, major: false, upgrade: false },
+    { id: '9e8d7c6b-5a49-4382-a1b0-c9d8e7f6a5b4', kind: 'promotion', title: 'Two months free on annual Team', body: 'Move to Team on annual billing this month and the first two months are on us.', severity: 'info', publishedAt: recent(2), endsAt: null, cta: null, dismissible: true, major: false, upgrade: true },
+  ],
+};
+export const previewChangelog = [
+  { id: 'preview-change-1', path: '/changelog/browser-downloads', title: 'Browser workers can save downloads as results', summary: 'Files a worker downloads while browsing are now kept with the run, checked, and listed in Results.', published: recent(3), tag: 'New', image: null },
+  { id: 'preview-change-2', path: '/changelog/faster-approvals', title: 'Approvals load twice as fast', summary: 'The Inbox now opens approvals without waiting for the full run history.', published: recent(6), tag: 'Improvement', image: null },
+  { id: 'preview-change-3', path: '/changelog/schedule-timezones', title: 'Schedules respect daylight saving', summary: 'Scheduled jobs now keep their local time when the clocks change.', published: recent(12), tag: 'Fix', image: null },
+];
+
 const commercialFixture = {
   organization: { id: org, name: 'Sample workspace' },
-  billing: { subscription: { planId: 'free', provider: 'none', verified: true, source: 'preview' }, adapter: { key: 'none', checkoutAvailable: false, providerConnected: false, verified: false }, plan: { id: 'free', name: 'Free', priceMonthlyUsd: 0, workerLimit: 3, positioning: 'A small starting workspace.' }, plans: [{ id: 'free', name: 'Free', priceMonthlyUsd: 0, workerLimit: 3, positioning: 'A small starting workspace.' }], enforcement: 'worker_limit_active' },
-  entitlements: { workerLimit: 3, currentWorkers: 2, remainingWorkers: 1, features: {} },
-  usage: { periodStart: time, workers: 2, jobsTotal: 1, jobsCreatedThisMonth: 1, runsThisMonth: 28, runsCompletedThisMonth: 21, runsFailedThisMonth: 2, accountingEventsThisMonth: 33, windowTruncated: false },
-  onboarding: { steps: [{ id: 'workspace', label: 'Create a workspace', complete: true, required: true, destination: 'settings' }, { id: 'worker', label: 'Add a worker', complete: true, required: true, destination: 'workforce' }], complete: 2, total: 2, percent: 100, commercialReady: true },
-  templates: { available: 0, applied: false }, invitations: { canInvite: false, recent: [], windowTruncated: false },
-  production: { state: 'healthy', deadLetterWorkItems: 0, failedRunsThisMonth: 2, failedActionsThisMonth: 0, openEscalations: 1, criticalEscalations: 0, criticalIncidents: 0, windowTruncated: false, checkedAt: time }, generatedAt: time,
+  billing: { plan: { code: 'free', name: 'Free', version: 0, status: 'active', allowsNewWork: true, enforced: true, periodStart: time, periodEnd: new Date(Date.parse(time) + 30 * 86_400_000).toISOString(), validUntil: null,
+    limits: [
+      { key: 'workers.max', name: 'workers', used: 2, limit: 2, period: false, state: 'reached' },
+      { key: 'jobs.per_worker.max', name: 'standing jobs per worker', used: 1, limit: 3, period: false, state: 'ok' },
+      { key: 'storage.bytes', name: 'bytes of storage', used: 52428800, limit: 1073741824, period: false, state: 'ok' },
+      { key: 'tasks.monthly', name: 'tasks', used: 168, limit: 200, period: true, state: 'near' },
+      { key: 'ai.tokens.monthly', name: 'AI tokens', used: 1200000, limit: 3000000, period: true, state: 'ok' },
+    ],
+    included: [{ key: 'browser.enabled', name: 'browser work', included: true }],
+    settings: [{ key: 'schedules.min_interval_minutes', name: 'minutes between scheduled runs, at least', value: 60 }] } },
+  invitations: { canInvite: false, recent: [], windowTruncated: false },
+  production: { state: 'healthy', since: time, failedRuns: 2, failedActions: 0, openEscalations: 1, criticalIncidents: 0, checkedAt: time }, generatedAt: time,
 };

@@ -108,6 +108,9 @@ export async function publicResponse({url, env, template}: {url: string; env: Re
   // In-page navigation: the bundle for any path (not-found bundles included).
   if (path === '/_public/site') return json(200, {bundle: await loader.load(normalizePath(request.searchParams.get('path') || '/'))});
 
+  // The workspace app's "What's new" lists the published changelog entries.
+  if (path === '/_public/changelog') return json(200, {entries: await loader.changelog()});
+
   // The Console preview asks for the release it was pinned to, to resolve links to other pages.
   if (path === '/_public/preview-reference') {
     const current = config.enabled ? await loader.release().catch(() => null) : null;

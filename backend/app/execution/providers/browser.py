@@ -12,6 +12,7 @@ from uuid import UUID
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+from app.application.services import entitlements
 from app.bootstrap.settings import settings
 from app.execution.authorization import CredentialReference, ProviderPermissionSnapshot
 from app.execution.browser.artifacts import (
@@ -57,6 +58,7 @@ from app.execution.contracts import (
 from app.execution.providers.base import ExecutionProvider
 from app.execution.redaction import redact_sensitive_structure, redact_text
 from app.infrastructure.redis.coordination import RedisCoordinator
+from app.observability.usage import browser_time
 
 FILE_TRANSFER_SCOPES = frozenset({"browser.file.upload", "browser.file.download"})
 
@@ -1021,13 +1023,27 @@ class PlaywrightBrowserProvider:
                 )
             )
         ttl_seconds = _browser_session_ttl(request.resource.configuration)
+        sessions = await self._plan_sessions(request)
         return await self._runtime.create_session(
             organization_id=request.organization_id,
             worker_id=request.worker_id,
             run_id=request.run_id,
             ttl_seconds=ttl_seconds,
             navigation_policy=policy,
+            **({} if sessions is None else {"organization_sessions": sessions}),
         )
+
+    async def _plan_sessions(self, request: ExecutionRequest) -> int | None:
+        """The browser sessions the organisation's plan allows at once; None when not enforced."""
+        try:
+            await entitlements.require_feature(None, request.organization_id, "browser.enabled")
+            return await entitlements.plan_number(
+                None, request.organization_id, "browser.sessions.concurrent"
+            )
+        except entitlements.EntitlementDenied as denied:
+            raise self._error(
+                request=request, code="policy_blocked", retryable=False, safe_message=denied.message
+            ) from denied
 
     async def close_session(self, session: BrowserSession) -> BrowserSession:
         return await self._runtime.close(session.id)
@@ -1529,6 +1545,7 @@ class PlaywrightBrowserProvider:
             started_at=state.started_at,
         )
 
+    @browser_time()
     async def execute(
         self,
         *,
@@ -1831,13 +1848,14 @@ class PlaywrightBrowserProvider:
             if session_id is None:
                 verified = False
             else:
-                probe = await self._runtime.verify_browser_state(
-                    session_id,
-                    organization_id=request.organization_id,
-                    worker_id=request.worker_id,
-                    expectation=expectation,
-                    result_output=output,
-                )
+                async with browser_time():
+                    probe = await self._runtime.verify_browser_state(
+                        session_id,
+                        organization_id=request.organization_id,
+                        worker_id=request.worker_id,
+                        expectation=expectation,
+                        result_output=output,
+                    )
                 verified = probe.verified
                 details["checks"] = probe.details
         elif base_valid and (request.capability.side_effect or request.capability.mode == "write"):

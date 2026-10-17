@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_dependencies import organization_principal
 from app.api.product_common import require_permission
+from app.application.services import entitlements
 from app.application.services.attachment_ingestion import (
     AttachmentIngestionService,
     decode_base64_content,
@@ -295,8 +296,10 @@ async def upload_attachment_v2(
 Reply = tuple[ConversationMessage, ConversationMessage, CommandReceipt]
 
 
-async def _replied(organization_id: UUID, thread_id: UUID, reply: Callable[[], Awaitable[Reply]]) -> dict[str, Any]:
+async def _replied(session: AsyncSession, organization_id: UUID, thread_id: UUID,
+                   reply: Callable[[], Awaitable[Reply]]) -> dict[str, Any]:
     """Run one reply to a message, metered and recorded, as the API's response."""
+    await entitlements.require_allowance(session, organization_id, "ai.tokens.monthly")
     usage, outcome = Usage(), "error"
     try:
         with metered(usage):
@@ -321,7 +324,7 @@ async def _send(
     principal: HumanPrincipal,
     session: AsyncSession,
 ) -> dict[str, Any]:
-    return await _replied(organization_id, thread_id, lambda: ConversationService(session).send_message(
+    return await _replied(session, organization_id, thread_id, lambda: ConversationService(session).send_message(
         organization_id=organization_id,
         principal=principal,
         thread_id=thread_id,
@@ -334,7 +337,7 @@ async def _send(
 
 def _retry(organization_id: UUID, thread_id: UUID, message_id: UUID, principal: HumanPrincipal,
            session: AsyncSession) -> Awaitable[dict[str, Any]]:
-    return _replied(organization_id, thread_id, lambda: ConversationService(session).retry_message(
+    return _replied(session, organization_id, thread_id, lambda: ConversationService(session).retry_message(
         organization_id=organization_id, principal=principal, thread_id=thread_id, message_id=message_id))
 
 

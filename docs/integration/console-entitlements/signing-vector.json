@@ -1,0 +1,16 @@
+{
+  "description": "TEST-ONLY signing vector. The key below is public and must never be configured anywhere.",
+  "signatureVersion": "audoryn-entitlements-v1",
+  "keyId": "console-entitlements-test",
+  "secretBase64url": "Y29uc29sZS1lbnRpdGxlbWVudHMtdGVzdC12ZWN0b3Ita2V5LTAxMjM0NTY3ODlhYmNkZWY",
+  "audience": "agentgate",
+  "scope": "entitlements.write",
+  "method": "POST",
+  "target": "/internal/console/entitlements/v1/snapshots",
+  "timestamp": "1791626400",
+  "nonce": "0123456789abcdef0123456789abcdef",
+  "body": "{\"organizationId\":\"8f14e45f-ceea-467a-9575-2f9d1c7f4c1a\",\"version\":3,\"status\":\"active\",\"planCode\":\"team\",\"periodStart\":\"2026-10-01T00:00:00+00:00\",\"periodEnd\":\"2026-11-01T00:00:00+00:00\",\"validUntil\":null,\"entitlements\":{\"workers.max\":10,\"browser.enabled\":true}}",
+  "bodySha256": "a0ce384607b2ddaa5b70a0a1d8de03363e1a9fc4d76608686baa2a6e6b6e07c3",
+  "canonical": "audoryn-entitlements-v1\nconsole-entitlements-test\nagentgate\nentitlements.write\nPOST\n/internal/console/entitlements/v1/snapshots\n1791626400\n0123456789abcdef0123456789abcdef\na0ce384607b2ddaa5b70a0a1d8de03363e1a9fc4d76608686baa2a6e6b6e07c3",
+  "signature": "v1=afff8d7773593833613b1e8db675ce6149ebc61c70dcbd32955d93f2185211ef"
+}

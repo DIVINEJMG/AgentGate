@@ -141,9 +141,9 @@
         "runtime.step:plan:continue": 1
       },
       "qstashTotal": 6,
-      "dbStatementsTotal": 182,
+      "dbStatementsTotal": 183,
       "dbRowsTotal": 97,
-      "dbBytesRead": 34394,
+      "dbBytesRead": 34696,
       "redisTotal": 81,
       "largestPromptChars": 7025
     }
@@ -405,9 +405,9 @@
         "runtime.step:plan:continue": 2
       },
       "qstashTotal": 10,
-      "dbStatementsTotal": 277,
+      "dbStatementsTotal": 278,
       "dbRowsTotal": 178,
-      "dbBytesRead": 63482,
+      "dbBytesRead": 63986,
       "redisTotal": 122,
       "largestPromptChars": 8098
     }
@@ -599,9 +599,9 @@
         "runtime.step:resume:continue": 1
       },
       "qstashTotal": 8,
-      "dbStatementsTotal": 226,
+      "dbStatementsTotal": 227,
       "dbRowsTotal": 133,
-      "dbBytesRead": 46439,
+      "dbBytesRead": 46849,
       "redisTotal": 101,
       "largestPromptChars": 6630
     }
@@ -748,9 +748,9 @@
         "runtime.step:plan:continue": 1
       },
       "qstashTotal": 6,
-      "dbStatementsTotal": 182,
+      "dbStatementsTotal": 183,
       "dbRowsTotal": 107,
-      "dbBytesRead": 36128,
+      "dbBytesRead": 36447,
       "redisTotal": 81,
       "largestPromptChars": 6968
     }
@@ -1268,9 +1268,9 @@
         "runtime.step:plan:continue": 8
       },
       "qstashTotal": 34,
-      "dbStatementsTotal": 841,
+      "dbStatementsTotal": 842,
       "dbRowsTotal": 657,
-      "dbBytesRead": 245022,
+      "dbBytesRead": 246714,
       "redisTotal": 368,
       "largestPromptChars": 14067
     }
@@ -1629,9 +1629,9 @@
         "runtime.step:plan:continue": 5
       },
       "qstashTotal": 22,
-      "dbStatementsTotal": 559,
+      "dbStatementsTotal": 560,
       "dbRowsTotal": 387,
-      "dbBytesRead": 423670,
+      "dbBytesRead": 424806,
       "redisTotal": 245,
       "largestPromptChars": 14452
     }
@@ -1784,9 +1784,9 @@
         "runtime.step:plan:continue": 1
       },
       "qstashTotal": 8,
-      "dbStatementsTotal": 196,
+      "dbStatementsTotal": 197,
       "dbRowsTotal": 107,
-      "dbBytesRead": 45382,
+      "dbBytesRead": 45765,
       "redisTotal": 81,
       "largestPromptChars": 7372
     }
@@ -1978,9 +1978,9 @@
         "runtime.step:resume:continue": 1
       },
       "qstashTotal": 8,
-      "dbStatementsTotal": 228,
+      "dbStatementsTotal": 229,
       "dbRowsTotal": 133,
-      "dbBytesRead": 47081,
+      "dbBytesRead": 47495,
       "redisTotal": 101,
       "largestPromptChars": 6663
     }
@@ -2097,9 +2097,9 @@
         "runtime.step:resume:completed": 1
       },
       "qstashTotal": 6,
-      "dbStatementsTotal": 154,
+      "dbStatementsTotal": 155,
       "dbRowsTotal": 85,
-      "dbBytesRead": 27686,
+      "dbBytesRead": 27936,
       "redisTotal": 67,
       "largestPromptChars": 5210
     }
@@ -2370,9 +2370,9 @@
         "runtime.step:resume:continue": 1
       },
       "qstashTotal": 12,
-      "dbStatementsTotal": 335,
+      "dbStatementsTotal": 336,
       "dbRowsTotal": 226,
-      "dbBytesRead": 80033,
+      "dbBytesRead": 80656,
       "redisTotal": 142,
       "largestPromptChars": 7755
     }
@@ -2519,9 +2519,9 @@
         "runtime.step:plan:continue": 1
       },
       "qstashTotal": 6,
-      "dbStatementsTotal": 182,
+      "dbStatementsTotal": 183,
       "dbRowsTotal": 97,
-      "dbBytesRead": 34604,
+      "dbBytesRead": 34911,
       "redisTotal": 81,
       "largestPromptChars": 7070
     }
@@ -2666,9 +2666,9 @@
         "runtime.step:plan:continue": 1
       },
       "qstashTotal": 6,
-      "dbStatementsTotal": 182,
+      "dbStatementsTotal": 183,
       "dbRowsTotal": 97,
-      "dbBytesRead": 34673,
+      "dbBytesRead": 34979,
       "redisTotal": 81,
       "largestPromptChars": 7084
     }
@@ -2815,9 +2815,9 @@
         "runtime.step:plan:continue": 1
       },
       "qstashTotal": 6,
-      "dbStatementsTotal": 186,
+      "dbStatementsTotal": 187,
       "dbRowsTotal": 98,
-      "dbBytesRead": 34989,
+      "dbBytesRead": 35291,
       "redisTotal": 87,
       "largestPromptChars": 7294
     }
@@ -4491,9 +4491,9 @@
         "runtime.step:plan:continue": 30
       },
       "qstashTotal": 122,
-      "dbStatementsTotal": 2909,
+      "dbStatementsTotal": 2910,
       "dbRowsTotal": 4012,
-      "dbBytesRead": 1211776,
+      "dbBytesRead": 1218027,
       "redisTotal": 1270,
       "largestPromptChars": 21745
     }
@@ -4889,9 +4889,9 @@
         "runtime.step:plan:continue": 5
       },
       "qstashTotal": 22,
-      "dbStatementsTotal": 570,
+      "dbStatementsTotal": 571,
       "dbRowsTotal": 392,
-      "dbBytesRead": 153064,
+      "dbBytesRead": 154226,
       "redisTotal": 255,
       "largestPromptChars": 12983
     }

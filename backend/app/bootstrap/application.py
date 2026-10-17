@@ -23,6 +23,8 @@ def create_application() -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Correlation-ID"],
+        # Which plan limit refused new work (402), so the app can show its upgrade prompt.
+        expose_headers=["X-Plan-Limit"],
     )
     application.add_middleware(GitHubOAuthQueryMiddleware)
     application.include_router(api_router)

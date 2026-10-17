@@ -378,3 +378,25 @@ test('with nothing published yet, fixed pages use their built-in content', async
   assert.equal(result.status, 200);
   assert.equal(result.source, 'default');
 });
+
+test('the changelog for the workspace app lists verified changelog pages, newest first', async () => {
+  const entry = (id, slug, title, published, kicker, contentType = 'changelog') => {
+    const doc = {contract: 'audoryn.public.v2', page: 'article', sections: {article: {
+      ...(kicker ? {kicker} : {}), title, summary: title + ' summary', published,
+      sections: [{id: 'what', heading: 'What changed', paragraphs: ['Details.'], points: [], links: []}]}}};
+    return envelope(doc, {pageId: id, slug, title, contentType});
+  };
+  const pages = [
+    entry('c1', '/changelog/older', 'Older fix', '2026-10-01', 'Fix'),
+    entry('c2', '/changelog/newer', 'Newer feature', '2026-10-15', 'New'),
+    entry('c3', '/changelog/tampered', 'Tampered', '2026-10-16', 'New'),
+    entry('a1', '/resources/guide', 'A guide', '2026-10-16', undefined, 'article'),
+  ];
+  const loader = make(storage({pages, checksums: {2: 'f'.repeat(64)}}));
+  const entries = await loader.changelog();
+  assert.deepEqual(entries.map(item => [item.id, item.path, item.tag, item.published]), [
+    ['c2', '/changelog/newer', 'New', '2026-10-15'], ['c1', '/changelog/older', 'Fix', '2026-10-01']]);
+  assert.equal(entries[0].summary, 'Newer feature summary');
+  assert.equal(await loader.changelog(), entries, 'cached for the same release');
+  assert.deepEqual(await make(storage({pages}), {enabled: false}).changelog(), []);
+});

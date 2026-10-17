@@ -7,6 +7,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.application.services import entitlements
 from app.application.services.integration_events import process_event
 from app.application.services.integration_tasks import prepare_integration_task
 from app.application.services.integration_worker_readiness import reconcile_worker_job
@@ -73,6 +74,10 @@ async def process(request: Request, upstash_signature: str | None = Header(defau
             row = await session.get(IntegrationEventInbox, signal.event_id)
             if not row or row.organization_id != signal.organization_id:
                 raise HTTPException(404, "Integration event not found.")
-            await process_event(session, row.id)
+            try:
+                await entitlements.require_feature(session, row.organization_id, "events.enabled")
+                await process_event(session, row.id)
+            except entitlements.EntitlementDenied:
+                row.status = "ignored"  # recorded; the plan does not include reacting to events now
         await session.commit()
     return {"status": "processed"}

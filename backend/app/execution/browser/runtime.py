@@ -212,6 +212,7 @@ class BrowserRuntimeContract(Protocol):
         run_id: UUID | None,
         ttl_seconds: int = 1800,
         navigation_policy: BrowserDomainPolicy | None = None,
+        organization_sessions: int | None = None,
     ) -> BrowserSession: ...
 
     async def resume(
@@ -1072,7 +1073,7 @@ class BrowserRuntime:
         )
         return response
 
-    def _check_local_capacity(self, organization_id: UUID) -> None:
+    def _check_local_capacity(self, organization_id: UUID, organization_sessions: int) -> None:
         """Memory pressure and this server's session limits, before any lease is taken."""
         current_memory = self._memory_snapshot()
         if (
@@ -1087,7 +1088,7 @@ class BrowserRuntime:
                 handle.session.organization_id == organization_id
                 for handle in self._sessions.values()
             )
-            >= self._max_sessions_per_organization
+            >= organization_sessions
         ):
             raise BrowserCapacityUnavailable("Organization browser capacity is in use.")
 
@@ -1099,9 +1100,13 @@ class BrowserRuntime:
         run_id: UUID | None,
         ttl_seconds: int = 1800,
         navigation_policy: BrowserDomainPolicy | None = None,
+        organization_sessions: int | None = None,
     ) -> BrowserSession:
+        # The organisation's plan sets its concurrent sessions; the server's setting otherwise.
+        if organization_sessions is None:
+            organization_sessions = self._max_sessions_per_organization
         async with self._capacity_lock:
-            self._check_local_capacity(organization_id)
+            self._check_local_capacity(organization_id, organization_sessions)
             lease_ttl = max(120, min(ttl_seconds, 900) + 120)
             capacity_lease: Lease | None = None
             organization_lease: Lease | None = None
@@ -1124,7 +1129,7 @@ class BrowserRuntime:
                         )
                     organization_lease = await self._acquire_slot(
                         f"browser-org:{organization_id}",
-                        self._max_sessions_per_organization,
+                        organization_sessions,
                         lease_ttl,
                     )
                     if organization_lease is None:

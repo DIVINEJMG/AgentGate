@@ -25,6 +25,9 @@ const MAX_CACHED_DOCUMENTS = 128;
 const MAX_CACHED_BYTES = 16 * 1024 * 1024;
 const MAX_PREVIOUS_BUNDLES = 8;
 
+// Changelog pages read for the workspace app, at most, per release.
+const MAX_CHANGELOG_PAGES = 40;
+export type ChangelogEntry = {id: string; path: string; title: string; summary: string; published: string; tag: string | null; image: string | null};
 export type Pointer = {schemaVersion: number; version: number; eventId: string; checksum: string; releaseUrl: string; releaseChecksum: string};
 export type PageIndex = {pageId: string; revisionId: string; locale: string; slug: string; title: string; contentType: string; rendererContract: string; url: string; checksum: string};
 export type Asset = {id: string; url: string; mediaType: string; checksumSha256: string; sizeBytes: number; width?: number; height?: number; verification?: {formatVerified?: boolean; checksumSha256?: string}};
@@ -45,6 +48,7 @@ export class SiteLoader {
   private current: {pointer: Pointer; release: Release; etag: string; checked: number} | null = null;
   private pointerRequest: Promise<{pointer: Pointer; release: Release}> | null = null;
   private previous = new Map<string, SiteBundle>();
+  private changelogCache: {checksum: string; entries: ChangelogEntry[]} | null = null;
   readonly metrics = {requests: 0, bytes: 0, cacheHits: 0};
 
   constructor(readonly config: SiteConfig, private fetcher: typeof fetch = fetch, private clock = () => Date.now(), private log: (category: string) => void = category => console.warn('Public content', {category})) {}
@@ -140,6 +144,27 @@ export class SiteLoader {
     })();
     this.pointerRequest = work;
     try {return await work;} finally {this.pointerRequest = null;}
+  }
+
+  /** The newest published changelog entries, for the workspace app's "What's new". Each entry is
+   *  read through `load`, so it is verified exactly like a page; anything invalid is left out. */
+  async changelog(limit = 20): Promise<ChangelogEntry[]> {
+    if (!this.config.enabled) return [];
+    const {release} = await this.release().catch(() => this.current ?? {release: null});
+    if (!release) return [];
+    if (this.changelogCache?.checksum === release.checksum) return this.changelogCache.entries;
+    const pages = release.pages.filter(item => item.locale === this.config.locale && item.contentType === 'changelog' && item.rendererContract === CONTRACT).slice(0, MAX_CHANGELOG_PAGES);
+    const entries: ChangelogEntry[] = [];
+    for (const index of pages) {
+      const bundle = await this.load(index.slug);
+      const article = bundle.source === 'published' && bundle.page?.page === 'article' ? bundle.page.sections.article : null;
+      if (!article) continue;
+      entries.push({id: index.pageId, path: index.slug, title: article.title, summary: article.summary, published: article.published ?? release.publishedAt,
+        tag: article.kicker ?? null, image: article.image ? bundle.assets[article.image.asset]?.url ?? null : null});
+    }
+    entries.sort((a, b) => Date.parse(b.published) - Date.parse(a.published));
+    this.changelogCache = {checksum: release.checksum, entries: entries.slice(0, limit)};
+    return this.changelogCache.entries;
   }
 
   /** The bundle for a path. Never throws for content problems; see the file header. */

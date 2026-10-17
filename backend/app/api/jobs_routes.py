@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth_dependencies import organization_principal
 from app.api.product_common import append_audit, not_found, require_permission, utcnow
 from app.api.workforce_routes import automatic_agent, create_worker
+from app.application.services import entitlements
 from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
 from app.execution.bootstrap import execution_provider_registry
@@ -121,6 +122,17 @@ def _next_schedule_occurrence(
             continue
         return candidate.astimezone(UTC)
     return (local_after + timedelta(days=1)).astimezone(UTC)
+
+
+async def _require_plan_interval(session: AsyncSession, organization_id: UUID, schedule: dict[str, Any]) -> None:
+    """A repeating schedule runs no more often than the organisation's plan allows."""
+    if not schedule.get("enabled") or str(schedule.get("cadence")) != "interval":
+        return
+    minimum = await entitlements.plan_number(session, organization_id, "schedules.min_interval_minutes")
+    if minimum is not None and int(schedule.get("intervalMinutes") or 60) < minimum:
+        raise entitlements.EntitlementDenied(
+            f"Your plan runs a scheduled job at most every {minimum} minutes. Choose a longer interval "
+            "or ask your administrator to upgrade the plan.", "schedules.min_interval_minutes")
 
 
 def _quick_trigger_payload(timing: dict[str, Any]) -> dict[str, Any]:
@@ -434,6 +446,9 @@ async def create_job(
     )
     if worker is None:
         raise not_found("Worker")
+    autonomy = payload.get("autonomy")
+    if not (isinstance(autonomy, dict) and autonomy.get("oneShot")):  # a one-time task's job is not standing
+        await entitlements.require_room(session, organization_id, "jobs.per_worker.max", worker_id=worker_id)
     name = str(payload.get("name", "")).strip()
     if len(name) < 2:
         raise HTTPException(400, "Job name must be at least 2 characters.")
@@ -909,6 +924,7 @@ async def save_trigger_config(
     schedule: dict[str, Any] = (
         dict(raw_schedule) if isinstance(raw_schedule, dict) else {}
     )
+    await _require_plan_interval(session, organization_id, schedule)
     next_due = (
         _next_schedule_occurrence(schedule, now).isoformat()
         if bool(schedule.get("enabled"))

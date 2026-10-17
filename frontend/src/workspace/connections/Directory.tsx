@@ -8,6 +8,7 @@ import { linkProps } from '../routes';
 import { Ago, EmptyState, Notice, Section, SkeletonLines, sentence } from '../ui';
 import { ConnectionsHeader, Pulse, ToolMark } from './Chrome';
 import { ConnectFlow } from './ConnectFlow';
+import { PlanFeatureNotice } from '../upgrade';
 import { HEALTH_TONE, RISK_TONE, SIGN_IN_LABEL, toolBySlug, TOOLS, useConnections, type ConnectionsData, type Tool } from './data';
 
 const needsVault = (tool: Tool, data: ConnectionsData | null) => tool.credential === 'required' && data?.security?.credentialVaultConfigured === false;
@@ -71,6 +72,8 @@ export function ToolPage({ organization, apiVersion, slug }: { organization: Org
     {!tool.available && <Notice tone='info'><Clock3 size={14} /> Not available yet. {tool.unavailableReason}</Notice>}
     {vaultMissing && <Notice tone='warn'><LockKeyhole size={14} /> {tool.name} needs the credential vault, which isn’t set up in this workspace. Ask an administrator to configure it.</Notice>}
     {githubApp && data?.github && !data.github.authenticationConfigured && <Notice tone='warn'>The GitHub App isn’t fully configured on the server yet, so GitHub can’t be connected.</Notice>}
+    {tool.provider === 'browser' && <PlanFeatureNotice feature='browser.enabled'><strong>Browser work</strong> lets workers read and act on websites.</PlanFeatureNotice>}
+    {tool.provider === 'github' && <PlanFeatureNotice feature='coding.enabled'><strong>Coding work</strong> lets workers write, test and change code in your repositories.</PlanFeatureNotice>}
     {!canManage && tool.available && <Notice tone='info'><Users size={14} /> Your role can see connections but not add them. Ask someone with connection access.</Notice>}
 
     {!data ? <SkeletonLines rows={5} /> : <>

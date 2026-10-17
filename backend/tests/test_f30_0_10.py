@@ -52,8 +52,9 @@ class FakeBrowserRuntime:
         run_id,
         ttl_seconds=1800,
         navigation_policy=None,
+        organization_sessions=None,
     ) -> BrowserSession:
-        del navigation_policy
+        del navigation_policy, organization_sessions
         now = datetime.now(UTC)
         session = BrowserSession(
             id=uuid4(),
