@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.jobs_routes import update_job
 from app.api.product_common import append_audit, utcnow
+from app.application.services import entitlements
 from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
 from app.execution.bootstrap import execution_provider_registry
@@ -172,6 +173,16 @@ def browser_origins_covered(
     return required.issubset(available)
 
 
+def _managed_session_settings() -> dict[str, str]:
+    """The browser session settings every AgentGate-managed origin keeps."""
+    return {
+        "loadVisualResources": "false",
+        "captureDomSnapshot": "false",
+        "sessionTtlSeconds": str(settings.browser_session_ttl_seconds),
+        "maxPages": str(settings.browser_max_pages_per_session),
+    }
+
+
 async def ensure_managed_browser_origins(
     session: AsyncSession,
     *,
@@ -229,12 +240,7 @@ async def ensure_managed_browser_origins(
                 dict(current.config) if isinstance(current.config, dict) else {}
             )
             if current_config.get("managedBy") == "worker_autonomy":
-                desired = {
-                    "loadVisualResources": "false",
-                    "captureDomSnapshot": "false",
-                    "sessionTtlSeconds": str(settings.browser_session_ttl_seconds),
-                    "maxPages": str(settings.browser_max_pages_per_session),
-                }
+                desired = _managed_session_settings()
                 if any(current_config.get(key) != value for key, value in desired.items()):
                     now = utcnow()
                     current.config = {
@@ -253,10 +259,7 @@ async def ensure_managed_browser_origins(
             "displayName": f"Managed web · {host}",
             "enableFileTransfer": "false",
             "allowPrivateNetwork": "false",
-            "loadVisualResources": "false",
-            "captureDomSnapshot": "false",
-            "sessionTtlSeconds": str(settings.browser_session_ttl_seconds),
-            "maxPages": str(settings.browser_max_pages_per_session),
+            **_managed_session_settings(),
         }
         resources = await provider.discover_resources(
             configuration=configuration,
@@ -267,6 +270,7 @@ async def ensure_managed_browser_origins(
                 "Managed Browser origin discovery did not resolve exactly one resource."
             )
         resource = resources[0]
+        await entitlements.require_room(session, organization_id, "connections.max")
         now = utcnow()
         integration = Integration(
             organization_id=organization_id,

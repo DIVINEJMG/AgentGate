@@ -434,6 +434,13 @@
 .ws-meter { height: 8px; overflow: hidden; border-radius: 4px; background: var(--ws-s3); }
 .ws-meter span { display: block; height: 100%; border-radius: 4px; background: var(--ws-live); transition: width .4s ease; }
 .ws-meter[data-tone="warn"] span { background: var(--ws-warn); }
+.ws-meter[data-tone="danger"] span { background: var(--ws-danger); }
+.ws-limits { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px 28px; }
+.ws-limit { display: grid; gap: 7px; }
+.ws-plan-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 16px 18px; border: 1px solid color-mix(in srgb, var(--ws-accent) 35%, var(--ws-line)); border-radius: var(--ws-radius); background: linear-gradient(90deg, color-mix(in srgb, var(--ws-accent) 8%, var(--ws-surface)), var(--ws-surface)); }
+.ws-plan-cta p { margin-top: 2px; }
+.ws-limit-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; font-size: 13.5px; }
+.ws-limit-head span { color: var(--ws-text-2); font-variant-numeric: tabular-nums; }
 .ws-checklist { margin-top: 8px; }
 .ws-check-dot { display: grid; place-items: center; width: 20px; height: 20px; border: 1.5px solid var(--ws-line-strong); border-radius: 50%; }
 .ws-checklist li[data-done="true"] .ws-check-dot { border-color: var(--ws-live); background: var(--ws-live); color: var(--ws-accent-ink); }
@@ -441,6 +448,7 @@
 .ws-plan { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 40px; align-items: center; padding: 24px 0; border-top: 1px solid var(--ws-line); border-bottom: 1px solid var(--ws-line); }
 .ws-plan-main h2 { margin: 2px 0 6px; font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
 .ws-plan-main p { color: var(--ws-text-2); }
+.ws-plan .ws-facts { padding: 0; border: 0; }
 .ws-plan-capacity { display: grid; gap: 10px; }
 .ws-plan-reading { display: flex; align-items: baseline; gap: 8px; }
 .ws-plan-reading strong { font-size: 32px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }

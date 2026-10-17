@@ -3,6 +3,7 @@ from fastapi import APIRouter, Response, status
 from app.api.github_routes import callback_router as github_callback_router
 from app.api.integration_foundation_routes import event_router as integration_event_router
 from app.api.internal.ai import router as internal_ai_router
+from app.api.internal.console_entitlements import router as internal_console_entitlements_router
 from app.api.internal.console_reads import router as internal_console_reads_router
 from app.api.internal.integrations import router as internal_integrations_router
 from app.api.internal.migration import router as internal_migration_router
@@ -38,6 +39,7 @@ async def ready(response: Response) -> dict[str, object]:
 api_router.include_router(realtime_ws_router)
 api_router.include_router(internal_ai_router)
 api_router.include_router(internal_console_reads_router)
+api_router.include_router(internal_console_entitlements_router)
 api_router.include_router(internal_integrations_router)
 api_router.include_router(internal_migration_router)
 api_router.include_router(internal_outbox_router)

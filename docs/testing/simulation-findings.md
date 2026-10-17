@@ -1405,6 +1405,133 @@ All checks worked except the three below.
 - **Simulator note:** the simulation workspace's policies require approval for clicks too;
   Oracle's allowed them. Approving those clicks in the simulator matched Oracle's behaviour.
 
+## F51: The simulator's GitHub connection is refused
+
+- **Severity:** Low (simulation only; blocks GitHub and coding scenarios there).
+- **Found in:** the commercial phase 1 check, 16 October: a read-only coding task on
+  `DIVINEJMG/school` stopped at its first GitHub call, `repository.branch.read`, with
+  "GitHub rejected authorization or renewal. Reconnect the account." (`ProviderTransportError`).
+  Nothing in phase 1 touches GitHub; the browser task before it ran normally.
+- **Cause:** the simulation branch is a copy of production, including production's GitHub
+  sign-in. GitHub refresh tokens are single-use, so once production renewed its copy, the
+  simulation's copy was refused.
+- **Fixed (16 October):** the owner reconnected GitHub in the simulation app. `.env.sim` (local,
+  git-ignored) now sets `GITHUB_CALLBACK_URL` and `GITHUB_LOGIN_CALLBACK_URL` to the simulation
+  tunnel, and those two callbacks were added to the GitHub App beside production's. The webhook and
+  setup URLs stay on production (a GitHub App has only one of each). A new tunnel address needs
+  both updated. The coding task then ran.
+
+## F52: A one-time chat task was checked as a standing job
+
+- **Severity:** High if enforcement were on (a chat browser task would be refused whenever its
+  worker had used its standing jobs). Found before release; enforcement was off everywhere else.
+- **Found in:** the commercial phase 2 check, 16 October, with enforcement switched on in the
+  simulator: a chat browser task stopped inside `create_job`, which chat tasks also use for their
+  one-time job, on the standing-jobs limit.
+- **Fixed:** `create_job` checks the standing-jobs limit only for a job that is not one-time
+  (`autonomy.oneShot`), matching how the limit counts. A test covers both kinds.
+
+## F53: The Console gave up when AgentGate held a newer plan version
+
+- **Severity:** Medium (a workspace would keep a plan the Console no longer has until someone
+  noticed).
+- **Found in:** the phase 3 end-to-end run, 16 October: AgentGate (simulation) held version 4 of a
+  workspace's plan from the phase 2 tests; the Console's first snapshot was version 1, answered
+  `stale`, and was marked exhausted. In production only the Console sends plans, so this needs a
+  restored or reset Console outbox, but it must heal.
+- **Fixed:** a `stale` answer re-stages the Console's plan as the version after AgentGate's and
+  sends it; the reconcile does the same when AgentGate's version is ahead. The Console's plan is
+  the truth. Tests on both paths; seen live: the Team plan went out as version 5 and was applied.
+
+## F54: Re-applying a lost plan failed with a bare 500
+
+- **Severity:** Medium.
+- **Found in:** the same run, after deleting the workspace's current plan in AgentGate (simulating
+  a lost plan): the reconcile resent version 5, AgentGate's history already had version 5, the
+  insert failed and the route answered a bare 500, which the Console treated as final.
+- **Fixed:**
+  - AgentGate keeps the first copy of each version in the history and applies the plan again.
+  - Any unexpected failure on the channel is the contract's `unavailable` answer (503), never a
+    bare 500; the error type is logged.
+  - The Console retries an answer without a contract body when the status is 500 or above.
+  - Tests on all three; seen live: the lost plan was restored by the reconcile.
+
+## F55: Test fakes no longer matched the browser runtime
+
+- **Severity:** Low (tests only; type-check failed, tests passed).
+- **Found in:** the phase 4 full type-check. Phase 2 added `organization_sessions` to the browser
+  runtime's `create_session`; eight fake runtimes in the tests still had the old signature (46
+  pyright errors). The phase 2 and 3 checks had type-checked the changed files only.
+- **Fixed:** the fakes take the new keyword; pyright reports 0 errors. Full checks run on the
+  whole tree from now on.
+
+## F56: Two signed-reads tests depend on the laptop's settings
+
+- **Severity:** Low (laptop only).
+- **Found in:** phase 4, after switching the signed reads on in the laptop `.env` files. Both tests
+  read that `.env` and expect the reads off:
+  - AgentGate `test_console_reads_foundation.py::test_default_settings_keep_every_route_hidden`;
+  - Console `test_console_separation.py::test_platform_boundary_preserves_rbac_and_reports_unconfigured`
+    (with the reads on it really read the simulator and got 200).
+  With the reads off both suites pass in full (AgentGate's 47 reads tests, the Console's 351); CI
+  has no `.env`.
+- **Not changed:** they are signed-reads files, which this work does not touch (owner's rule). Run
+  them with `CONSOLE_READS_ENABLED=false` / `AGENTGATE_READS_ENABLED=false`, or make them ignore
+  `.env` in a separate reads change.
+
+## F57: Switching enforcement on would have stopped existing workspaces
+
+- **Severity:** High if missed (every workspace created before the first template had no plan,
+  so all new work would have been refused once enforcement was on).
+- **Found in:** phase 4 planning: production has 7 workspaces and no plans; the simulator had 3
+  of 4 without one.
+- **Fixed:** a delivered template starts every workspace without a plan on it; the cutover order
+  in the handoff checks that every workspace has a plan before enforcement is switched on. Seen
+  live: the simulator's 3 workspaces started on Free when template 2 arrived.
+
+## F58: Webhook records hit the Console's append-only billing history
+
+- **Severity:** High (the first real Paystack payment webhook failed with a 500).
+- **Found in:** the phase 5 sandbox run. The Console's database refuses updates to billing
+  history (payments, attempts, refunds, webhook events, ledger); the webhook handler stored an
+  event as "received" and then updated it. The test fakes did not have the rule.
+- **Fixed:** an event is recorded once, with its outcome, in the same transaction as what it
+  changed; a failed attempt records nothing and the provider's retry is processed afresh; the
+  unique (provider, event) key stops two deliveries applying. The fakes now refuse a second record.
+  Seen live: Paystack's retry was applied.
+
+## F59: A checkout the provider declined lost the provider's price
+
+- **Severity:** Medium (orphan prices at the provider; a misleading message).
+- **Found in:** the sandbox run: Paystack refused a `.test` email address (400); the whole
+  transaction rolled back, including the Paystack plan just created, and the person was told the
+  provider "could not be reached".
+- **Fixed:** the provider price and the checkout (as `failed`, with the provider's code) are kept;
+  the message says the provider declined. Test added.
+
+## F60: The Paddle destination's ID was accepted as its secret
+
+- **Severity:** Medium (every Paddle webhook refused as unsigned until noticed).
+- **Found in:** the sandbox run: `PADDLE_WEBHOOK_SECRET` held the destination ID (`ntfset_…`)
+  instead of its secret key (`pdl_ntfset_…`).
+- **Fixed:** the Console refuses to start with a value that is not a `pdl_ntfset_` secret key and
+  says which one is needed. The refusals themselves were correct (nothing was applied).
+
+## F61: A settings error printed part of a secret
+
+- **Severity:** Medium (a key fragment could reach server logs).
+- **Found in:** the sandbox setup: pydantic's validation error included the settings' input values.
+- **Fixed:** both apps' settings hide input values in errors (`hide_input_in_errors`); the exposed
+  laptop billing key pair was replaced.
+
+## F62: A subscription notice before its payment was ignored for good
+
+- **Severity:** Low (no harm here: the payment reads the subscription from Paystack).
+- **Found in:** the sandbox run: Paystack's `subscription.create` arrived before the payment was
+  applied and was recorded as ignored, so its retry would be a duplicate.
+- **Fixed:** such an event is not recorded and answered 503, so the provider sends it again after
+  the payment. Test added.
+
 ## Where the simulator had an advantage
 
 Each row is a point where the simulator used something a live model does not have. Every one

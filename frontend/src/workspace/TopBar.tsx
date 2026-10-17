@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, ChevronRight } from 'lucide-react';
 import { toolBySlug } from './connections/data';
 import { canStep, goTo, nameEntry, useHistoryState, usePageTitles } from './history';
 import { useLive } from './live';
+import { NewsBell } from './news';
 import { linkProps, queryParam, type WorkspaceRoute } from './routes';
 import { sentence } from './ui';
 
@@ -50,6 +51,7 @@ export function useCrumbs(route: WorkspaceRoute): Crumb[] {
       return tab && tab !== 'overview' ? [home, { label: name, to: { page: 'connections', view: 'account', id: route.id } }, { label: TAB_LABEL[tab] ?? sentence(tab) }] : [home, { label: name }];
     }
     case 'settings': return route.section === 'workspace' ? [{ label: 'Settings' }] : [top('settings', { page: 'settings', section: 'workspace' }), { label: route.section === 'billing' ? 'Usage & billing' : 'Developer' }];
+    case 'plans': return [top('settings', { page: 'settings', section: 'billing' }), { label: 'Plans' }];
     default: return [{ label: PAGE_LABEL[route.page] ?? sentence(route.page) }];
   }
 }
@@ -109,6 +111,7 @@ export function TopBar({ route }: { route: WorkspaceRoute }) {
         </li>;
       })}</ol>
     </nav>
+    <NewsBell />
   </div>;
 }
 

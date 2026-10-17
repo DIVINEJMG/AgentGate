@@ -205,14 +205,39 @@ async def append_live_result_message(
         summary=summary,
         files=files,
     )
+    return await _post(session, item=item, worker=worker, thread=thread,
+                       content=summary[:12000] or f"{job.name} completed.", references=[reference],
+                       presentation={"presentation": "live_result", "result_id": str(result.id)})
+
+
+async def notify_task_conversation(session: AsyncSession, item: WorkItem, *, key: str, content: str) -> None:
+    """Tell a task's conversation something about it that has no result, such as a task the
+    organisation's plan did not start."""
+    if (item.payload or {}).get("integrationOrigin"):
+        from app.application.services.integration_foundation import notify_integration_work
+
+        await notify_integration_work(session, item, key=key, content=content)
+        return
+    job = await session.get(Job, item.job_id)
+    worker = await session.get(Worker, job.worker_id) if job is not None else None
+    if job is None or worker is None:
+        return
+    thread = await _delivery_thread(session, item=item, job=job, worker=worker)
+    if thread is not None:
+        await _post(session, item=item, worker=worker, thread=thread, content=content, references=[],
+                    presentation={"presentation": "worker_notice"})
+
+
+async def _post(session: AsyncSession, *, item: WorkItem, worker: Worker, thread: ConversationThread,
+                content: str, references: list[dict[str, Any]], presentation: dict[str, str]) -> ConversationMessage:
     message = ConversationMessage(
         organization_id=item.organization_id,
         thread_id=thread.id,
         role="worker",
-        content=summary[:12000] or f"{job.name} completed.",
+        content=content,
         artifact_references=[],
         command_references=[],
-        result_references=[reference],
+        result_references=references,
     )
     session.add(message)
     thread.updated_at = utcnow()
@@ -228,8 +253,7 @@ async def append_live_result_message(
             "thread_id": str(thread.id),
             "message_id": str(message.id),
             "role": message.role,
-            "presentation": "live_result",
-            "result_id": str(result.id),
+            **presentation,
         },
     )
     return message

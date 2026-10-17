@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_dependencies import organization_principal
 from app.api.product_common import append_audit, not_found, require_permission, utcnow
+from app.application.services import entitlements
 from app.bootstrap.settings import settings
 from app.domain.identity.principals import HumanPrincipal
 from app.execution.bootstrap import execution_provider_registry
@@ -183,6 +184,7 @@ async def _connect(
         if existing_key == resource.external_id:
             raise HTTPException(409, "This provider resource is already connected.")
 
+    await entitlements.require_room(session, organization_id, "connections.max")
     fingerprint = (
         f"sha256:{hashlib.sha256(credential.encode()).hexdigest()[:12]}" if credential else None
     )

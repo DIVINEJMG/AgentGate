@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_dependencies import organization_principal
 from app.api.product_common import append_audit, not_found, require_permission, utcnow
+from app.application.services import entitlements
 from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.database.models import (
     AgentCredential,
@@ -318,6 +319,7 @@ async def create_worker(
     provisioning: str = "existing",
 ) -> Worker:
     require_permission(principal, "workforce.manage")
+    await entitlements.require_room(session, organization_id, "workers.max")
     try:
         agent_id = UUID(str(payload.get("agentIdentityId")))
     except ValueError as error:
@@ -460,6 +462,8 @@ async def set_worker_status(
     )
     if worker is None:
         raise not_found("Worker")
+    if worker.status == "archived" and new_status != "archived":
+        await entitlements.require_room(session, organization_id, "workers.max")
     worker.status = new_status
     await session.commit()
     await session.refresh(worker)

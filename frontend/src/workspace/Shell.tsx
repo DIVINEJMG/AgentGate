@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import type { OrganizationAccess } from '../lib/identityApi';
 import { useLive } from './live';
+import { NewsBell } from './news';
 import { formatRoute, linkProps, navigate, sameSection, type WorkspaceRoute } from './routes';
 import type { ThemeChoice } from './theme';
 import { Avatar, Kbd } from './ui';
@@ -98,6 +99,7 @@ export function Shell({ route, organization, organizations, accountName, account
       <HistoryButtons compact />
       <span className='ws-mobile-org'>{organization.name}</span>
       <button type='button' className='ws-icon-button' aria-label='Search' onClick={() => setPaletteOpen(true)}><Search size={17} /></button>
+      <NewsBell compact />
       <a className='ws-icon-button ws-mobile-inbox' aria-label={`Inbox, ${live.inboxCount} need you`} {...linkProps({ page: 'inbox' })}><Inbox size={17} />{live.inboxCount > 0 && <i />}</a>
     </div>
     {mobileOpen && <button type='button' className='ws-scrim' aria-label='Close navigation' onClick={() => setMobileOpen(false)} />}
@@ -152,7 +154,7 @@ export function Shell({ route, organization, organizations, accountName, account
     </aside>
     <main className='ws-main' id='ws-main'><TopBar route={route} />{children}</main>
     <PageScrollbar routeKey={routeKey} />
-    <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={[...main, ...oversight, ...setup, { label: 'Settings', to: { page: 'settings', section: 'workspace' }, icon: Settings }, { label: 'Usage & billing', to: { page: 'settings', section: 'billing' }, icon: Settings }]} />
+    <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={[...main, ...oversight, ...setup, { label: 'Settings', to: { page: 'settings', section: 'workspace' }, icon: Settings }, { label: 'Usage & billing', to: { page: 'settings', section: 'billing' }, icon: Settings }, { label: 'Plans', to: { page: 'plans' }, icon: Settings }]} />
   </div>;
 }
 

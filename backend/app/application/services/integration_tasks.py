@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from pydantic import ValidationError
 from sqlalchemy import select
 
+from app.application.services import entitlements
 from app.application.services.grounding import grounded_in
 from app.application.services.integration_foundation import (
     IntegrationFoundation,
@@ -154,6 +155,9 @@ async def prepare_integration_task(session, command_id: UUID) -> None:
         await report_preparation_wait(session, command, status="policy_denied", category="policy_denial",
             message="Permanent integration responsibilities require permission to manage workers, capabilities and policies. This request has not granted standing authority.")
         return
+    if standing and (blocker := await _plan_blocker(session, command.organization_id, worker.id, trigger)):
+        await report_preparation_wait(session, command, status="policy_denied", category="policy_denial", message=blocker)
+        return
     job, revision = await _create_job(session, command, task, draft, worker, bindings, standing)
     if trigger is not None:
         await _set_up_event_trigger(session, command, task, draft, worker, job, revision, bindings, foundation)
@@ -224,6 +228,17 @@ async def _event_blocker(trigger) -> str | None:
         return (f"{provider_label(trigger.provider)} isn't sending “{setting}” events to Audoryn yet, so I "
                 f"can't react to them. In the GitHub App's settings, under Permissions & events, tick "
                 f"“{setting}” in Subscribe to events, then ask me again. Nothing was set up.")
+    return None
+
+
+async def _plan_blocker(session, organization_id, worker_id, trigger) -> str | None:
+    """Why the organisation's plan does not allow this standing job, or None."""
+    try:
+        if trigger is not None:
+            await entitlements.require_feature(session, organization_id, "events.enabled")
+        await entitlements.require_room(session, organization_id, "jobs.per_worker.max", worker_id=worker_id)
+    except entitlements.EntitlementDenied as denied:
+        return denied.message
     return None
 
 

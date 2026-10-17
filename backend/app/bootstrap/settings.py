@@ -54,6 +54,8 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+        # A configuration error names the setting, never its value (keys must not reach logs).
+        hide_input_in_errors=True,
     )
 
     environment: str = "development"
@@ -138,8 +140,11 @@ class Settings(BaseSettings):
     # 0 turns the check off (the scheduled QStash sweep remains the backstop).
     delivery_watchdog_seconds: int = Field(default=180, ge=0, le=3600)
     # Save the compute used by each runtime step and chat message in `usage_records`
-    # (one small insert each). Usage is always logged.
+    # (one small insert each), and count it into the organisation's plan period. Usage is always logged.
     usage_records_enabled: bool = True
+    # Enforce the plan limits the Console sends (commercial plan). Off: no check reads or refuses
+    # anything; usage is still counted for organisations that have a plan.
+    entitlements_enforcement: bool = False
     # A streamed AI response may use the whole planning budget while it keeps sending output;
     # a stream silent for this long is treated as a failed connection.
     planner_stream_silence_seconds: int = Field(default=300, ge=30, le=3600)
@@ -271,6 +276,26 @@ class Settings(BaseSettings):
     console_reads_clock_skew_seconds: int = 60
     console_reads_rate_per_minute: int = 120
     console_reads_statement_timeout_ms: int = 3000
+    # Plans the Console sends (commercial plan, phase 3); its own key, separate from the reads.
+    # See docs/integration/console-entitlements/.
+    console_entitlements_enabled: bool = False
+    console_entitlements_audience: str = "agentgate"
+    console_entitlements_key_id: str | None = None
+    console_entitlements_key_secret: SecretStr | None = None
+    console_entitlements_previous_key_id: str | None = None
+    console_entitlements_previous_key_secret: SecretStr | None = None
+    console_entitlements_clock_skew_seconds: int = 60
+    console_entitlements_rate_per_minute: int = 120
+
+    # Billing requests to the Console (commercial plan, phase 5): the workspace's plans and prices,
+    # starting a checkout, its status, and the provider's management page. Its own key and
+    # signature label (audoryn-billing-v1), separate from the reads and the entitlement channel.
+    console_billing_enabled: bool = False
+    console_billing_origin: str | None = None
+    console_billing_audience: str = "console"
+    console_billing_key_id: str | None = None
+    console_billing_key_secret: SecretStr | None = None
+    console_billing_timeout_seconds: float = 15.0
 
     @field_validator("database_url", mode="before")
     @classmethod

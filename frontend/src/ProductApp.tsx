@@ -26,9 +26,12 @@ import type { AppView } from './navigation';
 import { LiveProvider } from './workspace/live';
 import { formatRoute, navigate, routeForView, useRoute, type WorkspaceRoute } from './workspace/routes';
 import { Shell } from './workspace/Shell';
+import { NewsProvider } from './workspace/news';
+import { UpgradeBanner, UpgradeProvider } from './workspace/upgrade';
 import { useTheme } from './workspace/theme';
 import { RequestProgress, Toaster } from './workspace/feedback';
 import HomePage from './workspace/pages/HomePage';
+import PlansPage from './workspace/pages/PlansPage';
 import InboxPage from './workspace/pages/InboxPage';
 import ResultsPage from './workspace/pages/ResultsPage';
 import ActivityPage from './workspace/pages/ActivityPage';
@@ -254,6 +257,7 @@ export default function ProductApp({ entryMode, onBack, onSignedIn, onModeChange
         if (current.view === 'identities') return <AgentsPanel {...common} user={signedInUser} identityId={current.id} onCountChange={() => {}} />;
         if (current.view === 'access') return <AccessMap organization={organization} apiVersion={apiVersion} />;
         return <ConnectionsHome organization={organization} apiVersion={apiVersion} />;
+      case 'plans': return <PlansPage organization={organization} apiVersion={apiVersion} />;
       case 'settings': return current.section === 'billing' ? <CommercialPanel {...common} /> : current.section === 'developer' ? <DeveloperSettings apiVersion={apiVersion} onApiVersionChange={setApiVersion} /> : <SettingsPanel {...common} onWorkspaceUpdated={(name) => setOrganizations((items) => items.map((item) => item.id === organization.id ? { ...item, name } : item))} />;
     }
   }
@@ -261,11 +265,16 @@ export default function ProductApp({ entryMode, onBack, onSignedIn, onModeChange
   return <LiveProvider organization={organization} apiVersion={apiVersion}>
     <RequestProgress />
     <OnboardingProvider onboarding={onboarding.value} refresh={refreshOnboarding} dismiss={dismissChecklist}>
+    <UpgradeProvider organization={organization} apiVersion={apiVersion}>
+    <NewsProvider organization={organization} apiVersion={apiVersion}>
     <Shell route={route} organization={organization} organizations={organizations} accountName={accountLabel} accountEmail={signedInUser.email} theme={theme} onTheme={chooseTheme}
       onSwitchOrganization={(chosen) => { setOrganizations((items) => [chosen, ...items.filter((item) => item.id !== chosen.id)]); navigate({ page: 'home' }); }}
       onSignOut={previewContext ? undefined : () => void handleSignOut()} preview={previewContext ? { onExit: onBack } : undefined}>
+      <UpgradeBanner />
       {page(route)}
     </Shell>
+    </NewsProvider>
+    </UpgradeProvider>
     </OnboardingProvider>
     <Toaster />
   </LiveProvider>;

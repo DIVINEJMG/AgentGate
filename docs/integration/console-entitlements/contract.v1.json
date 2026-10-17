@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://audoryn.app/contracts/console-entitlements/v1",
+  "title": "Console entitlement channel, version 1",
+  "description": "Plans the Console sends to AgentGate (commercial plan, phase 3). Requests are signed with audoryn-entitlements-v1 (see signing-vector.json and backend/app/application/console_entitlements.py). Routes, under /internal/console/entitlements/v1: POST /snapshots (scope entitlements.write, body: snapshot), POST /template (scope entitlements.write, body: template), GET /status?after=<organizationId>&limit=1..200 (scope entitlements.read). Every response is {version: 1, data} or {version: 1, error: {code, message}}; error codes: not_found (channel off), unauthorized, invalid, unknown_organization, rate_limited, unavailable.",
+  "$defs": {
+    "status": {"enum": ["trialing", "active", "past_due", "paused", "cancelled", "expired"]},
+    "entitlements": {
+      "description": "Named limits: true/false for a feature, a whole number of at least 0 for a limit. A name the plan does not give is 0 or not included (never unlimited).",
+      "type": "object",
+      "additionalProperties": {"oneOf": [{"type": "boolean"}, {"type": "integer", "minimum": 0}]}
+    },
+    "planCode": {"type": ["string", "null"], "maxLength": 64},
+    "planName": {"description": "The plan's name as the Console shows it, for the workspace's Usage & billing page.", "type": ["string", "null"], "maxLength": 120},
+    "snapshot": {
+      "description": "One organisation's plan. AgentGate applies only a version higher than the one it holds; the same version answers already_applied, an older one stale. Versions start at 1 (0 is the new-workspace template AgentGate applied itself). When periodEnd passes and no newer snapshot arrived, AgentGate counts usage in the next period of the same length. Statuses trialing, active and past_due allow new work until validUntil (if given); paused, cancelled and expired do not.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["organizationId", "version", "status", "periodStart", "entitlements"],
+      "properties": {
+        "organizationId": {"type": "string", "format": "uuid"},
+        "version": {"type": "integer", "minimum": 1},
+        "status": {"$ref": "#/$defs/status"},
+        "planCode": {"$ref": "#/$defs/planCode"},
+        "planName": {"$ref": "#/$defs/planName"},
+        "periodStart": {"type": "string", "format": "date-time"},
+        "periodEnd": {"type": ["string", "null"], "format": "date-time"},
+        "validUntil": {"type": ["string", "null"], "format": "date-time"},
+        "entitlements": {"$ref": "#/$defs/entitlements"}
+      }
+    },
+    "template": {
+      "description": "The plan a new workspace starts on, applied the moment it is created. Usage resets every periodDays; it ends after validDays, or never when validDays is absent or null (the Free plan).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "status", "periodDays", "entitlements"],
+      "properties": {
+        "version": {"type": "integer", "minimum": 1},
+        "status": {"$ref": "#/$defs/status"},
+        "planCode": {"$ref": "#/$defs/planCode"},
+        "planName": {"$ref": "#/$defs/planName"},
+        "periodDays": {"type": "integer", "minimum": 1, "maximum": 366},
+        "validDays": {"type": ["integer", "null"], "minimum": 1, "maximum": 366},
+        "entitlements": {"$ref": "#/$defs/entitlements"}
+      }
+    },
+    "applyResult": {
+      "type": "object",
+      "required": ["result", "appliedVersion"],
+      "properties": {
+        "result": {"enum": ["applied", "already_applied", "stale"]},
+        "organizationId": {"type": "string", "format": "uuid"},
+        "appliedVersion": {"type": ["integer", "null"]}
+      }
+    },
+    "statusPage": {
+      "type": "object",
+      "required": ["templateVersion", "organizations", "next"],
+      "properties": {
+        "templateVersion": {"type": ["integer", "null"]},
+        "next": {"description": "Pass as ?after= for the next page; null on the last page.", "type": ["string", "null"], "format": "uuid"},
+        "organizations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["organizationId", "createdAt", "plan", "usage"],
+            "properties": {
+              "organizationId": {"type": "string", "format": "uuid"},
+              "createdAt": {"type": "string", "format": "date-time"},
+              "plan": {
+                "type": ["object", "null"],
+                "required": ["version", "status", "planCode", "validUntil"],
+                "properties": {
+                  "version": {"type": "integer", "minimum": 0},
+                  "status": {"$ref": "#/$defs/status"},
+                  "planCode": {"$ref": "#/$defs/planCode"},
+                  "validUntil": {"type": ["string", "null"], "format": "date-time"}
+                }
+              },
+              "usage": {
+                "description": "This period's usage (the period AgentGate is counting in now).",
+                "type": ["object", "null"],
+                "required": ["periodStart", "periodEnd", "tasks", "aiTokens", "browserSeconds", "codingSeconds", "webResearch"],
+                "properties": {
+                  "periodStart": {"type": "string", "format": "date-time"},
+                  "periodEnd": {"type": ["string", "null"], "format": "date-time"},
+                  "tasks": {"type": "integer"},
+                  "aiTokens": {"type": "integer"},
+                  "browserSeconds": {"type": "number"},
+                  "codingSeconds": {"type": "number"},
+                  "webResearch": {"type": "integer"}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

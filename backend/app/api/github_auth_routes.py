@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth_dependencies import authenticated_user, organization_principal
 from app.api.auth_routes import _payload
 from app.api.product_common import require_permission
+from app.application.services import entitlements
 from app.application.services.github_connector import connect_installation
 from app.application.services.integration_credentials import decode_bundle, encode_bundle
 from app.bootstrap.settings import settings
@@ -359,6 +360,7 @@ async def continue_connection(
     organization_id: UUID, flow_id: UUID, principal: Principal, session: Session,
     body: ConnectionContinuation | None = None,
 ):
+    await entitlements.require_room(session, organization_id, "connections.max")
     try:
         return await attach_signup_connection(
             organization_id, flow_id, principal, session,

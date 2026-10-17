@@ -71,6 +71,8 @@ async function request<T = any>(method: string, path: string, body?: unknown, si
           typeof (payload as { detail?: unknown }).detail === 'string'
           ? (payload as { detail: string }).detail
           : `Request failed with status ${response.status}.`;
+    // New work the plan refused: the workspace shows its upgrade prompt (workspace/upgrade.tsx).
+    if (response.status === 402) window.dispatchEvent(new CustomEvent('audoryn:plan-limit', { detail: { message, limit: response.headers.get('X-Plan-Limit') } }));
     throw new ApiClientError(message, response.status, payload);
   }
 
