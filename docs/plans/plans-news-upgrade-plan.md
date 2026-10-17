@@ -219,3 +219,9 @@ owner wants it to read like the product announcements at mature tech companies.
 - **Proof:** Console tests (asset must be verified, image or video type, alt text required,
   published copy checksum), AgentGate tests (only the storage origin and allowed types), and
   browser checks at desktop and phone widths, light and dark, with reduced motion.
+
+**Fix (17 October 2026, branch `feat/remove-unfinished-upload` in both repos):** the editor saved
+media only when an image was chosen, so a video on its own was skipped without a message. Now an
+image, a video or both are accepted, in the Console, in AgentGate's check and in the window. A
+video with no image plays muted and looping. Under reduced motion it shows its first frame,
+paused. No migration and no settings.

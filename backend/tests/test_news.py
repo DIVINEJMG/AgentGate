@@ -56,10 +56,13 @@ def test_media_only_from_one_origin_and_published_asset_keys() -> None:
     asset = f"https://media.example/public-bucket/cms-public/assets/{'a' * 64}/{uuid4()}"
     media = {"image": asset, "imageDark": asset, "video": asset, "alt": " A cover ", "width": 1600, "height": 900}
     assert news._clean({**ANNOUNCEMENT, "media": media})["media"] == {**media, "alt": "A cover"}  # type: ignore[index]
-    for bad in ({"image": None}, {"alt": ""}, {"image": asset.replace("https", "http")}, {"video": asset + "?x=1"},
+    for bad in ({"alt": ""}, {"image": asset.replace("https", "http")}, {"video": asset + "?x=1"},
                 {"imageDark": asset.replace("media.example", "other.example")}, {"image": "https://media.example/x.png"}, {"image": asset.replace("/public-bucket", "/../x")}):
         assert news._clean({**ANNOUNCEMENT, "media": {**media, **bad}})["media"] is None  # type: ignore[index]
     assert news._clean(ANNOUNCEMENT)["media"] is None  # type: ignore[index]
+    video_only = {"video": asset, "alt": "A clip"}
+    assert news._clean({**ANNOUNCEMENT, "media": video_only})["media"] == video_only  # type: ignore[index]
+    assert news._clean({**ANNOUNCEMENT, "media": {"alt": "Nothing"}})["media"] is None  # type: ignore[index]
 
 
 def test_announcements_reach_everyone_unless_limited_to_plans_or_roles() -> None:
