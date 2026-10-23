@@ -535,3 +535,89 @@ curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
 ```
 
 `audoryn-api` is back on 8000 exactly as before. `gateway.env` and the gateway image stay on the VM, unused.
+
+## Fix: a folder permission covers the files inside it (2026-10-23)
+
+**Found on Oracle:** the coding task "add a folder named RED…" stopped with "The file is outside the task's path authority" (work item `002f9486-5c95-43d1-9108-8826b032076d`).
+- **What happened:** its plan granted `allowedPaths: ["RED/"]`, and the first file, `RED/SETUP.md`, was refused.
+- **The cause:** the check matched paths as whole-path patterns, so `RED/` only ever matched the path `RED/` itself.
+- **Age:** this is older than the scale work, which changed only import lines in that code.
+
+**The fix** (`audoryn_shared/execution/providers/native/github/safety.py`):
+- A permission ending in `/` is a folder and covers every file inside it. It never covers `REDX/…` or `docs/RED/…`.
+- The same rule applies to denied folders.
+- Other patterns behave as before.
+- `..` paths were already refused, so a folder grant cannot reach outside its folder.
+
+**Also new:** `infrastructure/oracle/gateway_report.py`, a report of what the gateway did, read from its log with the host's `python3`.
+
+**This is a normal backend deploy** with the gateway in front:
+- no migration, setting or env change;
+- only `audoryn-api` restarts. While it does (about 20 s), the gateway answers 502, and QStash retries.
+
+### AgentGate VM (`130.61.104.247`)
+
+**A. Read-only inspection**
+
+```bash
+cd /opt/audoryn/AgentGate && git branch --show-current && git status --short && git fetch origin main && printf 'Current: %s\nRemote:  %s\n' "$(git rev-parse HEAD)" "$(git rev-parse origin/main)"
+systemctl --user is-active audoryn-api.service audoryn-gateway.service
+df -h /
+```
+
+- **Expected:** branch `main`, a clean tree, `Remote` = the merge SHA, `active` twice, 4 GB or more free.
+
+**B. Fast-forward**
+
+```bash
+cd /opt/audoryn/AgentGate && if [ "$(git branch --show-current)" != main ] || [ -n "$(git status --porcelain)" ]; then echo 'STOP: wrong branch or dirty working tree'; else OLD="$(git rev-parse HEAD)" && echo "$OLD" > "$HOME/agentgate-rollback.sha" && git pull --ff-only origin main && printf 'Before: %s\nAfter:  %s\n' "$OLD" "$(git rev-parse HEAD)" && git -c core.pager=cat diff --name-only "$OLD" HEAD -- backend packages services infrastructure; fi
+```
+
+- **Expected:** `safety.py`, `backend/tests/test_github_expanded.py` and `infrastructure/oracle/gateway_report.py`. No migration and no Containerfile.
+
+**C. Tag the rollback image, then rebuild**
+
+```bash
+cd /opt/audoryn/AgentGate && TAG="localhost/audoryn-api:rollback-$(cut -c1-7 "$HOME/agentgate-rollback.sha")-$(date +%Y%m%d)" && if podman image exists "$TAG"; then echo "STOP: $TAG already exists"; else podman tag localhost/audoryn-api:latest "$TAG" && echo "$TAG" > "$HOME/agentgate-rollback.tag" && echo "Rollback image: $TAG" && podman build -f backend/Containerfile -t localhost/audoryn-api:latest . && podman image inspect localhost/audoryn-api:latest --format '{{.Id}} {{.Created}}'; fi
+```
+
+**E. Read-only check with the new image**
+
+```bash
+podman run --rm -i --env-file /etc/audoryn/audoryn.env localhost/audoryn-api:latest python - <<'PY'
+from audoryn_shared.execution.providers.native.github.safety import validate_changes
+validate_changes([{"path": "RED/SETUP.md", "content": "x"}], {"allowedPaths": ["RED/"]})
+try:
+    validate_changes([{"path": "REDX/a.py", "content": "x"}], {"allowedPaths": ["RED/"]})
+except ValueError:
+    print("folder grant: RED/SETUP.md allowed, REDX/a.py refused")
+PY
+```
+
+**F. Restart AgentGate only (the gateway stays up)**
+
+```bash
+systemctl --user restart audoryn-api.service
+sleep 20
+systemctl --user is-active audoryn-api.service audoryn-gateway.service
+curl -sS --max-time 20 http://127.0.0.1:8101/health/ready; echo
+curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
+[ "$(podman image inspect localhost/audoryn-api:latest --format '{{.Id}}')" = "$(podman inspect --type container audoryn-api --format '{{.Image}}')" ] && echo 'PASS: running the new image' || echo 'FAIL: different image running'
+podman logs --since 5m audoryn-api 2>&1 | grep -E "Traceback|ERROR|startup complete"
+```
+
+### Proof
+
+1. **Ask again** at audoryn.vercel.app: "In DIVINEJMG/school, add a folder named RED about setup and a small helper script in python, then open a draft PR". It must finish with a draft PR whose files are under `RED/`.
+2. **What the gateway did, and the callers AgentGate saw:**
+
+   ```bash
+   podman logs --since 60m audoryn-gateway 2>&1 | python3 /opt/audoryn/AgentGate/infrastructure/oracle/gateway_report.py
+   podman logs --since 60m audoryn-api 2>&1 | grep -oE 'INFO: +[0-9a-f.:]+:[0-9]+ - "' | awk '{print $2}' | sed -E 's/:[0-9]+$//' | sort | uniq -c | sort -rn | head
+   ```
+
+   - **Expected:** 0 `5xx` apart from the restart window, and real caller addresses, not only `127.0.0.1`.
+
+### Rollback (only with your confirmation)
+
+`podman tag "$(cat "$HOME/agentgate-rollback.tag")" localhost/audoryn-api:latest`, then block F.

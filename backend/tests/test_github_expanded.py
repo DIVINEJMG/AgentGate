@@ -114,6 +114,28 @@ def test_path_authority_credentials_and_duplicate_files():
     validate_changes([{"path": ".env.example", "content": "API_KEY="}])
 
 
+@pytest.mark.parametrize(("path", "inside"), [
+    ("RED/SETUP.md", True),  # production, 2026-10-23: refused while the grant was `RED/`
+    ("RED/tools/helper.py", True),
+    ("RED", False),
+    ("REDX/a.py", False),
+    ("docs/RED/a.py", False),
+])
+def test_a_folder_grant_covers_exactly_the_files_inside_it(path, inside):
+    change = [{"path": path, "content": "test"}]
+    if inside:
+        validate_changes(change, {"allowedPaths": ["RED/"]})
+    else:
+        with pytest.raises(ValueError, match="outside the task's path authority"):
+            validate_changes(change, {"allowedPaths": ["RED/"]})
+
+
+def test_a_denied_folder_refuses_every_file_inside_it():
+    with pytest.raises(ValueError, match="outside the task's path authority"):
+        validate_changes([{"path": "secrets/keys.txt", "content": "x"}], {"deniedPaths": ["secrets/"]})
+    validate_changes([{"path": "src/keys.txt", "content": "x"}], {"deniedPaths": ["secrets/"]})
+
+
 def test_branch_boundaries():
     item = uuid4()
     validate_task_branch(f"codex/{str(item)[:8]}/fix", "main", item)
