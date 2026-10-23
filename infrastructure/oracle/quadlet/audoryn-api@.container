@@ -1,0 +1,37 @@
+# The core API (Phase 5, steps 4 and 5): people's routes only (SERVICE_ROLE=api), from the image without
+# the step runtime, Playwright or Chromium (backend/Containerfile.api). A due step goes to the execution
+# service as a signed direct call through the gateway (EXECUTION_CALL_URL); QStash is the fallback.
+#
+# A template: one copy per instance, named by its port (%i), on the host network at 127.0.0.1:%i.
+#   audoryn-api@8101 is the gateway's core-0, audoryn-api@8102 its core-1 (GATEWAY_CORE_UPSTREAMS).
+# A copy is enabled by a symlink next to this file: audoryn-api@8101.container -> audoryn-api@.container.
+# The copies share nothing in memory: the live updates, limits and replay checks are in Redis.
+# Only the gateway calls them, so only loopback is trusted for the forwarded caller and scheme.
+# A copy runs no steps, so a restart waits only for open requests (20 s); meanwhile the gateway sends
+# new requests to the other copy (infrastructure/oracle/restart_core.sh restarts them one at a time).
+# Migrations never run here: they run from the laptop, and two copies must never race.
+# Installed by copying into ~/.config/containers/systemd/.
+[Unit]
+Description=Audoryn API (core copy on port %i)
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=localhost/audoryn-core:latest
+ContainerName=audoryn-api-%i
+EnvironmentFile=/etc/audoryn/audoryn.env
+Environment=SERVICE_ROLE=api
+Environment=EXECUTION_CALL_URL=http://127.0.0.1:8000
+Environment=DATABASE_MIGRATE_ON_STARTUP=false
+Network=host
+Exec=uvicorn app.main:app --host 127.0.0.1 --port %i --proxy-headers --forwarded-allow-ips=127.0.0.1 --timeout-graceful-shutdown 20
+StopTimeout=30
+
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+TimeoutStopSec=60
+
+[Install]
+WantedBy=default.target

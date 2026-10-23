@@ -940,3 +940,145 @@ curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
 ```
 
 After the rollback, the single-service container (`SERVICE_ROLE=all`) runs everything again, as in step 3. The internal key can stay in `audoryn.env`: with role `all` it is unused.
+
+## Phase 5, step 5: a second core copy
+
+**Goal:**
+
+```
+nginx → gateway (8000) ─┬─ core-0: audoryn-api@8101 ─┐ people's routes, least busy copy first
+                        ├─ core-1: audoryn-api@8102 ─┘
+                        └─ execution-0: audoryn-execution (8201)
+```
+
+**What this gives:**
+- New core code goes live with no downtime: `restart_core.sh` restarts one copy at a time while the gateway sends people to the other.
+- A crash of one core copy no longer takes people's pages down.
+- It is not more speed: the VM has 1 CPU.
+
+**What changes on the VM:**
+- **The service file:** the core becomes one template, `audoryn-api@.container`, with one copy per port. The copies are enabled by two symlinks, `audoryn-api@8101.container` and `audoryn-api@8102.container`. The containers are `audoryn-api-8101` and `audoryn-api-8102`. The old `audoryn-api.container` goes away; the template runs the same image and settings, plus `DATABASE_MIGRATE_ON_STARTUP=false`, so two copies never race on migrations.
+- **`gateway.env`:** `GATEWAY_CORE_UPSTREAMS=http://127.0.0.1:8101,http://127.0.0.1:8102`.
+- **New on the VM, from the repository:** `infrastructure/oracle/restart_core.sh`, the command for every later core deploy.
+
+**Why two copies are safe:** the copies keep nothing that matters in memory. The live updates (Redis pub/sub), the limits and the replay checks are in Redis, and everything else is in Postgres.
+
+**Unchanged:** the images (no build), nginx, the database (no migration), `audoryn.env`, the execution service, QStash, the Console, Vercel and the laptop.
+
+**Downtime in F:** a few seconds while the gateway restarts with its new list, as in step 4. Old copy 8101 is then replaced while 8102 serves people.
+
+### AgentGate VM (`130.61.104.247`)
+
+**A. Read-only inspection**
+
+```bash
+cd /opt/audoryn/AgentGate && git branch --show-current && git status --short && git fetch origin main && printf 'Current: %s\nRemote:  %s\n' "$(git rev-parse HEAD)" "$(git rev-parse origin/main)"
+systemctl --user is-active audoryn-gateway.service audoryn-api.service audoryn-execution.service
+free -m && podman stats --no-stream --format '{{.Name}} {{.MemUsage}}'
+sudo grep -E '^\s*GATEWAY_CORE_UPSTREAMS=' /etc/audoryn/gateway.env
+sudo grep -E '^\s*DATABASE_MIGRATE_ON_STARTUP=' /etc/audoryn/audoryn.env || echo 'DATABASE_MIGRATE_ON_STARTUP: unset (false)'
+ls ~/.config/containers/systemd/
+ss -ltn | awk 'NR==1 || $4 ~ /:(8000|8101|8102|8201)$/'
+```
+
+- **Expected:**
+  - branch `main`, a clean tree, `Remote` = the merge SHA;
+  - `active` three times;
+  - in `free -m`, the `available` column is at least 500 MB more than `audoryn-api`'s memory in the stats line. If not, stop and send me the output;
+  - `GATEWAY_CORE_UPSTREAMS=http://127.0.0.1:8101`;
+  - `DATABASE_MIGRATE_ON_STARTUP` unset or `false`;
+  - the folder lists `audoryn-api.container`, `audoryn-execution.container` and `audoryn-gateway.container`;
+  - 8000, 8101 and 8201 listening, and 8102 free.
+
+**B. Fast-forward**
+
+```bash
+cd /opt/audoryn/AgentGate && if [ "$(git branch --show-current)" != main ] || [ -n "$(git status --porcelain)" ]; then echo 'STOP: wrong branch or dirty working tree'; else OLD="$(git rev-parse HEAD)" && git pull --ff-only origin main && printf 'Before: %s\nAfter:  %s\n' "$OLD" "$(git rev-parse HEAD)" && git -c core.pager=cat diff --name-only "$OLD" HEAD -- backend packages services infrastructure; fi
+```
+
+- **Expected:** only files under `infrastructure/oracle/`: `README.md`, `check_services.py`, `gateway_report.py`, `restart_core.sh` and the service file renamed to `quadlet/audoryn-api@.container`. No application code changed, so there is nothing to build (no block C).
+
+**D. The gateway's core list and the service folder, with backups**
+
+```bash
+sudo python3 - <<'PY'
+from pathlib import Path
+from datetime import datetime
+import os, shutil, tempfile
+
+p, name = Path('/etc/audoryn/gateway.env'), 'GATEWAY_CORE_UPSTREAMS'
+old, new = 'http://127.0.0.1:8101', 'http://127.0.0.1:8101,http://127.0.0.1:8102'
+lines = p.read_text().splitlines(keepends=True)
+found = [i for i, l in enumerate(lines) if l.strip() and not l.lstrip().startswith('#') and '=' in l and l.split('=', 1)[0].strip() == name]
+if len(found) != 1 or lines[found[0]].split('=', 1)[1].strip() != old:
+    raise SystemExit(f'STOP: {name} is not exactly one line with {old}; no changes made')
+lines[found[0]] = f'{name}={new}\n'
+backup = p.with_name(p.name + '.backup-copies-' + datetime.now().strftime('%Y%m%d-%H%M%S'))
+shutil.copy2(p, backup)
+fd, temp = tempfile.mkstemp(prefix='.' + p.name + '.', dir=p.parent)
+try:
+    with os.fdopen(fd, 'w') as f:
+        f.write(''.join(lines)); f.flush(); os.fsync(f.fileno())
+    st = p.stat()
+    os.chown(temp, st.st_uid, st.st_gid); os.chmod(temp, st.st_mode & 0o7777); os.replace(temp, p)
+except Exception:
+    if os.path.exists(temp):
+        os.unlink(temp)
+    raise
+print('Backup:', backup, '|', name, 'now lists 8101 and 8102')
+PY
+Q="$HOME/.config/containers/systemd" && B="$HOME/audoryn-quadlet.backup-copies-$(date +%Y%m%d-%H%M%S)" && cp -a "$Q" "$B" && echo "$B" > "$HOME/audoryn-quadlet.backup" && echo "Service folder backup: $B"
+```
+
+- **Expected:** the `Backup:` line and the service folder backup. Nothing running has changed yet: the gateway reads its list when it restarts in F.
+
+**E. Read-only check of the template, before anything switches**
+
+```bash
+T="$(mktemp -d)" && cp /opt/audoryn/AgentGate/infrastructure/oracle/quadlet/*.container "$T/" && ln -s 'audoryn-api@.container' "$T/audoryn-api@8102.container" && QUADLET_UNIT_DIRS="$T" /usr/libexec/podman/quadlet -dryrun -user 2>&1 | grep -E "^---|^ExecStart=|error|Error|warning"; rm -rf "$T"
+```
+
+- **Expected:**
+  - a `---audoryn-api@.service---` section whose `ExecStart=` has `--name audoryn-api-%i`, `localhost/audoryn-core:latest` and `--port %i` (systemd fills in the port);
+  - the gateway and execution sections as before;
+  - no errors.
+- If you see anything else, **do not run F**; send me the output.
+
+**F. Switch**
+
+```bash
+cd /opt/audoryn/AgentGate && Q="$HOME/.config/containers/systemd" && core_back() { for i in $(seq 60); do curl -sf "http://127.0.0.1:$1/health/live" >/dev/null && python3 -c 'import json,sys,urllib.request; p=json.load(urllib.request.urlopen("http://127.0.0.1:8000/health/gateway",timeout=5))["pools"]["core"]; sys.exit(p["inRotation"]!=p["copies"])' 2>/dev/null && echo "core copy $1 in rotation" && return 0; sleep 2; done; echo "STOP: core copy $1 not in rotation after 2 minutes"; return 1; } && cp 'infrastructure/oracle/quadlet/audoryn-api@.container' "$Q/" && ln -sfn 'audoryn-api@.container' "$Q/audoryn-api@8101.container" && ln -sfn 'audoryn-api@.container' "$Q/audoryn-api@8102.container" && systemctl --user daemon-reload && systemctl --user start audoryn-api@8102.service && systemctl --user restart audoryn-gateway.service && core_back 8102 && systemctl --user stop audoryn-api.service && rm "$Q/audoryn-api.container" && systemctl --user daemon-reload && systemctl --user start audoryn-api@8101.service && core_back 8101
+sleep 10
+python3 /opt/audoryn/AgentGate/infrastructure/oracle/check_services.py
+```
+
+- **What F does, in order:**
+  1. installs the template and the two copies;
+  2. starts the new copy on 8102;
+  3. restarts the gateway with both addresses (the old copy still answers on 8101);
+  4. once 8102 is in rotation, stops the old copy, removes its file, and starts the template's copy on 8101. Meanwhile 8102 serves people.
+- **Expected:** `core copy 8102 in rotation`, `core copy 8101 in rotation`, then every line `PASS`, including `gateway core pool has 2 in rotation`, ending in `ALL PASS`. If anything says `STOP` or `FAIL`, send me the output. Rollback is below.
+
+### Proof: a core deploy without downtime
+
+1. Keep audoryn.vercel.app open and ask the open-issues question while this runs on the VM:
+
+   ```bash
+   bash /opt/audoryn/AgentGate/infrastructure/oracle/restart_core.sh
+   podman logs --since 10m audoryn-gateway 2>&1 | python3 /opt/audoryn/AgentGate/infrastructure/oracle/gateway_report.py
+   ```
+
+2. **Expected:**
+   - `audoryn-api@8101: back in rotation`, then the same for 8102;
+   - the question is answered, and the page never errors;
+   - the report shows people's routes answered by both `core-0` and `core-1`, and no `5xx`.
+
+### Rollback (only with your confirmation)
+
+```bash
+Q="$HOME/.config/containers/systemd" && B="$(cat "$HOME/audoryn-quadlet.backup")" && systemctl --user stop audoryn-api@8101.service audoryn-api@8102.service; rm -f "$Q"/audoryn-api@*.container && cp -a "$B/audoryn-api.container" "$Q/" && sudo cp -a "$(ls -t /etc/audoryn/gateway.env.backup-copies-* | head -1)" /etc/audoryn/gateway.env && systemctl --user daemon-reload && systemctl --user start audoryn-api.service && systemctl --user restart audoryn-gateway.service
+sleep 25
+curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
+```
+
+After the rollback, one core copy (`audoryn-api` on 8101) serves people again, as in step 4.

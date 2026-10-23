@@ -5,6 +5,8 @@ the last errors with their correlation ids. Reads `podman logs` on stdin; needs 
 
 Ids in paths are folded into `:id`, so one route is one row. Nothing here reads headers or query
 strings: the gateway never logs them."""
+from __future__ import annotations
+
 import json
 import re
 import sys
