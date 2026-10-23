@@ -7,16 +7,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_dependencies import organization_principal
 from app.application.services.agent_identity import AgentIdentityService
-from app.domain.identity.agents import (
+from app.infrastructure.database.agent_repository import SQLAlchemyAgentRepository
+from audoryn_shared.api.auth_dependencies import organization_principal
+from audoryn_shared.domain.identity.agents import (
     AgentCredentialReveal,
     AgentDomainError,
     AgentIdentityView,
 )
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.database.agent_repository import SQLAlchemyAgentRepository
-from app.infrastructure.database.session import database_session
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.database.session import database_session
 
 
 class AgentCreateRequest(BaseModel):

@@ -5,9 +5,9 @@ ROOT = Path(__file__).resolve().parents[1]
 required = [
     "compose.yaml",
     ".env.example",
-    "backend/app/application/services/data_migration.py",
-    "backend/app/application/services/cutover_gate.py",
-    "backend/app/application/services/shadow_mode.py",
+    "packages/shared/audoryn_shared/application/services/data_migration.py",
+    "packages/shared/audoryn_shared/application/services/cutover_gate.py",
+    "packages/shared/audoryn_shared/application/services/shadow_mode.py",
     "docs/f28-checkpoints-21-26.md",
     "docs/f26-rollback.md",
 ]
@@ -32,7 +32,7 @@ for gate in (
     if gate not in ci:
         raise SystemExit(f"F28.22 CI gate missing: {gate}")
 
-settings = (ROOT / "backend/app/bootstrap/settings.py").read_text(encoding="utf-8")
+settings = (ROOT / "packages/shared/audoryn_shared/bootstrap/settings.py").read_text(encoding="utf-8")
 for flag in ("shadow_mode_enabled", "cutover_stage", "runtime_execution_enabled"):
     if flag not in settings:
         raise SystemExit(f"F28 cutover setting missing: {flag}")

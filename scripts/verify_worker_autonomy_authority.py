@@ -11,11 +11,11 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-draft_generator = read("backend/app/application/services/worker_draft.py")
-resolver = read("backend/app/application/services/capability_autoresolver.py")
-autonomy = read("backend/app/application/services/worker_autonomy.py")
+draft_generator = read("packages/shared/audoryn_shared/application/services/worker_draft.py")
+resolver = read("packages/shared/audoryn_shared/application/services/capability_autoresolver.py")
+autonomy = read("packages/shared/audoryn_shared/application/services/worker_autonomy.py")
 attachments = read("backend/app/application/services/attachment_ingestion.py")
-managed = read("backend/app/runtime/managed.py")
+managed = read("services/execution/audoryn_execution/runtime/managed.py")
 
 for path, text in (
     ("worker_draft.py", draft_generator),
@@ -54,7 +54,7 @@ if "save_trigger_config" not in autonomy:
     errors.append("AI schedules do not flow through existing scheduler service")
 if 'role="vision"' not in attachments:
     errors.append("image analysis bypasses generic vision model role")
-if 'role="planner"' not in read("backend/app/runtime/planner/adaptive.py"):
+if 'role="planner"' not in read("packages/shared/audoryn_shared/runtime/planner/adaptive.py"):
     errors.append("Runtime planner is not using the provider-neutral planner role")
 if "ActionGateway(" not in managed:
     errors.append("Managed Runtime no longer preserves F29 Action Gateway authority")

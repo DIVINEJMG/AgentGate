@@ -7,8 +7,8 @@ from datetime import datetime
 from typing import Any, cast
 
 from app.application.services.reply_claims import unsupported_assertion
-from app.domain.ai.providers import AIProviderError
-from app.domain.conversation.intent import WorkerCommandIntent
+from audoryn_shared.domain.ai.providers import AIProviderError
+from audoryn_shared.domain.conversation.intent import WorkerCommandIntent
 
 
 async def validated_structured(gateway, *, proposal_validator, **kwargs):
@@ -29,8 +29,8 @@ async def validated_structured(gateway, *, proposal_validator, **kwargs):
 def needs_connected_account(intent) -> bool:
     """A new job without a time schedule whose tools belong to a connected account (GitHub, email,
     Slack...), while integration tasks are enabled."""
-    from app.bootstrap.settings import settings
-    from app.execution.bootstrap import execution_provider_registry
+    from audoryn_shared.bootstrap.settings import settings
+    from audoryn_shared.execution.bootstrap import execution_provider_registry
     if intent.family != "job.create" or intent.schedule is not None or not settings.integration_foundation_enabled:
         return False
     native = {provider.manifest.provider for provider in execution_provider_registry().providers(kind="native_api")}

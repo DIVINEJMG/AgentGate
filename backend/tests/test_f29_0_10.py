@@ -6,9 +6,10 @@ from uuid import uuid4
 
 import pytest
 
-from app.execution.authorization import CredentialReference, ProviderPermissionSnapshot
-from app.execution.bootstrap import execution_provider_registry
-from app.execution.contracts import (
+from audoryn_execution.execution.providers.resolver import ExecutionResolver
+from audoryn_shared.execution.authorization import CredentialReference, ProviderPermissionSnapshot
+from audoryn_shared.execution.bootstrap import execution_provider_registry
+from audoryn_shared.execution.contracts import (
     CapabilityDescriptor,
     ExecutionRequest,
     ExecutionResult,
@@ -18,9 +19,8 @@ from app.execution.contracts import (
     ResourceDescriptor,
     VerificationResult,
 )
-from app.execution.providers.base import ExecutionProvider
-from app.execution.providers.resolver import ExecutionResolver
-from app.integrations.builtin import (
+from audoryn_shared.execution.providers.base import ExecutionProvider
+from audoryn_shared.integrations.builtin import (
     calendar_adapter,
     drive_adapter,
     github_adapter,
@@ -239,7 +239,7 @@ def test_all_native_providers_conform_to_execution_protocol() -> None:
 @pytest.mark.asyncio
 async def test_resolver_prefers_native_provider_and_checks_health() -> None:
     provider = FakeProvider()
-    from app.execution.providers.registry import ProviderRegistry
+    from audoryn_shared.execution.providers.registry import ProviderRegistry
 
     registry = ProviderRegistry((provider,))
     resolver = ExecutionResolver(registry)
@@ -274,7 +274,7 @@ async def test_resolver_prefers_native_provider_and_checks_health() -> None:
 @pytest.mark.asyncio
 async def test_resolver_fails_closed_without_required_credential() -> None:
     provider = FakeProvider(requires_credential=True)
-    from app.execution.providers.registry import ProviderRegistry
+    from audoryn_shared.execution.providers.registry import ProviderRegistry
 
     resolver = ExecutionResolver(ProviderRegistry((provider,)))
     res = resource(provider="test")
@@ -319,12 +319,19 @@ def test_legacy_builtin_adapters_are_universal_compatibility_facades() -> None:
 
 
 def test_core_runtime_and_gateway_have_no_provider_name_branches() -> None:
-    root = Path(__file__).resolve().parents[1] / "app"
-    paths = (
-        root / "runtime",
-        root / "domain" / "actions",
-        root / "execution" / "provider_executor.py",
-    )
+    repo = Path(__file__).resolve().parents[2]
+    roots = (
+        repo / "backend" / "app",
+        repo / "packages" / "shared" / "audoryn_shared",
+        repo / "services" / "execution" / "audoryn_execution",
+    )  # the three packages (Phase 4)
+    paths = [
+        root / part
+        for root in roots
+        for part in ("runtime", "domain/actions", "execution/provider_executor.py")
+        if (root / part).exists()
+    ]
+    assert len(paths) >= 3
     provider_literals = (
         '"github"',
         '"gmail"',
@@ -341,12 +348,12 @@ def test_core_runtime_and_gateway_have_no_provider_name_branches() -> None:
                 token in text and ("provider ==" in text or "provider in" in text)
                 for token in provider_literals
             ):
-                offenders.append(str(file.relative_to(root)))
+                offenders.append(str(file.relative_to(repo)))
     assert not offenders, f"Provider-specific runtime branches found: {offenders}"
 
 
 def test_public_api_still_mounts_v1_and_v2() -> None:
-    from app.bootstrap.application import create_application
+    from app.main import create_application
 
     paths = set(create_application().openapi()["paths"])
     assert "/api/v1/organizations/{organization_id}/integrations" in paths

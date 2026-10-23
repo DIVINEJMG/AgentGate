@@ -14,17 +14,17 @@ from pypdf import PdfReader
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.services import entitlements
-from app.bootstrap.settings import settings
-from app.domain.ai.providers import (
+from audoryn_shared.application.services import entitlements
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.ai.providers import (
     AIGateway,
     AIInvocationContext,
     AIMediaInput,
     AIProviderError,
 )
-from app.domain.artifacts.tenant_storage import TenantObjectStorage
-from app.infrastructure.database.models import Artifact, ArtifactAnalysis
-from app.infrastructure.storage.provider import object_storage_from_settings
+from audoryn_shared.domain.artifacts.tenant_storage import TenantObjectStorage
+from audoryn_shared.infrastructure.database.models import Artifact, ArtifactAnalysis
+from audoryn_shared.infrastructure.storage.provider import object_storage_from_settings
 
 _IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
 _PDF_TYPES = {"application/pdf"}

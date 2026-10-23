@@ -14,12 +14,12 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.dialects import postgresql
 
-from app.api.internal import runtime
-from app.infrastructure.database import models as m
-from app.runtime import outbox_publisher
-from app.runtime.admission import admission_order, next_admission
-from app.runtime.managed import ManagedRuntimeExecutor, RuntimeStepOutcome
-from app.runtime.qstash_trigger import RuntimeSignalResult
+from audoryn_execution.api.internal import runtime
+from audoryn_execution.runtime.admission import admission_order, next_admission
+from audoryn_execution.runtime.managed import ManagedRuntimeExecutor, RuntimeStepOutcome
+from audoryn_shared.infrastructure.database import models as m
+from audoryn_shared.runtime import outbox_publisher
+from audoryn_shared.runtime.qstash_trigger import RuntimeSignalResult
 from tests.test_efficiency_queries import Database
 
 # ---------- admission: one row, same choice ----------
@@ -241,8 +241,8 @@ def test_run_steps_planning_reads_without_outputs_raise_if_an_output_is_used() -
 def test_a_streamed_response_has_the_whole_budget_but_a_silence_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     import httpx
 
-    from app.bootstrap.settings import settings
-    from app.infrastructure.ai.streaming import transport_timeout
+    from audoryn_shared.bootstrap.settings import settings
+    from audoryn_shared.infrastructure.ai.streaming import transport_timeout
 
     monkeypatch.setattr(settings, "planner_stream_silence_seconds", 300)
     streamed = transport_timeout(2000, stream=True)
@@ -264,11 +264,11 @@ async def test_only_a_silent_stream_becomes_a_failed_connection(
 ) -> None:
     import httpx
 
-    from app.bootstrap.settings import settings
-    from app.domain.ai.providers import AIProviderError, AITextRequest
-    from app.infrastructure.ai.model_profiles import PlannerModelProfile
-    from app.infrastructure.ai.nvidia import NvidiaNimProvider
-    from app.infrastructure.ai.openrouter import OpenRouterPlannerProvider
+    from audoryn_shared.bootstrap.settings import settings
+    from audoryn_shared.domain.ai.providers import AIProviderError, AITextRequest
+    from audoryn_shared.infrastructure.ai.model_profiles import PlannerModelProfile
+    from audoryn_shared.infrastructure.ai.nvidia import NvidiaNimProvider
+    from audoryn_shared.infrastructure.ai.openrouter import OpenRouterPlannerProvider
 
     monkeypatch.setattr(settings, "planner_stream_silence_seconds", 300)
     timeouts: list[Any] = []
@@ -308,8 +308,8 @@ async def test_catalog_checks_credentials_in_one_query_and_the_snapshot_reads_on
 ) -> None:
     from dataclasses import replace
 
-    from app.api import integration_capability_routes as routes
-    from app.execution.providers.registry import ProviderRegistry
+    from audoryn_shared.api import integration_capability_routes as routes
+    from audoryn_shared.execution.providers.registry import ProviderRegistry
     from scripts.runtime_benchmark import BenchProvider
     from tests.test_efficiency_queries import AsyncAdapter
 

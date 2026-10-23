@@ -17,9 +17,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
-from app.application.context.narrator import narrate
-from app.runtime.managed import ManagedRuntimeExecutor
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
+from audoryn_execution.application.context.narrator import narrate
+from audoryn_execution.runtime.managed import ManagedRuntimeExecutor
+from audoryn_shared.runtime.planner.adaptive import AdaptiveRuntimePlanner
 from scripts.export_sim_fixtures import section_sizes
 
 FIXTURES = Path(__file__).parent / "fixtures" / "sim"

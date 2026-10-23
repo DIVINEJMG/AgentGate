@@ -11,8 +11,8 @@ import pytest
 from app.application.services.conversation_commands import ConversationCommandCompiler
 from app.application.services.conversation_semantics import REPLY_RULES, reply_from_intent
 from app.application.services.intent_interpreter import IntentInterpreter
-from app.domain.ai.providers import AIInvocationContext
-from app.domain.conversation.intent import WorkerCommandIntent
+from audoryn_shared.domain.ai.providers import AIInvocationContext
+from audoryn_shared.domain.conversation.intent import WorkerCommandIntent
 from tests.test_conversation_semantics import selector
 
 RUN = str(uuid4())

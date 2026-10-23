@@ -1,12 +1,12 @@
 from sqlalchemy import select
 
-from app.domain.identity.errors import AuthenticationError
-from app.domain.identity.permissions import permissions_for_role
-from app.domain.identity.principals import HumanPrincipal
-from app.domain.identity.providers import IdentityProvider
-from app.infrastructure.auth.session_store import RedisSessionStore
-from app.infrastructure.database.models import OrganizationMembership
-from app.infrastructure.database.session import session_factory
+from audoryn_shared.domain.identity.errors import AuthenticationError
+from audoryn_shared.domain.identity.permissions import permissions_for_role
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.domain.identity.providers import IdentityProvider
+from audoryn_shared.infrastructure.auth.session_store import RedisSessionStore
+from audoryn_shared.infrastructure.database.models import OrganizationMembership
+from audoryn_shared.infrastructure.database.session import session_factory
 
 
 class SessionIdentityProvider(IdentityProvider):

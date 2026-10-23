@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.execution.providers.native.github.catalog import assembled_catalog
+from audoryn_shared.execution.providers.native.github.catalog import assembled_catalog
 
 rows = [
     "# GitHub action catalog",

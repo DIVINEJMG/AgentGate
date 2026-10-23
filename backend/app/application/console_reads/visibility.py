@@ -16,7 +16,7 @@ from sqlalchemy import Table, column, distinct, exists, func, select, table, uni
 from sqlalchemy.engine import Connection
 
 from app.application.console_reads.database import clip, iso, iso_or_none, like_pattern
-from app.infrastructure.database import models as m
+from audoryn_shared.infrastructure.database import models as m
 
 MEMBER_CAP = 200
 WORKER_CAP = 100

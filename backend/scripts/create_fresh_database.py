@@ -28,9 +28,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from app.bootstrap.settings import settings
-from app.infrastructure.database import models  # noqa: F401
-from app.infrastructure.database.base import Base
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.infrastructure.database import models  # noqa: F401
+from audoryn_shared.infrastructure.database.base import Base
 
 
 async def existing_tables() -> list[str]:

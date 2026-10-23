@@ -2,13 +2,13 @@ from uuid import uuid4
 
 import pytest
 
-from app.domain.actions.gateway import (
+from audoryn_shared.domain.actions.gateway import (
     ActionGateway,
     ActionProposal,
     AuthorizationDecision,
 )
-from app.domain.identity.principals import AgentPrincipal, HumanPrincipal
-from app.domain.integrations.contracts import IntegrationExecutionResult
+from audoryn_shared.domain.identity.principals import AgentPrincipal, HumanPrincipal
+from audoryn_shared.domain.integrations.contracts import IntegrationExecutionResult
 
 
 class AllowGuard:

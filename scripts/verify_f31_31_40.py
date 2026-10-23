@@ -25,10 +25,10 @@ conversations = read("backend/app/application/services/conversations.py")
 intent = read("backend/app/application/services/intent_interpreter.py")
 attachments = read("backend/app/application/services/attachment_ingestion.py")
 context = read("backend/app/application/services/conversation_context.py")
-managed = read("backend/app/runtime/managed.py")
-runtime_internal = read("backend/app/api/internal/runtime.py")
+managed = read("services/execution/audoryn_execution/runtime/managed.py")
+runtime_internal = read("services/execution/audoryn_execution/api/internal/runtime.py")
 ai_ops = read("backend/app/api/ai_operations_routes.py")
-settings = read("backend/app/bootstrap/settings.py")
+settings = read("packages/shared/audoryn_shared/bootstrap/settings.py")
 provider_probe = read("backend/app/api/internal/ai.py")
 ci = read(".github/workflows/ci.yml")
 tests = read("backend/tests/test_f31_31_40.py")
@@ -121,14 +121,14 @@ if '"trust": "untrusted_external_data"' not in context:
 if '"trust": "untrusted_tool_output"' not in managed:
     errors.append("F31.36 runtime tool observations are not explicitly marked untrusted")
 if "outside the resolved allowlist" not in intent and "Only an authorized tool can be chosen" not in read(
-    "backend/app/runtime/planner/adaptive.py"
+    "packages/shared/audoryn_shared/runtime/planner/adaptive.py"
 ):
     errors.append("F31.36 planner allowlist boundary is missing")
 
 for path in (
     "backend/app/application/services/conversation_context.py",
     "backend/app/application/services/conversation_commands.py",
-    "backend/app/application/services/worker_memory.py",
+    "packages/shared/audoryn_shared/application/services/worker_memory.py",
     "backend/app/application/services/attachment_ingestion.py",
     "backend/app/api/ai_operations_routes.py",
 ):
@@ -184,7 +184,7 @@ if "WorkerQuickStart" not in workforce:
     errors.append("F31.40 deterministic/manual workflow fallback is missing")
 if "ActionGateway" not in managed:
     errors.append("F31.40 F29 Action Gateway authority is no longer mandatory")
-if "browser" not in read("backend/app/execution/browser/runtime.py").lower():
+if "browser" not in read("services/execution/audoryn_execution/execution/browser/runtime.py").lower():
     errors.append("F31.40 F30 browser execution path is unavailable")
 
 if errors:

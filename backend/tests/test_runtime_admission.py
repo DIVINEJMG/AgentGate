@@ -4,8 +4,8 @@ from types import SimpleNamespace
 from typing import cast
 from uuid import uuid4
 
-from app.infrastructure.database.models import WorkItem
-from app.runtime.admission import admission_order
+from audoryn_execution.runtime.admission import admission_order
+from audoryn_shared.infrastructure.database.models import WorkItem
 
 
 def _item(organization, priority, created_at):

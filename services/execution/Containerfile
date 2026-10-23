@@ -1,0 +1,29 @@
+# The execution service alone (SERVICE_ROLE=execution, architecture plan Phases 3-5): task steps,
+# the governed browser (Chromium), coding sessions, preparations and the QStash callbacks. No core
+# API code. Build from the repository root:
+#   docker build -f services/execution/Containerfile .
+FROM python:3.13-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    SERVICE_ROLE=execution
+
+WORKDIR /app/services/execution
+
+COPY packages/shared /app/packages/shared
+COPY services/execution /app/services/execution
+
+RUN pip install --upgrade pip \
+    && pip install -e '/app/packages/shared[coding]' -e . \
+    && playwright install --with-deps chromium
+
+RUN useradd --create-home --uid 10001 audoryn \
+    && chown -R audoryn:audoryn /app /ms-playwright
+
+USER audoryn
+
+EXPOSE 8201
+
+CMD ["uvicorn", "audoryn_execution.service:create_application", "--factory", "--host", "0.0.0.0", "--port", "8201", "--proxy-headers", "--forwarded-allow-ips=*"]

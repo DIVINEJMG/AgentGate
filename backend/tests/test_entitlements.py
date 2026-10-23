@@ -14,11 +14,11 @@ from sqlalchemy import create_engine, delete, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.application.services import entitlements as plans
-from app.bootstrap.settings import settings
-from app.infrastructure.database import models as m
-from app.infrastructure.database import usage_records
-from app.observability.usage import Usage, count_plan_usage, metered
+from audoryn_shared.application.services import entitlements as plans
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.infrastructure.database import models as m
+from audoryn_shared.infrastructure.database import usage_records
+from audoryn_shared.observability.usage import Usage, count_plan_usage, metered
 from scripts.runtime_benchmark import BenchSession, _aware_sqlite_datetimes
 
 TABLES = (m.Organization, m.OrganizationEntitlement, m.EntitlementSnapshot, m.EntitlementTemplate, m.OrganizationUsage, m.Worker,
@@ -42,7 +42,7 @@ def fresh_cache() -> Iterator[None]:
 def db(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     engine = create_engine("sqlite://", poolclass=StaticPool)
     m.Base.metadata.create_all(engine, tables=[cast(Any, table.__table__) for table in TABLES])
-    from app.infrastructure.database import session as session_module
+    from audoryn_shared.infrastructure.database import session as session_module
 
     monkeypatch.setattr(session_module, "session_factory", lambda: BenchSession(Session(engine)))
     with _aware_sqlite_datetimes():
@@ -309,7 +309,7 @@ async def test_a_free_plan_never_expires_and_its_usage_resets_each_period(
 
 @pytest.mark.asyncio
 async def test_a_task_the_plan_refuses_ends_without_running_and_says_why(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.api.internal import runtime
+    from audoryn_execution.api.internal import runtime
 
     monkeypatch.setattr(runtime.entitlements, "require_allowance",
                         AsyncMock(side_effect=plans.EntitlementDenied("This period's tasks (3) are used up.", "tasks.monthly")))
@@ -330,7 +330,7 @@ async def test_a_task_the_plan_refuses_ends_without_running_and_says_why(monkeyp
 
 @pytest.mark.asyncio
 async def test_a_task_already_under_way_is_never_stopped_by_a_limit(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.api.internal import runtime
+    from audoryn_execution.api.internal import runtime
 
     refuse = AsyncMock(side_effect=plans.EntitlementDenied("used up", "tasks.monthly"))
     monkeypatch.setattr(runtime.entitlements, "require_allowance", refuse)
@@ -348,7 +348,7 @@ async def test_a_task_already_under_way_is_never_stopped_by_a_limit(monkeypatch:
 
 @pytest.mark.asyncio
 async def test_a_new_task_is_counted_once_when_admitted(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.api.internal import runtime
+    from audoryn_execution.api.internal import runtime
 
     monkeypatch.setattr(runtime, "admit_due_item", AsyncMock(return_value=True))
     item = SimpleNamespace(id=uuid4(), organization_id=uuid4(), status="queued", payload={},
@@ -361,7 +361,7 @@ async def test_a_new_task_is_counted_once_when_admitted(monkeypatch: pytest.Monk
 
 @pytest.mark.asyncio
 async def test_a_schedule_runs_no_more_often_than_the_plan_allows(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.api import jobs_routes
+    from audoryn_shared.api import jobs_routes
 
     monkeypatch.setattr(jobs_routes.entitlements, "plan_number", AsyncMock(return_value=15))
     session, organization = cast(Any, object()), uuid4()
@@ -378,8 +378,8 @@ async def test_the_plan_sets_concurrent_browser_sessions_and_can_exclude_browser
         monkeypatch: pytest.MonkeyPatch) -> None:
     from test_f30_0_10 import FakeBrowserRuntime, request_for
 
-    from app.execution.contracts import ExecutionProviderError
-    from app.execution.providers.browser import PlaywrightBrowserProvider
+    from audoryn_shared.execution.contracts import ExecutionProviderError
+    from audoryn_shared.execution.providers.browser import PlaywrightBrowserProvider
 
     provider = PlaywrightBrowserProvider(FakeBrowserRuntime())
     request = request_for(provider, operation="navigation.open", payload={"url": "https://example.com"})
@@ -395,7 +395,7 @@ async def test_the_plan_sets_concurrent_browser_sessions_and_can_exclude_browser
 
 @pytest.mark.asyncio
 async def test_a_one_time_task_needs_no_room_for_a_standing_job(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.api import jobs_routes
+    from audoryn_shared.api import jobs_routes
 
     room = AsyncMock(side_effect=plans.EntitlementDenied("Your plan includes 1 standing jobs per worker.", "jobs.per_worker.max"))
     monkeypatch.setattr(jobs_routes.entitlements, "require_room", room)

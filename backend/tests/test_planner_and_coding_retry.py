@@ -9,10 +9,14 @@ from typing import Any
 
 import pytest
 
-from app.execution.coding import service
-from app.execution.contracts import ExecutionProviderError
-from app.execution.integration_execution import execute_native_action
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner, normalize_plan, rejection_reason
+from audoryn_execution.execution.integration_execution import execute_native_action
+from audoryn_shared.execution.coding import service
+from audoryn_shared.execution.contracts import ExecutionProviderError
+from audoryn_shared.runtime.planner.adaptive import (
+    AdaptiveRuntimePlanner,
+    normalize_plan,
+    rejection_reason,
+)
 from tests.test_integration_foundation import Coordination, DeterministicAdapter, execution
 from tests.test_run_plans import ACT, SCOPES, TOOLS, step
 
@@ -48,7 +52,7 @@ class _Gateway:
 
 @pytest.mark.asyncio
 async def test_a_rejected_proposal_is_logged_with_its_reason(caplog: pytest.LogCaptureFixture) -> None:
-    from app.domain.ai.providers import AIInvocationContext
+    from audoryn_shared.domain.ai.providers import AIInvocationContext
 
     good = {"decision": "act", "summary": "s", "title": "Read a", "instruction": "i",
             "resourceId": TOOLS[0]["resourceId"], "scope": TOOLS[0]["scope"], "input": {"key": "a"}}

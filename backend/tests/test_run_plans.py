@@ -11,11 +11,11 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.context.evidence import planner_evidence
-from app.application.services.task_activity import activity_for
-from app.bootstrap.settings import settings
-from app.runtime.managed import _plan_progress, _plan_view, action_budget
-from app.runtime.planner.adaptive import (
+from audoryn_execution.runtime.managed import _plan_progress, _plan_view, action_budget
+from audoryn_shared.application.context.evidence import planner_evidence
+from audoryn_shared.application.services.task_activity import activity_for
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.runtime.planner.adaptive import (
     AdaptivePlanDecision,
     AdaptiveRuntimePlanner,
     current_plan_step,

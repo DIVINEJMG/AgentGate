@@ -11,8 +11,8 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.application.services.conversation_context import ConversationContextAssembler
-from app.infrastructure.database import models as m
-from app.infrastructure.database.base import Base
+from audoryn_shared.infrastructure.database import models as m
+from audoryn_shared.infrastructure.database.base import Base
 from scripts.runtime_benchmark import BenchSession, _aware_sqlite_datetimes
 from tests.legacy_conversation_context import ConversationContextAssembler as LegacyAssembler
 from tests.test_efficiency_queries import NOW, ORG, Database

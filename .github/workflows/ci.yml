@@ -20,6 +20,61 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
 
+  gateway:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/gateway
+    services:
+      redis:  # the limit counters and shared drains are tested against a real Redis
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      GATEWAY_TEST_REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: pyright
+      - run: pytest
+
+  # Each service installed alone, as its image installs it (Phase 4): the core without the
+  # execution service or Playwright, the execution service without the core.
+  core-alone:
+    runs-on: ubuntu-latest
+    env:
+      SERVICE_ROLE: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --upgrade pip
+      - run: pip install "./packages/shared[coding]" "./backend[dev]"
+      - run: python -c "import importlib.util as u, sys; sys.exit(any(u.find_spec(m) for m in ('playwright', 'audoryn_execution')))"
+      - working-directory: backend
+        run: python -c "from app.main import app; print(len(app.routes), 'routes')"
+      - working-directory: backend
+        run: pytest -o pythonpath=. tests/test_message_contracts.py tests/test_health.py
+
+  execution-alone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --upgrade pip
+      - run: pip install "./packages/shared[coding]" "./services/execution[dev]"
+      - run: python -c "import importlib.util as u, sys; sys.exit(u.find_spec('app') is not None)"
+      - working-directory: services/execution
+        run: pytest
+
   backend:
     runs-on: ubuntu-latest
     defaults:
@@ -33,11 +88,12 @@ jobs:
         with:
           python-version: "3.13"
       - run: python -m pip install --upgrade pip
-      - run: pip install -e ".[dev]"
-      - run: ruff check app tests migrations scripts
+      # The core, with the shared code and the execution service it is tested with (Phase 4).
+      - run: pip install -e "../packages/shared[coding]" -e ../services/execution -e ".[dev]"
+      - run: ruff check app tests migrations scripts ../packages/shared ../services/execution
       - run: python scripts/check_changed_quality.py --base origin/${{ github.base_ref || 'main' }}
-      - run: ruff format --check app/application/services/data_migration.py app/application/services/cutover_gate.py tests/test_f28_21_26.py
-      - run: ruff format --check app/execution app/integrations/builtin.py app/api/integration_capability_routes.py tests/test_f29_0_10.py
+      - run: ruff format --check ../packages/shared/audoryn_shared/application/services/data_migration.py ../packages/shared/audoryn_shared/application/services/cutover_gate.py tests/test_f28_21_26.py
+      - run: ruff format --check ../packages/shared/audoryn_shared/execution ../services/execution/audoryn_execution/execution ../packages/shared/audoryn_shared/integrations/builtin.py ../packages/shared/audoryn_shared/api/integration_capability_routes.py tests/test_f29_0_10.py
       - run: pyright
       - run: pytest
       - run: pytest tests/test_f31_0_10.py

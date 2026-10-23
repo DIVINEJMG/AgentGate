@@ -18,16 +18,8 @@ from redis.asyncio import Redis
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_dependencies import authenticated_user, organization_principal
 from app.api.auth_routes import _payload
-from app.api.product_common import require_permission
-from app.application.services import entitlements
 from app.application.services.github_connector import connect_installation
-from app.application.services.integration_credentials import decode_bundle, encode_bundle
-from app.bootstrap.settings import settings
-from app.domain.identity.principals import HumanPrincipal
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.native.http import ProviderTransportError
 from app.infrastructure.auth.github import (
     check_flow,
     digest,
@@ -35,16 +27,24 @@ from app.infrastructure.auth.github import (
     resolve_identity,
     verified_email,
 )
-from app.infrastructure.auth.service import AuthenticatedUser, RegistrationFailure
-from app.infrastructure.auth.session_store import RedisSessionStore
-from app.infrastructure.database.models import (
+from audoryn_shared.api.auth_dependencies import authenticated_user, organization_principal
+from audoryn_shared.api.product_common import require_permission
+from audoryn_shared.application.services import entitlements
+from audoryn_shared.application.services.integration_credentials import decode_bundle, encode_bundle
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.native.http import ProviderTransportError
+from audoryn_shared.infrastructure.auth.service import AuthenticatedUser, RegistrationFailure
+from audoryn_shared.infrastructure.auth.session_store import RedisSessionStore
+from audoryn_shared.infrastructure.database.models import (
     GitHubAuthFlow,
     GitHubInstallationBinding,
     GitHubOnboarding,
     IntegrationConnectionState,
 )
-from app.infrastructure.database.session import database_session
-from app.infrastructure.secrets.integration_crypto import (
+from audoryn_shared.infrastructure.database.session import database_session
+from audoryn_shared.infrastructure.secrets.integration_crypto import (
     decrypt_integration_secret,
     encrypt_integration_secret,
 )

@@ -4,25 +4,34 @@ import hashlib
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
 from playwright.async_api import BrowserContext, Dialog, Frame, Page, Request, Route
 from playwright.async_api import Error as PlaywrightError
 
-from app.domain.actions.gateway import ActionProposal
-from app.execution.authorization import (
+from audoryn_execution.execution.browser.runtime import BrowserRuntime, _SessionHandle
+from audoryn_execution.execution.browser.sensitive import is_sensitive_field_metadata
+from audoryn_execution.execution.lifecycle import ObserveActVerifyLifecycle
+from audoryn_execution.execution.provider_executor import (
+    DatabaseProviderContextLoader,
+    UniversalProviderExecutor,
+)
+from audoryn_shared.domain.actions.gateway import ActionProposal
+from audoryn_shared.execution.authorization import (
     CredentialReference,
     ProviderPermissionSnapshot,
     UniversalActionRequest,
     build_authorization_snapshot,
 )
-from app.execution.browser.artifacts import (
+from audoryn_shared.execution.browser.artifacts import (
     BrowserArtifactInput,
     BrowserArtifactReference,
 )
-from app.execution.browser.contracts import (
+from audoryn_shared.execution.browser.contracts import (
     BrowserDownload,
     BrowserElement,
     BrowserFrame,
@@ -31,23 +40,16 @@ from app.execution.browser.contracts import (
     BrowserSession,
     BrowserVerificationProbe,
 )
-from app.execution.browser.policy import (
-    BrowserDomainPolicy,
-    BrowserNavigationBlocked,
-)
-from app.execution.browser.runtime import BrowserRuntime, _SessionHandle
-from app.execution.browser.sensitive import is_sensitive_field_metadata
-from app.execution.contracts import (
+from audoryn_shared.execution.browser.policy import BrowserDomainPolicy, BrowserNavigationBlocked
+from audoryn_shared.execution.contracts import (
     ExecutionPreferences,
     ExecutionRequest,
     ProviderRuntimeContext,
     ResourceDescriptor,
 )
-from app.execution.lifecycle import ObserveActVerifyLifecycle
-from app.execution.provider_executor import UniversalProviderExecutor
-from app.execution.providers.browser import PlaywrightBrowserProvider
-from app.execution.providers.registry import ProviderRegistry
-from app.execution.redaction import redact_sensitive_structure, redact_url
+from audoryn_shared.execution.providers.browser import PlaywrightBrowserProvider
+from audoryn_shared.execution.providers.registry import ProviderRegistry
+from audoryn_shared.execution.redaction import redact_sensitive_structure, redact_url
 
 
 class MemoryArtifactStore:
@@ -1190,6 +1192,54 @@ async def test_f30_23_30_universal_executor_records_evidence_after_lifecycle() -
         "verify",
         "completed",
     ]
+
+
+class ReleasingContextLoader(DatabaseProviderContextLoader):
+    """A database loader whose session only counts commits."""
+
+    def __init__(self, context: ProviderRuntimeContext) -> None:
+        self.context = context
+        self._session = SimpleNamespace(commit=AsyncMock())  # type: ignore[assignment]
+
+    async def load(self, proposal: ActionProposal) -> ProviderRuntimeContext:
+        del proposal
+        return self.context
+
+    async def record_execution_evidence(self, *, request, result, verification, snapshot) -> None:
+        del request, result, verification, snapshot
+
+
+@pytest.mark.asyncio
+async def test_loading_transaction_ends_before_the_provider_is_called() -> None:
+    """Loading may lock the connection's credential row; that lock must not be held across the
+    provider's network calls, or every other task on the connection waits for them."""
+    runtime = EvidenceRuntime()
+    provider = PlaywrightBrowserProvider(runtime)
+    request = await opened(provider, runtime, operation="element.click",
+                           extra={"locator": {"strategy": "role", "value": "button", "name": "Save"}})
+    loader = ReleasingContextLoader(ProviderRuntimeContext(
+        configuration=request.resource.configuration, credential=None, resource=request.resource))
+    commits_when_called: list[int] = []
+    original = provider.execute
+
+    async def execute(**kwargs):
+        commits_when_called.append(loader._session.commit.await_count)  # type: ignore[attr-defined]
+        return await original(**kwargs)
+
+    provider.execute = execute  # type: ignore[method-assign]
+    executor = UniversalProviderExecutor(registry=ProviderRegistry((provider,)), context_loader=loader)
+    permissions = ProviderPermissionSnapshot(
+        provider="browser", resource_id=request.resource.id, capability_scopes=(request.capability.scope,),
+        credential=CredentialReference(strategy="none", reference=None), checked_at=datetime.now(UTC),
+        adapter="browser", adapter_version=provider.manifest.version)
+    universal = UniversalActionRequest(execution=request, provider_permissions=permissions)
+    snapshot = build_authorization_snapshot(request=universal, risk=request.capability.risk, policy_outcome="ALLOW",
+                                            policy_reason="test", adapter="browser",
+                                            adapter_version=provider.manifest.version)
+
+    await executor.execute_request(universal, snapshot)
+
+    assert commits_when_called and commits_when_called[0] == 1
 
 
 def test_f30_21_30_vercel_auto_deploy_remains_disabled() -> None:

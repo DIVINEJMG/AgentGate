@@ -11,10 +11,14 @@ from typing import Any, cast
 import pytest
 from jsonschema import Draft202012Validator
 
-from app.application.context.corrections import schema_correction
-from app.application.context.planning import PlanningFacts, authorized_tools, planning_rules
-from app.runtime.managed import _plan_view
-from app.runtime.planner.adaptive import (
+from audoryn_execution.runtime.managed import _plan_view
+from audoryn_shared.application.context.corrections import schema_correction
+from audoryn_shared.application.context.planning import (
+    PlanningFacts,
+    authorized_tools,
+    planning_rules,
+)
+from audoryn_shared.runtime.planner.adaptive import (
     AdaptivePlanDecision,
     AdaptiveRuntimePlanner,
     normalize_plan,

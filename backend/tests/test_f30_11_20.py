@@ -7,17 +7,17 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.domain.actions.gateway import ActionGateway, AuthorizationDecision
-from app.domain.identity.principals import AgentPrincipal
-from app.domain.integrations.contracts import IntegrationExecutionResult
-from app.execution.authorization import (
+from audoryn_shared.domain.actions.gateway import ActionGateway, AuthorizationDecision
+from audoryn_shared.domain.identity.principals import AgentPrincipal
+from audoryn_shared.domain.integrations.contracts import IntegrationExecutionResult
+from audoryn_shared.execution.authorization import (
     CredentialReference,
     ExecutionAuthorizationSnapshot,
     ProviderPermissionSnapshot,
     UniversalActionRequest,
     action_fingerprint,
 )
-from app.execution.browser.contracts import (
+from audoryn_shared.execution.browser.contracts import (
     BrowserDownload,
     BrowserElement,
     BrowserFrame,
@@ -25,18 +25,18 @@ from app.execution.browser.contracts import (
     BrowserSession,
     BrowserVerificationProbe,
 )
-from app.execution.browser.credentials import (
+from audoryn_shared.execution.browser.credentials import (
     BrowserAuthenticationFailure,
     BrowserCredentialBundle,
 )
-from app.execution.browser.policy import BrowserDomainPolicy
-from app.execution.contracts import (
+from audoryn_shared.execution.browser.policy import BrowserDomainPolicy
+from audoryn_shared.execution.contracts import (
     ExecutionPreferences,
     ExecutionProviderError,
     ExecutionRequest,
     ResourceDescriptor,
 )
-from app.execution.providers.browser import (
+from audoryn_shared.execution.providers.browser import (
     FILE_TRANSFER_SCOPES,
     PlaywrightBrowserProvider,
 )

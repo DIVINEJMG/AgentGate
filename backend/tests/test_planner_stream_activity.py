@@ -6,12 +6,12 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from app.domain.ai.providers import AIProviderError, AITextRequest
-from app.infrastructure.ai.model_profiles import PlannerModelProfile
-from app.infrastructure.ai.nvidia import NvidiaNimProvider
-from app.infrastructure.ai.openrouter import OpenRouterPlannerProvider
-from app.infrastructure.ai.streaming import collect_response
-from app.runtime.smart_planner import CountedProvider
+from audoryn_shared.domain.ai.providers import AIProviderError, AITextRequest
+from audoryn_shared.infrastructure.ai.model_profiles import PlannerModelProfile
+from audoryn_shared.infrastructure.ai.nvidia import NvidiaNimProvider
+from audoryn_shared.infrastructure.ai.openrouter import OpenRouterPlannerProvider
+from audoryn_shared.infrastructure.ai.streaming import collect_response
+from audoryn_shared.runtime.smart_planner import CountedProvider
 
 
 def response(model="model", finish="stop", refusal=False):

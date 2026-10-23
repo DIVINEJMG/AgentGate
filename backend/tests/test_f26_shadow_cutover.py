@@ -1,7 +1,7 @@
 import pytest
 
-from app.application.services.cutover import CutoverController
-from app.application.services.shadow_mode import ShadowModeService
+from audoryn_shared.application.services.cutover import CutoverController
+from audoryn_shared.application.services.shadow_mode import ShadowModeService
 
 
 @pytest.mark.asyncio

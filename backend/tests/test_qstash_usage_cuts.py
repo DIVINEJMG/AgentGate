@@ -12,11 +12,11 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.sql.dml import Insert
 
-from app.bootstrap.settings import settings
-from app.execution.providers.native.github import event_routing
-from app.infrastructure.database import usage_records
-from app.observability.usage import Usage, count_qstash_message, metered
-from app.runtime import outbox_publisher, outbox_trigger
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.execution.providers.native.github import event_routing
+from audoryn_shared.infrastructure.database import usage_records
+from audoryn_shared.observability.usage import Usage, count_qstash_message, metered
+from audoryn_shared.runtime import outbox_publisher, outbox_trigger
 
 # --- Draining in the server --------------------------------------------------------------------
 

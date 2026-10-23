@@ -14,13 +14,13 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api import integration_foundation_routes as routes
-from app.bootstrap.settings import settings
-from app.domain.identity.principals import HumanPrincipal
-from app.execution.contracts import ExecutionProviderError
-from app.infrastructure.database import models as m
-from app.runtime import managed
-from app.runtime.managed import ManagedRuntimeExecutor
+from audoryn_execution.runtime import managed
+from audoryn_execution.runtime.managed import ManagedRuntimeExecutor
+from audoryn_shared.api import integration_foundation_routes as routes
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.execution.contracts import ExecutionProviderError
+from audoryn_shared.infrastructure.database import models as m
 from scripts.runtime_benchmark import BenchSession, _aware_sqlite_datetimes
 from tests.test_efficiency_queries import ORG
 from tests.test_planner_summary_and_workspace_guard import Guard

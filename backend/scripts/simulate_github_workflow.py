@@ -18,11 +18,15 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.domain.actions.gateway import ActionGateway, ActionProposal, AuthorizationDecision
-from app.domain.identity.principals import AgentPrincipal
-from app.domain.integrations.contracts import IntegrationExecutionResult
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.native.github.safety import (
+from audoryn_shared.domain.actions.gateway import (
+    ActionGateway,
+    ActionProposal,
+    AuthorizationDecision,
+)
+from audoryn_shared.domain.identity.principals import AgentPrincipal
+from audoryn_shared.domain.integrations.contracts import IntegrationExecutionResult
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.native.github.safety import (
     safe_path,
     validate_changes,
     validate_task_branch,
@@ -269,11 +273,11 @@ async def live(args):
         diagnostic_logger.addHandler(handler)
         diagnostic_logger.propagate = False
     diagnostic_logger.setLevel(logging.INFO)
-    from app.bootstrap.settings import settings
-    from app.infrastructure.database import session as database
-    from app.infrastructure.database.models import IntegrationResource, WorkItem
-    from app.infrastructure.redis.coordination import RedisCoordinator
-    from app.runtime.managed import ManagedRuntimeExecutor
+    from audoryn_execution.runtime.managed import ManagedRuntimeExecutor
+    from audoryn_shared.bootstrap.settings import settings
+    from audoryn_shared.infrastructure.database import session as database
+    from audoryn_shared.infrastructure.database.models import IntegrationResource, WorkItem
+    from audoryn_shared.infrastructure.redis.coordination import RedisCoordinator
 
     # Local process only: no inference, no normal routing/configuration changes.
     settings.smart_planner_enabled = False
@@ -300,7 +304,7 @@ async def live(args):
             # Verify the entire saved action history before releasing the paused task.
             from sqlalchemy import select
 
-            from app.infrastructure.database.models import Run
+            from audoryn_shared.infrastructure.database.models import Run
             from scripts.github_inspection_recovery import resume_inspection
             saved_run = await session.scalar(select(Run).where(Run.organization_id == org,
                 Run.work_item_id == item.id).order_by(Run.created_at.desc()).limit(1))

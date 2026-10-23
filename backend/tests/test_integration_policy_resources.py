@@ -5,15 +5,16 @@ from uuid import uuid4
 
 import pytest
 
-from app.api import governance_routes as governance
-from app.application.services.integration_foundation import IntegrationFoundation
-from app.application.services.live_results import live_result_reference
-from app.bootstrap.settings import settings
-from app.domain.ai.providers import AIGateway
-from app.domain.identity.principals import HumanPrincipal
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.registry import ProviderRegistry
-from app.infrastructure.database.models import (
+from audoryn_execution.application.services.live_results import live_result_reference
+from audoryn_execution.runtime.managed import _system_principal
+from audoryn_shared.api import governance_routes as governance
+from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.ai.providers import AIGateway
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.registry import ProviderRegistry
+from audoryn_shared.infrastructure.database.models import (
     AgentIdentity,
     Job,
     JobRevision,
@@ -23,14 +24,13 @@ from app.infrastructure.database.models import (
     Worker,
     WorkItem,
 )
-from app.runtime.managed import _system_principal
 
 
 @pytest.fixture
 def resource_setup(monkeypatch):
     monkeypatch.setattr(settings, "integration_foundation_enabled", True)
     provider = ExpandedGitHubProvider()
-    monkeypatch.setattr("app.execution.bootstrap.execution_provider_registry", lambda: ProviderRegistry((provider,)))
+    monkeypatch.setattr("audoryn_shared.execution.bootstrap.execution_provider_registry", lambda: ProviderRegistry((provider,)))
     org, rid, aid = uuid4(), uuid4(), uuid4()
     row = SimpleNamespace(id=rid, organization_id=org, provider="github", connection_id=uuid4(),
         display_name="owner/repository", health="healthy")
@@ -93,7 +93,7 @@ async def test_risk_assessment_uses_same_new_resource_identity(resource_setup):
 
 @pytest.mark.asyncio
 async def test_planner_keeps_authorized_tools_for_new_resource_ids(resource_setup, monkeypatch):
-    from app.runtime import managed
+    from audoryn_execution.runtime import managed
 
     session, org, rid, aid, row, connection, _ = resource_setup
     # A foundation resource has no legacy integration row, so the planner reads none for it.
@@ -144,8 +144,8 @@ def test_result_message_preserves_outcome_instead_of_hardcoding_success(status, 
 async def test_runtime_publishes_result_for_blocked_partial_and_successful_work(
     monkeypatch, completed_count, requested_status, expected_status, outcome,
 ):
-    from app.infrastructure.database.models import Result, ResultVersion
-    from app.runtime import managed
+    from audoryn_execution.runtime import managed
+    from audoryn_shared.infrastructure.database.models import Result, ResultVersion
 
     saved = []
 
@@ -184,7 +184,7 @@ async def test_runtime_publishes_result_for_blocked_partial_and_successful_work(
 
 
 def test_planner_can_report_partial_work_as_a_result_without_claiming_success():
-    from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
+    from audoryn_shared.runtime.planner.adaptive import AdaptiveRuntimePlanner
 
     planner = AdaptiveRuntimePlanner(cast(AIGateway, SimpleNamespace()))
     decision = planner._validate({"decision": "finish", "resultStatus": "attention",

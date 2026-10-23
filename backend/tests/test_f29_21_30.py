@@ -6,7 +6,14 @@ from uuid import uuid4
 
 import pytest
 
-from app.execution.contracts import (
+from audoryn_execution.execution.lifecycle import ObserveActVerifyLifecycle
+from audoryn_execution.execution.providers.extensible import (
+    CustomExecutionProvider,
+    MCPExecutionProvider,
+)
+from audoryn_execution.execution.recovery import RecoveryPolicy
+from audoryn_execution.execution.retry import RetryPolicy
+from audoryn_shared.execution.contracts import (
     CapabilityDescriptor,
     ExecutionError,
     ExecutionProviderError,
@@ -15,14 +22,7 @@ from app.execution.contracts import (
     ResourceDescriptor,
     VerificationResult,
 )
-from app.execution.lifecycle import ObserveActVerifyLifecycle
-from app.execution.providers.browser import BrowserExecutionProvider
-from app.execution.providers.extensible import (
-    CustomExecutionProvider,
-    MCPExecutionProvider,
-)
-from app.execution.recovery import RecoveryPolicy
-from app.execution.retry import RetryPolicy
+from audoryn_shared.execution.providers.browser import BrowserExecutionProvider
 
 
 def _request(*, risk: str = "low") -> ExecutionRequest:

@@ -9,13 +9,14 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.services.integration_credentials import decode_bundle, encode_bundle
-from app.application.services.integration_foundation import (
+from audoryn_execution.execution.integration_execution import execute_native_action
+from audoryn_shared.application.services.integration_credentials import decode_bundle, encode_bundle
+from audoryn_shared.application.services.integration_foundation import (
     IntegrationFoundation,
     notify_integration_work,
 )
-from app.bootstrap.settings import Settings
-from app.domain.integrations.foundation import (
+from audoryn_shared.bootstrap.settings import Settings
+from audoryn_shared.domain.integrations.foundation import (
     IntegrationNeed,
     IntegrationTaskDraft,
     grant_allows,
@@ -23,7 +24,7 @@ from app.domain.integrations.foundation import (
     recovery_disposition,
     select_resource,
 )
-from app.execution.contracts import (
+from audoryn_shared.execution.contracts import (
     CapabilityDescriptor,
     ExecutionProviderError,
     ExecutionRequest,
@@ -31,16 +32,15 @@ from app.execution.contracts import (
     ProviderRuntimeContext,
     ResourceDescriptor,
 )
-from app.execution.integration_execution import execute_native_action
-from app.execution.providers.integration_hooks import (
+from audoryn_shared.execution.providers.integration_hooks import (
     AuthenticationHooks,
     CredentialBundle,
     EventHooks,
     ResourcePage,
     VerifiedEvent,
 )
-from app.execution.providers.native.http import retry_after_seconds
-from app.infrastructure.database.models import (
+from audoryn_shared.execution.providers.native.http import retry_after_seconds
+from audoryn_shared.infrastructure.database.models import (
     ConversationMessage,
     ConversationThread,
     Integration,
@@ -49,7 +49,7 @@ from app.infrastructure.database.models import (
     Worker,
     WorkItem,
 )
-from app.infrastructure.database.outbox import TransactionalOutbox
+from audoryn_shared.infrastructure.database.outbox import TransactionalOutbox
 
 
 def resource(name="Repository", connection="account-a", id="repo-a"):
@@ -136,8 +136,8 @@ async def test_worker_share_revocation_also_blocks_the_owner_worker():
 
 @pytest.mark.asyncio
 async def test_credential_renewal_rereads_after_lock_and_keeps_rotated_token(monkeypatch):
-    import app.application.services.integration_credentials as credentials
-    from app.application.services.integration_credentials import CredentialManager
+    import audoryn_shared.application.services.integration_credentials as credentials
+    from audoryn_shared.application.services.integration_credentials import CredentialManager
 
     expired = CredentialBundle(access_token="old", refresh_token="refresh", expires_at=datetime.now(UTC) - timedelta(minutes=1))
     rotated = CredentialBundle(access_token="rotated", expires_at=datetime.now(UTC) + timedelta(hours=1), account_id="account")
@@ -153,8 +153,8 @@ async def test_credential_renewal_rereads_after_lock_and_keeps_rotated_token(mon
 
 @pytest.mark.asyncio
 async def test_revoked_renewal_moves_connection_to_reconnect(monkeypatch):
-    import app.application.services.integration_credentials as credentials
-    from app.application.services.integration_credentials import CredentialManager
+    import audoryn_shared.application.services.integration_credentials as credentials
+    from audoryn_shared.application.services.integration_credentials import CredentialManager
 
     expired = CredentialBundle(access_token="old", refresh_token="refresh", expires_at=datetime.now(UTC) - timedelta(minutes=1))
     monkeypatch.setattr(credentials, "decrypt_integration_secret", lambda value: value)
@@ -297,8 +297,8 @@ async def test_cross_tenant_notification_is_rejected():
 
 
 def test_current_adapters_do_not_simulate_oauth_or_events():
-    from app.execution.bootstrap import execution_provider_registry
-    from app.execution.providers.native.github.provider import ExpandedGitHubProvider
+    from audoryn_shared.execution.bootstrap import execution_provider_registry
+    from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
 
     for adapter in execution_provider_registry().providers(kind="native_api"):
         # Only the expanded GitHub adapter (GITHUB_EXPANDED_ENABLED with the integration
@@ -342,7 +342,7 @@ async def test_compound_task_preserves_exact_resources_and_all_capabilities():
 
 @pytest.mark.asyncio
 async def test_paginated_discovery_uses_cursor_without_resource_authority(monkeypatch):
-    import app.application.services.integration_foundation as service
+    import audoryn_shared.application.services.integration_foundation as service
 
     descriptors = [execution(False)[0].resource]
     adapter = SimpleNamespace(discover_resource_page=AsyncMock(side_effect=[
@@ -359,8 +359,8 @@ async def test_paginated_discovery_uses_cursor_without_resource_authority(monkey
 
 @pytest.mark.asyncio
 async def test_duplicate_verified_event_does_not_publish_twice(monkeypatch):
-    from app.application.services.integration_events import accept_event
-    monkeypatch.setattr("app.application.services.integration_events.execution_provider_registry", lambda: SimpleNamespace(get=lambda _: object()))
+    from audoryn_shared.application.services.integration_events import accept_event
+    monkeypatch.setattr("audoryn_shared.application.services.integration_events.execution_provider_registry", lambda: SimpleNamespace(get=lambda _: object()))
 
     state = SimpleNamespace(organization_id=uuid4(), connection_id=uuid4())
     existing = uuid4()
@@ -375,8 +375,8 @@ async def test_duplicate_verified_event_does_not_publish_twice(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_self_generated_event_is_recorded_without_triggering_work(monkeypatch):
-    from app.application.services.integration_events import accept_event
-    monkeypatch.setattr("app.application.services.integration_events.execution_provider_registry", lambda: SimpleNamespace(get=lambda _: object()))
+    from audoryn_shared.application.services.integration_events import accept_event
+    monkeypatch.setattr("audoryn_shared.application.services.integration_events.execution_provider_registry", lambda: SimpleNamespace(get=lambda _: object()))
 
     state = SimpleNamespace(organization_id=uuid4(), connection_id=uuid4())
     session = SimpleNamespace(scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: [state])), scalar=AsyncMock(return_value=uuid4()))

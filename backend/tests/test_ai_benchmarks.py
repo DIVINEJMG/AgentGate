@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.domain.ai.providers import AIProviderError, ModelProviderCapabilities
+from audoryn_shared.domain.ai.providers import AIProviderError, ModelProviderCapabilities
 from scripts import benchmark_ai_common as bench
 
 

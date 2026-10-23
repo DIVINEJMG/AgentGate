@@ -7,16 +7,19 @@ from uuid import uuid4
 from fastapi import HTTPException
 from sqlalchemy import select, update
 
-from app.application.services.integration_credentials import encode_bundle
-from app.application.services.integration_foundation import (
+from audoryn_shared.application.services.integration_credentials import encode_bundle
+from audoryn_shared.application.services.integration_foundation import (
     IntegrationFoundation,
     grants_review_message,
 )
-from app.bootstrap.settings import settings
-from app.domain.identity.permissions import permissions_for_role
-from app.execution.providers.native.github.authentication import app_jwt, permission_scopes
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.infrastructure.database.models import (
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.identity.permissions import permissions_for_role
+from audoryn_shared.execution.providers.native.github.authentication import (
+    app_jwt,
+    permission_scopes,
+)
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.infrastructure.database.models import (
     GitHubAuthFlow,
     GitHubInstallationBinding,
     HumanIdentity,
@@ -25,7 +28,7 @@ from app.infrastructure.database.models import (
     IntegrationCredential,
     OrganizationMembership,
 )
-from app.infrastructure.secrets.integration_crypto import encrypt_integration_secret
+from audoryn_shared.infrastructure.secrets.integration_crypto import encrypt_integration_secret
 
 
 async def finish_onboarding(session, row, connection_id):
@@ -138,7 +141,7 @@ async def connect_installation(organization_id, installation_id, principal, sess
 
     config["authorizedProjectIds"] = json.dumps(project_ids)
     if row.reconnect_connection_id:
-        from app.api.integration_foundation_routes import owned
+        from audoryn_shared.api.integration_foundation_routes import owned
 
         state = await owned(session, organization_id, row.reconnect_connection_id, principal)
         connection = await session.get(Integration, row.reconnect_connection_id)

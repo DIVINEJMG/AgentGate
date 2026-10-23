@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.runtime import outbox_publisher
-from app.runtime.qstash_trigger import RuntimeSignalResult
+from audoryn_shared.runtime import outbox_publisher
+from audoryn_shared.runtime.qstash_trigger import RuntimeSignalResult
 
 
 class _Session:

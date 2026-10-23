@@ -43,15 +43,16 @@ from sqlalchemy.dialects.sqlite.base import DATETIME as SQLITE_DATETIME
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session
 
-from app.api import governance_routes
-from app.api.internal import outbox as outbox_routes
-from app.api.internal import runtime as runtime_routes
-from app.bootstrap.settings import settings
-from app.domain.ai.providers import AIResponse, ModelProviderCapabilities
-from app.domain.identity.principals import HumanPrincipal
-from app.domain.queue.provider import QueueMessage
-from app.execution.authorization import CredentialReference, ProviderPermissionSnapshot
-from app.execution.contracts import (
+from audoryn_execution.api.internal import outbox as outbox_routes
+from audoryn_execution.api.internal import runtime as runtime_routes
+from audoryn_execution.runtime import managed
+from audoryn_shared.api import governance_routes
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.ai.providers import AIResponse, ModelProviderCapabilities
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.domain.queue.provider import QueueMessage
+from audoryn_shared.execution.authorization import CredentialReference, ProviderPermissionSnapshot
+from audoryn_shared.execution.contracts import (
     CapabilityDescriptor,
     ExecutionResult,
     ProviderHealth,
@@ -59,16 +60,16 @@ from app.execution.contracts import (
     ResourceDescriptor,
     VerificationResult,
 )
-from app.execution.providers.registry import ProviderRegistry
-from app.infrastructure.database import models as m
-from app.infrastructure.database.base import Base
-from app.infrastructure.qstash.provider import UpstashQStashProvider
-from app.infrastructure.redis.coordination import Lease, RedisCoordinator
-from app.observability.usage import count_redis_commands, current_usage, meter_database
-from app.realtime.bus import RedisRealtimeBus
-from app.runtime import managed, smart_planner
-from app.runtime.qstash_trigger import request_runtime_execution
-from app.runtime.schedule_wake import arm_schedule
+from audoryn_shared.execution.providers.registry import ProviderRegistry
+from audoryn_shared.infrastructure.database import models as m
+from audoryn_shared.infrastructure.database.base import Base
+from audoryn_shared.infrastructure.qstash.provider import UpstashQStashProvider
+from audoryn_shared.infrastructure.redis.coordination import Lease, RedisCoordinator
+from audoryn_shared.observability.usage import count_redis_commands, current_usage, meter_database
+from audoryn_shared.realtime.bus import RedisRealtimeBus
+from audoryn_shared.runtime import smart_planner
+from audoryn_shared.runtime.qstash_trigger import request_runtime_execution
+from audoryn_shared.runtime.schedule_wake import arm_schedule
 
 EXECUTE_URL = "https://bench.local/internal/v1/runtime/execute"
 DRAIN_URL = "https://bench.local/internal/v1/outbox/drain"
@@ -242,7 +243,7 @@ class FakeQStash:
 
     async def publish(self, *, destination: str, body: str, idempotency_key: str, delay_seconds: int | None = None,
                       **_: Any) -> QueueMessage:
-        from app.observability.usage import count_qstash_message
+        from audoryn_shared.observability.usage import count_qstash_message
 
         count_qstash_message()
         READS.qstash += 1 if READS.on else 0
@@ -436,7 +437,7 @@ class ScriptedAI:
         if self.calls >= len(self.answers):
             raise AssertionError(f"The script has no answer for planning call {self.calls + 1}.")
         if self.fail_on_call == self.calls + 1 and not self.failed:
-            from app.domain.ai.providers import AIProviderError
+            from audoryn_shared.domain.ai.providers import AIProviderError
 
             self.failed = True
             raise AIProviderError("provider_unavailable", "Scripted outage of the first model.", retryable=True)
@@ -651,9 +652,13 @@ def _patched(targets: list[tuple[Any, str, Any]]) -> Iterator[None]:
             setattr(owner, name, value)
 
 
+# AgentGate's code: the core, the shared code and the execution service (Phase 4).
+AGENTGATE_PACKAGES = ("app.", "audoryn_shared.", "audoryn_execution.")
+
+
 def _modules_with(name: str, value: Any) -> list[Any]:
     return [module for key, module in list(sys.modules.items())
-            if key.startswith("app.") and module is not None and getattr(module, name, None) is value]
+            if key.startswith(AGENTGATE_PACKAGES) and module is not None and getattr(module, name, None) is value]
 
 
 def _seed(session: Session, task: Task) -> dict[str, Any]:
@@ -863,8 +868,8 @@ async def _run_task(task: Task, directory: Path) -> dict[str, Any]:
     ids["planner_tools"] = []
     route = {"provider": "bench", "model": "scripted", "endpoint": "bench"}
     second = {"provider": "bench", "model": "scripted-second", "endpoint": "bench-second"}
-    from app.infrastructure.database import session as session_module
-    from app.runtime import outbox_publisher
+    from audoryn_shared.infrastructure.database import session as session_module
+    from audoryn_shared.runtime import outbox_publisher
 
     targets: list[tuple[Any, str, Any]] = [
         *[(module, "session_factory", factory) for module in _modules_with("session_factory", session_module.session_factory)],
@@ -935,7 +940,10 @@ async def _approve_pending(factory: Callable[[], BenchSession], ids: dict[str, A
 async def _expire_pending(factory: Callable[[], BenchSession], engine: Any) -> None:
     """Nobody decides: move the pending approval 25 hours into the past, then run the sweep's
     expiry pass and wake the run, as the 10-minute sweep would."""
-    from app.application.services.approval_expiry import expire_and_remind, wake_expired
+    from audoryn_execution.application.services.approval_expiry import (
+        expire_and_remind,
+        wake_expired,
+    )
 
     with Session(engine) as session:
         for approval in session.scalars(select(m.Approval).where(m.Approval.status == "pending")):

@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
+from audoryn_shared.runtime.planner.adaptive import AdaptiveRuntimePlanner
 
 
 class FixtureBlocked(RuntimeError):

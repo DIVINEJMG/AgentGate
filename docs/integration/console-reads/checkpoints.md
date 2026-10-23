@@ -5,7 +5,7 @@ committed, pushed, deployed or configured with real keys.
 
 ## How checks were run (10 October 2026)
 
-- Backend environment: `backend/.venv` created with `pip install -e ".[dev]"`, which is what CI uses,
+- Backend environment: `backend/.venv` created with `pip install -e ".[dev,browser]"`, which is what CI uses,
   but on **Python 3.14.7**, the only 3.13+ interpreter on this machine. CI uses 3.13.
 - `backend/.env` points at live services (Neon, Upstash). Tests and scripts were therefore
   run with the **working directory outside `backend/`**, so settings never load that file,
@@ -49,8 +49,8 @@ Existing pytest failures, unrelated to this work and left alone:
 
 New files:
 
-- `backend/app/application/console_reads/signing.py`: verifier (port of Console's scheme)
-- `backend/app/application/console_reads/config.py`: settings → keys; an invalid config turns the feature off and never stops startup
+- `packages/shared/audoryn_shared/application/console_reads/signing.py`: verifier (port of Console's scheme)
+- `packages/shared/audoryn_shared/application/console_reads/config.py`: settings → keys; an invalid config turns the feature off and never stops startup
 - `backend/app/application/console_reads/guard.py`: switch, signature, replay (Redis
   `console-reads:replay:*`, fails closed), rate limit (`console-reads:rate:*`), parameter
   check, envelope, error mapping and logging that contains no values
@@ -60,7 +60,7 @@ New files:
 Edits to existing files (additive only):
 
 - `backend/app/api/router.py`: one import and one `include_router`
-- `backend/app/bootstrap/settings.py`: 11 optional `console_reads_*` settings, off by default
+- `packages/shared/audoryn_shared/bootstrap/settings.py`: 11 optional `console_reads_*` settings, off by default
 - `.env.example`: placeholders with empty secrets
 
 Results:

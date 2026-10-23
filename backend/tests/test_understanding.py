@@ -13,12 +13,12 @@ from sqlalchemy.orm import Session
 
 from app.application.services import conversation_commands
 from app.application.services.conversation_commands import ConversationCommandCompiler
-from app.application.services.grounding import grounded_in
-from app.application.services.worker_draft import _enforce_human_approval_intent
-from app.domain.conversation.intent import CommandReceipt, WorkerCommandIntent
-from app.domain.workforce.drafts import WorkerDraft
-from app.infrastructure.database import models as m
-from app.infrastructure.database.base import Base
+from audoryn_shared.application.services.grounding import grounded_in
+from audoryn_shared.application.services.worker_draft import _enforce_human_approval_intent
+from audoryn_shared.domain.conversation.intent import CommandReceipt, WorkerCommandIntent
+from audoryn_shared.domain.workforce.drafts import WorkerDraft
+from audoryn_shared.infrastructure.database import models as m
+from audoryn_shared.infrastructure.database.base import Base
 from scripts.runtime_benchmark import BenchSession, _aware_sqlite_datetimes
 from tests.test_efficiency_queries import ORG, Database
 
@@ -219,8 +219,8 @@ async def test_a_message_on_another_subject_after_a_question_is_a_new_request(mo
     (["Tuesdays"], ["tuesday"]),
 ])
 def test_schedule_days_can_be_written_any_common_way(written: list[str], days: list[str]) -> None:
-    from app.application.services.schedule_inference import compile_schedule
-    from app.domain.workforce.drafts import ScheduleDraft
+    from audoryn_shared.application.services.schedule_inference import compile_schedule
+    from audoryn_shared.domain.workforce.drafts import ScheduleDraft
 
     compiled = compile_schedule(ScheduleDraft(kind="weekly", weekdays=written, local_time="09:00", timezone="UTC"))
     assert compiled.trigger_config is not None
@@ -229,8 +229,8 @@ def test_schedule_days_can_be_written_any_common_way(written: list[str], days: l
 
 
 def test_an_unknown_day_is_still_refused() -> None:
-    from app.application.services.schedule_inference import compile_schedule
-    from app.domain.workforce.drafts import ScheduleDraft
+    from audoryn_shared.application.services.schedule_inference import compile_schedule
+    from audoryn_shared.domain.workforce.drafts import ScheduleDraft
 
     with pytest.raises(ValueError, match="Invalid schedule weekdays"):
         compile_schedule(ScheduleDraft(kind="weekly", weekdays=["someday"], timezone="UTC"))
@@ -240,7 +240,7 @@ def test_an_unknown_day_is_still_refused() -> None:
     ("9:00", "09:00"), ("9am", "09:00"), ("9:30 pm", "21:30"), ("21.15", "21:15"), ("12am", "00:00"), ("12 PM", "12:00"),
 ])
 def test_schedule_times_can_be_written_any_common_way(written: str, clock: str) -> None:
-    from app.domain.workforce.drafts import ScheduleDraft
+    from audoryn_shared.domain.workforce.drafts import ScheduleDraft
 
     assert ScheduleDraft(kind="daily", local_time=written).local_time == clock
 
@@ -249,7 +249,7 @@ def test_schedule_times_can_be_written_any_common_way(written: str, clock: str) 
 def test_an_unclear_time_is_still_refused(unclear: str) -> None:
     from pydantic import ValidationError
 
-    from app.domain.workforce.drafts import ScheduleDraft
+    from audoryn_shared.domain.workforce.drafts import ScheduleDraft
 
     with pytest.raises(ValidationError):
         ScheduleDraft(kind="daily", local_time=unclear)

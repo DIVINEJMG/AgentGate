@@ -1,6 +1,6 @@
-from app.infrastructure.database.base import Base
-from app.infrastructure.database.models import Organization, WorkItem
-from app.infrastructure.redis.coordination import RedisCoordinator
+from audoryn_shared.infrastructure.database.base import Base
+from audoryn_shared.infrastructure.database.models import Organization, WorkItem
+from audoryn_shared.infrastructure.redis.coordination import RedisCoordinator
 
 
 def test_canonical_schema_contains_expected_tables() -> None:

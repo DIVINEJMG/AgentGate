@@ -30,10 +30,10 @@ async def prepare(args):
         raise FixtureBlocked("Preparation requires organization/source-work-item IDs, --preparation-key and --workers-stopped")
     from sqlalchemy import select, text
 
-    from app.application.services.integration_foundation import IntegrationFoundation
-    from app.domain.identity.permissions import permissions_for_role
-    from app.infrastructure.database import session as database
-    from app.infrastructure.database.models import (
+    from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
+    from audoryn_shared.domain.identity.permissions import permissions_for_role
+    from audoryn_shared.infrastructure.database import session as database
+    from audoryn_shared.infrastructure.database.models import (
         ConversationMessage,
         ConversationThread,
         IntegrationResource,

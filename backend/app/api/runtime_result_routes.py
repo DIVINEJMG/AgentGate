@@ -10,28 +10,28 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_dependencies import organization_principal
-from app.api.jobs_routes import (
+from audoryn_shared.api.auth_dependencies import organization_principal
+from audoryn_shared.api.jobs_routes import (
     _provision_managed_job_authority,
     current_revision,
     work_item_public,
     work_item_v2,
 )
-from app.api.product_common import (
+from audoryn_shared.api.product_common import (
     append_audit,
     latest_setting,
     not_found,
     require_permission,
     utcnow,
 )
-from app.application.services.browser_origin_authority import (
+from audoryn_shared.application.services.browser_origin_authority import (
     reconcile_ai_job_browser_origins,
 )
-from app.application.services.worker_memory import contains_secret_material
-from app.bootstrap.settings import settings
-from app.domain.identity.principals import HumanPrincipal
-from app.execution.provenance import ExecutionProvenance, provenance_from_action_payload
-from app.infrastructure.database.models import (
+from audoryn_shared.application.services.worker_memory import contains_secret_material
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.execution.provenance import ExecutionProvenance, provenance_from_action_payload
+from audoryn_shared.infrastructure.database.models import (
     Action,
     Artifact,
     AuditEvent,
@@ -45,11 +45,11 @@ from app.infrastructure.database.models import (
     Worker,
     WorkItem,
 )
-from app.infrastructure.database.outbox import TransactionalOutbox
-from app.infrastructure.database.session import database_session
-from app.infrastructure.redis.coordination import RedisCoordinator
-from app.infrastructure.storage.provider import object_storage_from_settings
-from app.runtime.qstash_trigger import (
+from audoryn_shared.infrastructure.database.outbox import TransactionalOutbox
+from audoryn_shared.infrastructure.database.session import database_session
+from audoryn_shared.infrastructure.redis.coordination import RedisCoordinator
+from audoryn_shared.infrastructure.storage.provider import object_storage_from_settings
+from audoryn_shared.runtime.qstash_trigger import (
     request_runtime_execution,
     request_runtime_execution_detailed,
 )
@@ -521,7 +521,7 @@ async def continue_run_v1(
     if item is None:
         raise HTTPException(500, "Run work item is unavailable.")
     # A task paused while planning starts a fresh planning decision (F16); otherwise this wakes it.
-    from app.runtime.smart_planner import restart_planning
+    from audoryn_shared.runtime.smart_planner import restart_planning
 
     await restart_planning(session, item, run)
     expected_step = int(
@@ -1229,8 +1229,8 @@ async def _artifact_access(session, artifact, principal):
     identity = (artifact.metadata_json or {}).get("integrationResourceId")
     if not identity:
         return True
-    from app.application.services.integration_foundation import IntegrationFoundation
-    from app.infrastructure.database.models import IntegrationResource
+    from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
+    from audoryn_shared.infrastructure.database.models import IntegrationResource
     resource = await session.get(IntegrationResource, UUID(identity))
     return bool(resource and resource.organization_id == artifact.organization_id and
         await IntegrationFoundation(session).can_use(resource.connection_id, artifact.organization_id, principal.user_id))
@@ -1791,18 +1791,18 @@ async def result_export_v2(
 async def planner_readiness(organization_id: UUID,
     principal: Annotated[HumanPrincipal, Depends(organization_principal)]) -> dict[str, Any]:
     require_permission(principal, "integrations.manage")
-    from app.runtime.smart_planner import configured_routes
+    from audoryn_shared.runtime.smart_planner import configured_routes
     coordinator = RedisCoordinator.from_settings()
     try:
         routes = configured_routes()
-        from app.infrastructure.ai.text_routes import snapshot_routes, text_routes
+        from audoryn_shared.infrastructure.ai.text_routes import snapshot_routes, text_routes
         workload_routes = {kind: snapshot_routes(settings, kind) for kind in ("interactive", "complex")}
         catalog_routes = text_routes(settings)
         for entries in workload_routes.values():
             for route in entries:
                 if not any(r["provider"] == route["provider"] and r["model"] == route["model"] for r in catalog_routes):
                     catalog_routes.append(route)
-        from app.infrastructure.ai.model_profiles import DEFAULT_PROFILES
+        from audoryn_shared.infrastructure.ai.model_profiles import DEFAULT_PROFILES
         for route in catalog_routes:
             profile = settings.smart_planner_model_profiles.get(f"{route['provider']}:{route['model']}") or DEFAULT_PROFILES.get(f"{route['provider']}:{route['model']}")
             if profile:
@@ -1810,7 +1810,7 @@ async def planner_readiness(organization_id: UUID,
         checks: dict[str, Any] = {}
         if settings.smart_planner_enabled and settings.openrouter_planner_data_allowed and settings.openrouter_allowed_providers:
             try:
-                from app.infrastructure.ai.openrouter import OpenRouterPlannerProvider
+                from audoryn_shared.infrastructure.ai.openrouter import OpenRouterPlannerProvider
                 provider = OpenRouterPlannerProvider(
                     api_key=settings.openrouter_api_key.get_secret_value() if settings.openrouter_api_key else None,
                     allowed_providers=settings.openrouter_allowed_providers,
@@ -1821,7 +1821,7 @@ async def planner_readiness(organization_id: UUID,
                 checks = await provider.readiness(coordinator)
             except (httpx.HTTPError, RuntimeError, ValueError, OSError) as exc:
                 checks = {"status": "catalog_unavailable", "errorType": type(exc).__name__}
-        from app.infrastructure.ai.model_profiles import PlannerModelProfile
+        from audoryn_shared.infrastructure.ai.model_profiles import PlannerModelProfile
         models = []
         for route in catalog_routes:
             profile = route.get("profile")
@@ -1857,7 +1857,7 @@ async def planner_attempts(organization_id: UUID, run_id: UUID,
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)]) -> dict[str, Any]:
     require_permission(principal, "integrations.manage")
-    from app.infrastructure.database.models import PlannerAttempt, PlannerDecision
+    from audoryn_shared.infrastructure.database.models import PlannerAttempt, PlannerDecision
     rows = (await session.execute(select(PlannerAttempt, PlannerDecision).join(PlannerDecision,
         PlannerAttempt.decision_id == PlannerDecision.id).where(
         PlannerDecision.organization_id == organization_id, PlannerDecision.run_id == run_id,

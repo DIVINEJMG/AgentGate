@@ -2,8 +2,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.domain.artifacts.storage import ObjectReference
-from app.domain.artifacts.tenant_storage import TenantObjectStorage, tenant_storage_key
+from audoryn_shared.domain.artifacts.storage import ObjectReference
+from audoryn_shared.domain.artifacts.tenant_storage import TenantObjectStorage, tenant_storage_key
 
 
 class RecordingStorage:
@@ -61,14 +61,14 @@ async def test_tenant_storage_scopes_large_payload_without_changing_bytes() -> N
 
 from unittest.mock import AsyncMock, MagicMock
 
-from app.domain.jobs.dispatch import ScheduledDispatch
-from app.infrastructure.database.dispatch import WorkItemDispatchRepository
-from app.infrastructure.qstash.provider import (
+from audoryn_execution.infrastructure.database.dispatch import WorkItemDispatchRepository
+from audoryn_shared.domain.jobs.dispatch import ScheduledDispatch
+from audoryn_shared.infrastructure.qstash.provider import (
     UpstashQStashProvider,
     _deduplication_id,
     _destination_path,
 )
-from app.infrastructure.storage.upstash_blob import UpstashBlobObjectStorage
+from audoryn_shared.infrastructure.storage.upstash_blob import UpstashBlobObjectStorage
 
 
 @pytest.mark.asyncio

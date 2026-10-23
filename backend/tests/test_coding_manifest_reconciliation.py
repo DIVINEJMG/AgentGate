@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.execution.coding.e2b import E2BCodingRuntime
-from app.execution.coding.service import log_failure
+from audoryn_shared.execution.coding.e2b import E2BCodingRuntime
+from audoryn_shared.execution.coding.service import log_failure
 
 
 @pytest.mark.parametrize("initial,ack_lost,remote_match,expected", [

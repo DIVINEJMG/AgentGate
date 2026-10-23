@@ -4,10 +4,13 @@ from typing import cast
 
 import pytest
 
-from app.application.context.evidence import planner_evidence
-from app.application.services.task_activity import action_phase
-from app.domain.ai.providers import AIGateway
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner, _repeated_integration_read
+from audoryn_shared.application.context.evidence import planner_evidence
+from audoryn_shared.application.services.task_activity import action_phase
+from audoryn_shared.domain.ai.providers import AIGateway
+from audoryn_shared.runtime.planner.adaptive import (
+    AdaptiveRuntimePlanner,
+    _repeated_integration_read,
+)
 
 
 def observation(scope="github.repository.tree.read", inputs=None, resource="repo"):

@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from code_paths import Code  # the backend's code, in its three packages (Phase 4)
 
 ROOT = Path(__file__).resolve().parents[1]
-DOMAIN = ROOT / "backend" / "app" / "domain"
+DOMAIN = Code("domain")
 
 FORBIDDEN_PREFIXES = (
-    "app.api",
-    "app.infrastructure",
-    "app.integrations",
+    "audoryn_shared.api",
+    "audoryn_shared.infrastructure",
+    "audoryn_shared.integrations",
     "fastapi",
     "sqlalchemy",
     "redis",

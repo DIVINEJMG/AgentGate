@@ -11,13 +11,14 @@ import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 
-from app.application.services.preparation_ai import (
+from audoryn_shared.application.services.preparation_ai import (
     PreparationObserver,
     restart_exhausted_preparation,
 )
-from app.bootstrap.settings import settings
-from app.domain.ai.providers import AIProviderError
-from app.infrastructure.database.models import PlannerAttempt, PlannerDecision
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.ai.providers import AIProviderError
+from audoryn_shared.infrastructure.database.models import PlannerAttempt, PlannerDecision
+from tests.test_several_copies import SharedLocks
 
 
 def state(status="exhausted", expired=False):
@@ -109,10 +110,11 @@ def test_audit_migration_upgrade_and_downgrade_sql():
 
 @pytest.mark.asyncio
 async def test_fresh_decision_replaces_local_old_task_without_losing_new_owner(monkeypatch):
-    from app.runtime import preparation_worker as worker
+    from audoryn_execution.runtime import preparation_worker as worker
 
     monkeypatch.setattr(worker, "_tasks", {})
     monkeypatch.setattr(worker, "_decision_ids", {})
+    monkeypatch.setattr(worker, "_coordinator", SharedLocks())  # the fresh task waits for the old one's lease
 
     async def prepare(command_id):
         await asyncio.Event().wait()

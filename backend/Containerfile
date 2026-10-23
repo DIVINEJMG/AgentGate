@@ -1,3 +1,7 @@
+# The single service (SERVICE_ROLE=all, the default): the core API and the execution service in one
+# process, as deployed before the split. Build from the repository root:
+#   docker build -f backend/Containerfile .
+# The split images are backend/Containerfile.api and services/execution/Containerfile (Phase 5).
 FROM python:3.13-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -5,15 +9,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-WORKDIR /app
+# The repository's layout: the shared code finds the core's migrations beside it (backend/alembic.ini).
+WORKDIR /app/backend
 
+COPY packages/shared /app/packages/shared
+COPY services/execution /app/services/execution
 COPY backend/pyproject.toml ./pyproject.toml
 COPY backend/app ./app
 COPY backend/migrations ./migrations
 COPY backend/alembic.ini ./alembic.ini
 
 RUN pip install --upgrade pip \
-    && pip install -e '.[coding]' \
+    && pip install -e '/app/packages/shared[coding]' -e /app/services/execution -e . \
     && playwright install --with-deps chromium
 
 RUN useradd --create-home --uid 10001 audoryn \

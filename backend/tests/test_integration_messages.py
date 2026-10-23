@@ -9,12 +9,12 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.services.integration_foundation import (
+from audoryn_shared.application.services.integration_foundation import (
     IntegrationFoundation,
     IntegrationRequirementError,
     describe_capabilities,
 )
-from app.domain.integrations.foundation import IntegrationNeed, IntegrationTaskDraft
+from audoryn_shared.domain.integrations.foundation import IntegrationNeed, IntegrationTaskDraft
 
 READ = "github.repository.metadata.read"
 
@@ -23,9 +23,9 @@ READ = "github.repository.metadata.read"
 def github_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     """The expanded GitHub provider, whatever the environment (its descriptions are what these
     messages quote); without this the result depended on GITHUB_EXPANDED_ENABLED in .env."""
-    from app.application.services import integration_foundation
-    from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-    from app.execution.providers.registry import ProviderRegistry
+    from audoryn_shared.application.services import integration_foundation
+    from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+    from audoryn_shared.execution.providers.registry import ProviderRegistry
 
     registry = ProviderRegistry((ExpandedGitHubProvider(),))
     monkeypatch.setattr(integration_foundation, "execution_provider_registry", lambda: registry)

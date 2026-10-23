@@ -8,13 +8,13 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from app.application.services import web_research, worker_site_targets
-from app.domain.ai.providers import AIGateway, AIProviderError
-from app.domain.conversation.intent import WorkerCommandIntent
-from app.domain.workforce.drafts import SiteTargetDraft
-from app.execution.bootstrap import execution_provider_registry
-from app.execution.contracts import ExecutionRequest
-from app.runtime.planner.adaptive import _last_browser_action_made_no_progress
+from audoryn_shared.application.services import web_research, worker_site_targets
+from audoryn_shared.domain.ai.providers import AIGateway, AIProviderError
+from audoryn_shared.domain.conversation.intent import WorkerCommandIntent
+from audoryn_shared.domain.workforce.drafts import SiteTargetDraft
+from audoryn_shared.execution.bootstrap import execution_provider_registry
+from audoryn_shared.execution.contracts import ExecutionRequest
+from audoryn_shared.runtime.planner.adaptive import _last_browser_action_made_no_progress
 
 
 class _Budget:
@@ -243,7 +243,7 @@ def test_managed_web_provider_is_read_only(monkeypatch: pytest.MonkeyPatch) -> N
         return web_research.ResearchOutcome("Verified answer", (_source(),), ("brave: ok",))
 
     monkeypatch.setattr(
-        "app.execution.providers.native.web_research.research_web", fake_research
+        "audoryn_shared.execution.providers.native.web_research.research_web", fake_research
     )
     resource = asyncio.run(provider.discover_resources(configuration={}, credential=None))[0]
     request = ExecutionRequest(

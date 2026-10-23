@@ -8,7 +8,7 @@ from alembic.operations import Operations
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
 
-from app.infrastructure.database.models import PlannerAttempt, PlannerDecision
+from audoryn_shared.infrastructure.database.models import PlannerAttempt, PlannerDecision
 
 
 def test_offline_upgrade_downgrade_and_model_constraints():

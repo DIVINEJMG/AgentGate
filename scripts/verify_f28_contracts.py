@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from code_paths import Code  # the backend's code, in its three packages (Phase 4)
 
 ROOT = Path(__file__).resolve().parents[1]
-PORTS = ROOT / "backend" / "app" / "application" / "ports.py"
+PORTS = Code("application", "ports.py")
 
 required = {
     "OrganizationRepository",

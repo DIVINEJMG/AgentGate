@@ -7,8 +7,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from pydantic import SecretStr
 
-from app.execution.providers.native.github import authentication
-from app.execution.providers.native.http import ProviderTransportError
+from audoryn_shared.execution.providers.native.github import authentication
+from audoryn_shared.execution.providers.native.http import ProviderTransportError
 
 PEM = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
     serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL, serialization.NoEncryption()).decode()

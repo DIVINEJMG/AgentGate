@@ -1,7 +1,7 @@
 import pytest
 from pydantic import SecretStr
 
-from app.bootstrap.settings import Settings
+from audoryn_shared.bootstrap.settings import Settings
 
 
 def test_production_cors_rejects_wildcard() -> None:

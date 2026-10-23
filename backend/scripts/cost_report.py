@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import Integer, func, select
 
-from app.infrastructure.database.models import AIInvocation, Artifact, UsageRecord
+from audoryn_shared.infrastructure.database.models import AIInvocation, Artifact, UsageRecord
 
 GB = 1024**3
 
@@ -49,7 +49,7 @@ def _token(column: str) -> Any:
 
 
 async def collect(since: datetime, until: datetime) -> dict[str, OrganizationUsage]:
-    from app.infrastructure.database.session import session_factory
+    from audoryn_shared.infrastructure.database.session import session_factory
 
     in_period = (UsageRecord.created_at >= since, UsageRecord.created_at < until)
     async with session_factory() as session:

@@ -24,7 +24,7 @@ from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
 REPO = BACKEND.parent
-CHECKED = ("backend/app/", "backend/scripts/")
+CHECKED = ("backend/app/", "backend/scripts/", "packages/shared/", "services/execution/")
 WARN_LINES, FAIL_LINES = 80, 150
 RUFF_RULES = "C901,PLR0912,PLR0915"
 RUFF_SETTINGS = ("lint.mccabe.max-complexity=15", "lint.pylint.max-branches=15", "lint.pylint.max-statements=60")
@@ -41,24 +41,39 @@ def git(*args: str) -> str:
 
 
 def changed_lines(base: str) -> dict[str, set[int] | None]:
-    """Changed Python files and their changed line numbers (None: a new file, all of it)."""
+    """Changed Python files and their changed line numbers (None: a new file, all of it).
+
+    A moved file is compared with where it was (Phase 4 moved most of backend/app), and a line
+    that only names where an import comes from does not count as a change to its function."""
     merge_base = git("merge-base", base, "HEAD").strip()
     result: dict[str, set[int] | None] = {}
+    moved: dict[str, str] = {}
+    for line in git("diff", "-M", "--name-status", "--diff-filter=AMR", merge_base).splitlines():
+        status, *paths = line.split("	")
+        if status.startswith("R"):
+            moved[paths[1]] = paths[0]
     tracked = git("diff", "--name-only", "--diff-filter=AMR", merge_base).split()
     untracked = git("ls-files", "--others", "--exclude-standard").split()
     for path in {*tracked, *untracked}:
         if not path.endswith(".py") or not path.startswith(CHECKED):
             continue
-        existed = run(["git", "cat-file", "-e", f"{merge_base}:{path}"], check=False).returncode == 0
+        before = moved.get(path, path)
+        existed = run(["git", "cat-file", "-e", f"{merge_base}:{before}"], check=False).returncode == 0
         if path in untracked or not existed:
             result[path] = None
             continue
         lines: set[int] = set()
-        for start, count in HUNK.findall(git("diff", "-U0", merge_base, "--", path)):
+        for start, count in HUNK.findall(git("diff", "-M", "-U0", merge_base, "--", before, path)):
             first, size = int(start), int(count) if count else 1
             lines.update(range(first, first + size))
-        result[path] = lines
+        result[path] = lines - import_lines(path)
     return result
+
+
+def import_lines(path: str) -> set[int]:
+    tree = ast.parse((REPO / path).read_text(encoding="utf-8"))
+    return {line for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom))
+            for line in range(node.lineno, (node.end_lineno or node.lineno) + 1)}
 
 
 def touched_functions(path: str, lines: set[int] | None) -> list[tuple[str, int, int]]:

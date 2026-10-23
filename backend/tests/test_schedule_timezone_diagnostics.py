@@ -2,7 +2,7 @@ from zoneinfo import ZoneInfoNotFoundError
 
 import pytest
 
-from app.application.services import schedule_inference
+from audoryn_shared.application.services import schedule_inference
 
 
 def test_valid_timezone_is_preserved_without_diagnostic(caplog):

@@ -18,19 +18,16 @@ from pathlib import Path
 # Direct script execution puts scripts/, not backend/, on sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.application.services.ai_gateway import ProviderAIGateway
-from app.bootstrap.settings import settings
-from app.domain.ai.providers import AIInvocationContext, AIProviderError
-from app.domain.ai.registry import ModelRegistry, ModelRoute
-from app.infrastructure.ai.connections import (
+from audoryn_shared.application.services.ai_gateway import ProviderAIGateway
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.ai.providers import AIInvocationContext, AIProviderError
+from audoryn_shared.domain.ai.registry import ModelRegistry, ModelRoute
+from audoryn_shared.infrastructure.ai.connections import (
     route_account_name,
     snapshot_connection,
     transport_identity,
 )
-from app.infrastructure.ai.text_routes import (
-    text_routes,
-    transport_for_text_route,
-)
+from audoryn_shared.infrastructure.ai.text_routes import text_routes, transport_for_text_route
 
 CANDIDATES = [
     "groq:qwen/qwen3.8-27b",

@@ -10,20 +10,20 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.context.conversation import compact_context
-from app.application.context.preparation import preparation_resources
-from app.application.services.ai_gateway import ReleasingGateway
 from app.application.services.conversation_commands import ConversationCommandCompiler
 from app.application.services.conversation_semantics import reply_facts, validate_route_proposal
 from app.application.services.conversations import ConversationService
-from app.domain.ai.providers import AIProviderError
-from app.domain.conversation.intent import WorkerCommandIntent
-from app.execution.providers.native.github.safety import (
+from audoryn_shared.application.context.conversation import compact_context
+from audoryn_shared.application.context.preparation import preparation_resources
+from audoryn_shared.application.services.ai_gateway import ReleasingGateway
+from audoryn_shared.domain.ai.providers import AIProviderError
+from audoryn_shared.domain.conversation.intent import WorkerCommandIntent
+from audoryn_shared.execution.providers.native.github.safety import (
     grounded_constraints,
     task_branch_prefix,
     validate_task_branch,
 )
-from app.observability.frames import app_frames
+from audoryn_shared.observability.frames import app_frames
 
 
 async def test_no_transaction_is_open_while_a_model_answers() -> None:  # F17

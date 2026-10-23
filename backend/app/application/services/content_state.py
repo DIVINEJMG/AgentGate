@@ -9,7 +9,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.infrastructure.database.models import UserContentState
+from audoryn_shared.infrastructure.database.models import UserContentState
 
 Mark = Literal["read", "dismissed"]
 

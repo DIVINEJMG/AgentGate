@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from code_paths import Code  # the backend's code, in its three packages (Phase 4)
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = ROOT / "backend" / "app"
+APP = Code()
 
 
 def require(condition: bool, message: str) -> None:
@@ -37,7 +38,7 @@ def main() -> None:
                 token in source and ("provider ==" in source or "provider in" in source)
                 for token in provider_literals
             ):
-                offenders.append(str(file.relative_to(APP)))
+                offenders.append(str(file.relative_to(ROOT)))
     require(not offenders, f"provider-specific Runtime branches found: {offenders}")
 
     bootstrap = text(APP / "execution" / "bootstrap.py")

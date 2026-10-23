@@ -3,7 +3,12 @@ from __future__ import annotations
 
 import pytest
 
-from app.application.messages import approval_wait, planning_paused, refused_write, uncertain_write
+from audoryn_execution.application.messages import (
+    approval_wait,
+    planning_paused,
+    refused_write,
+    uncertain_write,
+)
 
 REPO = "DIVINEJMG/school"
 
@@ -51,9 +56,9 @@ def test_waiting_for_a_planning_turn_spends_no_retry(monkeypatch: pytest.MonkeyP
     automatic retries are spent, the message says how to continue."""
     from datetime import UTC, datetime, timedelta
 
-    from app.api.internal import runtime
-    from app.api.internal.runtime import PLANNING_TURN, _planning_wait
-    from app.domain.ai.providers import AIProviderError
+    from audoryn_execution.api.internal import runtime
+    from audoryn_execution.api.internal.runtime import PLANNING_TURN, _planning_wait
+    from audoryn_shared.domain.ai.providers import AIProviderError
 
     # The smart planner's wait messages (F26); set here rather than taken from the local .env.
     monkeypatch.setattr(runtime.settings, "smart_planner_enabled", True)

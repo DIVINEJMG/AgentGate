@@ -17,15 +17,15 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.context.narrator import narrate
-from app.domain.actions.gateway import ActionProposal
-from app.execution.browser.contracts import BrowserLocator
-from app.execution.browser.policy import BrowserDomainPolicy
-from app.execution.browser.runtime import BrowserRuntime
-from app.execution.contracts import ExecutionProviderError, ExecutionResult
-from app.execution.provider_executor import UniversalProviderExecutor
-from app.execution.providers.browser import PlaywrightBrowserProvider
-from app.execution.providers.registry import ProviderRegistry
+from audoryn_execution.application.context.narrator import narrate
+from audoryn_execution.execution.browser.runtime import BrowserRuntime
+from audoryn_execution.execution.provider_executor import UniversalProviderExecutor
+from audoryn_shared.domain.actions.gateway import ActionProposal
+from audoryn_shared.execution.browser.contracts import BrowserLocator
+from audoryn_shared.execution.browser.policy import BrowserDomainPolicy
+from audoryn_shared.execution.contracts import ExecutionProviderError, ExecutionResult
+from audoryn_shared.execution.providers.browser import PlaywrightBrowserProvider
+from audoryn_shared.execution.providers.registry import ProviderRegistry
 
 sys.path.insert(0, str(Path(__file__).parent))
 from test_f30_0_10 import FakeBrowserRuntime, request_for
@@ -222,13 +222,13 @@ async def test_a_refused_action_input_is_an_invalid_action_not_an_interrupted_on
 async def test_a_chat_task_replans_a_refused_action_and_nothing_else_changes(monkeypatch, code, replanned) -> None:
     """F49: a task without a chat origin (a chat browser task) replans an action refused before
     anything was sent; other errors keep their earlier handling."""
-    from app.bootstrap.settings import settings
-    from app.runtime.managed import ManagedRuntimeExecutor
+    from audoryn_execution.runtime.managed import ManagedRuntimeExecutor
+    from audoryn_shared.bootstrap.settings import settings
 
     monkeypatch.setattr(settings, "integration_foundation_enabled", True)
-    monkeypatch.setattr("app.runtime.managed.notify_integration_work", AsyncMock())
+    monkeypatch.setattr("audoryn_execution.runtime.managed.notify_integration_work", AsyncMock())
     enqueue = AsyncMock()
-    monkeypatch.setattr("app.runtime.managed.TransactionalOutbox", lambda _: SimpleNamespace(enqueue=enqueue))
+    monkeypatch.setattr("audoryn_execution.runtime.managed.TransactionalOutbox", lambda _: SimpleNamespace(enqueue=enqueue))
     executor = object.__new__(ManagedRuntimeExecutor)
     executor._session = cast(Any, SimpleNamespace(commit=AsyncMock()))
     item = SimpleNamespace(id=uuid4(), organization_id=uuid4(), job_id=uuid4(), correlation_id="test",

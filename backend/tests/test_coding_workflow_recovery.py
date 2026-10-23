@@ -6,16 +6,16 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.context.evidence import bounded_evidence
-from app.bootstrap.settings import settings
-from app.domain.actions.gateway import ActionProposal
-from app.execution.coding import service
-from app.execution.contracts import ExecutionProviderError
-from app.execution.provider_executor import UniversalProviderExecutor
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.registry import ProviderRegistry
-from app.runtime.managed import ManagedRuntimeExecutor
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner, _json_for_prompt
+from audoryn_execution.execution.provider_executor import UniversalProviderExecutor
+from audoryn_execution.runtime.managed import ManagedRuntimeExecutor
+from audoryn_shared.application.context.evidence import bounded_evidence
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.actions.gateway import ActionProposal
+from audoryn_shared.execution.coding import service
+from audoryn_shared.execution.contracts import ExecutionProviderError
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.registry import ProviderRegistry
+from audoryn_shared.runtime.planner.adaptive import AdaptiveRuntimePlanner, _json_for_prompt
 
 
 def test_read_prerequisites_remain_on_selected_repository_without_extra_writes():
@@ -168,10 +168,10 @@ async def test_invalid_saved_step_replans_and_exhaustion_returns_attention(monke
     executor = object.__new__(ManagedRuntimeExecutor)
     executor._session = cast(Any, session)
     executor._complete = AsyncMock(return_value="attention-result")
-    monkeypatch.setattr("app.runtime.managed.notify_integration_work", AsyncMock())
+    monkeypatch.setattr("audoryn_execution.runtime.managed.notify_integration_work", AsyncMock())
     enqueue = AsyncMock()
     monkeypatch.setattr(
-        "app.runtime.managed.TransactionalOutbox", lambda _: SimpleNamespace(enqueue=enqueue)
+        "audoryn_execution.runtime.managed.TransactionalOutbox", lambda _: SimpleNamespace(enqueue=enqueue)
     )
     item = SimpleNamespace(
         id=uuid4(),

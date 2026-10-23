@@ -7,28 +7,31 @@ from uuid import uuid4
 import pytest
 from legacy_execution import legacy_registry
 
-from app.api.internal.outbox import _verify_qstash as verify_outbox_qstash
 from app.api.realtime_routes import _ensure_organization_access
-from app.domain.identity.errors import AuthorizationError
-from app.domain.identity.principals import HumanPrincipal
-from app.environment.model import (
+from audoryn_execution.api.internal.outbox import _verify_qstash as verify_outbox_qstash
+from audoryn_shared.domain.identity.errors import AuthorizationError
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.environment.model import (
     EnvironmentSnapshot,
     EnvironmentSystem,
     ResourceRelationship,
 )
-from app.execution.authorization import CredentialReference, ProviderPermissionSnapshot
-from app.execution.bootstrap import execution_provider_registry
-from app.execution.capability_resolver import CapabilityResolver
-from app.execution.contracts import (
+from audoryn_shared.execution.authorization import CredentialReference, ProviderPermissionSnapshot
+from audoryn_shared.execution.bootstrap import execution_provider_registry
+from audoryn_shared.execution.capability_resolver import CapabilityResolver
+from audoryn_shared.execution.contracts import (
     CapabilityDescriptor,
     ExecutionRequest,
     ExecutionResult,
     ResourceDescriptor,
 )
-from app.execution.provenance import audit_provenance_payload, provenance_from_action_payload
-from app.execution.providers.base import ExecutionProvider
-from app.execution.providers.native.http import ProviderTransportError
-from app.observability.metrics import (
+from audoryn_shared.execution.provenance import (
+    audit_provenance_payload,
+    provenance_from_action_payload,
+)
+from audoryn_shared.execution.providers.base import ExecutionProvider
+from audoryn_shared.execution.providers.native.http import ProviderTransportError
+from audoryn_shared.observability.metrics import (
     CAPABILITY_SUCCESS,
     EVENT_DELIVERY_LATENCY,
     EXECUTION_RETRY,
@@ -36,10 +39,10 @@ from app.observability.metrics import (
     ExecutionMetrics,
     MetricPoint,
 )
-from app.realtime.bus import RedisRealtimeBus
-from app.realtime.contracts import RealtimeEvent
-from app.runtime.planner.contracts import MultiProviderPlan
-from app.runtime.planner.delegation import DelegationRequest, WorkerDelegation
+from audoryn_shared.realtime.bus import RedisRealtimeBus
+from audoryn_shared.realtime.contracts import RealtimeEvent
+from audoryn_shared.runtime.planner.contracts import MultiProviderPlan
+from audoryn_shared.runtime.planner.delegation import DelegationRequest, WorkerDelegation
 
 
 def _resource(provider: str, capability: CapabilityDescriptor) -> ResourceDescriptor:
@@ -498,7 +501,7 @@ def test_f29_qstash_outbox_drain_requires_signed_delivery() -> None:
 
 
 def test_f29_outbox_after_commit_requests_immediate_qstash_drain(monkeypatch) -> None:
-    from app.infrastructure.database import session as session_module
+    from audoryn_shared.infrastructure.database import session as session_module
 
     requested: list[str] = []
 

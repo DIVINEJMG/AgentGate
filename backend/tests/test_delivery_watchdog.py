@@ -11,10 +11,9 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
-from app.api.internal import runtime as internal_runtime
-from app.bootstrap.settings import settings
-from app.infrastructure.database import models as m
-from app.runtime import delivery_watchdog, outbox_publisher, outbox_trigger
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.infrastructure.database import models as m
+from audoryn_shared.runtime import delivery_watchdog, outbox_publisher, outbox_trigger
 from scripts.runtime_benchmark import BenchSession, _aware_sqlite_datetimes
 from tests.test_approvals_phase4 import TABLES
 from tests.test_efficiency_queries import ORG, Database
@@ -29,7 +28,7 @@ def world(monkeypatch: pytest.MonkeyPatch) -> Any:
     drain = AsyncMock(return_value=1)
     sweep = AsyncMock(return_value={"queued": 1})
     monkeypatch.setattr(outbox_publisher, "drain_outbox_batch", drain)
-    monkeypatch.setattr(internal_runtime, "run_sweep", sweep)
+    monkeypatch.setattr(delivery_watchdog, "sweep", sweep)  # what the execution service installs
     return db, drain, sweep
 
 
@@ -72,6 +71,21 @@ async def test_open_work_gets_its_wake_up_sent_again(world: Any) -> None:
     with _aware_sqlite_datetimes():
         assert await delivery_watchdog.recover_lost_deliveries() is True
     sweep.assert_awaited_once()
+    drain.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_an_api_process_asks_the_execution_service_to_sweep(world: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    from audoryn_shared.runtime import qstash_trigger
+
+    db, drain, _ = world
+    requested = AsyncMock(return_value="qstash-message")
+    monkeypatch.setattr(delivery_watchdog, "sweep", None)  # no execution service in this process
+    monkeypatch.setattr(qstash_trigger, "request_runtime_sweep", requested)
+    _work(db, "queued")
+    with _aware_sqlite_datetimes():
+        assert await delivery_watchdog.recover_lost_deliveries() is True
+    assert requested.await_args is not None and requested.await_args.kwargs["reason"].startswith("watchdog:")
     drain.assert_not_awaited()
 
 

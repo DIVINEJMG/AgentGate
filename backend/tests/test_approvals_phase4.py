@@ -12,12 +12,12 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api import governance_routes
-from app.application.services import approval_expiry
-from app.domain.identity.principals import HumanPrincipal
-from app.execution.providers.registry import ProviderRegistry
-from app.infrastructure.database import models as m
-from app.infrastructure.database.base import Base
+from audoryn_execution.application.services import approval_expiry
+from audoryn_shared.api import governance_routes
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.execution.providers.registry import ProviderRegistry
+from audoryn_shared.infrastructure.database import models as m
+from audoryn_shared.infrastructure.database.base import Base
 from scripts.runtime_benchmark import BenchProvider, BenchSession, _aware_sqlite_datetimes
 from tests.test_efficiency_queries import ORG, Database
 
@@ -30,7 +30,7 @@ class Approvals:
     def __init__(self, monkeypatch: pytest.MonkeyPatch, *, policies: dict[str, int] | None = None) -> None:
         provider = BenchProvider()
         registry = ProviderRegistry((provider,))
-        for module in ("app.execution.bootstrap", "app.api.integration_capability_routes", "app.api.governance_routes"):
+        for module in ("audoryn_shared.execution.bootstrap", "audoryn_shared.api.integration_capability_routes", "audoryn_shared.api.governance_routes"):
             monkeypatch.setattr(f"{module}.execution_provider_registry", lambda: registry, raising=False)
         self.woken: list[Any] = []
 
@@ -146,7 +146,7 @@ async def test_always_allow_is_refused_for_actions_that_always_need_approval(mon
     provider = BenchProvider()
     read, write = provider.manifest.capabilities
     provider.manifest = replace(provider.manifest, capabilities=(read, replace(write, approval_recommendation="required")))
-    monkeypatch.setattr("app.execution.bootstrap.execution_provider_registry", lambda: ProviderRegistry((provider,)))
+    monkeypatch.setattr("audoryn_shared.execution.bootstrap.execution_provider_registry", lambda: ProviderRegistry((provider,)))
     with pytest.raises(HTTPException, match="always needs approval"):
         await approvals.decide(approvals.pending(), {"decision": "approve", "alwaysAllow": True}, "policies.manage")
 
@@ -186,8 +186,9 @@ async def test_a_waiting_approval_is_reminded_once_then_expires(monkeypatch: pyt
             session = BenchSession(Session(approvals.db.engine, expire_on_commit=False))
             return await approval_expiry.expire_and_remind(cast(Any, session), now=now)
 
-    await sweep()
-    await sweep()  # a second pass does not remind again
+    item = _waiting_task(approvals, overdue)
+    assert await sweep() == [(ORG, item.id)]  # the expired approval's task is woken to finish
+    assert await sweep() == []  # a second pass does not remind or expire again
     with Session(approvals.db.engine) as session:
         statuses = {row.id: row.status for row in session.scalars(select(m.Approval))}
         messages = session.scalars(select(m.ConversationMessage.content).where(m.ConversationMessage.thread_id == thread_id)).all()
@@ -218,7 +219,7 @@ async def test_the_runtime_runs_an_edit_only_while_it_matches_what_was_approved(
     from types import SimpleNamespace
     from unittest.mock import AsyncMock
 
-    from app.runtime.managed import ManagedRuntimeExecutor
+    from audoryn_execution.runtime.managed import ManagedRuntimeExecutor
 
     approved = {"key": "b", "value": "corrected"}
     action = SimpleNamespace(id=uuid4(), scope="bench.record.write", resource_id="r", idempotency_key="k", payload={
@@ -275,7 +276,7 @@ async def test_either_decision_wakes_the_waiting_task(monkeypatch: pytest.Monkey
 async def test_the_sweep_resumes_tasks_whose_approval_was_decided(monkeypatch: pytest.MonkeyPatch) -> None:
     """F28: the sweep resumes an approved or a rejected task (in three queries for all of them),
     and leaves one still waiting for a decision."""
-    from app.api.internal.runtime import _decided_approval_items
+    from audoryn_execution.api.internal.runtime import _decided_approval_items
 
     approvals = Approvals(monkeypatch)
     tasks = {}

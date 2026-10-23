@@ -10,11 +10,11 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
-from app.execution.contracts import ExecutionProviderError
-from app.execution.provider_executor import DatabaseProviderContextLoader
-from app.execution.providers.registry import ProviderRegistry
-from app.infrastructure.database import models as m
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
+from audoryn_execution.execution.provider_executor import DatabaseProviderContextLoader
+from audoryn_shared.execution.contracts import ExecutionProviderError
+from audoryn_shared.execution.providers.registry import ProviderRegistry
+from audoryn_shared.infrastructure.database import models as m
+from audoryn_shared.runtime.planner.adaptive import AdaptiveRuntimePlanner
 from scripts.runtime_benchmark import BenchSession, _aware_sqlite_datetimes
 from tests.test_approvals_phase4 import TABLES
 from tests.test_efficiency_queries import ORG, Database

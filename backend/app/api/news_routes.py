@@ -10,14 +10,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_dependencies import organization_principal
-from app.api.product_common import require_permission
 from app.application.console_billing import ConsoleBilling, load_channel
 from app.application.services import content_state, news
-from app.bootstrap.settings import settings
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.database.models import OrganizationEntitlement
-from app.infrastructure.database.session import database_session
+from audoryn_shared.api.auth_dependencies import organization_principal
+from audoryn_shared.api.product_common import require_permission
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.database.models import OrganizationEntitlement
+from audoryn_shared.infrastructure.database.session import database_session
 
 v1_router = APIRouter(tags=["commercial"])
 v2_router = APIRouter(tags=["commercial"])

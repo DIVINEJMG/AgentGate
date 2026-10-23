@@ -1,6 +1,6 @@
 from pydantic import SecretStr
 
-from app.bootstrap.settings import Settings
+from audoryn_shared.bootstrap.settings import Settings
 
 
 def test_render_postgres_url_is_normalized_for_async_sqlalchemy() -> None:

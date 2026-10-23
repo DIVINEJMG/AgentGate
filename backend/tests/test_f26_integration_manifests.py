@@ -1,5 +1,5 @@
-from app.execution.providers.native.github import github_provider
-from app.integrations.builtin import (
+from audoryn_shared.execution.providers.native.github import github_provider
+from audoryn_shared.integrations.builtin import (
     UniversalIntegrationAdapter,
     calendar_adapter,
     drive_adapter,

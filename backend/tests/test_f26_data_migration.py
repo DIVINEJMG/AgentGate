@@ -2,9 +2,9 @@ import json
 
 import pytest
 
-from app.migration.json_export import JsonDirectoryExtractor
-from app.migration.normalize import CanonicalMigrationValidator, CanonicalNormalizer
-from app.migration.service import MigrationPreparationService
+from audoryn_shared.migration.json_export import JsonDirectoryExtractor
+from audoryn_shared.migration.normalize import CanonicalMigrationValidator, CanonicalNormalizer
+from audoryn_shared.migration.service import MigrationPreparationService
 
 
 @pytest.mark.asyncio

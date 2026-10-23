@@ -7,19 +7,19 @@ import pytest
 from jsonschema import ValidationError, validate
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.services.integration_foundation import IntegrationFoundation
-from app.bootstrap.settings import settings
-from app.domain.ai.providers import AIGateway, AIProviderError
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.native.github.safety import validate_changes
-from app.execution.providers.registry import ProviderRegistry
+from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.ai.providers import AIGateway, AIProviderError
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.native.github.safety import validate_changes
+from audoryn_shared.execution.providers.registry import ProviderRegistry
 
 
 @pytest.mark.asyncio
 async def test_task_schema_binds_provider_to_available_scopes_and_constraint_names(monkeypatch):
     monkeypatch.setattr(settings, "coding_execution_enabled", False)
     registry = ProviderRegistry((ExpandedGitHubProvider(),))
-    monkeypatch.setattr("app.application.services.integration_foundation.execution_provider_registry", lambda: registry)
+    monkeypatch.setattr("audoryn_shared.application.services.integration_foundation.execution_provider_registry", lambda: registry)
     service = IntegrationFoundation(cast(AsyncSession, SimpleNamespace()))
     monkeypatch.setattr(service, "catalog", AsyncMock(return_value=[]))
     gateway = SimpleNamespace(generate_structured=AsyncMock(return_value={

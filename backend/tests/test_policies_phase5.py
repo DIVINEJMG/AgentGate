@@ -10,11 +10,11 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api import governance_routes
-from app.api.governance_routes import _matches, explain_decision
-from app.api.jobs_routes import _provision_managed_job_authority
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.database import models as m
+from audoryn_shared.api import governance_routes
+from audoryn_shared.api.governance_routes import _matches, explain_decision
+from audoryn_shared.api.jobs_routes import _provision_managed_job_authority
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.database import models as m
 from tests.test_approvals_phase4 import Approvals
 from tests.test_efficiency_queries import ORG
 

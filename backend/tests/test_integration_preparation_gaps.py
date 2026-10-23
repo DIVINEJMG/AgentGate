@@ -6,30 +6,34 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.services import integration_tasks
-from app.bootstrap.settings import settings
-from app.domain.ai.providers import AIGateway
+from audoryn_execution.application.services import integration_tasks
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.ai.providers import AIGateway
 
 
 @pytest.fixture(autouse=True)
 def legacy_preparation(monkeypatch):
     monkeypatch.setattr(settings, "smart_planner_enabled", False)
-from app.application.services.approval_conversation import approval_conversation_id
 from app.application.services.conversation_commands import (
     CommandResolutionError,
     ConversationCommandCompiler,
 )
-from app.application.services.integration_foundation import (
+from app.application.services.integration_request_context import integration_request_context
+from audoryn_shared.application.services.approval_conversation import approval_conversation_id
+from audoryn_shared.application.services.integration_foundation import (
     IntegrationFoundation,
     IntegrationRequirementError,
 )
-from app.application.services.integration_request_context import integration_request_context
-from app.application.services.worker_site_targets import extract_site_assignments
-from app.domain.ai.providers import AIProviderError
-from app.domain.conversation.intent import WorkerCommandIntent
-from app.domain.identity.principals import HumanPrincipal
-from app.domain.integrations.foundation import IntegrationTaskDraft
-from app.infrastructure.database.models import ConversationMessage, JobRevision, WorkerDirective
+from audoryn_shared.application.services.worker_site_targets import extract_site_assignments
+from audoryn_shared.domain.ai.providers import AIProviderError
+from audoryn_shared.domain.conversation.intent import WorkerCommandIntent
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.domain.integrations.foundation import IntegrationTaskDraft
+from audoryn_shared.infrastructure.database.models import (
+    ConversationMessage,
+    JobRevision,
+    WorkerDirective,
+)
 
 
 def test_task_context_preserves_references_and_attachment_findings_without_credentials():
@@ -160,7 +164,7 @@ async def test_approval_is_bound_to_originating_conversation_and_tenant():
 
 @pytest.mark.asyncio
 async def test_legacy_connection_request_uses_accessible_exact_resource_catalog(monkeypatch):
-    from app.bootstrap.settings import settings
+    from audoryn_shared.bootstrap.settings import settings
     monkeypatch.setattr(settings, "integration_foundation_enabled", True)
     org, user = uuid4(), uuid4()
     principal = HumanPrincipal(user_id=user, organization_id=org, membership_id=uuid4(),
@@ -185,7 +189,7 @@ async def test_legacy_connection_request_uses_accessible_exact_resource_catalog(
 @pytest.mark.asyncio
 async def test_worker_creation_routing_precedence_is_in_interpreter_contract():
     from app.application.services.intent_interpreter import IntentInterpreter
-    from app.domain.ai.providers import AIInvocationContext
+    from audoryn_shared.domain.ai.providers import AIInvocationContext
     gateway = SimpleNamespace(generate_structured=AsyncMock(return_value={"family":"worker.create"}))
     result = await IntentInterpreter(cast(AIGateway, gateway)).interpret(message="Create a GitHub worker",
         context={}, invocation_context=AIInvocationContext(organization_id=uuid4()))

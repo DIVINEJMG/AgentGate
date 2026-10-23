@@ -14,8 +14,8 @@ from fastapi import HTTPException
 from app.api import conversation_routes
 from app.application.services import conversation_commands as commands
 from app.application.services.conversation_commands import ConversationCommandCompiler
-from app.bootstrap.settings import settings
-from app.domain.conversation.intent import WorkerCommandIntent
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.conversation.intent import WorkerCommandIntent
 
 ORG = uuid4()
 

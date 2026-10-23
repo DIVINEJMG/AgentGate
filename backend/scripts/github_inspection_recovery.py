@@ -3,8 +3,8 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
-from app.application.services.integration_foundation import IntegrationFoundation
-from app.infrastructure.database.models import Action, Run
+from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
+from audoryn_shared.infrastructure.database.models import Action, Run
 from scripts.github_scripted_planner import FixtureBlocked
 
 INSPECTIONS = {

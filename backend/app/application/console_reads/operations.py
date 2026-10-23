@@ -27,7 +27,7 @@ from app.application.console_reads.visibility import (
     queue_failures,
     runs,
 )
-from app.infrastructure.database import models as m
+from audoryn_shared.infrastructure.database import models as m
 
 work_items = _t(m.WorkItem)
 outbox_events = _t(m.OutboxEvent)

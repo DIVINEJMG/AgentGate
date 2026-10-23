@@ -4,8 +4,8 @@ import signal
 
 import pytest
 
-import app.execution.browser.runtime as browser_runtime_module
-from app.execution.browser.runtime import BrowserRuntime
+import audoryn_execution.execution.browser.runtime as browser_runtime_module
+from audoryn_execution.execution.browser.runtime import BrowserRuntime
 
 
 @pytest.mark.asyncio

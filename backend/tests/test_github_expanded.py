@@ -13,15 +13,21 @@ import pytest
 from jsonschema import Draft202012Validator, ValidationError
 from pydantic import SecretStr
 
-from app.bootstrap.settings import Settings, settings
-from app.execution.coding.snapshot import validated_snapshot
-from app.execution.contracts import ExecutionRequest, ResourceDescriptor
-from app.execution.providers.native.github.catalog import assembled_catalog
-from app.execution.providers.native.github.events import verify_event
-from app.execution.providers.native.github.legacy import CAPABILITIES
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.native.github.safety import validate_changes, validate_task_branch
-from app.execution.providers.native.github.transport import GitHubResponse, classify_status
+from audoryn_shared.bootstrap.settings import Settings, settings
+from audoryn_shared.execution.coding.snapshot import validated_snapshot
+from audoryn_shared.execution.contracts import ExecutionRequest, ResourceDescriptor
+from audoryn_shared.execution.providers.native.github.catalog import assembled_catalog
+from audoryn_shared.execution.providers.native.github.events import verify_event
+from audoryn_shared.execution.providers.native.github.legacy import CAPABILITIES
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.native.github.safety import (
+    validate_changes,
+    validate_task_branch,
+)
+from audoryn_shared.execution.providers.native.github.transport import (
+    GitHubResponse,
+    classify_status,
+)
 
 
 def request(provider, operation, payload=None, work_item_id=None):
@@ -290,12 +296,12 @@ async def test_reconciliation_never_matches_title_alone():
 
 
 async def test_e2b_creation_has_network_boundary_and_no_credentials_in_environment(monkeypatch):
-    from app.execution.coding.e2b import E2BCodingRuntime
+    from audoryn_shared.execution.coding.e2b import E2BCodingRuntime
 
     monkeypatch.setattr(settings, "coding_execution_enabled", True)
     monkeypatch.setattr(settings, "e2b_api_key", SecretStr("e2b-control-token"))
     monkeypatch.setattr(settings, "coding_template_id", "pinned-template")
-    monkeypatch.setattr("app.execution.coding.e2b.validate_registry_hosts", AsyncMock())
+    monkeypatch.setattr("audoryn_shared.execution.coding.e2b.validate_registry_hosts", AsyncMock())
     sdk = SimpleNamespace(create=AsyncMock(return_value=SimpleNamespace(sandbox_id="sandbox")))
     assert (
         await E2BCodingRuntime(sdk=sdk).create(metadata={"workItemId": "task"}, timeout=300)

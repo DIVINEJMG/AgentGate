@@ -8,9 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
-from app.application.migration_order import DOMAIN_MIGRATION_ORDER, assert_migration_order
-from app.domain.integrations.contracts import IntegrationOperation, ProviderManifest
-from app.infrastructure.database.models import OutboxEvent
+from audoryn_shared.application.migration_order import DOMAIN_MIGRATION_ORDER, assert_migration_order
+from audoryn_shared.domain.integrations.contracts import IntegrationOperation, ProviderManifest
+from audoryn_shared.infrastructure.database.models import OutboxEvent
+from code_paths import Code  # the backend's code, in its three packages (Phase 4)
 
 violations: list[str] = []
 
@@ -37,29 +38,29 @@ if OutboxEvent.__tablename__ != "outbox_events":
     violations.append("F28.15 canonical outbox table is missing.")
 
 required_files = (
-    "backend/app/infrastructure/database/outbox.py",
-    "backend/app/runtime/outbox_worker.py",
-    "backend/app/infrastructure/queue/broker.py",
-    "backend/app/domain/secrets/vault.py",
-    "backend/app/infrastructure/secrets/settings_vault.py",
-    "backend/app/domain/artifacts/storage.py",
-    "backend/app/observability/context.py",
-    "backend/app/observability/middleware.py",
-    "backend/app/runtime/worker.py",
-    "backend/app/runtime/scheduler.py",
+    "packages/shared/audoryn_shared/infrastructure/database/outbox.py",
+    "services/execution/audoryn_execution/runtime/outbox_worker.py",
+    "packages/shared/audoryn_shared/infrastructure/queue/broker.py",
+    "packages/shared/audoryn_shared/domain/secrets/vault.py",
+    "packages/shared/audoryn_shared/infrastructure/secrets/settings_vault.py",
+    "packages/shared/audoryn_shared/domain/artifacts/storage.py",
+    "packages/shared/audoryn_shared/observability/context.py",
+    "packages/shared/audoryn_shared/observability/middleware.py",
+    "services/execution/audoryn_execution/runtime/worker.py",
+    "services/execution/audoryn_execution/runtime/scheduler.py",
 )
 for relative in required_files:
     if not (ROOT / relative).exists():
         violations.append(f"F28.11-20 required boundary missing: {relative}")
 
 # API process must not execute worker/scheduler loops.
-api_root = BACKEND / "app" / "api"
+api_root = Code("api")
 for path in api_root.rglob("*.py"):
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module in {
-            "app.runtime.worker",
-            "app.runtime.scheduler",
+            "audoryn_execution.runtime.worker",
+            "audoryn_execution.runtime.scheduler",
         }:
             violations.append(f"F28.16 API imports runtime process loop: {path.relative_to(ROOT)}")
 

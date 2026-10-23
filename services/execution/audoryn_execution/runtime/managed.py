@@ -1,0 +1,2641 @@
+from __future__ import annotations
+
+# ruff: noqa: I001
+
+import asyncio
+import copy
+import hashlib
+import logging
+import time
+from collections import OrderedDict
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta
+from typing import Any, Literal
+from uuid import UUID
+
+from sqlalchemy import desc, inspect, or_, select
+from sqlalchemy.orm import defer
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
+
+from audoryn_shared.api.governance_routes import _evaluate
+from audoryn_shared.api.integration_capability_routes import _catalog, catalog_snapshot, snapshot_integrations
+from audoryn_shared.api.product_common import utcnow
+from audoryn_shared.application.services.browser_origin_authority import browser_integration_autonomy_suitable, browser_integration_origins, explicit_http_origins
+from audoryn_execution.application.messages import approval_wait, refused_write, uncertain_write
+from audoryn_shared.application.context.evidence import as_map, browser_evidence, compact_output, planned_action_fingerprint
+from audoryn_execution.application.services.live_results import append_live_result_message
+from audoryn_shared.application.services.integration_foundation import notify_integration_work
+from audoryn_shared.application.services.worker_memory import WorkerMemoryService
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.actions.gateway import ActionGateway, ActionProposal, AuthorizationDecision
+from audoryn_shared.domain.ai.providers import AIInvocationContext, AIProviderError
+from audoryn_shared.domain.identity.principals import AgentPrincipal, HumanPrincipal
+from audoryn_shared.execution.authorization import UniversalActionRequest, action_fingerprint
+from audoryn_shared.execution.bootstrap import browser_provider, execution_provider_registry
+from audoryn_shared.execution.browser.http_reader import fetch_http_page
+from audoryn_shared.execution.browser.policy import BrowserDomainPolicy
+from audoryn_shared.execution.contracts import ExecutionProviderError
+from audoryn_execution.execution.provider_executor import DatabaseProviderContextLoader, UniversalProviderExecutor
+from audoryn_shared.infrastructure.database.models import Action, AgentIdentity, Approval, Artifact, CapabilityProfile, Integration, Job, JobRevision, Memory, Result, ResultVersion, Run, RunPlanStep, RunStep, Worker, WorkerDirective, WorkItem
+from audoryn_shared.infrastructure.ai.provider import ai_gateway_from_settings
+from audoryn_shared.infrastructure.database.outbox import TransactionalOutbox
+from audoryn_shared.observability.usage import label_usage
+from audoryn_shared.runtime.planner.adaptive import AdaptivePlanDecision, AdaptiveRuntimePlanner, survives_revision
+
+
+RuntimeState = Literal["completed", "continue", "waiting_approval", "failed", "noop"]
+
+logger = logging.getLogger(__name__)
+telemetry_logger = logging.getLogger("uvicorn.error")
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeStepOutcome:
+    state: RuntimeState
+    work_item_id: UUID
+    run_id: UUID | None
+    current_step: int
+    summary: str
+    continuation_phase: Literal["plan", "execute"] | None = None
+    # QStash flow-control partition for the next delivery (an execute phase on one resource).
+    queue_partition: str | None = None
+
+
+# Planner observations of finished steps, by (step id, updated_at, status). A step's output is
+# fixed once it finishes and any change moves updated_at, so each planning phase reads full
+# outputs only for steps it has not seen, instead of every earlier output each time.
+_OBSERVATIONS: OrderedDict[tuple[UUID, Any, str], list[dict[str, object]]] = OrderedDict()
+_OBSERVATIONS_LIMIT = 2000
+
+
+def _queue_partition(provider: str, resource_id: str, scope: str) -> str:
+    return provider + ":" + resource_id + (":workspace" if ".workspace." in scope else "")
+
+
+@dataclass(frozen=True, slots=True)
+class _StaticGuard:
+    outcome: str
+    reason: str
+
+    async def evaluate(self, *, principal: AgentPrincipal, proposal: ActionProposal) -> AuthorizationDecision:
+        del principal, proposal
+        return AuthorizationDecision(outcome=self.outcome, reason=self.reason)
+
+
+def _system_principal(organization_id: UUID) -> HumanPrincipal:
+    zero = UUID(int=0)
+    return HumanPrincipal(
+        user_id=zero,
+        organization_id=organization_id,
+        membership_id=zero,
+        role="system",
+        permissions=frozenset({"policies.read"}),
+    )
+
+
+def _runtime_meta(item: WorkItem) -> dict[str, Any]:
+    payload = dict(item.payload or {})
+    raw = payload.get("runtime")
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _write_runtime_meta(item: WorkItem, **patch: object) -> dict[str, Any]:
+    payload = dict(item.payload or {})
+    runtime = _runtime_meta(item)
+    runtime.update(patch)
+    payload["runtime"] = runtime
+    item.payload = payload
+    return runtime
+
+
+def action_budget(plan_length: int) -> int:
+    """Actions a run may take: the flat limit without a plan; with one, two per plan step (a read
+    or a retry each), at least the flat limit and at most the plan action cap."""
+    if not plan_length:
+        return settings.runtime_max_action_steps
+    return min(settings.runtime_max_plan_actions, max(settings.runtime_max_action_steps, 2 * plan_length))
+
+
+def _plan_view(rows: list[RunPlanStep], steps: list[RunStep]) -> list[dict[str, object]]:
+    """The saved plan with each step's progress, read from the run's own action steps (each records
+    the plan step it worked on), so completing an action never has to write the plan."""
+    worked: dict[int, list[int]] = {}
+    completed: dict[int, list[int]] = {}
+    done: set[int] = set()
+    for step in steps:
+        spec = step.input if isinstance(step.input, dict) else {}
+        position = spec.get("planStep")
+        if step.kind != "action" or not isinstance(position, int):
+            continue
+        worked.setdefault(position, []).append(step.step_index + 1)
+        if step.status == "completed":
+            completed.setdefault(position, []).append(step.step_index + 1)
+            if spec.get("planStepDone") is True:
+                done.add(position)
+    # A step a revision kept (saved as done) stays done.
+    return [{"position": row.position, "title": row.title, "goal": row.goal, "scope": row.scope,
+             "target": row.target, "dependsOn": list(row.depends_on or []), "check": row.check,
+             "status": "done" if row.position in done else row.status,
+             "actionSteps": worked.get(row.position, []),
+             "completedActions": completed.get(row.position, [])} for row in rows]
+
+
+def _plan_progress(view: list[dict[str, object]]) -> dict[str, object]:
+    from audoryn_shared.runtime.planner.adaptive import current_plan_step
+    current = current_plan_step(view)
+    return {"done": sum(1 for step in view if step["status"] in {"done", "skipped"}), "total": len(view),
+            "position": current["position"] if current else None,
+            "title": current["title"] if current else None,
+            "target": current["target"] if current else None}
+
+
+def _count(value: object) -> int:
+    try:
+        return int(value or 0)  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        return 0
+
+
+def _provider_wait(item: WorkItem, error: Any, *, retry_limit: int, backoff_seconds: float) -> tuple[float, dict[str, object]] | None:
+    """How long to wait before trying a provider action again, and the counter to record, or
+    None when the budget is spent. Waiting for a rate limit or for capacity is not a failure:
+    it has its own budget and leaves the failure retries untouched."""
+    if not error.retryable:
+        return None
+    meta = _runtime_meta(item)
+    if error.code == "queued":
+        since = meta.get("providerQueuedSince")
+        started = datetime.fromisoformat(str(since)) if since else utcnow()
+        if (utcnow() - started).total_seconds() >= settings.coding_queue_max_wait_seconds:
+            return None
+        return float(error.retry_after_seconds or 60), {"providerQueuedSince": started.isoformat()}
+    if error.code == "rate_limited":
+        waits = _count(meta.get("providerWaitCount"))
+        if waits >= settings.integration_rate_limit_max_waits:
+            return None
+        return (max(float(error.retry_after_seconds or 0), backoff_seconds * 2 ** min(waits, 4)),
+                {"providerWaitCount": waits + 1})
+    count = _count(meta.get("providerRetryCount"))
+    if count >= retry_limit:
+        return None
+    return max(backoff_seconds * 2**count, float(error.retry_after_seconds or 0)), {"providerRetryCount": count + 1}
+
+
+def _outcome_checks(item: WorkItem, step: int) -> int:
+    """How many times this step's uncertain write has already been looked for again."""
+    record = _runtime_meta(item).get("outcomeChecks")
+    if not isinstance(record, dict) or record.get("step") != step:
+        return 0
+    return _count(record.get("count"))
+
+
+def _waiting_message(error: Any, delay_seconds: float) -> str:
+    """A plain sentence for the person: what is happening and roughly when work continues."""
+    minutes = round(delay_seconds / 60)
+    if delay_seconds < 60:
+        when = "in a few seconds" if delay_seconds < 20 else "in under a minute"
+    elif delay_seconds < 5400:
+        when = f"in about {minutes} minute{'s' if minutes != 1 else ''}"
+    else:
+        hours = round(delay_seconds / 3600)
+        when = f"in about {hours} hour{'s' if hours != 1 else ''}"
+    verb = "continue" if error.code in {"rate_limited", "queued"} else "try again"
+    return f"{error.safe_message.rstrip('.')}. I'll {verb} {when}. Completed steps are saved."
+
+
+def _step_output(step: RunStep) -> dict[str, Any]:
+    return dict(step.output or {}) if isinstance(step.output, dict) else {}
+
+
+def _completion_summary(job: Job, steps: list[RunStep], given: str | None) -> str:
+    """The given summary, else the completed actions' summaries, else a plain default."""
+    action_summaries = [
+        str(_step_output(step).get("summary") or "").strip()
+        for step in steps
+        if step.kind == "action" and step.status == "completed"
+    ]
+    summary = (given or "").strip()
+    if not summary:
+        summary = " ".join(value for value in action_summaries if value).strip()
+    return summary or f"{job.name} completed by Managed Runtime."
+
+
+# Files a run produced for the person (not its screenshots and other evidence).
+RESULT_FILE_KINDS = frozenset({"browser_download"})
+
+
+def _login_fields(config: dict[str, Any]) -> list[str]:
+    """The stored login's field names (never values) a sign-in may bind (F35)."""
+    return [name for name in str(config.get("loginFields") or "").split(",") if name]
+
+
+def _authorized_browser_origins(definition: dict[str, Any], autonomy: dict[str, Any]) -> tuple[str, ...]:
+    """The browser origins the job may use: those authorized on it, else the explicit HTTP origins in
+    its objective and instructions."""
+    raw = autonomy.get("authorizedBrowserOrigins")
+    origins = tuple(str(origin) for origin in raw if str(origin)) if isinstance(raw, list) else ()
+    return origins or explicit_http_origins(
+        chr(10).join((str(definition.get("objective", "")), str(definition.get("instructions", "")))))
+
+
+def _browser_resource_admitted(integration: Integration | None, resource_origins: tuple[str, ...],
+                               authorized: tuple[str, ...], autonomy: dict[str, Any]) -> bool:
+    """Whether a browser resource stays within the job's authorized origins (and, for a job the AI
+    created, is suitable for autonomous use)."""
+    if not authorized:
+        return True
+    if not resource_origins or not set(resource_origins).issubset(authorized):
+        return False
+    return not autonomy.get("createdByAI") or browser_integration_autonomy_suitable(integration, set(authorized))
+
+
+def _superseded_managed_browsers(resources: list[dict[str, Any]], integrations: dict[str, Any]) -> set[str]:
+    """AgentGate's own browser connections whose sites a connection the person set up also covers:
+    the person's, with its login, rules and file actions, is used instead (F43)."""
+    managed: dict[str, set[str]] = {}
+    personal: set[str] = set()
+    for resource in resources:
+        integration = integrations.get(str(resource.get("id", "")))
+        if resource.get("provider") != "browser" or resource.get("status") != "connected" or integration is None:
+            continue
+        origins = set(browser_integration_origins(integration))
+        if _integration_config(integration).get("managedBy") == "worker_autonomy":
+            managed[str(resource["id"])] = origins
+        elif browser_integration_autonomy_suitable(integration, origins):
+            personal |= origins
+    return {resource_id for resource_id, origins in managed.items() if origins and origins <= personal}
+
+
+def _integration_config(integration: Integration | None) -> dict[str, Any]:
+    return dict(integration.config or {}) if integration and isinstance(integration.config, dict) else {}
+
+
+def _attach_observation_id(value: object, observation_id: str | None) -> object:
+    if observation_id is None:
+        return value
+    if isinstance(value, dict):
+        result = {
+            str(key): _attach_observation_id(nested, observation_id)
+            for key, nested in value.items()
+        }
+        if (
+            result.get("strategy") == "observation_ref"
+            and result.get("value")
+            and not result.get("observationId")
+        ):
+            result["observationId"] = observation_id
+        return result
+    if isinstance(value, list):
+        return [_attach_observation_id(item, observation_id) for item in value]
+    return value
+
+
+class ManagedRuntimeExecutor:
+    """Durable, provider-neutral Managed Runtime executed one step at a time.
+
+    QStash drives this class through signed HTTP calls. Each call performs at most
+    one governed capability step, checkpoints state in PostgreSQL, and lets the
+    caller queue the next continuation.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+        self._registry = execution_provider_registry()
+        self._provider_executor = UniversalProviderExecutor(
+            registry=self._registry,
+            context_loader=DatabaseProviderContextLoader(session, self._registry),
+        )
+        self._planner = AdaptiveRuntimePlanner(
+            ai_gateway_from_settings(planner=True)
+        )
+        # The catalog read by the latest tools build, and the one revalidated after planning, which
+        # recording the chosen action then uses instead of reading it again.
+        self._last_catalog: dict | None = None
+        self._revalidated_catalog: dict | None = None
+
+    async def execute_step(
+        self,
+        *,
+        item: WorkItem,
+        expected_step: int | None = None,
+    ) -> RuntimeStepOutcome:
+        if item.status in {"waiting_reconnect", "uncertain_outcome", "policy_denied", "partial_completion"}:
+            return RuntimeStepOutcome("noop", item.id, None, int(_runtime_meta(item).get("currentStep", 0)),
+                str(_runtime_meta(item).get("waitingReason", "Integration action is waiting.")))
+        meta = _runtime_meta(item)
+        current_step = max(0, int(meta.get("currentStep", 0)))
+        # A stale or duplicate delivery is recognised from the work item alone, before
+        # loading anything else or touching the run.
+        if expected_step is not None and expected_step != current_step:
+            return RuntimeStepOutcome(
+                state="noop",
+                work_item_id=item.id,
+                run_id=None,
+                current_step=current_step,
+                summary="Stale or duplicate runtime delivery ignored.",
+            )
+        job, revision, worker, agent = await self._load_context(item)
+        run = await self._ensure_run(item)
+        label_usage(run_id=run.id)
+
+        if run.status in {"completed", "failed", "cancelled"}:
+            return RuntimeStepOutcome(
+                state="noop",
+                work_item_id=item.id,
+                run_id=run.id,
+                current_step=current_step,
+                summary=f"Run is already {run.status}.",
+            )
+
+        # Step headers decide what to do; full step input and output are loaded only where
+        # they are used: every step for planning and finishing, the current step otherwise.
+        headers = await self._step_headers(run)
+        if current_step >= len(headers):
+            label_usage(phase="plan")
+            if (not headers and settings.integration_foundation_enabled
+                    and not _runtime_meta(item).get("integrationPreflightAt")):
+                waiting = await self._integration_preflight(item, run)
+                if waiting is not None:
+                    return waiting
+            steps = await self._load_steps(run, outputs=False)
+            # Recovery context reads unfinished steps' outputs.
+            await self._load_outputs([step for step in steps if step.status != "completed"])
+            _write_runtime_meta(item, plannerPhase="preparing_tools", queueState="planning",
+                plannerTiming={},
+                plannerPhaseStartedAt=utcnow().isoformat(),
+                waitingReason="Preparing the authorized tools for the next action.")
+            # Commit the run identity before cancellable preparation or inference.
+            await self._session.commit()
+            planner_started = time.monotonic()
+            planner_timeout_seconds = settings.runtime_planner_timeout_seconds
+            logger.info(
+                "Runtime planner started work_item=%s run=%s step=%s timeout=%ss",
+                item.id,
+                run.id,
+                current_step,
+                planner_timeout_seconds,
+            )
+            try:
+                async with asyncio.timeout(planner_timeout_seconds):
+                    decision = await self._plan_next_step(
+                        item=item,
+                        run=run,
+                        job=job,
+                        revision=revision,
+                        worker=worker,
+                        agent=agent,
+                        steps=steps,
+                    )
+            except TimeoutError as exc:
+                logger.warning(
+                    "Runtime planner timed out work_item=%s run=%s step=%s elapsed=%.3fs",
+                    item.id,
+                    run.id,
+                    current_step,
+                    time.monotonic() - planner_started,
+                )
+                raise AIProviderError(
+                    "provider_unavailable",
+                    "Planning exceeded its configured time budget.",
+                    retryable=True,
+                ) from exc
+            except SQLAlchemyError as exc:
+                from audoryn_execution.runtime.planning_diagnostics import database_planning_error
+                raise database_planning_error(exc, work_item_id=item.id, run_id=run.id) from exc
+            logger.info(
+                "Runtime planner completed work_item=%s run=%s step=%s elapsed=%.3fs "
+                "decision=%s scope=%s",
+                item.id,
+                run.id,
+                current_step,
+                time.monotonic() - planner_started,
+                decision.decision,
+                decision.scope,
+            )
+            if item.status in {"completed", "failed", "cancelled"} or run.status in {"completed", "failed", "cancelled"}:
+                return RuntimeStepOutcome("noop", item.id, run.id, current_step,
+                    "Run was stopped while planning; no planned action was dispatched.")
+            await self._save_plan(item, run, decision)
+            if decision.decision == "finish":
+                await self._close_plan(item)
+                await self._load_outputs(steps)
+                return await self._complete(
+                    item,
+                    run,
+                    job,
+                    worker,
+                    steps,
+                    completion_summary=decision.summary,
+                    finish_title=decision.title,
+                    finish_instruction=decision.instruction,
+                    result_status=decision.result_status,
+                    completion_check=decision.criteria,
+                )
+            appended = await self._append_action_step(
+                item=item,
+                run=run,
+                decision=decision,
+                step_index=current_step,
+            )
+            logger.info(
+                "Runtime action checkpointed work_item=%s run=%s step=%s scope=%s",
+                item.id,
+                run.id,
+                current_step,
+                decision.scope,
+            )
+            return RuntimeStepOutcome(
+                state="continue",
+                work_item_id=item.id,
+                run_id=run.id,
+                current_step=current_step,
+                summary="Next governed action planned and queued for execution.",
+                continuation_phase="execute",
+                queue_partition=_queue_partition(str((appended.input or {}).get("provider", "")),
+                    decision.resource_id, decision.scope),
+            )
+
+        header = headers[current_step]
+        label_usage(phase="execute")
+        if header.status == "completed":
+            label_usage(phase="advance")
+            _write_runtime_meta(item, currentStep=current_step + 1)
+            await self._session.commit()
+            return RuntimeStepOutcome(
+                state="continue",
+                work_item_id=item.id,
+                run_id=run.id,
+                current_step=current_step + 1,
+                summary="Completed step checkpoint advanced.",
+                continuation_phase="plan",
+            )
+
+        if header.kind == "finish" and header.status != "waiting_approval":
+            label_usage(phase="finish")
+            return await self._complete(item, run, job, worker, await self._load_steps(run))
+
+        step = await self._session.scalar(select(RunStep).where(RunStep.id == header.id))
+        assert step is not None
+        if step.status == "waiting_approval":
+            label_usage(phase="resume")
+            return await self._integration_guarded_action(self._resume_approved_action,
+                item=item,
+                run=run,
+                step=step,
+                job=job,
+                worker=worker,
+                agent=agent,
+                current_step=current_step,
+            )
+
+        spec = dict(step.input or {})
+        logger.info(
+            "Runtime action started work_item=%s run=%s step=%s provider=%s scope=%s operation=%s",
+            item.id,
+            run.id,
+            current_step,
+            str(spec.get("provider", "")),
+            str(spec.get("scope", "")),
+            str(spec.get("operation", "")),
+        )
+        action_started = time.monotonic()
+        outcome = await self._integration_guarded_action(self._execute_action_step,
+            item=item,
+            run=run,
+            step=step,
+            job=job,
+            worker=worker,
+            agent=agent,
+            current_step=current_step,
+        )
+        logger.info(
+            "Runtime action finished work_item=%s run=%s step=%s state=%s elapsed=%.3fs",
+            item.id,
+            run.id,
+            current_step,
+            outcome.state,
+            time.monotonic() - action_started,
+        )
+        return outcome
+
+    async def _load_context(
+        self, item: WorkItem
+    ) -> tuple[Job, JobRevision, Worker, AgentIdentity]:
+        job = await self._session.scalar(
+            select(Job).where(
+                Job.organization_id == item.organization_id,
+                Job.id == item.job_id,
+            )
+        )
+        revision = await self._session.scalar(
+            select(JobRevision).where(
+                JobRevision.id == item.job_revision_id,
+                JobRevision.job_id == item.job_id,
+            )
+        )
+        if job is None or revision is None:
+            raise RuntimeError("Runtime job definition is unavailable.")
+        worker = await self._session.scalar(
+            select(Worker).where(
+                Worker.organization_id == item.organization_id,
+                Worker.id == job.worker_id,
+            )
+        )
+        if worker is None:
+            raise RuntimeError("Runtime worker is unavailable.")
+        agent = await self._session.scalar(
+            select(AgentIdentity).where(
+                AgentIdentity.organization_id == item.organization_id,
+                AgentIdentity.id == worker.agent_identity_id,
+            )
+        )
+        if agent is None:
+            raise RuntimeError("Runtime agent identity is unavailable.")
+        if job.status != "active":
+            raise RuntimeError("Runtime Job must be ACTIVE.")
+        if worker.status != "active":
+            raise RuntimeError("Runtime Worker must be ACTIVE.")
+        if agent.status != "active":
+            raise RuntimeError("Runtime Agent Identity must be ACTIVE.")
+        return job, revision, worker, agent
+
+    async def _ensure_run(self, item: WorkItem) -> Run:
+        run = await self._session.scalar(
+            select(Run)
+            .where(Run.work_item_id == item.id)
+            .order_by(desc(Run.created_at))
+            .limit(1)
+        )
+        now = utcnow()
+        new_run = run is None or (
+            item.status in {"queued", "admitted"}
+            and run is not None
+            and run.status in {"completed", "failed", "cancelled"}
+        )
+        if new_run:
+            run = Run(
+                organization_id=item.organization_id,
+                work_item_id=item.id,
+                status="running",
+                correlation_id=item.correlation_id,
+            )
+            self._session.add(run)
+            await self._session.flush()
+            await TransactionalOutbox(self._session).enqueue(
+                topic="run.created",
+                aggregate_type="run",
+                aggregate_id=str(run.id),
+                payload={
+                    "organization_id": str(item.organization_id),
+                    "run_id": str(run.id),
+                    "job_id": str(item.job_id),
+                    "correlation_id": item.correlation_id,
+                    "status": "running",
+                },
+            )
+        elif run is not None and run.status not in {
+            "waiting_approval",
+            "completed",
+            "failed",
+            "cancelled",
+        }:
+            run.status = "running"
+
+        assert run is not None
+        item.status = "running"
+        meta = _runtime_meta(item)
+        if new_run or not meta.get("startedAt"):
+            _write_runtime_meta(
+                item,
+                attempt=int(meta.get("attempt", 1)),
+                currentStep=int(meta.get("currentStep", 0)),
+                startedAt=now.isoformat(),
+            )
+            await TransactionalOutbox(self._session).enqueue(
+                topic="run.started",
+                aggregate_type="run",
+                aggregate_id=str(run.id),
+                payload={
+                    "organization_id": str(item.organization_id),
+                    "run_id": str(run.id),
+                    "job_id": str(item.job_id),
+                    "correlation_id": item.correlation_id,
+                },
+            )
+        await self._session.flush()
+        return run
+
+    async def _step_headers(self, run: Run) -> list[Any]:
+        return list(
+            (
+                await self._session.execute(
+                    select(RunStep.id, RunStep.step_index, RunStep.kind, RunStep.status)
+                    .where(RunStep.run_id == run.id)
+                    .order_by(RunStep.step_index)
+                )
+            ).all()
+        )
+
+    async def _load_steps(self, run: Run, *, outputs: bool = True) -> list[RunStep]:
+        """Every step of the run. With outputs=False the large output column is left unloaded and
+        reading it raises, so `_load_outputs` must load what is used."""
+        query = select(RunStep).where(RunStep.run_id == run.id).order_by(RunStep.step_index)
+        if not outputs:
+            query = query.options(defer(RunStep.output, raiseload=True))
+        return list((await self._session.scalars(query)).all())
+
+    async def _load_outputs(self, steps: list[RunStep]) -> None:
+        missing = [step.id for step in steps if "output" in inspect(step).unloaded]
+        if missing:
+            # Consuming the rows is what fills in the outputs.
+            (await self._session.scalars(
+                select(RunStep).where(RunStep.id.in_(missing)).execution_options(populate_existing=True)
+            )).all()
+
+    async def _cached_observations(self, steps: list[RunStep]) -> list[dict[str, object]]:
+        """`_planner_observations`, reading full outputs only for steps not seen before."""
+        def key(step: RunStep) -> tuple[UUID, Any, str]:
+            return (step.id, step.updated_at, step.status)
+
+        # Failed steps decide from their output whether they are evidence; they are few.
+        await self._load_outputs([step for step in steps if step.status == "failed"])
+        unseen = [step for step in steps if step.status == "completed" and key(step) not in _OBSERVATIONS]
+        await self._load_outputs(unseen)
+        observations: list[dict[str, object]] = []
+        for step in steps:
+            if step.status == "completed":
+                if key(step) not in _OBSERVATIONS:
+                    _OBSERVATIONS[key(step)] = self._planner_observations([step])
+                    while len(_OBSERVATIONS) > _OBSERVATIONS_LIMIT:
+                        _OBSERVATIONS.popitem(last=False)
+                _OBSERVATIONS.move_to_end(key(step))
+                observations.extend(copy.deepcopy(_OBSERVATIONS[key(step)]))
+            elif step.status == "failed":
+                observations.extend(self._planner_observations([step]))
+        return observations
+
+    async def _planner_tools(
+        self,
+        *,
+        item: WorkItem,
+        revision: JobRevision,
+        agent: AgentIdentity,
+    ) -> list[dict[str, object]]:
+        # One read snapshot of the capability catalog for the whole preparation.
+        with catalog_snapshot():
+            return await self._build_planner_tools(item=item, revision=revision, agent=agent)
+
+    async def _build_planner_tools(
+        self,
+        *,
+        item: WorkItem,
+        revision: JobRevision,
+        agent: AgentIdentity,
+    ) -> list[dict[str, object]]:
+        tool_started = time.monotonic()
+        self._tool_preparation_metrics = {"policyChecks": 0, "policySeconds": 0.0, "slowestPolicySeconds": 0.0}
+        definition = (
+            dict(revision.definition or {})
+            if isinstance(revision.definition, dict)
+            else {}
+        )
+        selected = {
+            str(scope)
+            for scope in definition.get("requiredCapabilities", [])
+            if str(scope)
+        }
+        raw_autonomy = definition.get("autonomy")
+        autonomy = dict(raw_autonomy) if isinstance(raw_autonomy, dict) else {}
+        authorized_browser_origins = _authorized_browser_origins(definition, autonomy)
+        active = await self._active_scopes(agent.id)
+        catalog_started = time.monotonic()
+        catalog = self._last_catalog = await self._execution_catalog(item)
+        self._tool_preparation_metrics["catalogSeconds"] = round(time.monotonic() - catalog_started, 3)
+        self._capability_exclusions = list(catalog.get("capabilityExclusions", []))
+        resources = list(catalog.get("resources", []))
+        tools: list[dict[str, object]] = []
+        # The policy check would read this same agent row again.
+        preparation_cache: dict[Any, Any] = {(item.organization_id, agent.id, "agent"): agent}
+        # Rows the catalog read just now (a legacy resource's id is its integration's id).
+        integrations = snapshot_integrations(item.organization_id)
+        superseded = _superseded_managed_browsers(resources, integrations)
+
+        for resource in resources:
+            if resource.get("status") != "connected" or str(resource.get("id", "")) in superseded:
+                continue
+            provider_name = str(resource.get("provider", ""))
+            try:
+                provider = self._registry.get(provider_name)
+            except KeyError:
+                continue
+            resource_id = str(resource.get("id", ""))
+            integration = integrations.get(resource_id)
+            config = _integration_config(integration)
+            resource_browser_origins = (
+                browser_integration_origins(integration)
+                if provider_name == "browser"
+                else ()
+            )
+            if provider_name == "browser" and not _browser_resource_admitted(
+                    integration, resource_browser_origins, authorized_browser_origins, autonomy):
+                continue
+            actions = list(resource.get("actions", []))
+            for action in actions:
+                scope = str(action.get("scope", ""))
+                if scope not in selected or scope not in active:
+                    self._capability_exclusions.append({"resourceId": resource_id, "scope": scope,
+                        "reason": "Not selected by this job revision" if scope not in selected else "Worker capability profile is inactive"})
+                    continue
+                capability = next(
+                    (
+                        entry
+                        for entry in provider.manifest.capabilities
+                        if entry.scope == scope
+                    ),
+                    None,
+                )
+                if capability is None:
+                    self._capability_exclusions.append({"resourceId": resource_id, "scope": scope, "reason": "Provider tool is disabled or unavailable"})
+                    continue
+                policy = await self._timed_policy_decision(item=item, agent=agent, resource_id=resource_id,
+                                                           scope=scope, preparation_cache=preparation_cache)
+                if policy.get("outcome") == "DENY":
+                    self._capability_exclusions.append({"resourceId": resource_id, "scope": scope,
+                        "reason": str(policy.get("explanation") or policy.get("reason") or "Organizational policy denies this action")})
+                    continue
+                tools.append(
+                    {
+                        "resourceId": resource_id,
+                        "resourceName": str(resource.get("displayName", resource_id)),
+                        "provider": provider_name,
+                        "scope": scope,
+                        "operation": capability.operation,
+                        "description": capability.description,
+                        "risk": str(
+                            (policy.get("riskAssessment") or {}).get("effectiveRisk")
+                            or capability.risk
+                        ),
+                        "sideEffect": capability.side_effect,
+                        "approvalRecommendation": capability.approval_recommendation,
+                        "inputSchema": capability.input_schema,
+                        "authorityConstraints": resource.get("authorityConstraints", {}),
+                        "defaultStartUrl": (
+                            str(config.get("startUrl", ""))
+                            if scope == "browser.navigation.open"
+                            else ""
+                        ),
+                        "allowedOrigins": (
+                            list(resource_browser_origins)
+                            if provider_name == "browser"
+                            else []
+                        ),
+                        # Only the sign-in tool names the stored fields, so no other tool grows.
+                        **(
+                            {"loginFields": _login_fields(config)}
+                            if scope == "browser.auth.login"
+                            else {}
+                        ),
+                    }
+                )
+
+        self._tool_preparation_metrics["totalToolSeconds"] = round(time.monotonic() - tool_started, 3)
+        self._tool_preparation_metrics["policySeconds"] = round(self._tool_preparation_metrics["policySeconds"], 3)
+        telemetry_logger.info("Planner tool preparation work_item=%s timing=%s", item.id, self._tool_preparation_metrics)
+        return tools
+
+    async def _timed_policy_decision(self, **arguments: Any) -> dict:
+        """The policy decision for one candidate tool, timed into the tool-preparation metrics."""
+        started = time.monotonic()
+        policy = await self._policy_decision(**arguments)
+        seconds = time.monotonic() - started
+        metrics = self._tool_preparation_metrics
+        metrics["policyChecks"] += 1
+        metrics["policySeconds"] += seconds
+        metrics["slowestPolicySeconds"] = max(metrics["slowestPolicySeconds"], seconds)
+        return policy
+
+    async def _execution_catalog(self, item: WorkItem) -> dict:
+        catalog = await _catalog(self._session, item.organization_id)
+        if not settings.integration_foundation_enabled:
+            return catalog
+        from audoryn_shared.infrastructure.database.models import IntegrationResource, IntegrationTaskGrant
+        grants = (await self._session.scalars(select(IntegrationTaskGrant).where(
+            IntegrationTaskGrant.organization_id == item.organization_id,
+            IntegrationTaskGrant.job_revision_id == item.job_revision_id,
+            IntegrationTaskGrant.active.is_(True)))).all()
+        # Browser/research keep their existing contracts. Native integrations must
+        # be explicitly rebound during adoption; legacy scope grants are not expanded.
+        resources = [r for r in catalog.get("resources", []) if r.get("provider") in {"browser", "web_research"}]
+        from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
+        foundation = IntegrationFoundation(self._session)
+        exclusions = []
+        job = await self._session.get(Job, item.job_id)
+        for grant in grants:
+            resource = await self._session.get(IntegrationResource, grant.resource_id)
+            if not resource or resource.organization_id != item.organization_id:
+                continue
+            worker = await self._session.get(Worker, grant.worker_id)
+            if not worker or not job or worker.id != job.worker_id:
+                exclusions.append({"resourceId": str(resource.id), "reason": "Granted worker no longer exists"})
+                continue
+            try:
+                await foundation.authorize(organization_id=item.organization_id,
+                    agent_id=worker.agent_identity_id, work_item_id=item.id,
+                    resource_id=resource.id, scope=None, payload={})
+            except PermissionError as error:
+                exclusions.append({"resourceId": str(resource.id), "reason": str(error)})
+                continue
+            provider = self._registry.get(resource.provider)
+            available = {c.scope for c in provider.manifest.capabilities} & set(resource.capabilities)
+            for scope in set(grant.scopes) - available:
+                exclusions.append({"resourceId": str(resource.id), "scope": scope,
+                    "reason": "Current provider consent, resource availability or runtime setup excludes this capability"})
+            resources.append({"id": str(resource.id), "displayName": resource.display_name,
+                "provider": resource.provider, "status": "connected", "scopes": grant.scopes,
+                "authorityConstraints": getattr(grant, "constraints", {}) or {},
+                "actions": [{"scope": c.scope, "providerOperation": c.operation} for c in provider.manifest.capabilities
+                            if c.scope in grant.scopes and c.scope in resource.capabilities]})
+        return {**catalog, "resources": resources, "capabilityExclusions": exclusions}
+
+    async def _integration_guarded_action(self, action, **kwargs):
+        try:
+            return await action(**kwargs)
+        except ExecutionProviderError as error:
+            item, run, step = kwargs["item"], kwargs["run"], kwargs["step"]
+            if settings.integration_foundation_enabled and (item.payload or {}).get("integrationOrigin") and error.error.code in {"authentication_error", "uncertain_outcome"}:
+                return await self._wait_integration(item, run, step, error.error, kwargs["current_step"])
+            # An action refused before anything was sent is replanned in every task, not only
+            # integration ones: a chat browser task would otherwise fail on it (F49).
+            if error.error.code == "validation_error" or (
+                    settings.integration_foundation_enabled and (item.payload or {}).get("integrationOrigin")):
+                wait = _provider_wait(item, error.error, retry_limit=settings.runtime_provider_retry_limit,
+                                      backoff_seconds=settings.runtime_provider_retry_backoff_seconds)
+                if wait is not None:
+                    delay, counter = wait
+                    item.status, run.status = "queued", "running"
+                    item.scheduled_at = utcnow() + timedelta(seconds=delay)
+                    _write_runtime_meta(item, queueState="retrying", waitingReason=error.error.safe_message,
+                        providerRetryAt=item.scheduled_at.isoformat(), providerRetryCode=error.error.code,
+                        providerRetryProvider=error.error.provider, **counter)
+                    attempt = next(iter(counter.values()))
+                    await notify_integration_work(self._session, item,
+                        key=f"prepare-retry:{kwargs['current_step']}:{error.error.code}:{attempt}",
+                        content=_waiting_message(error.error, delay))
+                    await self._session.commit()
+                    return RuntimeStepOutcome("continue", item.id, run.id, kwargs["current_step"], error.error.safe_message)
+                step.status = "failed"
+                step.output = {"summary": error.error.safe_message, "error": error.error.safe_message,
+                    "data": {"integrationFailure": {"code": error.error.code, "executed": False,
+                        "instruction": "Do not repeat this failed action or assume its prerequisites succeeded. Replan independent authorized objectives or finish with remaining work."}}}
+                next_step = kwargs["current_step"] + 1
+                invalid_count = int(_runtime_meta(item).get("invalidActionCount", 0)) + (error.error.code == "validation_error")
+                _write_runtime_meta(item, currentStep=next_step, providerRetryCount=0, providerWaitCount=0,
+                    invalidActionCount=invalid_count, queueState="replanning", waitingReason=error.error.safe_message)
+                if error.error.code == "validation_error" and invalid_count > settings.runtime_provider_retry_limit:
+                    steps = list((await self._session.scalars(select(RunStep).where(
+                        RunStep.run_id == run.id).order_by(RunStep.step_index))).all())
+                    return await self._complete(item, run, kwargs["job"], kwargs["worker"], steps,
+                        completion_summary="I could not produce a valid action within the correction budget. "
+                            "Completed work is preserved. The remaining task needs attention. " + error.error.safe_message,
+                        result_status="attention")
+                item.status, run.status = "running", "running"
+                await notify_integration_work(self._session, item, key=f"action-failed:{kwargs['current_step']}",
+                    content="This action could not complete: " + error.error.safe_message + " I will assess the remaining authorized work without repeating completed actions.")
+                await TransactionalOutbox(self._session).enqueue(topic="run.progress", aggregate_type="run", aggregate_id=str(run.id),
+                    payload={"organization_id": str(item.organization_id), "work_item_id": str(item.id), "run_id": str(run.id),
+                        "job_id": str(item.job_id), "current_step": next_step, "continuation_phase": "plan", "wakeup": "runtime", "correlation_id": item.correlation_id})
+                await self._session.commit()
+                return RuntimeStepOutcome("continue", item.id, run.id, next_step, error.error.safe_message, "plan")
+            raise
+        except (LookupError, PermissionError) as error:
+            item, run = kwargs["item"], kwargs["run"]
+            if not settings.integration_foundation_enabled or not (item.payload or {}).get("integrationOrigin"):
+                raise
+            item.status, run.status = "policy_denied", "policy_denied"
+            _write_runtime_meta(item, queueState="policy_denied", waitingReason=str(error), executionCertainty="not_executed")
+            await notify_integration_work(self._session, item, key=f"denied:{kwargs['current_step']}",
+                content=f"I cannot execute the pending action: {error}. Completed steps remain saved. Review the account and exact resource authority before continuing.")
+            await self._session.commit()
+            return RuntimeStepOutcome("noop", item.id, run.id, kwargs["current_step"], str(error))
+
+    async def _integration_preflight(self, item: WorkItem, run: Run) -> RuntimeStepOutcome | None:
+        """Before any work starts, check each account this task uses: renew a token that is
+        about to expire, and if an account needs reconnecting, wait for that now rather than
+        fail midway. Runs once per run, with one credential read per account."""
+        from audoryn_shared.application.services.integration_credentials import CredentialManager
+        from audoryn_shared.application.services.integration_foundation import provider_label
+        from audoryn_shared.infrastructure.database.models import Integration, IntegrationResource, IntegrationTaskGrant
+        connections = list((await self._session.scalars(select(Integration).where(
+            Integration.organization_id == item.organization_id,
+            Integration.provider.not_in(("browser", "web_research")),
+            Integration.id.in_(select(IntegrationResource.connection_id).where(
+                IntegrationResource.id.in_(select(IntegrationTaskGrant.resource_id).where(
+                    IntegrationTaskGrant.organization_id == item.organization_id,
+                    IntegrationTaskGrant.job_revision_id == item.job_revision_id,
+                    IntegrationTaskGrant.active.is_(True)))))).order_by(Integration.id))).all())
+        for connection in connections:
+            try:
+                provider = self._registry.get(connection.provider)
+            except KeyError:
+                continue
+            try:
+                await CredentialManager(self._session).resolve(
+                    connection=connection, provider=provider, correlation_id=item.correlation_id)
+            except ExecutionProviderError as error:
+                # Temporary problems (a renewal already running, coordination unavailable) are
+                # left to the action itself, which waits for them.
+                if error.error.code != "authentication_error":
+                    continue
+                label = provider_label(connection.provider)
+                message = (f"{label} ({connection.display_name}) needs reconnecting before this task can start. "
+                           "Nothing has been done yet. Reconnect the account, then resume the task.")
+                return await self._wait_integration(item, run, None, replace(error.error, safe_message=message), 0,
+                                                    saved_note=False)
+        # Authority that changed since this job was set up (for example, new permissions accepted)
+        # would leave the task without tools; wait for review instead of running without them.
+        from types import SimpleNamespace
+
+        from audoryn_shared.infrastructure.database.models import IntegrationConnectionState
+        changed = (await self._session.scalars(select(Integration.display_name).where(
+            Integration.id == IntegrationResource.connection_id,
+            IntegrationConnectionState.connection_id == IntegrationResource.connection_id,
+            IntegrationResource.id == IntegrationTaskGrant.resource_id,
+            IntegrationTaskGrant.organization_id == item.organization_id,
+            IntegrationTaskGrant.job_revision_id == item.job_revision_id,
+            IntegrationTaskGrant.active.is_(True),
+            IntegrationTaskGrant.authority_version != IntegrationConnectionState.authority_version,
+        ).distinct().order_by(Integration.display_name))).all()
+        if changed:
+            message = (f"Access to {', '.join(changed)} changed since this task was set up. Nothing has been "
+                       "done yet. Review its access (reconnect the account if asked), then resume the task.")
+            return await self._wait_integration(item, run, None,
+                SimpleNamespace(code="authentication_error", safe_message=message), 0, saved_note=False)
+        _write_runtime_meta(item, integrationPreflightAt=utcnow().isoformat())
+        return None
+
+    async def _wait_integration(self, item, run, step, error, current_step, *, saved_note: bool = True):
+        state = "waiting_reconnect" if error.code == "authentication_error" else "uncertain_outcome"
+        checks = _outcome_checks(item, current_step)
+        scope = str((step.input or {}).get("scope", "")) if step is not None else ""
+        # Running the step again only looks for the write (its record says it was dispatched), so it
+        # cannot repeat it. Workspace commands are run again instead, so they wait for a person.
+        if state == "uncertain_outcome" and step is not None and ".workspace." not in scope \
+                and checks < settings.integration_outcome_checks:
+            delay = settings.integration_outcome_check_seconds * 2**checks
+            item.status, run.status = "queued", "running"
+            item.scheduled_at = utcnow() + timedelta(seconds=delay)
+            reason = "I couldn't confirm whether the last write went through, so I'll look for it again shortly."
+            _write_runtime_meta(item, queueState="checking_outcome", outcomeChecks={"step": current_step, "count": checks + 1},
+                waitingReason=reason)
+            if checks == 0:
+                # Said once in the chat, so the person knows the task is still working on it (F47).
+                await notify_integration_work(self._session, item, key=f"checking_outcome:{current_step}",
+                    content=reason + " It won't be sent twice.")
+            await self._session.commit()
+            return RuntimeStepOutcome("continue", item.id, run.id, current_step, "Looking for the write's outcome again.")
+        item.status, run.status = state, state
+        content = error.safe_message + (" Completed steps remain saved." if saved_note else "")
+        references = None
+        if state == "uncertain_outcome" and step is not None:
+            # Name the write, where to look, and offer the three answers in the chat (F21).
+            spec = step.input or {}
+            content = uncertain_write(scope, as_map(spec.get("actionInput")), await self._resource_name(spec.get("resourceId")))
+            references = {"type": "work_item", "id": str(item.id), "controls": "outcome"}
+        _write_runtime_meta(item, queueState=state, waitingReason=content,
+            executionCertainty="uncertain" if state == "uncertain_outcome" else "not_executed")
+        await notify_integration_work(self._session, item, key=f"{state}:{current_step}", content=content,
+                                      references=references)
+        await self._session.commit()
+        return RuntimeStepOutcome("noop", item.id, run.id, current_step, error.safe_message)
+
+    async def _resource_name(self, resource_id: object) -> str | None:
+        """A resource's name for a message (None when unknown)."""
+        from audoryn_shared.infrastructure.database.models import IntegrationResource
+
+        try:
+            return await self._session.scalar(select(IntegrationResource.display_name).where(
+                IntegrationResource.id == UUID(str(resource_id))))
+        except ValueError:
+            return None
+
+    def _planner_observations(self, steps: list[RunStep]) -> list[dict[str, object]]:
+        """What the planner is shown of each step: its identity and summary, and its output as
+        compacted evidence (audoryn_shared.application.context.evidence)."""
+        observations: list[dict[str, object]] = []
+        for step in steps:
+            output = _step_output(step)
+            data = as_map(output.get("data"))
+            if step.status != "completed" and not (step.status == "failed" and data.get("integrationFailure")):
+                continue
+            spec = as_map(step.input)
+            scope = str(spec.get("scope", ""))
+            entry: dict[str, object] = {
+                "trust": "untrusted_tool_output",
+                "step": step.step_index + 1,
+                "status": step.status,
+                "title": str(spec.get("title", "")),
+                "scope": scope,
+                "resourceId": str(spec.get("resourceId", "")),
+                "summary": str(output.get("summary", ""))[:2000],
+            }
+            action_input = spec.get("actionInput")
+            if isinstance(action_input, dict):
+                entry["actionFingerprint"] = planned_action_fingerprint(scope, spec.get("resourceId"), action_input)
+            request = as_map(action_input)
+            if scope == "github.repository.contents.read" and isinstance(action_input, dict):
+                entry["actionInput"] = {key: request[key] for key in ("path", "ref") if key in request}
+            elif scope == "browser.element.press_key" and isinstance(action_input, dict):
+                entry["actionInput"] = {"value": str(request.get("value") or "")[:32]}
+            if data.get("integrationFailure"):
+                entry["data"] = {"integrationFailure": data["integrationFailure"]}
+            provider_output = data.get("output")
+            verification = as_map(data.get("verification"))
+            observation = as_map(provider_output).get("observation")
+            if isinstance(observation, dict):
+                entry["browserObservation"] = browser_evidence(
+                    as_map(observation), as_map(provider_output).get("actionEvidence"))
+            else:
+                entry["providerOutput"] = compact_output(
+                    scope, provider_output, action_input=request,
+                    confirmed_fields=as_map(verification.get("details")).get("confirmedFields"))
+            if isinstance(data.get("verification"), dict):
+                entry["verification"] = {"verified": verification.get("verified"), "summary": verification.get("summary")}
+            observations.append(entry)
+        return observations
+
+    async def _worker_memory_context(
+        self,
+        worker: Worker,
+    ) -> dict[str, object]:
+        now = utcnow()
+        memories = list(
+            (
+                await self._session.scalars(
+                    select(Memory)
+                    .where(
+                        Memory.organization_id == worker.organization_id,
+                        Memory.owner_id == str(worker.id),
+                        Memory.status == "active",
+                        or_(Memory.expires_at.is_(None), Memory.expires_at > now),
+                    )
+                    .order_by(desc(Memory.created_at))
+                    .limit(20)
+                )
+            ).all()
+        )
+        directives = list(
+            (
+                await self._session.scalars(
+                    select(WorkerDirective)
+                    .where(
+                        WorkerDirective.organization_id == worker.organization_id,
+                        WorkerDirective.worker_id == worker.id,
+                        WorkerDirective.status == "active",
+                    )
+                    .order_by(desc(WorkerDirective.created_at))
+                    .limit(20)
+                )
+            ).all()
+        )
+        return {
+            "standingInstructions": [directive.text[:1200] for directive in directives],
+            "memory": [
+                {
+                    "type": memory.memory_type,
+                    "title": memory.title[:300],
+                    "content": memory.content[:1200],
+                    "source": memory.source,
+                    "provenance": dict(memory.provenance or {}),
+                    "sensitivity": memory.sensitivity,
+                }
+                for memory in memories
+                if memory.sensitivity != "secret"
+            ],
+        }
+
+    async def _http_first_observations(
+        self,
+        *,
+        item: WorkItem,
+        tools: list[dict[str, object]],
+        steps: list[RunStep],
+    ) -> list[dict[str, object]]:
+        completed_browser = any(
+            step.status == "completed"
+            and isinstance(step.input, dict)
+            and str(step.input.get("scope", "")).startswith("browser.")
+            for step in steps
+        )
+        if completed_browser:
+            return []
+
+        runtime_meta = _runtime_meta(item)
+        cached = runtime_meta.get("httpFirstObservations")
+        if isinstance(cached, list) and cached:
+            telemetry_logger.info(
+                "HTTP-first bootstrap cache reused work_item=%s observations=%s",
+                item.id,
+                len(cached),
+            )
+            return [dict(entry) for entry in cached if isinstance(entry, dict)]
+
+        observations: list[dict[str, object]] = []
+        seen_resources: set[str] = set()
+        for tool in tools:
+            if (
+                str(tool.get("provider", "")) != "browser"
+                or str(tool.get("scope", "")) != "browser.navigation.open"
+            ):
+                continue
+            resource_id = str(tool.get("resourceId", ""))
+            start_url = str(tool.get("defaultStartUrl", "")).strip()
+            if not resource_id or not start_url or resource_id in seen_resources:
+                continue
+            seen_resources.add(resource_id)
+            if len(seen_resources) > 2:
+                break
+
+            try:
+                integration = await self._session.get(Integration, UUID(resource_id))
+            except ValueError:
+                integration = None
+            if integration is None:
+                continue
+            config = _integration_config(integration)
+            try:
+                policy = BrowserDomainPolicy.from_configuration(
+                    {str(key): str(value) for key, value in config.items() if value is not None},
+                    fallback_url=start_url,
+                )
+                observation = await fetch_http_page(
+                    start_url,
+                    policy=policy,
+                    max_bytes=settings.browser_http_read_max_bytes,
+                    timeout_seconds=settings.browser_http_read_timeout_seconds,
+                )
+            except (PermissionError, RuntimeError, ValueError) as error:
+                telemetry_logger.info(
+                    "HTTP-first bootstrap skipped work_item=%s resource=%s error=%s",
+                    item.id,
+                    resource_id,
+                    type(error).__name__,
+                )
+                continue
+
+            telemetry_logger.info(
+                "HTTP-first bootstrap completed work_item=%s resource=%s status=%s "
+                "text_chars=%s links=%s forms=%s truncated=%s",
+                item.id,
+                resource_id,
+                observation.status_code,
+                len(observation.visible_text),
+                len(observation.links),
+                len(observation.forms),
+                observation.truncated,
+            )
+            observations.append(
+                {
+                    "trust": "untrusted_tool_output",
+                    "step": 0,
+                    "title": "Authorized HTTP-first page read",
+                    "scope": "browser.http.bootstrap",
+                    "summary": (
+                        "Lightweight authorized page content fetched without starting Chromium. "
+                        "Use governed browser actions only when interaction or JavaScript state is needed."
+                    ),
+                    "resourceId": resource_id,
+                    "httpObservation": observation.as_dict(),
+                }
+            )
+
+        if observations:
+            _write_runtime_meta(
+                item,
+                httpFirstObservations=observations,
+                httpFirstObservedAt=utcnow().isoformat(),
+            )
+            await self._session.flush()
+        return observations
+
+    async def _plan_next_step(
+        self,
+        *,
+        item: WorkItem,
+        run: Run,
+        job: Job,
+        revision: JobRevision,
+        worker: Worker,
+        agent: AgentIdentity,
+        steps: list[RunStep],
+    ) -> AdaptivePlanDecision:
+        smart = None
+        if settings.smart_planner_enabled:
+            from audoryn_shared.runtime.smart_planner import SmartPlanner
+            smart = SmartPlanner(self._session, item, run, len(steps))
+            await smart.prepare()
+        preparation_started = time.monotonic()
+        tools = await self._planner_tools(
+            item=item,
+            revision=revision,
+            agent=agent,
+        )
+        definition = (
+            dict(revision.definition or {})
+            if isinstance(revision.definition, dict)
+            else {}
+        )
+        payload = dict(item.payload or {})
+        raw_trigger = payload.get("trigger")
+        trigger = (
+            {str(key): value for key, value in raw_trigger.items()}
+            if isinstance(raw_trigger, dict)
+            else {}
+        )
+        profile = dict(worker.profile or {}) if isinstance(worker.profile, dict) else {}
+        preparation_breakdown = dict(getattr(self, "_tool_preparation_metrics", {}))
+        memory_started = time.monotonic()
+        memory_context = await self._worker_memory_context(worker)
+        preparation_breakdown["memorySeconds"] = round(time.monotonic() - memory_started, 3)
+        durable_observations = await self._cached_observations(steps)
+        # A plan is saved with the run's first action, so before any step there is none to read.
+        self._plan_rows = await self._load_plan(run) if steps else []
+        self._plan_steps = steps
+        if self._plan_rows:
+            _write_runtime_meta(item, planProgress=_plan_progress(_plan_view(self._plan_rows, steps)))
+        observation_started = time.monotonic()
+        http_first = await self._http_first_observations(
+            item=item,
+            tools=tools,
+            steps=steps,
+        )
+        preparation_breakdown["observationSeconds"] = round(time.monotonic() - observation_started, 3)
+        preparation_seconds = time.monotonic() - preparation_started
+        telemetry_logger.info("Planner preparation completed work_item=%s run=%s seconds=%.3f breakdown=%s", item.id, run.id, preparation_seconds, preparation_breakdown)
+        _write_runtime_meta(item, plannerPhase="awaiting_ai",
+            plannerPhaseStartedAt=utcnow().isoformat(),
+            plannerTiming={"preparationSeconds": round(preparation_seconds, 3), "preparationBreakdown": preparation_breakdown},
+            waitingReason="The AI is planning the next action.")
+        # Release the database transaction while waiting for inference. Telemetry
+        # has its own short-lived transactions and cannot roll back this run.
+        await self._session.commit()
+        logger.info("Runtime tool preparation completed work_item=%s run=%s elapsed=%.3fs tools=%s",
+            item.id, run.id, preparation_seconds, len(tools))
+        ai_started = time.monotonic()
+        logger.info("Runtime AI response started work_item=%s run=%s", item.id, run.id)
+        try:
+            arguments = {"item": item, "run": run, "job": job, "worker": worker,
+                "definition": definition, "profile": profile, "memory_context": memory_context,
+                "trigger": trigger, "tools": tools, "observations": [*http_first, *durable_observations], "steps": steps,
+                "plan": _plan_view(self._plan_rows, steps),
+                "plan_revisions_left": max(0, settings.runtime_max_plan_revisions
+                                           - _count(_runtime_meta(item).get("planRevisions")))}
+            if smart is None:
+                decision = await self._choose_planner_decision(**arguments)
+            else:
+                decision = await self._smart_decision(smart, arguments, revision=revision, agent=agent,
+                                                      durable_observations=durable_observations)
+        finally:
+            ai_seconds = time.monotonic() - ai_started
+            logger.info("Runtime AI response finished work_item=%s run=%s elapsed=%.3fs",
+                item.id, run.id, ai_seconds)
+        # A user may cancel during a long response; do not overwrite that state
+        # with stale planner metadata or finish a cancelled run as successful.
+        await self._session.refresh(item)
+        await self._session.refresh(run)
+        if item.status in {"completed", "failed", "cancelled"} or run.status in {"completed", "failed", "cancelled"}:
+            return decision
+        _write_runtime_meta(item, plannerPhase="planned",
+            plannerPhaseStartedAt=None,
+            plannerTiming={"preparationSeconds": round(preparation_seconds, 3), "preparationBreakdown": preparation_breakdown, "aiResponseSeconds": round(ai_seconds, 3)},
+            waitingReason=None, planSummary=decision.summary, plannerMode="adaptive",
+            plannerModel=smart.decision.accepted_model if smart and smart.decision else settings.ai_coordinator_model)
+        await self._session.flush()
+        return decision
+
+    async def _smart_decision(self, smart, arguments: dict[str, Any], *, revision: JobRevision,
+                              agent: AgentIdentity, durable_observations: list) -> AdaptivePlanDecision:
+        """Plan through the smart planner's routes, then check that the tools are still authorized
+        (planning can take minutes) before accepting the decision."""
+        assert smart.decision is not None
+        from audoryn_shared.runtime.smart_planner import recovery_context
+        item, trigger, tools = arguments["item"], arguments["trigger"], arguments["tools"]
+        recovery = recovery_context(arguments["steps"], durable_observations, smart.decision)
+        arguments["trigger"] = {**trigger, "recovery": recovery}
+
+        async def choose_route(gateway):
+            return await self._choose_planner_decision(**arguments, planner=AdaptiveRuntimePlanner(gateway))
+        decision = await smart.choose({"revision": str(revision.id), "definition": arguments["definition"],
+            "tools": tools, "observations": arguments["observations"], "trigger": trigger,
+            "profile": arguments["profile"], "memory": arguments["memory_context"]}, choose_route)
+        if await self._planner_tools(item=item, revision=revision, agent=agent) != tools:
+            smart.decision.status = "pending"
+            smart.decision.accepted_proposal = None
+            await self._session.commit()
+            raise AIProviderError("invalid_provider_response",
+                "Available authority changed during planning; revalidation is required.", retryable=False)
+        self._revalidated_catalog = self._last_catalog
+        _write_runtime_meta(item, plannerDecisionId=str(smart.decision.id),
+            plannerRecoveryRound=smart.decision.recovery_round,
+            plannerRecoveryMode=recovery["mode"], plannerStatus="accepted",
+            plannerAttemptCount=smart.attempt_count,
+            plannerElapsedSeconds=round(settings.runtime_planner_timeout_seconds - smart.remaining(), 3),
+            aiRetryCount=0)
+        await self._session.commit()
+        return decision
+
+    async def _choose_planner_decision(self, *, item, run, job, worker, definition, profile,
+        memory_context, trigger, tools, observations, steps, planner=None, plan=None, plan_revisions_left=0):
+        decision = await (planner or self._planner).choose_next(
+            job={
+                "name": job.name,
+                "objective": str(definition.get("objective", "")),
+                "instructions": str(definition.get("instructions", "")),
+                "completionCriteria": list(definition.get("completionCriteria", [])),
+                "capabilityExclusions": getattr(self, "_capability_exclusions", [])[:30],
+                "workItemId": str(item.id),
+            },
+            worker={
+                "name": worker.name,
+                "role": profile.get("role"),
+                "department": profile.get("department"),
+                "responsibilities": profile.get("responsibilities", []),
+                "instructions": profile.get("instructions", ""),
+                "standingInstructions": memory_context["standingInstructions"],
+                "memory": memory_context["memory"],
+            },
+            trigger=trigger,
+            tools=tools,
+            observations=observations,
+            action_count=len([step for step in steps if step.kind == "action"]),
+            max_actions=action_budget(len(plan or [])),
+            plan=plan,
+            plan_revisions_left=plan_revisions_left,
+            invocation_context=AIInvocationContext(
+                organization_id=item.organization_id,
+                worker_id=worker.id,
+                job_id=job.id,
+                run_id=run.id,
+                correlation_id=item.correlation_id,
+            ),
+        )
+        return decision
+
+    async def _run_files(self, run_id: UUID) -> list[tuple[str, str]]:
+        """The files a run produced for the person, as (id, name), listed on its result (F41)."""
+        rows = (
+            await self._session.execute(
+                select(Artifact.id, Artifact.metadata_json)
+                .where(Artifact.run_id == run_id)
+                .order_by(Artifact.created_at)
+            )
+        ).all()
+        return [
+            (str(artifact_id), str(meta.get("name") or "file"))
+            for artifact_id, meta in rows
+            if isinstance(meta, dict) and meta.get("kind") in RESULT_FILE_KINDS
+        ]
+
+    async def _load_plan(self, run: Run) -> list[RunPlanStep]:
+        return list((await self._session.scalars(select(RunPlanStep).where(
+            RunPlanStep.run_id == run.id, RunPlanStep.status != "superseded").order_by(RunPlanStep.position))).all())
+
+    async def _save_plan(self, item: WorkItem, run: Run, decision: AdaptivePlanDecision) -> None:
+        """The run's first plan, or a revision: steps not yet done are superseded by the new ones."""
+        if not decision.plan:
+            return
+        rows = list(getattr(self, "_plan_rows", []))
+        if rows and not decision.plan_revision_reason:
+            return  # a replayed first decision: the plan is already saved
+        revision = _count(_runtime_meta(item).get("planRevisions")) + (1 if rows else 0)
+        if rows:
+            # The revision replaces the steps with no completed work; its numbers continue after them.
+            view = _plan_view(rows, list(getattr(self, "_plan_steps", [])))
+            for row, step in zip(rows, view, strict=True):
+                if row.status != "pending":
+                    continue
+                if survives_revision(step):
+                    row.status = "done"
+                else:
+                    row.status = "superseded"
+                    await self._session.delete(row)
+            logger.info("Runtime plan revised work_item=%s run=%s revision=%s reason=%s",
+                        item.id, run.id, revision, decision.plan_revision_reason[:200])
+        added = [RunPlanStep(organization_id=item.organization_id, run_id=run.id, position=int(step["position"]),  # type: ignore[call-overload]
+                             revision=revision, title=str(step["title"]), goal=str(step["goal"]),
+                             scope=str(step["scope"]), target=str(step["target"]),
+                             depends_on=list(step["dependsOn"]), check=str(step["check"]),  # type: ignore[call-overload]
+                             status="pending", action_steps=[]) for step in decision.plan]
+        self._session.add_all(added)
+        await self._session.flush()
+        self._plan_rows = [row for row in rows if row.status != "superseded"] + added
+        meta: dict[str, object] = {"planProgress": _plan_progress(
+            _plan_view(self._plan_rows, list(getattr(self, "_plan_steps", []))))}
+        if rows:
+            meta.update(planRevisions=revision, planRevisionReason=decision.plan_revision_reason[:500])
+        _write_runtime_meta(item, **meta)
+
+    async def _close_plan(self, item: WorkItem) -> None:
+        """At finish, the plan's final state is written once: steps done, and steps never reached
+        recorded as skipped (the run decided they were not needed)."""
+        rows = list(getattr(self, "_plan_rows", []))
+        if not rows:
+            return
+        view = _plan_view(rows, list(getattr(self, "_plan_steps", [])))
+        final = [{**step, "status": "done" if step["status"] == "done" else "skipped"} for step in view]
+        for row, step in zip(rows, final, strict=True):
+            row.status = str(step["status"])
+            row.action_steps = list(step["actionSteps"])  # type: ignore[call-overload]
+        _write_runtime_meta(item, planProgress=_plan_progress(final))
+
+    async def _append_action_step(
+        self,
+        *,
+        item: WorkItem,
+        run: Run,
+        decision: AdaptivePlanDecision,
+        step_index: int,
+    ) -> RunStep:
+        catalog = self._revalidated_catalog or await self._execution_catalog(item)
+        resource = next(
+            (
+                candidate
+                for candidate in list(catalog.get("resources", []))
+                if str(candidate.get("id", "")) == decision.resource_id
+                and decision.scope in list(candidate.get("scopes", []))
+            ),
+            None,
+        )
+        if resource is None:
+            raise RuntimeError("Planner-selected execution resource is no longer available.")
+        action = next(
+            (
+                entry
+                for entry in list(resource.get("actions", []))
+                if entry.get("scope") == decision.scope
+            ),
+            None,
+        )
+        if action is None:
+            raise RuntimeError("Planner-selected capability is no longer executable.")
+
+        step = RunStep(
+            run_id=run.id,
+            step_index=step_index,
+            kind="action",
+            status="pending",
+            input={
+                "title": decision.title,
+                "instruction": decision.instruction,
+                "resourceId": decision.resource_id,
+                "scope": decision.scope,
+                "provider": str(resource.get("provider", "")),
+                "operation": str(action.get("providerOperation", "")),
+                "actionInput": decision.action_input,
+                **({"planStep": decision.plan_step, "planStepDone": decision.plan_step_done}
+                   if decision.plan_step is not None else {}),
+            },
+            output={},
+        )
+        if decision.scope == "github.repository.contents.read":
+            step.input = {**step.input, "plannerInstruction": decision.instruction,
+                "instruction": "Inspect only the repository path " + str(decision.action_input.get("path", ""))
+                + " at " + str(decision.action_input.get("ref") or "the default revision")
+                + ". Other paths require separate actions; no creation or edit is performed by this read."}
+        self._session.add(step)
+        await self._session.flush()
+        logger.info("Runtime action selected work_item=%s run=%s step=%s scope=%s resource=%s",
+            item.id, run.id, step_index, decision.scope, decision.resource_id)
+        await TransactionalOutbox(self._session).enqueue(
+            topic="run.progress",
+            aggregate_type="run",
+            aggregate_id=str(run.id),
+            payload={
+                "organization_id": str(item.organization_id),
+                "work_item_id": str(item.id),
+                "run_id": str(run.id),
+                "job_id": str(item.job_id),
+                "current_step": step_index,
+                "continuation_phase": "execute",
+                "planner_scope": decision.scope,
+                "queue_partition": _queue_partition(str(resource.get("provider", "")), decision.resource_id, decision.scope),
+                "wakeup": "runtime",
+                "correlation_id": item.correlation_id,
+            },
+        )
+        await self._session.commit()
+        return step
+
+    async def _active_scopes(self, agent_id: UUID) -> frozenset[str]:
+        rows = list(
+            (
+                await self._session.scalars(
+                    select(CapabilityProfile).where(
+                        CapabilityProfile.agent_id == agent_id,
+                        CapabilityProfile.active.is_(True),
+                    )
+                )
+            ).all()
+        )
+        return frozenset(row.scope for row in rows)
+
+    async def _action_input(
+        self,
+        *,
+        item: WorkItem,
+        step: RunStep,
+    ) -> dict[str, object]:
+        spec = dict(step.input or {})
+        scope = str(spec.get("scope", ""))
+        operation = str(spec.get("operation", ""))
+        payload = dict(item.payload or {})
+
+        planned_raw = spec.get("actionInput")
+        action_input: dict[str, object] = (
+            {str(key): value for key, value in planned_raw.items()}
+            if isinstance(planned_raw, dict)
+            else {}
+        )
+
+        explicit = payload.get("actionInputs")
+        trigger = payload.get("trigger")
+        if not isinstance(explicit, dict) and isinstance(trigger, dict):
+            trigger_payload = trigger.get("payload")
+            if isinstance(trigger_payload, dict):
+                explicit = trigger_payload.get("actionInputs")
+        if isinstance(explicit, dict):
+            raw = explicit.get(scope, explicit.get(operation))
+            if isinstance(raw, dict):
+                action_input.update({str(key): value for key, value in raw.items()})
+
+        resource_id = str(spec.get("resourceId", ""))
+        integration: Integration | None = None
+        try:
+            integration = await self._session.get(Integration, UUID(resource_id))
+        except ValueError:
+            integration = None
+        config = _integration_config(integration)
+
+        if scope == "browser.navigation.open" and not action_input.get("url"):
+            start_url = str(config.get("startUrl", "")).strip()
+            if start_url:
+                action_input["url"] = start_url
+
+        if scope.startswith("browser."):
+            session_id, observation_id = await self._latest_browser_context(
+                step.run_id,
+                step.step_index,
+            )
+            if not session_id and scope != "browser.navigation.open":
+                raise RuntimeError(
+                    f"Runtime capability {scope} requires an active browser session. "
+                    "The planner must open the governed browser first."
+                )
+            if session_id:
+                action_input.setdefault("sessionId", session_id)
+                normalized = _attach_observation_id(action_input, observation_id)
+                action_input = (
+                    {str(key): value for key, value in normalized.items()}
+                    if isinstance(normalized, dict)
+                    else action_input
+                )
+
+        provider = self._registry.get(str(spec.get("provider", "")))
+        capability = next(
+            (entry for entry in provider.manifest.capabilities if entry.scope == scope),
+            None,
+        )
+        if capability is None:
+            raise RuntimeError(f"Runtime capability is not registered: {scope}.")
+        raw_required = capability.input_schema.get("required", [])
+        required = [str(key) for key in raw_required] if isinstance(raw_required, list) else []
+        missing = [
+            key
+            for key in required
+            if key not in action_input or action_input.get(key) in (None, "")
+        ]
+        if missing:
+            raise RuntimeError(
+                f"Planner produced incomplete structured input for {scope}: "
+                + ", ".join(missing)
+                + "."
+            )
+        return action_input
+
+    async def _latest_browser_context(
+        self,
+        run_id: UUID,
+        before_index: int,
+    ) -> tuple[str | None, str | None]:
+        rows = list(
+            (
+                await self._session.scalars(
+                    select(RunStep)
+                    .where(
+                        RunStep.run_id == run_id,
+                        RunStep.step_index < before_index,
+                        RunStep.status == "completed",
+                    )
+                    .order_by(desc(RunStep.step_index))
+                )
+            ).all()
+        )
+        for row in rows:
+            data = _step_output(row)
+            nested = data.get("data")
+            nested = nested if isinstance(nested, dict) else {}
+            provider_output = nested.get("output")
+            provider_output = provider_output if isinstance(provider_output, dict) else {}
+            session = provider_output.get("session")
+            session = session if isinstance(session, dict) else {}
+            observation = provider_output.get("observation")
+            observation = observation if isinstance(observation, dict) else {}
+            raw_session_id = session.get("id") or observation.get("sessionId")
+            if raw_session_id:
+                raw_observation_id = observation.get("id")
+                return (
+                    str(raw_session_id),
+                    str(raw_observation_id) if raw_observation_id else None,
+                )
+        return None, None
+
+    async def _close_browser_session(
+        self,
+        run_id: UUID,
+        *,
+        before_index: int,
+    ) -> None:
+        session_id, _ = await self._latest_browser_context(run_id, before_index)
+        if session_id is None:
+            return
+        try:
+            await browser_provider.close_session_id(UUID(session_id))
+        except (LookupError, ValueError):
+            # Recovery/restart may already have dropped the in-memory Browser session.
+            return
+
+    async def _policy_decision(
+        self,
+        *,
+        item: WorkItem,
+        agent: AgentIdentity,
+        resource_id: str,
+        scope: str,
+        preparation_cache: dict[Any, Any] | None = None,
+    ) -> dict[str, Any]:
+        return await _evaluate(
+            self._session,
+            item.organization_id,
+            _system_principal(item.organization_id),
+            agent_id=agent.id,
+            resource_id=resource_id,
+            scope=scope,
+            preparation_cache=preparation_cache,
+        )
+
+    async def _universal_request(
+        self,
+        *,
+        proposal: ActionProposal,
+        worker: Worker,
+        job: Job,
+        item: WorkItem,
+        run: Run,
+    ) -> UniversalActionRequest:
+        prepared = await self._provider_executor.prepare(proposal)
+        execution = replace(
+            prepared.execution,
+            worker_id=worker.id,
+            job_id=job.id,
+            work_item_id=item.id,
+            run_id=run.id,
+        )
+        return replace(prepared, execution=execution)
+
+    async def _execute_action_step(
+        self,
+        *,
+        item: WorkItem,
+        run: Run,
+        step: RunStep,
+        job: Job,
+        worker: Worker,
+        agent: AgentIdentity,
+        current_step: int,
+    ) -> RuntimeStepOutcome:
+        spec = dict(step.input or {})
+        resource_id = str(spec.get("resourceId", ""))
+        scope = str(spec.get("scope", ""))
+        provider = str(spec.get("provider", ""))
+        operation = str(spec.get("operation", ""))
+        decision = await self._policy_decision(
+            item=item,
+            agent=agent,
+            resource_id=resource_id,
+            scope=scope,
+        )
+        input_payload = await self._action_input(item=item, step=step)
+        proposal = ActionProposal(
+            organization_id=item.organization_id,
+            agent_id=agent.id,
+            provider=provider,
+            operation=operation,
+            scope=scope,
+            resource_id=resource_id,
+            payload=input_payload,
+            correlation_id=item.correlation_id,
+            idempotency_key=f"runtime:{run.id}:{current_step}",
+            work_item_id=item.id,
+            risk=str((decision.get("riskAssessment") or {}).get("effectiveRisk") or "low"),
+        )
+        universal = await self._universal_request(
+            proposal=proposal,
+            worker=worker,
+            job=job,
+            item=item,
+            run=run,
+        )
+        if (settings.integration_foundation_enabled and universal.provider_permissions.adapter == "native_api"
+            and universal.execution.capability.approval_recommendation == "required" and decision["outcome"] != "DENY"):
+            decision = {**decision, "outcome": "REQUIRE_APPROVAL",
+                "reason": "This provider action requires approval for the exact resource, content and revision."}
+        fingerprint = action_fingerprint(universal)
+        existing = await self._session.scalar(
+            select(Action).where(
+                Action.organization_id == item.organization_id,
+                Action.idempotency_key == proposal.idempotency_key,
+            )
+        )
+        if existing is not None and existing.status == "executed":
+            step.status = "completed"
+            step.output = dict((existing.payload or {}).get("result") or {})
+            _write_runtime_meta(item, currentStep=current_step + 1)
+            await self._session.commit()
+            return RuntimeStepOutcome(
+                state="continue",
+                work_item_id=item.id,
+                run_id=run.id,
+                current_step=current_step + 1,
+                summary="Previously executed action checkpoint reused.",
+                continuation_phase="plan",
+            )
+
+        if decision["outcome"] == "DENY":
+            return await self._deny(item=item, run=run, step=step, agent=agent, proposal=proposal,
+                                    decision=decision, fingerprint=fingerprint, existing=existing,
+                                    current_step=current_step)
+        if decision["outcome"] == "REQUIRE_APPROVAL":
+            return await self._hold_for_approval(item=item, run=run, step=step, agent=agent, proposal=proposal,
+                                                 decision=decision, fingerprint=fingerprint, existing=existing,
+                                                 current_step=current_step)
+
+        return await self._execute_authorized(
+            item=item,
+            run=run,
+            step=step,
+            job=job,
+            worker=worker,
+            agent=agent,
+            proposal=proposal,
+            universal=universal,
+            decision=decision,
+            current_step=current_step,
+            existing=existing,
+        )
+
+    def _action_record(self, *, existing: Action | None, item: WorkItem, run: Run, agent: AgentIdentity,
+                       proposal: ActionProposal, status: str) -> Action:
+        """The step's action record: the one saved for this idempotency key, or a new one."""
+        action = existing or Action(
+            organization_id=item.organization_id,
+            agent_id=agent.id,
+            run_id=run.id,
+            status=status,
+            resource_id=proposal.resource_id,
+            scope=proposal.scope,
+            idempotency_key=proposal.idempotency_key,
+            payload={},
+        )
+        if existing is None:
+            self._session.add(action)
+        return action
+
+    async def _deny(self, *, item: WorkItem, run: Run, step: RunStep, agent: AgentIdentity, proposal: ActionProposal,
+                    decision: dict[str, Any], fingerprint: str, existing: Action | None,
+                    current_step: int) -> RuntimeStepOutcome:
+        """Policy denies the action: record it as blocked and end the task."""
+        action = self._action_record(existing=existing, item=item, run=run, agent=agent, proposal=proposal,
+                                     status="blocked")
+        action.status = "blocked"
+        action.payload = self._action_record_payload(
+            proposal=proposal, decision=decision, fingerprint=fingerprint, result=None, error=str(decision["reason"]))
+        await self._fail(item=item, run=run, step=step, message=str(decision["reason"]))
+        return RuntimeStepOutcome(state="failed", work_item_id=item.id, run_id=run.id,
+                                  current_step=current_step, summary=str(decision["reason"]))
+
+    async def _hold_for_approval(self, *, item: WorkItem, run: Run, step: RunStep, agent: AgentIdentity,
+                                 proposal: ActionProposal, decision: dict[str, Any], fingerprint: str,
+                                 existing: Action | None, current_step: int) -> RuntimeStepOutcome:
+        """Policy asks a person first: hold the action, open an approval and say plainly what waits.
+        The policy's own reason stays in the step's record (approvalReason)."""
+        action = self._action_record(existing=existing, item=item, run=run, agent=agent, proposal=proposal,
+                                     status="held")
+        await self._session.flush()
+        approval = await self._session.scalar(select(Approval).where(Approval.action_id == action.id))
+        if approval is None:
+            approval = Approval(organization_id=item.organization_id, action_id=action.id, status="pending",
+                                decided_by=None, decision_reason=None)
+            self._session.add(approval)
+            await self._session.flush()
+        action.status = "held"
+        action.payload = self._action_record_payload(
+            proposal=proposal, decision=decision, fingerprint=fingerprint, result=None, error=None)
+        waiting = approval_wait(proposal.scope, proposal.payload,
+                                str((decision.get("request") or {}).get("resourceName") or "") or None)
+        step.status = "waiting_approval"
+        step.output = {
+            "actionId": str(action.id),
+            "approvalId": str(approval.id),
+            "actionFingerprint": fingerprint,
+            "approvalReason": str(decision.get("reason") or "Human approval is required."),
+        }
+        run.status = "waiting_approval"
+        item.status = "waiting_approval"
+        _write_runtime_meta(item, waitingReason=waiting, approvalId=str(approval.id))
+        await self._queue_action_events(item=item, action=action, approval=approval, event="approval.created")
+        await notify_integration_work(self._session, item, key=f"approval:{approval.id}", content=waiting,
+                                      references={"type": "approval", "id": str(approval.id)})
+        await self._session.commit()
+        return RuntimeStepOutcome(state="waiting_approval", work_item_id=item.id, run_id=run.id,
+                                  current_step=current_step, summary=waiting)
+
+    async def _resume_approved_action(
+        self,
+        *,
+        item: WorkItem,
+        run: Run,
+        step: RunStep,
+        job: Job,
+        worker: Worker,
+        agent: AgentIdentity,
+        current_step: int,
+    ) -> RuntimeStepOutcome:
+        output = _step_output(step)
+        action_id = output.get("actionId")
+        if not action_id:
+            await self._fail(item=item, run=run, step=step, message="Held step lost its Action reference.")
+            return RuntimeStepOutcome("failed", item.id, run.id, current_step, "Held step is invalid.")
+        action = await self._session.get(Action, UUID(str(action_id)))
+        if action is None:
+            await self._fail(item=item, run=run, step=step, message="Held Action is unavailable.")
+            return RuntimeStepOutcome("failed", item.id, run.id, current_step, "Held Action is unavailable.")
+        approval = await self._session.scalar(select(Approval).where(Approval.action_id == action.id))
+        if approval is None or approval.status == "pending":
+            item.status = "waiting_approval"
+            run.status = "waiting_approval"
+            await self._session.commit()
+            return RuntimeStepOutcome(
+                "waiting_approval", item.id, run.id, current_step, "Waiting for human approval."
+            )
+        if approval.status == "expired":
+            # Nobody decided in time: nothing was performed. Finish with what was done so far.
+            message = "The approval expired before anyone decided, so this action was not performed."
+            step.status = "failed"
+            step.output = {**output, "summary": message, "error": message}
+            _write_runtime_meta(item, currentStep=current_step + 1, approvalId=None)
+            await self._session.flush()
+            return await self._complete(item, run, job, worker, await self._load_steps(run),
+                completion_summary=message, result_status="attention")
+        if approval.status != "approved":
+            await self._fail(
+                item=item,
+                run=run,
+                step=step,
+                message="Human approval rejected the action.",
+            )
+            return RuntimeStepOutcome(
+                "failed", item.id, run.id, current_step, "Human approval rejected the action."
+            )
+
+        payload = dict(action.payload or {})
+        request = payload.get("request")
+        request = request if isinstance(request, dict) else {}
+        decision = payload.get("policy")
+        decision = decision if isinstance(decision, dict) else {}
+        proposal = ActionProposal(
+            organization_id=item.organization_id,
+            agent_id=agent.id,
+            provider=str(request.get("provider", "")),
+            operation=str(request.get("operation", "")),
+            scope=action.scope,
+            resource_id=action.resource_id,
+            payload=dict(request.get("input") or {}),
+            correlation_id=item.correlation_id,
+            idempotency_key=action.idempotency_key,
+            work_item_id=item.id,
+            risk=str(request.get("risk") or "low"),
+        )
+        edit = payload.get("approvedEdit")
+        if isinstance(edit, dict):
+            from audoryn_shared.api.governance_routes import input_hash
+            if edit.get("inputHash") != input_hash(proposal.payload):
+                # Only the exact input the person approved may run.
+                await self._fail(item=item, run=run, step=step,
+                    message="The approved edit no longer matches the action, so it was not performed.")
+                return RuntimeStepOutcome("failed", item.id, run.id, current_step, "Approved edit mismatch.")
+        universal = await self._universal_request(
+            proposal=proposal,
+            worker=worker,
+            job=job,
+            item=item,
+            run=run,
+        )
+        approved_fingerprint = str(payload.get("actionFingerprint") or "")
+        if isinstance(edit, dict):
+            # The person approved this edited input: bind the approval to it.
+            approved_fingerprint = action_fingerprint(universal)
+        universal = replace(
+            universal,
+            approval_id=str(approval.id),
+            approval_status="approved",
+            approval_action_fingerprint=approved_fingerprint,
+        )
+        return await self._execute_authorized(
+            item=item,
+            run=run,
+            step=step,
+            job=job,
+            worker=worker,
+            agent=agent,
+            proposal=proposal,
+            universal=universal,
+            decision={
+                "outcome": "REQUIRE_APPROVAL",
+                "reason": str(decision.get("reason") or "Human approval required."),
+            },
+            current_step=current_step,
+            existing=action,
+        )
+
+    async def _execute_authorized(
+        self,
+        *,
+        item: WorkItem,
+        run: Run,
+        step: RunStep,
+        job: Job,
+        worker: Worker,
+        agent: AgentIdentity,
+        proposal: ActionProposal,
+        universal: UniversalActionRequest,
+        decision: dict[str, Any],
+        current_step: int,
+        existing: Action | None,
+    ) -> RuntimeStepOutcome:
+        scopes = await self._active_scopes(agent.id)
+        principal = AgentPrincipal(
+            agent_id=agent.id,
+            organization_id=item.organization_id,
+            credential_fingerprint="internal-managed-runtime",
+            capabilities=scopes,
+            risk_level=proposal.risk,
+            policy_context=(),
+        )
+        action = existing or Action(
+            organization_id=item.organization_id,
+            agent_id=agent.id,
+            run_id=run.id,
+            status="processing",
+            resource_id=proposal.resource_id,
+            scope=proposal.scope,
+            idempotency_key=proposal.idempotency_key,
+            payload={},
+        )
+        if existing is None:
+            self._session.add(action)
+            await self._session.flush()
+        action.status = "processing"
+        _write_runtime_meta(item, queueState="executing", activeActionScope=proposal.scope,
+                            actionStartedAt=utcnow().isoformat())
+        await TransactionalOutbox(self._session).enqueue(
+            topic="action.proposed",
+            aggregate_type="action",
+            aggregate_id=str(action.id),
+            payload={
+                "organization_id": str(item.organization_id),
+                "action_id": str(action.id),
+                "resource_id": proposal.resource_id,
+                "run_id": str(run.id),
+                "correlation_id": item.correlation_id,
+            },
+        )
+        await self._session.commit()
+
+        try:
+            gateway = ActionGateway(
+                (_StaticGuard(str(decision["outcome"]), str(decision["reason"])),),
+                self._provider_executor,
+            )
+            result = await gateway.execute_request(principal=principal, request=universal)
+        except ExecutionProviderError as exc:
+            if settings.integration_foundation_enabled and (item.payload or {}).get("integrationOrigin") and exc.error.code in {"authentication_error", "uncertain_outcome"}:
+                action.payload = self._action_record_payload(proposal=proposal, decision=decision,
+                    fingerprint=action_fingerprint(universal), result=None, error=exc.error.safe_message)
+                action.status = "processing"
+                if exc.error.code == "authentication_error":
+                    action.payload = {**action.payload, "integrationCertainty": "not_executed"}
+                else:
+                    action.payload = {**action.payload, "integrationCertainty": "dispatching"}
+                return await self._wait_integration(item, run, step, exc.error, current_step)
+            if (settings.integration_foundation_enabled and (item.payload or {}).get("integrationOrigin")
+                and not universal.execution.capability.side_effect
+                and not proposal.scope.startswith("browser.")
+                and exc.error.code != "authorization_error"):
+                # One handler owns read retries and replanning. Keep dispatched
+                # writes/permission denials on their existing certainty boundaries.
+                action.status = "failed"
+                action.payload = self._action_record_payload(proposal=proposal, decision=decision,
+                    fingerprint=action_fingerprint(universal), result=None, error=exc.error.safe_message)
+                logger.warning("Runtime read returned to recovery work_item=%s run=%s step=%s scope=%s code=%s retryable=%s",
+                    item.id, run.id, current_step, proposal.scope, exc.error.code, exc.error.retryable)
+                raise
+            if exc.error.code == "browser_capacity_unavailable":
+                retry_at = utcnow() + timedelta(
+                    seconds=max(5, settings.browser_runtime_retry_backoff_seconds)
+                )
+                action.status = "processing"
+                item.status = "queued"
+                item.scheduled_at = retry_at
+                run.status = "running"
+                _write_runtime_meta(
+                    item,
+                    queueState="waiting_browser_capacity",
+                    waitingReason="All available browser sessions are in use.",
+                    capacityRetryAt=retry_at.isoformat(),
+                )
+                await self._session.commit()
+                return RuntimeStepOutcome(
+                    "continue", item.id, run.id, current_step,
+                    "Waiting for browser capacity.",
+                )
+            browser_runtime_error = exc.error.code in {
+                "browser_capacity_unavailable",
+                "browser_cold_start_timeout",
+            }
+            retry_limit = (
+                settings.browser_runtime_retry_limit
+                if browser_runtime_error
+                else settings.runtime_provider_retry_limit
+            )
+            retry_backoff = (
+                settings.browser_runtime_retry_backoff_seconds
+                if browser_runtime_error
+                else settings.runtime_provider_retry_backoff_seconds
+            )
+            wait = _provider_wait(item, exc.error, retry_limit=retry_limit, backoff_seconds=retry_backoff)
+            if wait is not None:
+                backoff_seconds, counter = wait
+                retry_at = utcnow() + timedelta(seconds=backoff_seconds)
+                action.status = "processing"
+                action.payload = self._action_record_payload(
+                    proposal=proposal,
+                    decision=decision,
+                    fingerprint=action_fingerprint(universal),
+                    result=None,
+                    error=exc.error.safe_message,
+                )
+                item.status = "queued"
+                item.scheduled_at = retry_at
+                run.status = "running"
+                _write_runtime_meta(
+                    item,
+                    queueState="retrying",
+                    waitingReason=exc.error.safe_message,
+                    providerRetryAt=retry_at.isoformat(),
+                    providerRetryReason=exc.error.safe_message,
+                    providerRetryCode=exc.error.code,
+                    providerRetryProvider=exc.error.provider,
+                    **counter,
+                )
+                await notify_integration_work(self._session, item,
+                    key=f"retry:{current_step}:{exc.error.code}:{next(iter(counter.values()))}",
+                    content=_waiting_message(exc.error, backoff_seconds))
+                await self._session.commit()
+                return RuntimeStepOutcome(
+                    "continue",
+                    item.id,
+                    run.id,
+                    current_step,
+                    "Execution provider returned a retryable error; action will retry shortly.",
+                )
+            action.status = "failed"
+            action.payload = self._action_record_payload(
+                proposal=proposal,
+                decision=decision,
+                fingerprint=action_fingerprint(universal),
+                result=None,
+                error=exc.error.safe_message,
+            )
+            await self._fail(
+                item=item,
+                run=run,
+                step=step,
+                message=exc.error.safe_message,
+            )
+            return RuntimeStepOutcome(
+                "failed",
+                item.id,
+                run.id,
+                current_step,
+                exc.error.safe_message,
+            )
+        except (LookupError, PermissionError, RuntimeError, TypeError, ValueError) as exc:
+            action.status = "failed"
+            action.payload = self._action_record_payload(
+                proposal=proposal,
+                decision=decision,
+                fingerprint=action_fingerprint(universal),
+                result=None,
+                error=str(exc),
+            )
+            await self._fail(item=item, run=run, step=step, message=str(exc))
+            return RuntimeStepOutcome(
+                "failed", item.id, run.id, current_step, str(exc)
+            )
+
+        action.status = "executed"
+        action.payload = self._action_record_payload(
+            proposal=proposal,
+            decision=decision,
+            fingerprint=action_fingerprint(universal),
+            result={"summary": result.summary, "data": result.data},
+            error=None,
+        )
+        step.status = "completed"
+        step.output = {
+            "actionId": str(action.id),
+            "summary": result.summary,
+            "data": result.data,
+        }
+        from audoryn_shared.application.services.task_activity import action_phase
+        progress_label = action_phase(str((step.input or {}).get("scope", "")), (step.input or {}).get("actionInput"))[1]
+        result_data = result.data if isinstance(result.data, dict) else {}
+        logger.info("Runtime action completed work_item=%s run=%s step=%s scope=%s certainty=%s",
+            item.id, run.id, current_step, (step.input or {}).get("scope"),
+            result_data.get("executionCertainty"))
+        await notify_integration_work(self._session, item, key=f"progress:{current_step}",
+            content=f"{progress_label}: {result.summary}")
+        run.status = "running"
+        item.status = "running"
+        _write_runtime_meta(
+            item,
+            currentStep=current_step + 1,
+            providerRetryCount=0,
+            providerWaitCount=0,
+            providerQueuedSince=None,
+            providerRetryAt=None,
+            providerRetryReason=None,
+            providerRetryCode=None,
+            waitingReason=None,
+            approvalId=None,
+        )
+        await TransactionalOutbox(self._session).enqueue(
+            topic="run.progress",
+            aggregate_type="run",
+            aggregate_id=str(run.id),
+            payload={
+                "organization_id": str(item.organization_id),
+                "work_item_id": str(item.id),
+                "run_id": str(run.id),
+                "job_id": str(job.id),
+                "current_step": current_step + 1,
+                "continuation_phase": "plan",
+                "wakeup": "runtime",
+                "correlation_id": item.correlation_id,
+            },
+        )
+        await self._session.commit()
+        return RuntimeStepOutcome(
+            "continue",
+            item.id,
+            run.id,
+            current_step + 1,
+            result.summary,
+            "plan",
+        )
+
+    def _action_record_payload(
+        self,
+        *,
+        proposal: ActionProposal,
+        decision: dict[str, Any],
+        fingerprint: str,
+        result: dict[str, Any] | None,
+        error: str | None,
+    ) -> dict[str, Any]:
+        return {
+            "correlationId": proposal.correlation_id,
+            "idempotencyHash": hashlib.sha256(proposal.idempotency_key.encode()).hexdigest(),
+            "actionFingerprint": fingerprint,
+            "request": {
+                "provider": proposal.provider,
+                "operation": proposal.operation,
+                "scope": proposal.scope,
+                "resourceId": proposal.resource_id,
+                "input": proposal.payload,
+                "risk": proposal.risk,
+            },
+            "policy": {
+                "outcome": decision.get("outcome"),
+                "reason": decision.get("reason"),
+            },
+            "result": result,
+            "error": error,
+            "completedAt": utcnow().isoformat() if result is not None or error else None,
+        }
+
+    async def _queue_action_events(
+        self,
+        *,
+        item: WorkItem,
+        action: Action,
+        approval: Approval,
+        event: str,
+    ) -> None:
+        outbox = TransactionalOutbox(self._session)
+        await outbox.enqueue(
+            topic="action.proposed",
+            aggregate_type="action",
+            aggregate_id=str(action.id),
+            payload={
+                "organization_id": str(item.organization_id),
+                "action_id": str(action.id),
+                "resource_id": action.resource_id,
+                "run_id": str(action.run_id) if action.run_id else None,
+                "correlation_id": item.correlation_id,
+            },
+        )
+        await outbox.enqueue(
+            topic=event,
+            aggregate_type="approval",
+            aggregate_id=str(approval.id),
+            payload={
+                "organization_id": str(item.organization_id),
+                "approval_id": str(approval.id),
+                "action_id": str(action.id),
+                "resource_id": action.resource_id,
+                "run_id": str(action.run_id) if action.run_id else None,
+                "correlation_id": item.correlation_id,
+            },
+        )
+
+    async def _fail(
+        self,
+        *,
+        item: WorkItem,
+        run: Run,
+        step: RunStep,
+        message: str,
+    ) -> None:
+        step.status = "failed"
+        output = _step_output(step)
+        output["error"] = message[:4000]
+        step.output = output
+        run.status = "failed"
+        run.result_summary = message[:4000]
+        item.status = "failed"
+        payload = dict(item.payload or {})
+        payload["lastError"] = message[:1000]
+        payload["completedAt"] = utcnow().isoformat()
+        item.payload = payload
+        if (item.payload or {}).get("integrationOrigin"):
+            completed = await self._session.scalar(select(RunStep.id).where(RunStep.run_id == run.id,
+                RunStep.kind == "action", RunStep.status == "completed").limit(1))
+            if completed is not None:
+                item.status, run.status = "partial_completion", "partial_completion"
+        _write_runtime_meta(item, failure=message[:4000], completedAt=utcnow().isoformat())
+        await self._close_browser_session(
+            run.id,
+            before_index=step.step_index + 1,
+        )
+        await TransactionalOutbox(self._session).enqueue(
+            topic="run.failed",
+            aggregate_type="run",
+            aggregate_id=str(run.id),
+            payload={
+                "organization_id": str(item.organization_id),
+                "run_id": str(run.id),
+                "job_id": str(item.job_id),
+                "correlation_id": item.correlation_id,
+                "error": message[:1000],
+            },
+        )
+        await notify_integration_work(self._session, item, key="failed", content=refused_write(message[:2000]))
+        await self._session.commit()
+
+    async def _apply_stop_after_next_run(
+        self,
+        *,
+        item: WorkItem,
+        job: Job,
+    ) -> None:
+        revision = await self._session.scalar(
+            select(JobRevision).where(
+                JobRevision.job_id == job.id,
+                JobRevision.revision == job.current_revision,
+            )
+        )
+        if revision is None or not isinstance(revision.definition, dict):
+            return
+        definition = dict(revision.definition)
+        raw_autonomy = definition.get("autonomy")
+        autonomy = dict(raw_autonomy) if isinstance(raw_autonomy, dict) else {}
+        if not bool(autonomy.get("stopAfterNextRun")):
+            return
+        raw_trigger = definition.get("triggerConfig")
+        trigger = dict(raw_trigger) if isinstance(raw_trigger, dict) else {}
+        raw_schedule = trigger.get("schedule")
+        schedule = dict(raw_schedule) if isinstance(raw_schedule, dict) else {}
+        if not schedule.get("enabled") and job.status == "paused":
+            return
+
+        from audoryn_shared.api.jobs_routes import job_status_v1, save_trigger_config
+
+        principal = HumanPrincipal(
+            user_id=revision.created_by,
+            organization_id=item.organization_id,
+            membership_id=UUID(int=0),
+            role="system",
+            permissions=frozenset({"jobs.manage"}),
+        )
+        if trigger and schedule:
+            await save_trigger_config(
+                self._session,
+                item.organization_id,
+                job.id,
+                principal,
+                {
+                    "schedule": {**schedule, "enabled": False},
+                    "apiEnabled": bool(trigger.get("apiEnabled", False)),
+                    "internalEventKeys": list(trigger.get("internalEventKeys", [])),
+                    "dependencyJobIds": list(trigger.get("dependencyJobIds", [])),
+                },
+            )
+        await job_status_v1(
+            item.organization_id,
+            job.id,
+            {"status": "paused"},
+            principal,
+            self._session,
+        )
+        _write_runtime_meta(item, stopAfterNextRunApplied=True)
+
+    async def _record_finish(
+        self,
+        item: WorkItem,
+        run: Run,
+        steps: list[RunStep],
+        completion_summary: str | None,
+        finish_title: str,
+        finish_instruction: str,
+    ) -> None:
+        """The run's finish step, added or completed with the completion summary."""
+        current = max(0, int(_runtime_meta(item).get("currentStep", 0)))
+        finish_output = completion_summary or "Runtime completion checkpoint verified."
+        if current >= len(steps):
+            finish = RunStep(
+                run_id=run.id,
+                step_index=current,
+                kind="finish",
+                status="completed",
+                input={
+                    "title": finish_title or "Finish",
+                    "instruction": finish_instruction
+                    or "Verify completion from recorded execution evidence.",
+                    "resourceId": "",
+                    "scope": "",
+                },
+                output={
+                    "output": finish_output,
+                    "completedAt": utcnow().isoformat(),
+                },
+            )
+            self._session.add(finish)
+            await self._session.flush()
+            steps.append(finish)
+        else:
+            finish = steps[current]
+            if finish.kind == "finish":
+                finish.status = "completed"
+                finish.output = {
+                    "output": finish_output,
+                    "completedAt": utcnow().isoformat(),
+                }
+
+    async def _result_body(
+        self,
+        item: WorkItem,
+        run: Run,
+        worker: Worker,
+        steps: list[RunStep],
+        *,
+        summary: str,
+        result_status: str,
+        completion_check: list[dict[str, object]] | None,
+        outcome: object,
+        now: datetime,
+    ) -> dict[str, Any]:
+        """The first result version's body, with the files the run downloaded (F41)."""
+        # Only a run that downloaded something has files to list; others add no query.
+        downloaded = any(
+            step.kind == "action"
+            and step.status == "completed"
+            and (step.input or {}).get("scope") == "browser.file.download"
+            for step in steps
+        )
+        files = await self._run_files(run.id) if downloaded else []
+        return {
+            "summary": summary,
+            "completionCriteriaVerified": result_status == "completed",
+            **({"completionCheck": completion_check} if completion_check else {}),
+            "executionOutcome": outcome,
+            "completedAt": now.isoformat(),
+            "workItemId": str(item.id),
+            "runId": str(run.id),
+            "agentId": str(worker.agent_identity_id),
+            "blocks": [
+                {"type": "paragraph", "text": summary},
+                *(
+                    {"type": "attachment", "artifactId": file_id, "label": name}
+                    for file_id, name in files
+                ),
+            ],
+            "artifactIds": [file_id for file_id, _ in files],
+            "sourceReferences": [reference for step in steps
+                for reference in ((_step_output(step).get("data") or {}).get("externalReferences", []))],
+            "capabilitiesUsed": [
+                str((step.input or {}).get("scope", ""))
+                for step in steps
+                if step.kind == "action" and step.status == "completed"
+            ],
+            "actionIds": [
+                str(_step_output(step).get("actionId"))
+                for step in steps
+                if _step_output(step).get("actionId")
+            ],
+            "approvalIds": [
+                str(_step_output(step).get("approvalId"))
+                for step in steps
+                if _step_output(step).get("approvalId")
+            ],
+            "correlationId": item.correlation_id,
+            "isNew": True,
+            "hasTables": False,
+        }
+
+    async def _complete(
+        self,
+        item: WorkItem,
+        run: Run,
+        job: Job,
+        worker: Worker,
+        steps: list[RunStep],
+        *,
+        completion_summary: str | None = None,
+        finish_title: str = "Finish",
+        finish_instruction: str = "Verify completion from recorded execution evidence.",
+        result_status: Literal["completed", "attention"] = "completed",
+        completion_check: list[dict[str, object]] | None = None,
+    ) -> RuntimeStepOutcome:
+        await self._record_finish(
+            item, run, steps, completion_summary, finish_title, finish_instruction
+        )
+
+        summary = _completion_summary(job, steps, completion_summary)
+
+        now = utcnow()
+        completed_actions = [step for step in steps if step.kind == "action" and step.status == "completed"]
+        if (item.payload or {}).get("integrationOrigin") and not completed_actions:
+            revision_definition = await self._session.get(JobRevision, item.job_revision_id)
+            if revision_definition and (revision_definition.definition or {}).get("requiredCapabilities"):
+                result_status = "attention"
+        if (item.payload or {}).get("integrationOrigin") and any(step.status == "failed" for step in steps):
+            result_status = "attention"
+            unresolved = [str(_step_output(step).get("summary") or "An action could not complete.")[:500] for step in steps if step.status == "failed"]
+            summary += "\n\nWork requiring attention: " + " ".join(unresolved)
+        run.status = "completed"
+        run.result_summary = summary
+        item.status = "completed"
+        if (item.payload or {}).get("integrationOrigin") and result_status == "attention":
+            item.status, run.status = "partial_completion", "partial_completion"
+        if item.status == "completed" and getattr(job, "status", None) == "active":
+            revision = await self._session.get(JobRevision, item.job_revision_id)
+            autonomy = (revision.definition or {}).get("autonomy") if revision is not None else None
+            if isinstance(autonomy, dict) and autonomy.get("oneShot") is True:
+                # A one-off task's job leaves the active list once done (owner decision); its run,
+                # result and conversation stay. Unfinished ones stay active so they can continue.
+                job.status = "archived"
+        payload = dict(item.payload or {})
+        payload["completedAt"] = now.isoformat()
+        item.payload = payload
+        runtime = _write_runtime_meta(
+            item,
+            currentStep=len(steps),
+            resultSummary=summary,
+            resultStatus=result_status,
+            executionOutcome=("completed" if result_status == "completed" else
+                "partial" if completed_actions else "blocked"),
+            failure=None,
+            completedAt=now.isoformat(),
+        )
+
+        if not runtime.get("resultId"):
+            result = Result(
+                organization_id=item.organization_id,
+                worker_id=worker.id,
+                job_id=job.id,
+                latest_version=1,
+                status=result_status,
+                title=f"{job.name} result",
+            )
+            self._session.add(result)
+            await self._session.flush()
+            body = await self._result_body(
+                item, run, worker, steps, summary=summary, result_status=result_status,
+                completion_check=completion_check,
+                outcome=runtime["executionOutcome"], now=now,
+            )
+            self._session.add(ResultVersion(result_id=result.id, version=1, body=body, created_at=now))
+            _write_runtime_meta(item, resultId=str(result.id))
+            memory_service = WorkerMemoryService(self._session)
+            await memory_service.record_operational(
+                worker=worker,
+                title=f"{job.name} latest outcome",
+                content=summary,
+                source_type="runtime_result",
+                source_id=str(result.id),
+                provenance={
+                    "runId": str(run.id),
+                    "resultId": str(result.id),
+                    "jobId": str(job.id),
+                },
+            )
+            await memory_service.record_episode(
+                worker=worker,
+                run_id=run.id,
+                result_id=result.id,
+                summary=summary,
+            )
+            await TransactionalOutbox(self._session).enqueue(
+                topic="result.created",
+                aggregate_type="result",
+                aggregate_id=str(result.id),
+                payload={
+                    "organization_id": str(item.organization_id),
+                    "worker_id": str(worker.id),
+                    "job_id": str(job.id),
+                    "run_id": str(run.id),
+                    "result_id": str(result.id),
+                    "correlation_id": item.correlation_id,
+                },
+            )
+            await append_live_result_message(
+                self._session,
+                item=item,
+                run=run,
+                job=job,
+                worker=worker,
+                result=result,
+                summary=summary,
+                files=[
+                    {"id": block["artifactId"], "name": block["label"]}
+                    for block in body["blocks"]
+                    if block.get("type") == "attachment"
+                ],
+            )
+
+        await self._close_browser_session(
+            run.id,
+            before_index=len(steps) + 1,
+        )
+        await self._apply_stop_after_next_run(item=item, job=job)
+        await TransactionalOutbox(self._session).enqueue(
+            topic="run.completed",
+            aggregate_type="run",
+            aggregate_id=str(run.id),
+            payload={
+                "organization_id": str(item.organization_id),
+                "run_id": str(run.id),
+                "job_id": str(job.id),
+                "correlation_id": item.correlation_id,
+                "summary": summary,
+            },
+        )
+        await self._session.commit()
+        return RuntimeStepOutcome(
+            "completed",
+            item.id,
+            run.id,
+            len(steps),
+            summary,
+        )

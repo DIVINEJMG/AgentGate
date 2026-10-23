@@ -21,10 +21,10 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.api.governance_routes import _approvals_public
 from app.api.runtime_result_routes import _runs_public
-from app.application.services.approval_conversation import approval_conversation_id
-from app.infrastructure.database import models as m
+from audoryn_shared.api.governance_routes import _approvals_public
+from audoryn_shared.application.services.approval_conversation import approval_conversation_id
+from audoryn_shared.infrastructure.database import models as m
 
 
 @compiles(JSONB, "sqlite")
@@ -167,7 +167,7 @@ async def legacy_run_public(session: Any, run: Any) -> dict[str, Any]:
 
 
 async def legacy_approval_public(session: Any, approval: Any) -> dict[str, Any]:
-    from app.api.governance_routes import _action_record, _approval_record
+    from audoryn_shared.api.governance_routes import _action_record, _approval_record
 
     action = await session.get(m.Action, approval.action_id)
     agent = await session.get(m.AgentIdentity, action.agent_id)
@@ -243,8 +243,8 @@ async def _all(function: Any, session: Any, rows: list[Any]) -> list[dict[str, A
 
 def test_reference_helpers_match_the_live_single_record_paths() -> None:
     # The detail endpoints now go through the batched code with one record.
-    from app.api.governance_routes import _approval_public
     from app.api.runtime_result_routes import _run_public
+    from audoryn_shared.api.governance_routes import _approval_public
 
     db = Database()
     seeded = seed(db, 2)

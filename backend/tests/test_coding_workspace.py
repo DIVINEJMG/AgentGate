@@ -21,13 +21,13 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
-from app.bootstrap.settings import settings
-from app.execution.coding import sandbox_helper as helper
-from app.execution.coding import service
-from app.execution.contracts import ExecutionError, ExecutionProviderError
-from app.execution.integration_execution import execute_native_action
-from app.infrastructure.database import models as m
-from app.runtime.managed import _provider_wait
+from audoryn_execution.execution.integration_execution import execute_native_action
+from audoryn_execution.runtime.managed import _provider_wait
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.execution.coding import sandbox_helper as helper
+from audoryn_shared.execution.coding import service
+from audoryn_shared.execution.contracts import ExecutionError, ExecutionProviderError
+from audoryn_shared.infrastructure.database import models as m
 from scripts.runtime_benchmark import BenchSession, _aware_sqlite_datetimes
 from tests.test_approvals_phase4 import TABLES
 from tests.test_efficiency_queries import ORG, Database
@@ -242,7 +242,7 @@ async def test_a_lost_sandbox_is_rebuilt_with_every_saved_change(monkeypatch: py
         return {}
 
     monkeypatch.setattr(service, "session_factory", factory)
-    monkeypatch.setattr("app.execution.coding.initialization.initialize", initialize)
+    monkeypatch.setattr("audoryn_shared.execution.coding.initialization.initialize", initialize)
     with _aware_sqlite_datetimes():
         await service.rebuild_workspace(None, request, {}, None, sandbox)
     rebuilt = sandbox.roots["sb-2"]

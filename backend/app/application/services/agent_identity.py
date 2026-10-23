@@ -5,7 +5,7 @@ import secrets
 from datetime import UTC, datetime
 from uuid import UUID
 
-from app.domain.identity.agents import (
+from audoryn_shared.domain.identity.agents import (
     AGENT_AUTHENTICATE_SCOPE,
     AGENT_STATUSES,
     AgentCredentialReveal,
@@ -13,7 +13,7 @@ from app.domain.identity.agents import (
     AgentIdentityView,
     AgentRepository,
 )
-from app.domain.identity.permissions import permissions_for_role
+from audoryn_shared.domain.identity.permissions import permissions_for_role
 
 
 class AgentIdentityService:

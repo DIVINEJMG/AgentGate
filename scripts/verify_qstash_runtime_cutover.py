@@ -8,11 +8,11 @@ ROOT = Path(__file__).resolve().parents[1]
 errors: list[str] = []
 
 render = (ROOT / "infrastructure/render/render.yaml").read_text(encoding="utf-8")
-internal = (ROOT / "backend/app/api/internal/runtime.py").read_text(encoding="utf-8")
-managed = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
-jobs = (ROOT / "backend/app/api/jobs_routes.py").read_text(encoding="utf-8")
-governance = (ROOT / "backend/app/api/governance_routes.py").read_text(encoding="utf-8")
-settings = (ROOT / "backend/app/bootstrap/settings.py").read_text(encoding="utf-8")
+internal = (ROOT / "services/execution/audoryn_execution/api/internal/runtime.py").read_text(encoding="utf-8")
+managed = (ROOT / "services/execution/audoryn_execution/runtime/managed.py").read_text(encoding="utf-8")
+jobs = (ROOT / "packages/shared/audoryn_shared/api/jobs_routes.py").read_text(encoding="utf-8")
+governance = (ROOT / "packages/shared/audoryn_shared/api/governance_routes.py").read_text(encoding="utf-8")
+settings = (ROOT / "packages/shared/audoryn_shared/bootstrap/settings.py").read_text(encoding="utf-8")
 
 if "name: audoryn-worker" in render:
     errors.append("paid Render runtime worker is still present")

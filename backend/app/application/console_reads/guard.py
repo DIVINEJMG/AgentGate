@@ -22,8 +22,8 @@ from uuid import uuid4
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
-from app.application.console_reads.config import ConsoleReadsConfig, load_config
-from app.application.console_reads.signing import (
+from audoryn_shared.application.console_reads.config import ConsoleReadsConfig, load_config
+from audoryn_shared.application.console_reads.signing import (
     ReplayProtection,
     ReplayStoreUnavailable,
     ServiceRequestRejected,
@@ -118,7 +118,7 @@ class ConsoleReadsRuntime:
 
 @lru_cache
 def _runtime_from_settings() -> ConsoleReadsRuntime:
-    from app.bootstrap.settings import settings
+    from audoryn_shared.bootstrap.settings import settings
 
     config = load_config(settings)
     if not config.enabled:

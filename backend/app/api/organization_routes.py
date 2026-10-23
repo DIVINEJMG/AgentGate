@@ -10,17 +10,17 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_dependencies import bearer_token
-from app.application.services import entitlements
-from app.domain.identity.permissions import permissions_for_role
-from app.infrastructure.auth.service import LocalAuthenticationService
-from app.infrastructure.auth.session_store import RedisSessionStore
-from app.infrastructure.database.models import (
+from audoryn_shared.api.auth_dependencies import bearer_token
+from audoryn_shared.application.services import entitlements
+from audoryn_shared.domain.identity.permissions import permissions_for_role
+from audoryn_shared.infrastructure.auth.service import LocalAuthenticationService
+from audoryn_shared.infrastructure.auth.session_store import RedisSessionStore
+from audoryn_shared.infrastructure.database.models import (
     Organization,
     OrganizationMembership,
     OrganizationOnboarding,
 )
-from app.infrastructure.database.session import database_session
+from audoryn_shared.infrastructure.database.session import database_session
 
 
 class OrganizationCreateRequest(BaseModel):

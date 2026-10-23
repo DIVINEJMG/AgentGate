@@ -6,10 +6,10 @@ import pytest
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import async_playwright
 
-from app.execution.browser.contracts import BrowserLocator, BrowserObservation
-from app.execution.browser.observation import observe_page
-from app.execution.browser.runtime import BrowserRuntime
-from app.execution.providers.browser import CAPABILITIES
+from audoryn_execution.execution.browser.observation import observe_page
+from audoryn_execution.execution.browser.runtime import BrowserRuntime
+from audoryn_shared.execution.browser.contracts import BrowserLocator, BrowserObservation
+from audoryn_shared.execution.providers.browser import CAPABILITIES
 
 
 def test_browser_tools_expose_focused_read_and_horizontal_scroll() -> None:

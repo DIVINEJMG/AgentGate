@@ -6,16 +6,16 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from app.bootstrap.settings import Settings, settings
-from app.domain.ai.providers import AIProviderError, AITextRequest
-from app.infrastructure.ai.model_profiles import (
+from audoryn_shared.bootstrap.settings import Settings, settings
+from audoryn_shared.domain.ai.providers import AIProviderError, AITextRequest
+from audoryn_shared.infrastructure.ai.model_profiles import (
     DEFAULT_PROFILES,
     PlannerModelProfile,
     model_profile,
 )
-from app.infrastructure.ai.nvidia import NvidiaNimProvider
-from app.infrastructure.ai.openrouter import OpenRouterPlannerProvider
-from app.runtime.smart_planner import configured_routes, provider_for
+from audoryn_shared.infrastructure.ai.nvidia import NvidiaNimProvider
+from audoryn_shared.infrastructure.ai.openrouter import OpenRouterPlannerProvider
+from audoryn_shared.runtime.smart_planner import configured_routes, provider_for
 
 
 def test_twelve_ordered_models_and_disabled_rollout(monkeypatch):

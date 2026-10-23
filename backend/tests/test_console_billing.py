@@ -16,9 +16,9 @@ from fastapi import HTTPException
 
 from app.api import billing_routes
 from app.application import console_billing
-from app.application.console_entitlements import sign
-from app.application.console_reads.signing import ServiceKey
-from app.domain.identity.principals import HumanPrincipal
+from audoryn_shared.application.console_entitlements import sign
+from audoryn_shared.application.console_reads.signing import ServiceKey
+from audoryn_shared.domain.identity.principals import HumanPrincipal
 
 VECTOR = json.loads((Path(__file__).resolve().parents[2] / "docs/integration/console-billing/signing-vector.json")
                     .read_text(encoding="utf-8"))

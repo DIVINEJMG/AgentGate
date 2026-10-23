@@ -5,18 +5,22 @@ from uuid import uuid4
 
 import pytest
 
-from app.domain.actions.gateway import ActionGateway, AuthorizationDecision
-from app.domain.identity.principals import AgentPrincipal
-from app.domain.integrations.contracts import IntegrationExecutionResult
-from app.execution.authorization import (
+from audoryn_shared.domain.actions.gateway import ActionGateway, AuthorizationDecision
+from audoryn_shared.domain.identity.principals import AgentPrincipal
+from audoryn_shared.domain.integrations.contracts import IntegrationExecutionResult
+from audoryn_shared.execution.authorization import (
     CredentialReference,
     ExecutionAuthorizationSnapshot,
     ProviderPermissionSnapshot,
     UniversalActionRequest,
 )
-from app.execution.contracts import CapabilityDescriptor, ExecutionRequest, ResourceDescriptor
-from app.realtime.bus import RedisRealtimeBus
-from app.realtime.contracts import REALTIME_EVENT_TYPES, RealtimeEvent
+from audoryn_shared.execution.contracts import (
+    CapabilityDescriptor,
+    ExecutionRequest,
+    ResourceDescriptor,
+)
+from audoryn_shared.realtime.bus import RedisRealtimeBus
+from audoryn_shared.realtime.contracts import REALTIME_EVENT_TYPES, RealtimeEvent
 
 
 def _capability() -> CapabilityDescriptor:
@@ -127,7 +131,7 @@ def _principal(request: UniversalActionRequest) -> AgentPrincipal:
 
 @pytest.mark.asyncio
 async def test_f29_action_gateway_authorizes_capability_and_resource_intersection(monkeypatch) -> None:
-    from app.bootstrap.settings import settings
+    from audoryn_shared.bootstrap.settings import settings
 
     # This scenario exercises legacy authorization, before foundation approvals.
     monkeypatch.setattr(settings, "integration_foundation_enabled", False)
@@ -165,7 +169,7 @@ async def test_f29_resource_bound_authorization_fails_closed() -> None:
 
 @pytest.mark.asyncio
 async def test_foundation_manifest_approval_cannot_be_bypassed_by_allow_guard(monkeypatch):
-    from app.bootstrap.settings import settings
+    from audoryn_shared.bootstrap.settings import settings
 
     monkeypatch.setattr(settings, "integration_foundation_enabled", True)
     request = _universal()

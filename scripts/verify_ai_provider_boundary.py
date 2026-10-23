@@ -10,17 +10,17 @@ ai_paths = [
     ROOT / "backend/app/domain/ai",
     ROOT / "backend/app/infrastructure/ai",
 ]
-ai_files = [ROOT / "backend/app/application/services/ai_gateway.py"]
+ai_files = [ROOT / "packages/shared/audoryn_shared/application/services/ai_gateway.py"]
 for directory in ai_paths:
     ai_files.extend(sorted(directory.glob("*.py")))
 
 for path in ai_files:
     text = path.read_text(encoding="utf-8").lower()
     for forbidden_import in (
-        "app.integrations",
-        "app.execution",
-        "app.runtime",
-        "app.infrastructure.qstash",
+        "audoryn_shared.integrations",
+        "audoryn_shared.execution",
+        "audoryn_shared.runtime",
+        "audoryn_shared.infrastructure.qstash",
     ):
         if forbidden_import in text:
             errors.append(
@@ -36,11 +36,11 @@ for path in runtime_files:
                 f"{path.relative_to(ROOT)} contains vendor-specific AI dependency: {vendor}"
             )
 
-managed = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+managed = (ROOT / "services/execution/audoryn_execution/runtime/managed.py").read_text(encoding="utf-8")
 if "ActionGateway" not in managed or "UniversalProviderExecutor" not in managed:
     errors.append("Managed Runtime no longer preserves F29 governed execution")
 if 'role="planner"' not in (
-    ROOT / "backend/app/runtime/planner/adaptive.py"
+    ROOT / "packages/shared/audoryn_shared/runtime/planner/adaptive.py"
 ).read_text(encoding="utf-8"):
     errors.append("Adaptive planner is not routed through the planner model role")
 

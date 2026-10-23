@@ -14,19 +14,19 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.governance_routes import _create_policy
-from app.api.product_common import append_audit
-from app.api.workforce_routes import (
+from audoryn_shared.api.governance_routes import _create_policy
+from audoryn_shared.api.product_common import append_audit
+from audoryn_shared.api.workforce_routes import (
     DEFAULT_HOURS,
     automatic_agent,
     create_role,
     create_worker,
     set_worker_status,
 )
-from app.application.services.worker_memory import WorkerMemoryService
-from app.domain.identity.principals import HumanPrincipal
-from app.execution.bootstrap import execution_provider_registry
-from app.infrastructure.database.models import (
+from audoryn_shared.application.services.worker_memory import WorkerMemoryService
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.execution.bootstrap import execution_provider_registry
+from audoryn_shared.infrastructure.database.models import (
     Approval,
     ConversationMessage,
     ConversationThread,

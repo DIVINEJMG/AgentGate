@@ -6,14 +6,14 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_dependencies import bearer_token
-from app.infrastructure.auth.service import (
+from audoryn_shared.api.auth_dependencies import bearer_token
+from audoryn_shared.infrastructure.auth.service import (
     AuthenticationFailure,
     LocalAuthenticationService,
     RegistrationFailure,
 )
-from app.infrastructure.auth.session_store import RedisSessionStore
-from app.infrastructure.database.session import database_session
+from audoryn_shared.infrastructure.auth.session_store import RedisSessionStore
+from audoryn_shared.infrastructure.database.session import database_session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

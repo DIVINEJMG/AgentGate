@@ -13,15 +13,15 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bootstrap.settings import settings
-from app.execution.coding.service import admit_capacity, inspect_command
-from app.execution.contracts import ExecutionProviderError
-from app.execution.providers.integration_hooks import CredentialBundle
-from app.execution.providers.native.github.authentication import GitHubAuthentication
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.native.github.transport import GitHubHTTPClient
-from app.infrastructure.database.models import OutboxEvent
-from app.infrastructure.database.outbox import TransactionalOutbox
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.execution.coding.service import admit_capacity, inspect_command
+from audoryn_shared.execution.contracts import ExecutionProviderError
+from audoryn_shared.execution.providers.integration_hooks import CredentialBundle
+from audoryn_shared.execution.providers.native.github.authentication import GitHubAuthentication
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.native.github.transport import GitHubHTTPClient
+from audoryn_shared.infrastructure.database.models import OutboxEvent
+from audoryn_shared.infrastructure.database.outbox import TransactionalOutbox
 from tests.test_github_expanded import ScriptedHTTP, request, snapshot
 
 
@@ -98,7 +98,7 @@ async def test_branch_race_stops_before_publishing():
 
 async def test_atomic_commit_preserves_parent_modes_and_never_force_pushes(monkeypatch):
     monkeypatch.setattr(
-        "app.execution.providers.native.github.artifacts.associate_test_revision", AsyncMock()
+        "audoryn_shared.execution.providers.native.github.artifacts.associate_test_revision", AsyncMock()
     )
     item, sha, published = uuid4(), "a" * 40, "b" * 40
     http = ScriptedHTTP(
@@ -299,7 +299,7 @@ async def test_installation_renewal_without_refresh_preserves_user_authority():
 
 
 async def test_reconnect_cannot_execute_after_user_repository_access_is_revoked(monkeypatch):
-    from app.application.services.integration_credentials import encode_bundle
+    from audoryn_shared.application.services.integration_credentials import encode_bundle
 
     user = CredentialBundle(access_token="user", account_id="user")
     parent = CredentialBundle(
@@ -349,7 +349,7 @@ async def test_command_exit_file_cannot_fake_a_successful_test():
 async def test_coding_capacity_is_durable_and_does_not_create_an_extra_sandbox(monkeypatch):
     monkeypatch.setattr(settings, "coding_global_concurrency", 2)
     queue = SimpleNamespace(queue_position=AsyncMock(return_value=0), queue_leave=AsyncMock(), close=AsyncMock())
-    monkeypatch.setattr("app.execution.coding.service.RedisCoordinator.from_settings", lambda: queue)
+    monkeypatch.setattr("audoryn_shared.execution.coding.service.RedisCoordinator.from_settings", lambda: queue)
     session = SimpleNamespace(scalar=AsyncMock(side_effect=[2, 0]))
     with pytest.raises(ExecutionProviderError, match="Waiting for a coding workspace: this task is next"):
         await admit_capacity(
@@ -382,8 +382,8 @@ def test_secret_redaction_removes_entire_private_key():
 
 
 def test_binary_assets_survive_snapshot_transfer_without_binary_publication():
-    from app.execution.coding.snapshot import validated_snapshot
-    from app.execution.providers.native.github.safety import validate_changes
+    from audoryn_shared.execution.coding.snapshot import validated_snapshot
+    from audoryn_shared.execution.providers.native.github.safety import validate_changes
 
     files = validated_snapshot(snapshot("root/logo.png", b"\x89PNG\xff"), include_binary=True)
     assert files["logo.png"]["binaryBase64"]
@@ -410,17 +410,17 @@ async def test_installation_circuit_breaker_is_account_scoped():
 
 
 async def test_registry_hostname_cannot_resolve_to_private_network(monkeypatch):
-    from app.execution.coding.e2b import validate_registry_hosts
-    from app.execution.providers.integration_hooks import HookUnavailable
+    from audoryn_shared.execution.coding.e2b import validate_registry_hosts
+    from audoryn_shared.execution.providers.integration_hooks import HookUnavailable
 
     loop = SimpleNamespace(getaddrinfo=AsyncMock(return_value=[(2, 1, 6, "", ("127.0.0.1", 443))]))
-    monkeypatch.setattr("app.execution.coding.e2b.asyncio.get_running_loop", lambda: loop)
+    monkeypatch.setattr("audoryn_shared.execution.coding.e2b.asyncio.get_running_loop", lambda: loop)
     with pytest.raises(HookUnavailable, match="public addresses"):
         await validate_registry_hosts(["registry.example.com"])
 
 
 async def test_next_day_resume_cannot_bypass_daily_budget(monkeypatch):
-    from app.execution.coding.service import rollover_budget
+    from audoryn_shared.execution.coding.service import rollover_budget
 
     monkeypatch.setattr(settings, "coding_task_active_seconds", 1800)
     monkeypatch.setattr(settings, "coding_organization_daily_seconds", 7200)
@@ -442,7 +442,7 @@ async def test_next_day_resume_cannot_bypass_daily_budget(monkeypatch):
 
 
 async def test_failed_export_does_not_block_other_session_retention(monkeypatch):
-    from app.execution.coding import service
+    from audoryn_shared.execution.coding import service
 
     monkeypatch.setattr(settings, "coding_execution_enabled", True)
     now = datetime.now(UTC)
@@ -533,7 +533,7 @@ async def test_a_request_waits_for_the_installations_turn(monkeypatch):
     at once), and gives up only after TURN_WAIT_SECONDS."""
     from types import SimpleNamespace as Namespace
 
-    from app.execution.providers.native.github import transport
+    from audoryn_shared.execution.providers.native.github import transport
 
     answers = iter([None, None, "lease"])
     coordinator = Namespace(acquire_lock=lambda key, ttl_seconds: _value(next(answers)))

@@ -17,10 +17,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.product_common import append_audit
-from app.application.services import entitlements
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.database.models import (
+from audoryn_shared.api.product_common import append_audit
+from audoryn_shared.application.services import entitlements
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.database.models import (
     OrganizationEntitlement,
     OrganizationUsage,
     UsageReset,

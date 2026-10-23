@@ -351,7 +351,7 @@ def add_test_site(app: FastAPI) -> None:
 
     @app.post("/test-site/code")
     async def check_code(request: Request):
-        from app.execution.browser.credentials import one_time_code
+        from audoryn_shared.execution.browser.credentials import one_time_code
 
         now = time.time()
         expected = {one_time_code(TEST_SITE_OTP_SECRET, at=now + step * 30) for step in (-1, 0, 1)}
