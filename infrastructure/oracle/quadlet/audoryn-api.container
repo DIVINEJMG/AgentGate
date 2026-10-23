@@ -1,0 +1,23 @@
+# AgentGate behind the gateway (Phase 5, step 2): the same image and role as before (SERVICE_ROLE=all),
+# on the host network at 127.0.0.1:8101. Only the gateway calls it, so only loopback is trusted for
+# the forwarded caller and scheme. Installed by copying into ~/.config/containers/systemd/.
+[Unit]
+Description=Audoryn API
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=localhost/audoryn-api:latest
+ContainerName=audoryn-api
+EnvironmentFile=/etc/audoryn/audoryn.env
+Network=host
+Exec=uvicorn app.main:app --host 127.0.0.1 --port 8101 --proxy-headers --forwarded-allow-ips=127.0.0.1
+ShmSize=1g
+
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

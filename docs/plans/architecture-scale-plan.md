@@ -750,6 +750,11 @@ Every phase lists its changes, tests, local proof, rollback and documentation.
   4. the execution process;
   5. limits in report mode, then enforce.
 - The old single service stays ready until each step is proven.
+- **The layout on the VM** ([infrastructure/oracle](../../infrastructure/oracle/README.md)):
+  - every container uses the host network and listens on loopback only; nginx stays the only public listener and calls the gateway on `127.0.0.1:8000`;
+  - the Quadlet files live in the repository.
+- **Found while preparing step 2 (fixed before it):** behind nginx, the gateway would have told the core `http` and `127.0.0.1` for every request. That would break QStash's signature checks (made over the `https://` URL), the OAuth callbacks and the per-IP limits. `GATEWAY_TRUSTED_PROXIES` takes the caller and the scheme from nginx only.
+- **The VM has 1 CPU.** More copies there buy restarts without downtime and isolation, not speed. Capacity comes from copies on more CPUs or machines, through the gateway's upstream lists (Phase 6).
 - TLS for the public entry point, and whether to move from the VM to managed containers, are decided here from measured load.
 
 ### Phase 6: By the numbers
@@ -804,5 +809,5 @@ Further splits, a dedicated queue or read replicas, only when metrics show the n
 | 2 Core copies | **done locally** (2026-10-22); one copy runs steps until Phase 3 (browser sessions) |
 | 3 Execution process | **done locally** (2026-10-22); all four route groups switch together (see Phase 3) |
 | 4 Execution service + images | **done locally** (2026-10-22); three packages, three Containerfiles (not built: no Docker), gateway keep-alive fix |
-| 5 Production rollout | **step 1 ready** (2026-10-23): deploy Phases 0–4 unchanged in behaviour, commands in the [Oracle handoff](../deploy/oracle-handoff-scale-plan.md#phase-5-step-1-deploy-phases-04-as-they-are-behaviour-unchanged). After it is proven: a staging copy for testing changes before users get them (own Neon branch, own Upstash Redis), then the drain, gateway, copies, execution process and limits |
+| 5 Production rollout | **step 1 done** (2026-10-23): Phases 0–4 run on Oracle unchanged in behaviour, proven by a real task; results in the [Oracle handoff](../deploy/oracle-handoff-scale-plan.md#phase-5-step-1-deploy-phases-04-as-they-are-behaviour-unchanged). Next: a staging copy for testing changes before users get them (own Neon branch, own Upstash Redis), then the drain, gateway, copies, execution process and limits |
 | 6 By the numbers | not started |

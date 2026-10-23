@@ -11,6 +11,10 @@ Plan: [docs/plans/architecture-scale-plan.md](../plans/architecture-scale-plan.m
 
 **Oracle action now:** none. With the default of `0`, a restart behaves exactly as before. Deploying this branch is a normal deploy.
 
+**Found on Oracle (2026-10-23, Phase 5 step 1, block A):**
+- `audoryn-api.service` is a Quadlet unit, generated from `/home/opc/.config/containers/systemd/audoryn-api.container`.
+- Its `ExecStop` is `podman rm -v -f -i audoryn-api`, which gives the container podman's default 10 s to stop. So the drain needs `StopTimeout=` and `TimeoutStopSec=` set in that `.container` file, above `RUNTIME_DRAIN_SECONDS`, followed by `systemctl --user daemon-reload`.
+
 **When the drain is turned on** (Phase 5, its own A–F block):
 - `RUNTIME_DRAIN_SECONDS` goes into `/etc/audoryn/audoryn.env`, backed up first.
 - The container's stop timeout must be longer than the drain (`podman run --stop-timeout`, and `TimeoutStopSec` on the `audoryn-api.service` unit). Otherwise podman kills the process mid-drain.
@@ -217,9 +221,10 @@ cd /opt/audoryn/AgentGate && if [ "$(git branch --show-current)" != main ] || [ 
 **C. Tag the rollback image, then rebuild**
 
 ```bash
-cd /opt/audoryn/AgentGate && podman tag localhost/audoryn-api:latest "localhost/audoryn-api:rollback-$(cut -c1-7 "$HOME/agentgate-rollback.sha")" && podman build -f backend/Containerfile -t localhost/audoryn-api:latest . && podman image inspect localhost/audoryn-api:latest --format '{{.Id}} {{.Created}}'
+cd /opt/audoryn/AgentGate && TAG="localhost/audoryn-api:rollback-$(cut -c1-7 "$HOME/agentgate-rollback.sha")-$(date +%Y%m%d)" && if podman image exists "$TAG"; then echo "STOP: $TAG already exists"; else podman tag localhost/audoryn-api:latest "$TAG" && echo "$TAG" > "$HOME/agentgate-rollback.tag" && echo "Rollback image: $TAG" && podman build -f backend/Containerfile -t localhost/audoryn-api:latest . && podman image inspect localhost/audoryn-api:latest --format '{{.Id}} {{.Created}}'; fi
 ```
 
+- **The tag is dated**, because an older `rollback-<sha>` tag may already exist (on 2026-10-23, `rollback-0d34b3a` already named an earlier image). The block never moves an existing tag. It saves the tag's name in `~/agentgate-rollback.tag`.
 - The build command is the same as always (the repository root is the context). The running service is not touched.
 
 **E. Read-only checks with the new image (nothing restarts yet)**
@@ -247,7 +252,7 @@ PY
 - **Expected:**
   - `0023_usage_resets (head)`;
   - `folder: /app/backend`;
-  - `environment: production | runtime on: True`;
+  - `environment: staging | runtime on: True` (Oracle's existing `ENVIRONMENT` value, unchanged by this deploy);
   - `service role: all | execution call url set: False`;
   - `drain seconds: 0 | core CORS on: True`;
   - `people routes: True | execution routes: True`.
@@ -269,7 +274,33 @@ podman logs --since 5m audoryn-api 2>&1 | grep -E "Traceback|ERROR|startup compl
 
 ### Console VM (`130.61.172.186`), after AgentGate passes
 
-Use blocks A, B, C and F of [the Console's usual deploy](oracle-commands-commercial-plans.md#3-console-vm-13061172186). There is no block D (no env change) and no migration. In block A, expect `agentgate over https: 200`, and ignore that block's key-count lines.
+This includes a pull (block B). There is no block D (no env change) and no migration. The Console PR also updates Next.js for its web app on Vercel; that needs its own Vercel deploy, with your approval. The Oracle build does not include the web app.
+
+**A. Read-only inspection**
+
+```bash
+cd /opt/audoryn-console/Audoryn-Console && git branch --show-current && git status --short && git fetch origin main && printf 'Current: %s\nRemote:  %s\n' "$(git rev-parse HEAD)" "$(git rev-parse origin/main)"
+systemctl --user is-active audoryn-console-api.service
+df -h / /var/tmp
+podman images --format 'table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.Size}}'
+curl -sS -o /dev/null -w 'agentgate over https: %{http_code}\n' --max-time 15 https://130.61.104.247/health/ready
+```
+
+- **Expected:** branch `main`, a clean tree, `Remote` = the Console merge SHA, `active`, 4 GB or more free, `agentgate over https: 200`.
+
+**B. Fast-forward (saves the old SHA for the rollback tag)**
+
+```bash
+cd /opt/audoryn-console/Audoryn-Console && if [ "$(git branch --show-current)" != main ] || [ -n "$(git status --porcelain)" ]; then echo 'STOP: wrong branch or dirty working tree'; else OLD="$(git rev-parse HEAD)" && echo "$OLD" > "$HOME/console-rollback.sha" && git pull --ff-only origin main && printf 'Before: %s\nAfter:  %s\n' "$OLD" "$(git rev-parse HEAD)" && git -c core.pager=cat diff --name-only "$OLD" HEAD -- backend/Containerfile backend/pyproject.toml backend/migrations; fi
+```
+
+- **Expected:** `After` = the merge SHA, and no files listed.
+
+**C. Tag the rollback image (dated, never moved), then rebuild**
+
+```bash
+cd /opt/audoryn-console/Audoryn-Console && TAG="localhost/audoryn-console-api:rollback-$(cut -c1-7 "$HOME/console-rollback.sha")-$(date +%Y%m%d)" && if podman image exists "$TAG"; then echo "STOP: $TAG already exists"; else podman tag localhost/audoryn-console-api:latest "$TAG" && echo "$TAG" > "$HOME/console-rollback.tag" && echo "Rollback image: $TAG" && podman build -f backend/Containerfile -t localhost/audoryn-console-api:latest . && podman image inspect localhost/audoryn-console-api:latest --format '{{.Id}} {{.Created}}'; fi
+```
 
 **E. Read-only check with the new image**
 
@@ -279,6 +310,17 @@ podman run --rm -i --env-file /etc/audoryn-console/audoryn-console.env localhost
 ```
 
 - **Expected:** the same revision as before the deploy (no new migration), and `traffic limits module: app.application.services.traffic_limits`.
+
+**F. Restart and verify**
+
+```bash
+systemctl --user restart audoryn-console-api.service
+sleep 20
+systemctl --user is-active audoryn-console-api.service
+curl -sS --max-time 20 http://127.0.0.1:8001/health/ready; echo
+[ "$(podman image inspect localhost/audoryn-console-api:latest --format '{{.Id}}')" = "$(podman inspect --type container audoryn-console-api --format '{{.Image}}')" ] && echo 'PASS: running the new image' || echo 'FAIL: different image running'
+podman logs --since 5m audoryn-console-api 2>&1 | grep -E "Traceback|ERROR|startup complete"
+```
 
 ### Proof that it works (health is not proof)
 
@@ -292,7 +334,204 @@ podman run --rm -i --env-file /etc/audoryn-console/audoryn-console.env localhost
    - **Expected:** `POST /internal/v1/runtime/execute` lines with `202`, and no `Traceback` or `ERROR`. A `202` alone does not prove it; the answer in step 1 does.
 3. **The Console:** open a workspace page and the platform configuration page; both load as before. Do **not** save `gateway_traffic_limits` yet. Nothing reads it until the gateway is deployed.
 
+### Result (2026-10-23): done on both VMs
+
+| | AgentGate | Console |
+|---|---|---|
+| Code | `0d34b3a` → `2e16030` (PR #141; also brings PR #140) | `1ee61c0` → `9dfaeb6` (PR #30) |
+| Rollback image | `rollback-0d34b3a-20261023` | `rollback-1ee61c0-20261023` |
+| New image | `99e370f950d5`, running (`PASS`) | running (`PASS`) |
+| Migration | `0023_usage_resets (head)`, unchanged | `0012_announcement_media (head)`, unchanged |
+| Health | ready, locally and over HTTPS | ready |
+| Logs | clean startup | clean startup |
+
+- **Settings read with the new image:** `environment: staging` (Oracle's existing value), `service role: all`, drain 0, core CORS on, people and execution routes mounted.
+- **Proof:** "What are the open issues in DIVINEJMG/school" finished in 15 s with the 6 open issues, read-only. The Console's Settings page lists `gateway_traffic_limits` with `using default`; it is not saved yet, on purpose.
+- **Vercel:** the Console's web app still needs its own deploy at `9dfaeb6` for the Next.js 16.4.2 security fix (approval). For AgentGate's web app, deploy at `2e16030` only if production is older than `a1d3cca` (PR #140); this deploy has no other frontend change.
+
 ### Rollback (only with your confirmation)
 
-- **AgentGate:** run `podman tag "localhost/audoryn-api:rollback-$(cut -c1-7 "$HOME/agentgate-rollback.sha")" localhost/audoryn-api:latest`, then block F. With no migration and no env change, the old image runs exactly as before.
-- **Console:** retag its `rollback-<sha>` image the same way, then run its block F.
+- **AgentGate:** run `podman tag "$(cat "$HOME/agentgate-rollback.tag")" localhost/audoryn-api:latest`, then block F. With no migration and no env change, the old image runs exactly as before.
+- **Console:** run `podman tag "$(cat "$HOME/console-rollback.tag")" localhost/audoryn-console-api:latest`, then its block F.
+
+## Phase 5, step 2: the gateway in front of AgentGate
+
+**Goal:** every request goes nginx → `audoryn-gateway` (127.0.0.1:8000) → `audoryn-api` (127.0.0.1:8101). AgentGate itself is unchanged: same image, `SERVICE_ROLE=all`. The gateway routes requests, checks the copies' health, logs one line per request and counts limits (`off` for now). The layout and the reasons for it are in [infrastructure/oracle](../../infrastructure/oracle/README.md).
+
+**What changes on the VM:**
+- **A new image,** `localhost/audoryn-gateway:latest` (`services/gateway/Containerfile`).
+- **A new env file,** `/etc/audoryn/gateway.env`.
+  - Its two secrets, the admin token and the limit secret, are made on the VM and never printed. They exist only for the gateway, so there is no laptop value to copy.
+  - Its Redis address is copied from `REDIS_URL` in `audoryn.env`, also without printing.
+- **The service files,** from `infrastructure/oracle/quadlet/`:
+  - `audoryn-gateway.container` is new;
+  - `audoryn-api.container` moves to the host network and port 8101, and trusts forwarded headers only from loopback (the gateway).
+- **Nginx is unchanged.** It still calls `127.0.0.1:8000`, which is now the gateway.
+
+**Not changed:** the AgentGate image, `audoryn.env`, the database, QStash's URLs (they still go through nginx), the Console and Vercel.
+
+**Fixed before this step (found while preparing it):**
+- **Forwarded headers.** Without `GATEWAY_TRUSTED_PROXIES=127.0.0.1`, the gateway would tell AgentGate `http` and `127.0.0.1` for every request behind nginx. QStash's signature checks, which are made over the `https://` URL, would then fail.
+- **Proven locally** with the core's own server settings: `https://130.61.104.247/internal/v1/runtime/execute` and the real caller come through.
+- **The admin controls** also judge the real caller, so a request through nginx is never "from this machine".
+
+**Downtime:** about 20 seconds in block F, while `audoryn-api` restarts on its new port and the gateway starts. QStash retries anything refused in that window.
+
+### AgentGate VM (`130.61.104.247`)
+
+**A. Read-only inspection**
+
+```bash
+cd /opt/audoryn/AgentGate && git branch --show-current && git status --short && git fetch origin main && printf 'Current: %s\nRemote:  %s\n' "$(git rev-parse HEAD)" "$(git rev-parse origin/main)"
+systemctl --user is-active audoryn-api.service; systemctl --user is-active audoryn-gateway.service
+loginctl show-user opc --property=Linger
+ls /home/opc/.config/containers/systemd/
+sudo stat -c '%U:%G %a %n' /etc/audoryn/audoryn.env; sudo ls /etc/audoryn/
+for k in REDIS_URL GATEWAY_REDIS_PREFIX; do printf '%s: %s line(s)\n' "$k" "$(sudo grep -cE "^\s*$k=" /etc/audoryn/audoryn.env)"; done
+ss -ltn | awk 'NR==1 || $4 ~ /:(8000|8101|8102|8201)$/'
+```
+
+- **Expected:**
+  - branch `main`, a clean tree, `Remote` = the merge SHA;
+  - `audoryn-api` `active`, `audoryn-gateway` `inactive`;
+  - `Linger=yes` (user services start at boot);
+  - only `audoryn-api.container` in the folder, and no `gateway.env` yet;
+  - `REDIS_URL: 1 line(s)` and `GATEWAY_REDIS_PREFIX: 0 line(s)`. AgentGate then uses `audoryn:gateway`, the same prefix as the gateway;
+  - only 8000 listening.
+
+**B. Fast-forward**
+
+```bash
+cd /opt/audoryn/AgentGate && if [ "$(git branch --show-current)" != main ] || [ -n "$(git status --porcelain)" ]; then echo 'STOP: wrong branch or dirty working tree'; else OLD="$(git rev-parse HEAD)" && git pull --ff-only origin main && printf 'Before: %s\nAfter:  %s\n' "$OLD" "$(git rev-parse HEAD)" && echo 'Changed outside the gateway and docs (should be none):' && git -c core.pager=cat diff --name-only "$OLD" HEAD -- backend packages services/execution; fi
+```
+
+- **Expected:** `After` = the merge SHA, and nothing listed after "Changed outside the gateway and docs". So the AgentGate image does not need rebuilding.
+
+**C. Build the gateway image (nothing running changes)**
+
+```bash
+cd /opt/audoryn/AgentGate && podman build -f services/gateway/Containerfile -t localhost/audoryn-gateway:latest . && podman image inspect localhost/audoryn-gateway:latest --format '{{.Id}} {{.Created}}'
+```
+
+**D. The gateway's env file, and a backup of the current service file**
+
+```bash
+sudo python3 - <<'PY'
+from pathlib import Path
+import os, secrets, tempfile
+
+source, target = Path('/etc/audoryn/audoryn.env'), Path('/etc/audoryn/gateway.env')
+if target.exists():
+    raise SystemExit('STOP: /etc/audoryn/gateway.env already exists; no changes made')
+redis = [line.split('=', 1)[1].strip() for line in source.read_text().splitlines()
+         if line.strip() and not line.lstrip().startswith('#') and '=' in line and line.split('=', 1)[0].strip() == 'REDIS_URL']
+if len(redis) != 1 or not redis[0] or redis[0][0] in '"\'':
+    raise SystemExit('STOP: REDIS_URL is missing, repeated or quoted in audoryn.env; no changes made')
+values = {
+    "GATEWAY_CORE_UPSTREAMS": "http://127.0.0.1:8101",
+    "GATEWAY_TRUSTED_PROXIES": "127.0.0.1",
+    "GATEWAY_ADMIN_TOKEN": secrets.token_urlsafe(32),
+    "GATEWAY_REDIS_URL": redis[0],
+    "GATEWAY_REDIS_PREFIX": "audoryn:gateway",
+    "GATEWAY_LIMIT_SECRET": secrets.token_urlsafe(32),
+    "GATEWAY_LIMITS_MODE": "off",
+}
+st = source.stat()
+fd, temp = tempfile.mkstemp(prefix='.gateway.env.', dir=target.parent)
+try:
+    with os.fdopen(fd, 'w') as f:
+        f.write('# The Audoryn Gateway (Phase 5, step 2). Holds secrets: never print or commit.\n')
+        f.write(''.join(f'{name}={value}\n' for name, value in values.items()))
+        f.flush(); os.fsync(f.fileno())
+    os.chown(temp, st.st_uid, st.st_gid); os.chmod(temp, st.st_mode & 0o7777); os.replace(temp, target)
+except Exception:
+    if os.path.exists(temp):
+        os.unlink(temp)
+    raise
+print('Created:', target, '| owner and mode copied from', source)
+print('Keys:', ', '.join(values))
+PY
+Q="$HOME/.config/containers/systemd" && B="$HOME/audoryn-api.container.backup-$(date +%Y%m%d-%H%M%S)" && cp -a "$Q/audoryn-api.container" "$B" && echo "$B" > "$HOME/audoryn-api.container.backup" && echo "Service file backup: $B"
+```
+
+- **Expected:** `Created: /etc/audoryn/gateway.env`, the 7 key names, and the backup path. Nothing running has changed yet.
+
+**E. Read-only checks of the new files, before anything switches**
+
+```bash
+QUADLET_UNIT_DIRS=/opt/audoryn/AgentGate/infrastructure/oracle/quadlet /usr/libexec/podman/quadlet -dryrun -user 2>&1 | grep -E "^---|ExecStart=|error|Error|warning"
+podman run --rm -i --network host --env-file /etc/audoryn/gateway.env localhost/audoryn-gateway:latest python - <<'PY'
+import asyncio
+from redis.asyncio import Redis
+from audoryn_gateway.settings import GatewaySettings
+
+s = GatewaySettings()
+print("core:", [str(u) for u in s.core_upstreams], "| execution:", [str(u) for u in s.execution_upstreams] or "the core's copies")
+print("trusted proxies:", s.trusted_proxies, "| limits:", s.limits_mode, "| prefix:", s.redis_prefix)
+print("admin token set:", s.admin_token is not None, "| limit secret set:", s.limit_secret is not None)
+
+async def ping():
+    redis = Redis.from_url(s.redis_url.get_secret_value())
+    print("redis reachable:", await redis.ping())
+    await redis.aclose()
+asyncio.run(ping())
+PY
+```
+
+- **Expected:**
+  - two `ExecStart=` lines and no errors: the gateway's with `--network host`, and the API's with `--network host` and `--port 8101`;
+  - `core: ['http://127.0.0.1:8101/'] | execution: the core's copies`;
+  - `trusted proxies: ['127.0.0.1'] | limits: off | prefix: audoryn:gateway`;
+  - both secrets set;
+  - `redis reachable: True`.
+- If you see an error or anything else, **do not run F**; send me the output.
+
+**F. Switch (about 20 seconds of downtime)**
+
+```bash
+cd /opt/audoryn/AgentGate && Q="$HOME/.config/containers/systemd" && cp infrastructure/oracle/quadlet/audoryn-gateway.container infrastructure/oracle/quadlet/audoryn-api.container "$Q/" && systemctl --user daemon-reload && systemctl --user restart audoryn-api.service && systemctl --user start audoryn-gateway.service
+sleep 20
+systemctl --user is-active audoryn-api.service audoryn-gateway.service
+ss -ltn | awk 'NR==1 || $4 ~ /:(8000|8101)$/'
+curl -sS --max-time 20 http://127.0.0.1:8101/health/ready; echo
+curl -sS --max-time 20 http://127.0.0.1:8000/health/gateway; echo
+curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
+podman logs --since 2m audoryn-gateway 2>&1 | grep -E "Traceback|ERROR|startup complete|rotation"
+podman logs --since 2m audoryn-api 2>&1 | grep -E "Traceback|ERROR|startup complete"
+```
+
+- **Expected:**
+  - `active` twice;
+  - 8000 and 8101 listening, both on `127.0.0.1`;
+  - the core ready on 8101;
+  - the gateway's health shows `core` and `execution` each with `inRotation: 1`;
+  - ready over HTTPS (that answer now came through the gateway);
+  - both started, with no `Traceback` or `ERROR`.
+
+### Proof that the gateway does its work
+
+1. **Real tasks** at audoryn.vercel.app: the open-issues question, then one that needs approval. Both must finish.
+2. **On the VM, while they run:**
+
+   ```bash
+   podman logs --since 10m audoryn-gateway 2>&1 | grep -E '"path":"/(internal/v1/runtime|api/v1/conversations)' | tail -8
+   podman logs --since 10m audoryn-gateway 2>&1 | grep -cE '"status":5[0-9][0-9]'
+   podman logs --since 10m audoryn-api 2>&1 | grep -E "runtime/execute" | tail -3
+   ```
+
+   - **Expected:**
+     - gateway lines for the task's requests and for QStash's `/internal/v1/runtime/execute` (`202`), each with `"upstream":"core-0"`;
+     - `0` server errors;
+     - in AgentGate's own log, `runtime/execute` from QStash's address, not from `127.0.0.1`.
+3. **Live updates** appear without refreshing the page. The WebSocket now goes through the gateway.
+4. **The Console** loads a workspace page. Its signed calls now go through the gateway.
+
+### Rollback (only with your confirmation)
+
+```bash
+Q="$HOME/.config/containers/systemd" && systemctl --user stop audoryn-gateway.service && rm -f "$Q/audoryn-gateway.container" && cp -a "$(cat "$HOME/audoryn-api.container.backup")" "$Q/audoryn-api.container" && systemctl --user daemon-reload && systemctl --user restart audoryn-api.service
+sleep 20
+curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
+```
+
+`audoryn-api` is back on 8000 exactly as before. `gateway.env` and the gateway image stay on the VM, unused.

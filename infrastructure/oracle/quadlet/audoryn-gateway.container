@@ -1,0 +1,25 @@
+# The Audoryn Gateway on the AgentGate VM: nginx (TLS) -> 127.0.0.1:8000 -> the copies.
+# Installed by copying into ~/.config/containers/systemd/ (docs/deploy/oracle-handoff-scale-plan.md).
+[Unit]
+Description=Audoryn Gateway
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=localhost/audoryn-gateway:latest
+ContainerName=audoryn-gateway
+EnvironmentFile=/etc/audoryn/gateway.env
+# The host network, listening on loopback only: nginx is seen as 127.0.0.1 (GATEWAY_TRUSTED_PROXIES)
+# and the copies are reached on their loopback ports.
+Network=host
+# Above the gateway's own 30 s graceful shutdown.
+StopTimeout=40
+
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+TimeoutStopSec=60
+
+[Install]
+WantedBy=default.target
