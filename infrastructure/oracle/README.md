@@ -15,8 +15,8 @@ internet ─ nginx (TLS) ─ 127.0.0.1:8000 audoryn-gateway ─┬─ 127.0.0.1:
 |---|---|---|
 | 1 (done) | `audoryn-api` on 8000, `SERVICE_ROLE=all` | `backend/Containerfile` |
 | 2 (done) | `audoryn-gateway` on 8000; `audoryn-api` on 8101, still `all` | + `services/gateway/Containerfile` |
-| 3 | the drain: `RUNTIME_DRAIN_SECONDS=120`, stop timeout 150 s (until step 4, a restart during a step blocks users up to ~2 min) | unchanged |
-| 4 | `audoryn-execution` on 8201; `audoryn-api` becomes `api` | `backend/Containerfile.api`, `services/execution/Containerfile` |
+| 3 (done) | the drain: `RUNTIME_DRAIN_SECONDS=120`, stop timeout 150 s (until step 4, a restart during a step blocks users up to ~2 min) | unchanged |
+| 4 | `audoryn-execution` on 8201 (steps, browser, drain); `audoryn-api` becomes `api` (no steps, quick restarts); an internal call key in `audoryn.env` | `localhost/audoryn-core` (`backend/Containerfile.api`), `localhost/audoryn-execution` (`services/execution/Containerfile`); `audoryn-api:latest` kept for rollback |
 | 5 | a second core copy on 8102 | unchanged |
 | 6 | limits `report`, then `enforce`; CORS and security headers at the gateway | unchanged |
 
@@ -35,6 +35,14 @@ internet ─ nginx (TLS) ─ 127.0.0.1:8000 audoryn-gateway ─┬─ 127.0.0.1:
 |---|---|---|
 | `/etc/audoryn/audoryn.env` | `audoryn-api` (and `audoryn-execution` from step 4) | AgentGate's settings and secrets |
 | `/etc/audoryn/gateway.env` | `audoryn-gateway` | `GATEWAY_*`: upstreams, `GATEWAY_TRUSTED_PROXIES=127.0.0.1`, the admin token, Redis (AgentGate's `REDIS_URL`, prefix `audoryn:gateway`), the limit secret, the limits mode |
+
+## Checking the services
+
+`check_services.py` prints PASS or FAIL for each container: running and on its newest image, its port, no tracebacks, its role and settings, readiness, the gateway's pools, and HTTPS end to end. It never prints a secret.
+
+```bash
+python3 /opt/audoryn/AgentGate/infrastructure/oracle/check_services.py
+```
 
 ## What the gateway did
 

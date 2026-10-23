@@ -1,0 +1,34 @@
+# The execution service (Phase 5, step 4): task steps, the governed browser (Chromium), coding
+# sessions, preparations, and the QStash and direct calls that drive them (SERVICE_ROLE=execution,
+# services/execution/Containerfile). One copy only: a browser session lives in its memory.
+# On the host network at 127.0.0.1:8201, reached through the gateway's execution pool.
+#
+# Stopping: uvicorn waits up to 20 s for open requests, then running steps get RUNTIME_DRAIN_SECONDS
+# (120, in audoryn.env) to finish; podman waits 150 s before killing it, systemd 180 s. Meanwhile the
+# API keeps answering people; due steps fall back to QStash, which retries.
+# It never runs migrations: the API container keeps that setting, so two processes never race.
+# Installed by copying into ~/.config/containers/systemd/.
+[Unit]
+Description=Audoryn execution service
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=localhost/audoryn-execution:latest
+ContainerName=audoryn-execution
+EnvironmentFile=/etc/audoryn/audoryn.env
+Environment=SERVICE_ROLE=execution
+Environment=DATABASE_MIGRATE_ON_STARTUP=false
+Network=host
+Exec=uvicorn audoryn_execution.service:create_application --factory --host 127.0.0.1 --port 8201 --proxy-headers --forwarded-allow-ips=127.0.0.1 --timeout-graceful-shutdown 20
+ShmSize=1g
+StopTimeout=150
+
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+TimeoutStopSec=180
+
+[Install]
+WantedBy=default.target
