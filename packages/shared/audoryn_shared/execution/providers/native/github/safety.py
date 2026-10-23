@@ -85,7 +85,6 @@ def safe_path(path: str) -> str:
     return path
 
 
-
 def _within(path: str, pattern: str) -> bool:
     """A pattern ending in `/` is a folder: the path is inside it (`RED/` covers `RED/SETUP.md` and
     `RED/tools/x.py`, never `REDX/a`). Anything else is a glob matched against the whole path."""
