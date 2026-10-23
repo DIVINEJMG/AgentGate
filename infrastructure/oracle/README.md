@@ -7,17 +7,20 @@ The service files for the AgentGate VM (`130.61.104.247`): rootless podman under
 Every AgentGate container uses the host network and listens on loopback only. Nginx is the only public listener (80/443), and it calls `127.0.0.1:8000`.
 
 ```
-internet ─ nginx (TLS) ─ 127.0.0.1:8000 audoryn-gateway ─┬─ 127.0.0.1:8101 audoryn-api (core)
-                                                         └─ 127.0.0.1:8201 audoryn-execution   (from step 4)
+internet ─ nginx (TLS) ─ 127.0.0.1:8000 audoryn-gateway ─┬─ 127.0.0.1:8101 audoryn-api@8101 (core-0)
+                                                         ├─ 127.0.0.1:8102 audoryn-api@8102 (core-1, from step 5)
+                                                         └─ 127.0.0.1:8201 audoryn-execution (from step 4)
 ```
+
+The core copies are instances of one template, `audoryn-api@.container`, named by their port. A copy is enabled by a symlink next to it in `~/.config/containers/systemd/` (`audoryn-api@8102.container -> audoryn-api@.container`), and its container is `audoryn-api-<port>`.
 
 | Step (Phase 5) | Services | Image |
 |---|---|---|
 | 1 (done) | `audoryn-api` on 8000, `SERVICE_ROLE=all` | `backend/Containerfile` |
 | 2 (done) | `audoryn-gateway` on 8000; `audoryn-api` on 8101, still `all` | + `services/gateway/Containerfile` |
 | 3 (done) | the drain: `RUNTIME_DRAIN_SECONDS=120`, stop timeout 150 s (until step 4, a restart during a step blocks users up to ~2 min) | unchanged |
-| 4 | `audoryn-execution` on 8201 (steps, browser, drain); `audoryn-api` becomes `api` (no steps, quick restarts); an internal call key in `audoryn.env` | `localhost/audoryn-core` (`backend/Containerfile.api`), `localhost/audoryn-execution` (`services/execution/Containerfile`); `audoryn-api:latest` kept for rollback |
-| 5 | a second core copy on 8102 | unchanged |
+| 4 (done) | `audoryn-execution` on 8201 (steps, browser, drain); `audoryn-api` becomes `api` (no steps, quick restarts); an internal call key in `audoryn.env` | `localhost/audoryn-core` (`backend/Containerfile.api`), `localhost/audoryn-execution` (`services/execution/Containerfile`); `audoryn-api:latest` kept for rollback |
+| 5 | the core becomes the template `audoryn-api@.container`: copies on 8101 and 8102, both in `GATEWAY_CORE_UPSTREAMS` | unchanged |
 | 6 | limits `report`, then `enforce`; CORS and security headers at the gateway | unchanged |
 
 **Why the host network:**
@@ -33,7 +36,7 @@ internet ─ nginx (TLS) ─ 127.0.0.1:8000 audoryn-gateway ─┬─ 127.0.0.1:
 
 | File | Read by | Holds |
 |---|---|---|
-| `/etc/audoryn/audoryn.env` | `audoryn-api` (and `audoryn-execution` from step 4) | AgentGate's settings and secrets |
+| `/etc/audoryn/audoryn.env` | the core copies and `audoryn-execution` | AgentGate's settings and secrets |
 | `/etc/audoryn/gateway.env` | `audoryn-gateway` | `GATEWAY_*`: upstreams, `GATEWAY_TRUSTED_PROXIES=127.0.0.1`, the admin token, Redis (AgentGate's `REDIS_URL`, prefix `audoryn:gateway`), the limit secret, the limits mode |
 
 ## Checking the services
@@ -51,5 +54,15 @@ python3 /opt/audoryn/AgentGate/infrastructure/oracle/check_services.py
 ```bash
 podman logs --since 60m audoryn-gateway 2>&1 | python3 /opt/audoryn/AgentGate/infrastructure/oracle/gateway_report.py
 ```
+
+## Deploying new core code
+
+After building a new `localhost/audoryn-core:latest`, restart the core copies one at a time. People are served throughout: the next copy restarts only once the gateway has the first back in rotation.
+
+```bash
+bash /opt/audoryn/AgentGate/infrastructure/oracle/restart_core.sh
+```
+
+The execution service has one copy (a browser session lives in its memory), so `systemctl --user restart audoryn-execution.service` pauses task steps for up to its drain (2 minutes). People's pages keep working, and QStash retries the steps it delivers meanwhile.
 
 The commands for each step are in [the Oracle handoff](../../docs/deploy/oracle-handoff-scale-plan.md).

@@ -11,12 +11,16 @@ import sys
 import urllib.request
 
 PUBLIC = "https://130.61.104.247/health/ready"
-# Each container: its port, the role it must run, and what its settings must say.
+# Each container: its service, its port, the role it must run, and what its settings must say. The core
+# copies are instances of one template, named by their port (quadlet/audoryn-api@.container).
 CONTAINERS = {
-    "audoryn-gateway": {"port": 8000},
-    "audoryn-api": {"port": 8101, "role": "api", "call_url": "http://127.0.0.1:8000"},
-    "audoryn-execution": {"port": 8201, "role": "execution", "drain": 120},
+    "audoryn-gateway": {"unit": "audoryn-gateway", "port": 8000},
+    **{f"audoryn-api-{port}": {"unit": f"audoryn-api@{port}", "port": port, "role": "api",
+                               "call_url": "http://127.0.0.1:8000"} for port in (8101, 8102)},
+    "audoryn-execution": {"unit": "audoryn-execution", "port": 8201, "role": "execution", "drain": 120},
 }
+# How many copies each of the gateway's pools must have in rotation.
+POOLS = {"core": 2, "execution": 1}
 SETTINGS = ("import json; from audoryn_shared.bootstrap.settings import settings as s; print(json.dumps({"
             "'role': s.service_role, 'call_url': s.execution_call_url, 'key': s.internal_call_key_secret is not None, "
             "'drain': s.runtime_drain_seconds}))")
@@ -44,7 +48,7 @@ def fetch(url: str) -> tuple[int | None, object]:
 def main() -> None:
     listening = run("ss", "-ltn")
     for name, want in CONTAINERS.items():
-        report(run("systemctl", "--user", "is-active", f"{name}.service") == "active", f"{name} active")
+        report(run("systemctl", "--user", "is-active", f"{want['unit']}.service") == "active", f"{want['unit']} active")
         image = run("podman", "inspect", "--type", "container", name, "--format", "{{.ImageName}}")
         running = run("podman", "inspect", "--type", "container", name, "--format", "{{.Image}}")
         report(bool(image) and running == run("podman", "image", "inspect", image, "--format", "{{.Id}}"),
@@ -66,9 +70,9 @@ def main() -> None:
             report(status == 200, f"{name} ready", status)
     status, health = fetch("http://127.0.0.1:8000/health/gateway")
     pools = health.get("pools", {}) if isinstance(health, dict) else {}
-    for pool in ("core", "execution"):
+    for pool, copies in POOLS.items():
         rotation = pools.get(pool, {}).get("inRotation", 0)
-        report(rotation >= 1, f"gateway {pool} pool has a copy in rotation", rotation)
+        report(rotation == copies, f"gateway {pool} pool has {copies} in rotation", rotation)
     status, _ = fetch(PUBLIC)
     report(status == 200, "ready over HTTPS through nginx and the gateway", status)
     print(f"\n{'ALL PASS' if not failures else f'{failures} FAILED'}")
