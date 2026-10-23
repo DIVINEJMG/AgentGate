@@ -3,6 +3,8 @@ Needs only the host's python3, podman and ss. Exit status 1 when any check fails
 
     python3 /opt/audoryn/AgentGate/infrastructure/oracle/check_services.py
 """
+from __future__ import annotations
+
 import json
 import subprocess
 import sys
