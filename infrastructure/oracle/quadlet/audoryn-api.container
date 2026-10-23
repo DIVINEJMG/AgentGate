@@ -1,29 +1,29 @@
-# AgentGate behind the gateway: the same image and role as before (SERVICE_ROLE=all), on the host
-# network at 127.0.0.1:8101. Only the gateway calls it, so only loopback is trusted for the forwarded
-# caller and scheme. Installed by copying into ~/.config/containers/systemd/.
-#
-# Stopping (Phase 5, step 3): uvicorn closes its port, waits up to 20 s for open requests, then running
-# steps get RUNTIME_DRAIN_SECONDS (120, in audoryn.env) to finish. Podman waits 150 s before killing
-# it, systemd 180 s. A step still running then is cancelled and the sweep resumes it.
+# The core API (Phase 5, step 4): people's routes only (SERVICE_ROLE=api), from the image without the
+# step runtime, Playwright or Chromium (backend/Containerfile.api). A due step goes to the execution
+# service as a signed direct call through the gateway (EXECUTION_CALL_URL); QStash is the fallback.
+# On the host network at 127.0.0.1:8101; only the gateway calls it, so only loopback is trusted for the
+# forwarded caller and scheme. It runs no steps, so a restart waits only for open requests (20 s).
+# Installed by copying into ~/.config/containers/systemd/.
 [Unit]
 Description=Audoryn API
 Wants=network-online.target
 After=network-online.target
 
 [Container]
-Image=localhost/audoryn-api:latest
+Image=localhost/audoryn-core:latest
 ContainerName=audoryn-api
 EnvironmentFile=/etc/audoryn/audoryn.env
+Environment=SERVICE_ROLE=api
+Environment=EXECUTION_CALL_URL=http://127.0.0.1:8000
 Network=host
 Exec=uvicorn app.main:app --host 127.0.0.1 --port 8101 --proxy-headers --forwarded-allow-ips=127.0.0.1 --timeout-graceful-shutdown 20
-ShmSize=1g
-StopTimeout=150
+StopTimeout=30
 
 [Service]
 Restart=always
 RestartSec=5
 TimeoutStartSec=120
-TimeoutStopSec=180
+TimeoutStopSec=60
 
 [Install]
 WantedBy=default.target

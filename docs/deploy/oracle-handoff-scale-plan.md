@@ -753,3 +753,190 @@ cp -a "$(cat "$HOME/audoryn-api.container.backup")" "$HOME/.config/containers/sy
 sleep 20
 curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
 ```
+
+## Phase 5, step 4: the execution service in its own container
+
+**Goal:**
+
+```
+nginx → gateway (8000) ─┬─ core API (8101):          people's routes
+                        └─ execution service (8201): task steps, browser, coding, QStash callbacks
+```
+
+**What this gives:**
+- A restart or crash of one no longer stops the other.
+- An API restart takes seconds and never waits for tasks, which ends step 3's two-minute outage.
+- Chromium runs only in the execution container.
+
+**What changes on the VM:**
+- **Two images** built from the repository: `localhost/audoryn-core:latest` (`backend/Containerfile.api`: no Playwright, no Chromium) and `localhost/audoryn-execution:latest` (`services/execution/Containerfile`). The single-service image `localhost/audoryn-api:latest` stays for rollback.
+- **The service files** (`infrastructure/oracle/quadlet/`):
+  - `audoryn-api.container` runs the core image with `SERVICE_ROLE=api` and sends due steps to the gateway (`EXECUTION_CALL_URL=http://127.0.0.1:8000`);
+  - `audoryn-execution.container` is new: `SERVICE_ROLE=execution`, the drain, and it never runs migrations.
+- **`audoryn.env`:** a new internal call key (`INTERNAL_CALL_KEY_ID`, `INTERNAL_CALL_KEY_SECRET`) signs the direct calls from the API to the execution service. It is made on the VM and never printed. It exists only between these containers, so there is no laptop value to copy.
+- **`gateway.env`:** `GATEWAY_EXECUTION_UPSTREAMS=http://127.0.0.1:8201`.
+
+**Unchanged:**
+- nginx, the database (no migration), QStash's URLs (they reach the execution pool through the gateway), the Console and Vercel;
+- the laptop: `SERVICE_ROLE` defaults to `all` there, so local runs stay one process.
+
+**Downtime in F:**
+- a few seconds while the gateway restarts with its new upstream;
+- then the API restart. **Run F when no task is running.** Otherwise the old single-service container drains first (step 3), up to two minutes.
+
+### AgentGate VM (`130.61.104.247`)
+
+**A. Read-only inspection**
+
+```bash
+cd /opt/audoryn/AgentGate && git branch --show-current && git status --short && git fetch origin main && printf 'Current: %s\nRemote:  %s\n' "$(git rev-parse HEAD)" "$(git rev-parse origin/main)"
+systemctl --user is-active audoryn-api.service audoryn-gateway.service audoryn-execution.service
+df -h /
+podman images --format 'table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.Size}}'
+for k in INTERNAL_CALL_KEY_ID INTERNAL_CALL_KEY_SECRET SERVICE_ROLE EXECUTION_CALL_URL; do printf '%s: %s line(s)\n' "$k" "$(sudo grep -cE "^\s*$k=" /etc/audoryn/audoryn.env)"; done
+sudo grep -E '^\s*DATABASE_MIGRATE_ON_STARTUP=' /etc/audoryn/audoryn.env || echo 'DATABASE_MIGRATE_ON_STARTUP: unset (false)'
+printf 'GATEWAY_EXECUTION_UPSTREAMS: %s line(s)\n' "$(sudo grep -cE '^\s*GATEWAY_EXECUTION_UPSTREAMS=' /etc/audoryn/gateway.env)"
+ss -ltn | awk 'NR==1 || $4 ~ /:(8000|8101|8201)$/'
+```
+
+- **Expected:**
+  - branch `main`, a clean tree, `Remote` = the merge SHA;
+  - `active`, `active`, `inactive`;
+  - **at least 6 GB free.** The two images need about 4.5 GB. If there is less, stop and send me the image list: older rollback images can be removed, with your approval.
+  - every key `0 line(s)`;
+  - 8201 free.
+
+**B. Fast-forward**
+
+```bash
+cd /opt/audoryn/AgentGate && if [ "$(git branch --show-current)" != main ] || [ -n "$(git status --porcelain)" ]; then echo 'STOP: wrong branch or dirty working tree'; else OLD="$(git rev-parse HEAD)" && git pull --ff-only origin main && printf 'Before: %s\nAfter:  %s\n' "$OLD" "$(git rev-parse HEAD)" && git -c core.pager=cat diff --name-only "$OLD" HEAD -- backend packages services infrastructure; fi
+```
+
+- **Expected:** only files under `infrastructure/oracle/` are listed. No application code changed.
+
+**C. Build the two images (nothing running changes; about 10 minutes)**
+
+```bash
+cd /opt/audoryn/AgentGate && podman build -f backend/Containerfile.api -t localhost/audoryn-core:latest . && podman build -f services/execution/Containerfile -t localhost/audoryn-execution:latest . && podman images --format 'table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.Size}}' | grep -E 'REPOSITORY|audoryn-(core|execution)'
+```
+
+**D. The internal key and the gateway's execution address, with backups**
+
+```bash
+sudo python3 - <<'PY'
+from pathlib import Path
+from datetime import datetime
+import base64, os, secrets, shutil, tempfile
+
+def add(path, values, comment):
+    p = Path(path)
+    lines = p.read_text().splitlines(keepends=True)
+    for name in values:
+        if any(l.strip() and not l.lstrip().startswith('#') and '=' in l and l.split('=', 1)[0].strip() == name for l in lines):
+            raise SystemExit(f'STOP: {name} already in {path}; no changes made')
+    if lines and not lines[-1].endswith('\n'):
+        lines[-1] += '\n'
+    lines += [f'# {comment}, added {datetime.now():%Y-%m-%d}\n'] + [f'{n}={v}\n' for n, v in values.items()]
+    backup = p.with_name(p.name + '.backup-execution-' + datetime.now().strftime('%Y%m%d-%H%M%S'))
+    shutil.copy2(p, backup)
+    fd, temp = tempfile.mkstemp(prefix='.' + p.name + '.', dir=p.parent)
+    try:
+        with os.fdopen(fd, 'w') as f:
+            f.write(''.join(lines)); f.flush(); os.fsync(f.fileno())
+        st = p.stat()
+        os.chown(temp, st.st_uid, st.st_gid); os.chmod(temp, st.st_mode & 0o7777); os.replace(temp, p)
+    except Exception:
+        if os.path.exists(temp):
+            os.unlink(temp)
+        raise
+    print('Backup:', backup, '| added:', ', '.join(values))
+
+for path, name in (('/etc/audoryn/audoryn.env', 'INTERNAL_CALL_KEY_ID'), ('/etc/audoryn/gateway.env', 'GATEWAY_EXECUTION_UPSTREAMS')):
+    if any(l.split('=', 1)[0].strip() == name for l in Path(path).read_text().splitlines() if '=' in l and not l.lstrip().startswith('#')):
+        raise SystemExit(f'STOP: {name} already in {path}; no changes made')
+add('/etc/audoryn/audoryn.env', {
+    'INTERNAL_CALL_KEY_ID': 'agentgate-internal-2026-10',
+    'INTERNAL_CALL_KEY_SECRET': base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip('='),
+}, 'Phase 5 step 4: signed calls from the API to the execution service')
+add('/etc/audoryn/gateway.env', {'GATEWAY_EXECUTION_UPSTREAMS': 'http://127.0.0.1:8201'},
+    'Phase 5 step 4: the execution service')
+PY
+Q="$HOME/.config/containers/systemd" && B="$HOME/audoryn-api.container.backup-$(date +%Y%m%d-%H%M%S)" && cp -a "$Q/audoryn-api.container" "$B" && echo "$B" > "$HOME/audoryn-api.container.backup" && echo "Service file backup: $B"
+```
+
+- **Expected:** two `Backup:` lines (one for `audoryn.env`, one for `gateway.env`) and the service file backup. Nothing running has changed yet.
+
+**E. Read-only checks with the new images, before anything switches**
+
+```bash
+QUADLET_UNIT_DIRS=/opt/audoryn/AgentGate/infrastructure/oracle/quadlet /usr/libexec/podman/quadlet -dryrun -user 2>&1 | grep -E "^ExecStart=|error|Error|warning"
+podman run --rm -i --env-file /etc/audoryn/audoryn.env -e SERVICE_ROLE=api -e EXECUTION_CALL_URL=http://127.0.0.1:8000 localhost/audoryn-core:latest python - <<'PY'
+import importlib.util
+from audoryn_shared.application.internal_calls import load_config
+from audoryn_shared.bootstrap.settings import settings
+from app.main import app
+def walk(route):
+    nested = getattr(route, "effective_candidates", None)
+    return [p for child in nested() for p in walk(child)] if nested else [getattr(route, "path", "")]
+paths = {p for r in app.routes for p in walk(r)}
+print("core | role:", settings.service_role, "| key valid:", load_config(settings).enabled,
+      "| people routes:", any(p.startswith("/api/v1/") for p in paths),
+      "| execution routes:", "/internal/v1/runtime/execute" in paths,
+      "| playwright installed:", importlib.util.find_spec("playwright") is not None)
+PY
+podman run --rm -i --env-file /etc/audoryn/audoryn.env -e SERVICE_ROLE=execution localhost/audoryn-execution:latest python - <<'PY'
+import importlib.util, os
+from audoryn_shared.application.internal_calls import load_config
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_execution.service import create_application
+def walk(route):
+    nested = getattr(route, "effective_candidates", None)
+    return [p for child in nested() for p in walk(child)] if nested else [getattr(route, "path", "")]
+paths = {p for r in create_application().routes for p in walk(r)}
+print("execution | role:", settings.service_role, "| key valid:", load_config(settings).enabled,
+      "| execution routes:", "/internal/v1/runtime/execute" in paths,
+      "| people routes:", any(p.startswith("/api/v1/") for p in paths),
+      "| core installed:", importlib.util.find_spec("app") is not None,
+      "| chromium:", any(n.startswith("chromium") for n in os.listdir("/ms-playwright")))
+PY
+```
+
+- **Expected:**
+  - three `ExecStart=` lines (`audoryn-api` with `audoryn-core`, `audoryn-execution` with `--port 8201`, and the gateway), with no errors;
+  - `core | role: api | key valid: True | people routes: True | execution routes: False | playwright installed: False`;
+  - `execution | role: execution | key valid: True | execution routes: True | people routes: False | core installed: False | chromium: True`.
+- If you see anything else, **do not run F**; send me the output.
+
+**F. Switch (run it when no task is running)**
+
+```bash
+cd /opt/audoryn/AgentGate && Q="$HOME/.config/containers/systemd" && cp infrastructure/oracle/quadlet/audoryn-execution.container infrastructure/oracle/quadlet/audoryn-api.container "$Q/" && systemctl --user daemon-reload && systemctl --user start audoryn-execution.service && for i in $(seq 1 45); do curl -sf http://127.0.0.1:8201/health/live >/dev/null && echo 'execution service up' && break; sleep 2; done && systemctl --user restart audoryn-gateway.service && systemctl --user restart audoryn-api.service
+sleep 25
+python3 /opt/audoryn/AgentGate/infrastructure/oracle/check_services.py
+```
+
+- **Expected:** `execution service up`, then every line `PASS`, ending in `ALL PASS`. If anything says `FAIL`, send me the output. Rollback is below.
+
+### Proof
+
+1. At audoryn.vercel.app, ask the open-issues question, then a coding task (a new folder). Both must finish, the second with a draft PR.
+2. Then, on the VM:
+
+   ```bash
+   podman logs --since 15m audoryn-gateway 2>&1 | python3 /opt/audoryn/AgentGate/infrastructure/oracle/gateway_report.py
+   ```
+
+   - **Expected:**
+     - people's routes answered by `core-0`;
+     - `POST /internal/v1/runtime/execute` (`202`) answered by `execution-0`: the API's signed direct calls and QStash's deliveries;
+     - no `5xx`.
+
+### Rollback (only with your confirmation)
+
+```bash
+Q="$HOME/.config/containers/systemd" && systemctl --user stop audoryn-execution.service && rm -f "$Q/audoryn-execution.container" && cp -a "$(cat "$HOME/audoryn-api.container.backup")" "$Q/audoryn-api.container" && sudo cp -a "$(ls -t /etc/audoryn/gateway.env.backup-execution-* | head -1)" /etc/audoryn/gateway.env && systemctl --user daemon-reload && systemctl --user restart audoryn-gateway.service audoryn-api.service
+sleep 25
+curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
+```
+
+After the rollback, the single-service container (`SERVICE_ROLE=all`) runs everything again, as in step 3. The internal key can stay in `audoryn.env`: with role `all` it is unused.
