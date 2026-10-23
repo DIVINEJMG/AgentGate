@@ -36,4 +36,12 @@ internet ─ nginx (TLS) ─ 127.0.0.1:8000 audoryn-gateway ─┬─ 127.0.0.1:
 | `/etc/audoryn/audoryn.env` | `audoryn-api` (and `audoryn-execution` from step 4) | AgentGate's settings and secrets |
 | `/etc/audoryn/gateway.env` | `audoryn-gateway` | `GATEWAY_*`: upstreams, `GATEWAY_TRUSTED_PROXIES=127.0.0.1`, the admin token, Redis (AgentGate's `REDIS_URL`, prefix `audoryn:gateway`), the limit secret, the limits mode |
 
+## What the gateway did
+
+`gateway_report.py` summarises the gateway's log: requests by route, status and copy, with latency, and the last errors with their correlation ids. It needs only the host's `python3`:
+
+```bash
+podman logs --since 60m audoryn-gateway 2>&1 | python3 /opt/audoryn/AgentGate/infrastructure/oracle/gateway_report.py
+```
+
 The commands for each step are in [the Oracle handoff](../../docs/deploy/oracle-handoff-scale-plan.md).

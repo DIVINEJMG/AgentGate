@@ -85,6 +85,14 @@ def safe_path(path: str) -> str:
     return path
 
 
+def _within(path: str, pattern: str) -> bool:
+    """A pattern ending in `/` is a folder: the path is inside it (`RED/` covers `RED/SETUP.md` and
+    `RED/tools/x.py`, never `REDX/a`). Anything else is a glob matched against the whole path."""
+    if pattern.endswith("/"):
+        return path.startswith(pattern)
+    return fnmatch.fnmatchcase(path, pattern)
+
+
 def validate_changes(changes: list[dict], constraints: dict | None = None):
     constraints = constraints or {}
     validate_constraints(constraints)
@@ -96,8 +104,8 @@ def validate_changes(changes: list[dict], constraints: dict | None = None):
             raise ValueError("A commit cannot contain the same path twice.")
         seen.add(path)
         allowed, denied = constraints.get("allowedPaths", []), constraints.get("deniedPaths", [])
-        if (allowed and not any(fnmatch.fnmatchcase(path, pattern) for pattern in allowed)) or any(
-            fnmatch.fnmatchcase(path, pattern) for pattern in denied
+        if (allowed and not any(_within(path, pattern) for pattern in allowed)) or any(
+            _within(path, pattern) for pattern in denied
         ):
             raise ValueError("The file is outside the task's path authority.")
         content = change.get("content", "")
