@@ -33,7 +33,7 @@ Edition*: inspect first, change only what this release needs, and verify the out
 
 1. **Merge** the pull request once CI passes.
 2. **Pull:** follow rules sections 3 and 12, checkpoints A and B (`git pull --ff-only origin
-   main`). The diff should show only `backend/app/execution/coding/e2b.py`, one test and this doc.
+   main`). The diff should show only `packages/shared/audoryn_shared/execution/coding/e2b.py`, one test and this doc.
 3. **Disk check:** run `df -h /` before building.
    - **If less than 4 GB is free:** run `podman image prune -f` first. It removes only untagged
      images.

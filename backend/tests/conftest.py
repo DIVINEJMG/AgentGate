@@ -1,6 +1,6 @@
 import pytest
 
-from app.bootstrap.settings import settings
+from audoryn_shared.bootstrap.settings import settings
 
 
 @pytest.fixture(autouse=True)

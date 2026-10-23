@@ -22,7 +22,7 @@ SheetJS's package download uses its official distribution host during installati
 
 ## Changed files
 
-- Production corrections: `backend/app/api/jobs_routes.py`, the heartbeat interval annotation in `backend/app/application/services/ai_gateway.py`, and `frontend/src/components/GitHubConnection.tsx`.
+- Production corrections: `packages/shared/audoryn_shared/api/jobs_routes.py`, the heartbeat interval annotation in `packages/shared/audoryn_shared/application/services/ai_gateway.py`, and `frontend/src/components/GitHubConnection.tsx`.
 - Existing CI formatting: 31 files in the execution formatting scope; import ordering in backend source/tests.
 - Test fixture corrections: the diagnosed backend type-error files, `backend/tests/legacy_execution.py`, and `backend/tests/test_repository_verification_files.py`.
 - Frontend verification: `frontend/tests/publicCms.test.mjs`, `frontend/tests/resultExportDependencies.test.mjs`.

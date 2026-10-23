@@ -8,16 +8,12 @@ from uuid import UUID
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from pydantic import BaseModel
 
-from app.application.services.worker_draft import WorkerDraftGenerator
-from app.domain.ai.providers import (
-    AIInvocationContext,
-    AIMediaInput,
-    AIProviderError,
-)
-from app.infrastructure.ai.provider import ai_gateway_from_settings
-from app.infrastructure.database.session import session_factory
-from app.infrastructure.qstash.verifier import QStashSignatureVerifier
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
+from audoryn_shared.application.services.worker_draft import WorkerDraftGenerator
+from audoryn_shared.domain.ai.providers import AIInvocationContext, AIMediaInput, AIProviderError
+from audoryn_shared.infrastructure.ai.provider import ai_gateway_from_settings
+from audoryn_shared.infrastructure.database.session import session_factory
+from audoryn_shared.infrastructure.qstash.verifier import QStashSignatureVerifier
+from audoryn_shared.runtime.planner.adaptive import AdaptiveRuntimePlanner
 
 router = APIRouter(prefix="/internal/v1/ai", tags=["internal-ai"])
 logger = logging.getLogger(__name__)

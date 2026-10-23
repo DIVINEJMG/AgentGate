@@ -11,19 +11,20 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_dependencies import authenticated_user, organization_principal
-from app.api.product_common import (
+from app.application.services import usage_resets
+from audoryn_shared.api.auth_dependencies import authenticated_user, organization_principal
+from audoryn_shared.api.product_common import (
     append_audit,
     latest_setting,
     not_found,
     require_permission,
     utcnow,
 )
-from app.application.services import entitlements, usage_resets
-from app.domain.identity.permissions import permissions_for_role
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.auth.service import AuthenticatedUser
-from app.infrastructure.database.models import (
+from audoryn_shared.application.services import entitlements
+from audoryn_shared.domain.identity.permissions import permissions_for_role
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.auth.service import AuthenticatedUser
+from audoryn_shared.infrastructure.database.models import (
     Action,
     AuditEvent,
     HumanIdentity,
@@ -35,7 +36,7 @@ from app.infrastructure.database.models import (
     Worker,
     WorkItem,
 )
-from app.infrastructure.database.session import database_session
+from audoryn_shared.infrastructure.database.session import database_session
 
 v1_router = APIRouter(tags=["product", "commercial", "supervision", "performance"])
 v2_router = APIRouter(tags=["product", "commercial", "supervision", "performance"])
@@ -71,7 +72,7 @@ async def _productization(
     workspace = await _workspace_settings(session, organization_id)
     # The same getting-started steps new workspaces see on their home page.
     from app.application.services.onboarding import checklist
-    from app.infrastructure.database.models import OrganizationOnboarding
+    from audoryn_shared.infrastructure.database.models import OrganizationOnboarding
 
     answers = await session.scalar(select(OrganizationOnboarding.answers).where(
         OrganizationOnboarding.organization_id == organization_id))

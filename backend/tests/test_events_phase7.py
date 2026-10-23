@@ -10,14 +10,14 @@ import pytest
 from pydantic import SecretStr
 from redis.exceptions import RedisError
 
-from app.api.internal import outbox as outbox_routes
-from app.api.internal import runtime as runtime_routes
-from app.bootstrap.settings import settings
-from app.infrastructure.qstash.provider import UpstashQStashProvider
-from app.infrastructure.redis.coordination import RedisCoordinator
-from app.realtime.bus import RedisRealtimeBus
-from app.realtime.contracts import RealtimeEvent
-from app.runtime import outbox_publisher, outbox_trigger
+from audoryn_execution.api.internal import outbox as outbox_routes
+from audoryn_execution.api.internal import runtime as runtime_routes
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.infrastructure.qstash.provider import UpstashQStashProvider
+from audoryn_shared.infrastructure.redis.coordination import RedisCoordinator
+from audoryn_shared.realtime.bus import RedisRealtimeBus
+from audoryn_shared.realtime.contracts import RealtimeEvent
+from audoryn_shared.runtime import outbox_publisher, outbox_trigger
 from scripts.runtime_benchmark import FakeCoordinator, FakeQStash, FakeRequest
 from tests.test_f29_31_40 import FakeRedis
 
@@ -89,7 +89,7 @@ async def test_maintenance_runs_on_the_sweep_not_on_every_drain(monkeypatch: pyt
     monkeypatch.setattr(outbox_publisher, "run_periodic_maintenance", maintenance)
     monkeypatch.setattr(settings, "coding_execution_enabled", True)
     coding = AsyncMock()
-    monkeypatch.setattr("app.execution.coding.service.maintain_coding_sessions", coding)
+    monkeypatch.setattr("audoryn_shared.execution.coding.service.maintain_coding_sessions", coding)
 
     class Empty:
         async def __aenter__(self) -> Any:

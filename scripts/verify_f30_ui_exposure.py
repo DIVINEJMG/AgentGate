@@ -22,7 +22,7 @@ def main() -> None:
     worker_quick_start = text("frontend/src/components/WorkerQuickStart.tsx")
     jobs = text("frontend/src/components/JobsPanel.tsx")
     policies = text("frontend/src/components/PoliciesPanel.tsx")
-    backend = text("backend/app/api/integration_capability_routes.py")
+    backend = text("packages/shared/audoryn_shared/api/integration_capability_routes.py")
     vercel = text("vercel.json")
 
     require(

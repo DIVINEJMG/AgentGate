@@ -11,12 +11,12 @@ from typing import Any
 
 import pytest
 
-from app.application.context.evidence import as_list, as_map, compact_output
-from app.application.context.narrator import narrate
-from app.application.context.sections import Section, assemble
-from app.execution.coding.patch import workspace_patch
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.observability.usage import metered
+from audoryn_execution.application.context.narrator import narrate
+from audoryn_shared.application.context.evidence import as_list, as_map, compact_output
+from audoryn_shared.application.context.sections import Section, assemble
+from audoryn_shared.execution.coding.patch import workspace_patch
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.observability.usage import metered
 from tests.test_github_expanded import ScriptedHTTP, request
 from tests.test_phase0_golden import evidence_steps, observations
 

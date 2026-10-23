@@ -6,12 +6,12 @@ from uuid import UUID
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.identity.agents import (
+from audoryn_shared.domain.identity.agents import (
     AgentCredentialView,
     AgentDomainError,
     AgentIdentityView,
 )
-from app.infrastructure.database.models import (
+from audoryn_shared.infrastructure.database.models import (
     AgentCredential,
     AgentIdentity,
     AuditEvent,

@@ -13,10 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
 from app.api import github_auth_routes as routes
-from app.application.services.integration_credentials import encode_bundle
-from app.bootstrap.settings import settings
-from app.domain.identity.principals import HumanPrincipal
-from app.execution.providers.integration_hooks import CredentialBundle
 from app.infrastructure.auth.github import (
     check_flow,
     digest,
@@ -24,14 +20,18 @@ from app.infrastructure.auth.github import (
     resolve_identity,
     verified_email,
 )
-from app.infrastructure.auth.service import AuthenticatedUser
-from app.infrastructure.database.models import (
+from audoryn_shared.application.services.integration_credentials import encode_bundle
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.execution.providers.integration_hooks import CredentialBundle
+from audoryn_shared.infrastructure.auth.service import AuthenticatedUser
+from audoryn_shared.infrastructure.database.models import (
     ExternalAuthIdentity,
     GitHubAuthFlow,
     GitHubOnboarding,
     HumanIdentity,
 )
-from app.infrastructure.secrets.integration_crypto import (
+from audoryn_shared.infrastructure.secrets.integration_crypto import (
     decrypt_integration_secret,
     encrypt_integration_secret,
 )
@@ -480,7 +480,7 @@ async def test_real_http_callback_is_redacted_and_exchange_is_one_use(configured
     import httpx
     from fastapi import FastAPI
 
-    from app.infrastructure.database.session import database_session
+    from audoryn_shared.infrastructure.database.session import database_session
 
     row = connection_flow()
     row.status = "authorizing"
@@ -531,8 +531,8 @@ async def test_real_http_callback_is_redacted_and_exchange_is_one_use(configured
 async def test_connector_reuses_exact_owned_installation_instead_of_creating_duplicate(
     configured, monkeypatch
 ):
-    from app.api import integration_foundation_routes
     from app.application.services import github_connector as connector
+    from audoryn_shared.api import integration_foundation_routes
 
     owner, org, connection_id = uuid4(), uuid4(), uuid4()
     binding = SimpleNamespace(
@@ -644,7 +644,7 @@ async def test_multiple_installations_are_not_automatically_chosen(configured, m
 async def test_provider_connection_failure_is_actionable_without_invalidating_login(
     configured, monkeypatch
 ):
-    from app.execution.providers.native.http import ProviderTransportError
+    from audoryn_shared.execution.providers.native.http import ProviderTransportError
 
     row = connection_flow()
     session = db(row)
@@ -891,7 +891,7 @@ async def test_real_identity_map_refreshes_concurrent_dismissal(configured, monk
     from sqlalchemy import create_engine, update
     from sqlalchemy.orm import Session
 
-    from app.infrastructure.database.models import GitHubAuthFlow
+    from audoryn_shared.infrastructure.database.models import GitHubAuthFlow
 
     engine = create_engine("sqlite://")
     cast(Table, GitHubOnboarding.__table__).create(engine)

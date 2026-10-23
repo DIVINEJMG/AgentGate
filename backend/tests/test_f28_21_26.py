@@ -2,13 +2,13 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.services.cutover_gate import CutoverReadiness, FinalCutoverGate
-from app.application.services.data_migration import (
+from audoryn_shared.application.services.cutover_gate import CutoverReadiness, FinalCutoverGate
+from audoryn_shared.application.services.data_migration import (
     LegacyRecord,
     MigrationValidationError,
     RepeatableMigrationPipeline,
 )
-from app.application.services.shadow_mode import ShadowModeService
+from audoryn_shared.application.services.shadow_mode import ShadowModeService
 
 
 def test_repeatable_migration_rejects_duplicate_legacy_identity() -> None:

@@ -8,7 +8,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.execution.browser.contracts import (
+from audoryn_execution.execution.providers.resolver import ExecutionResolver
+from audoryn_shared.execution.browser.contracts import (
     BrowserDownload,
     BrowserElement,
     BrowserFrame,
@@ -17,19 +18,18 @@ from app.execution.browser.contracts import (
     BrowserSession,
     BrowserVerificationProbe,
 )
-from app.execution.contracts import (
+from audoryn_shared.execution.contracts import (
     ExecutionPreferences,
     ExecutionRequest,
     ExecutionResult,
     ProviderRuntimeContext,
     ResourceDescriptor,
 )
-from app.execution.providers.browser import (
+from audoryn_shared.execution.providers.browser import (
     BrowserExecutionProvider,
     PlaywrightBrowserProvider,
 )
-from app.execution.providers.registry import ProviderRegistry
-from app.execution.providers.resolver import ExecutionResolver
+from audoryn_shared.execution.providers.registry import ProviderRegistry
 
 
 class FakeBrowserRuntime:

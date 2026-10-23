@@ -27,7 +27,7 @@ _JSON_KEY = re.compile(r"[a-z_]{1,40}")
 
 
 def _engine() -> AsyncEngine:
-    from app.infrastructure.database.session import engine
+    from audoryn_shared.infrastructure.database.session import engine
 
     return engine
 

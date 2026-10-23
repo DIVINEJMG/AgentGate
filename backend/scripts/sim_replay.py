@@ -123,9 +123,9 @@ async def member_principal(session: Any, organization_id: Any, user_id: Any) -> 
     """The person's identity in the organisation, as the API would build it after sign-in."""
     from sqlalchemy import select
 
-    from app.domain.identity.permissions import permissions_for_role
-    from app.domain.identity.principals import HumanPrincipal
-    from app.infrastructure.database.models import OrganizationMembership
+    from audoryn_shared.domain.identity.permissions import permissions_for_role
+    from audoryn_shared.domain.identity.principals import HumanPrincipal
+    from audoryn_shared.infrastructure.database.models import OrganizationMembership
 
     membership = await session.scalar(select(OrganizationMembership).where(
         OrganizationMembership.organization_id == organization_id, OrganizationMembership.user_id == user_id))
@@ -140,8 +140,8 @@ async def send_message(thread_id: str, content: str) -> None:
     from uuid import UUID
 
     from app.application.services.conversations import ConversationService
-    from app.infrastructure.database.models import ConversationThread
-    from app.infrastructure.database.session import session_factory
+    from audoryn_shared.infrastructure.database.models import ConversationThread
+    from audoryn_shared.infrastructure.database.session import session_factory
 
     async with session_factory() as session:
         thread = await session.get(ConversationThread, UUID(thread_id))
@@ -156,7 +156,7 @@ async def send_message(thread_id: str, content: str) -> None:
 async def newest_item(session: Any, since: Any) -> Any:
     from sqlalchemy import select
 
-    from app.infrastructure.database.models import WorkItem
+    from audoryn_shared.infrastructure.database.models import WorkItem
 
     return await session.scalar(select(WorkItem).where(WorkItem.created_at >= since)
                                 .order_by(WorkItem.created_at.desc()).limit(1))
@@ -165,7 +165,7 @@ async def newest_item(session: Any, since: Any) -> Any:
 async def report_settled(session: Any, item: Any) -> None:
     from sqlalchemy import select
 
-    from app.infrastructure.database.models import Run
+    from audoryn_shared.infrastructure.database.models import Run
 
     summary = await session.scalar(select(Run.result_summary).where(Run.work_item_id == item.id))
     print(f"[replay] {str(item.id)[:8]} {item.status}: {summary or ''}"[:400], flush=True)
@@ -175,8 +175,8 @@ async def handle_approvals(session: Any, item: Any, approve: bool, announced: se
     """Approve the task's new pending approvals (with --approve), or say they are waiting."""
     from sqlalchemy import select
 
-    from app.api.governance_routes import _decide_approval
-    from app.infrastructure.database.models import Action, Approval, Run
+    from audoryn_shared.api.governance_routes import _decide_approval
+    from audoryn_shared.infrastructure.database.models import Action, Approval, Run
 
     pending = [approval for approval in (await session.scalars(
         select(Approval).join(Action, Action.id == Approval.action_id).join(Run, Run.id == Action.run_id)
@@ -202,8 +202,8 @@ async def watch(started: float, approve: bool, timeout: float, focus: dict[str, 
     from datetime import UTC, datetime
     from uuid import UUID
 
-    from app.infrastructure.database.models import WorkItem
-    from app.infrastructure.database.session import session_factory
+    from audoryn_shared.infrastructure.database.models import WorkItem
+    from audoryn_shared.infrastructure.database.session import session_factory
 
     since = datetime.fromtimestamp(started, UTC)
     resumed = focus["item"]

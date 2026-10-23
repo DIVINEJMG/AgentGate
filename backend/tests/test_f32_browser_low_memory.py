@@ -2,15 +2,10 @@
 
 from pathlib import Path
 
-from app.bootstrap.settings import settings
-from app.execution.browser.http_reader import (
-    MAX_HTTP_FORMS,
-    MAX_HTTP_LINKS,
-    MAX_HTTP_TEXT,
-    _BoundedHTMLParser,
-)
-from app.execution.browser.policy import BrowserDomainPolicy
-from app.execution.providers.browser import _browser_session_ttl
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.execution.browser.http_reader import MAX_HTTP_FORMS, MAX_HTTP_LINKS, MAX_HTTP_TEXT, _BoundedHTMLParser
+from audoryn_shared.execution.browser.policy import BrowserDomainPolicy
+from audoryn_shared.execution.providers.browser import _browser_session_ttl
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -71,10 +66,10 @@ def test_managed_browser_uses_current_ttl_without_changing_manual_resource() -> 
 
 
 def test_f32_chromium_is_lazy_and_runtime_sweep_reaps_sessions() -> None:
-    lifecycle = (ROOT / "backend/app/bootstrap/lifecycle.py").read_text(encoding="utf-8")
-    runtime_api = (ROOT / "backend/app/api/internal/runtime.py").read_text(encoding="utf-8")
+    lifecycle = (ROOT / "services/execution/audoryn_execution/service.py").read_text(encoding="utf-8")  # starts execution
+    runtime_api = (ROOT / "services/execution/audoryn_execution/api/internal/runtime.py").read_text(encoding="utf-8")
     browser_runtime = (
-        ROOT / "backend/app/execution/browser/runtime.py"
+        ROOT / "services/execution/audoryn_execution/execution/browser/runtime.py"
     ).read_text(encoding="utf-8")
 
     assert "browser_provider.warmup()" not in lifecycle
@@ -87,10 +82,10 @@ def test_f32_chromium_is_lazy_and_runtime_sweep_reaps_sessions() -> None:
 
 def test_f32_observation_and_evidence_paths_are_memory_bounded() -> None:
     observation = (
-        ROOT / "backend/app/execution/browser/observation.py"
+        ROOT / "services/execution/audoryn_execution/execution/browser/observation.py"
     ).read_text(encoding="utf-8")
     provider = (
-        ROOT / "backend/app/execution/providers/browser.py"
+        ROOT / "packages/shared/audoryn_shared/execution/providers/browser.py"
     ).read_text(encoding="utf-8")
 
     assert "MAX_VISIBLE_TEXT = 12_000" in observation
@@ -105,12 +100,12 @@ def test_f32_observation_and_evidence_paths_are_memory_bounded() -> None:
 
 
 def test_f32_http_first_and_provider_neutral_capacity_backoff_are_durable() -> None:
-    managed = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    managed = (ROOT / "services/execution/audoryn_execution/runtime/managed.py").read_text(encoding="utf-8")
     authority = (
-        ROOT / "backend/app/application/services/browser_origin_authority.py"
+        ROOT / "packages/shared/audoryn_shared/application/services/browser_origin_authority.py"
     ).read_text(encoding="utf-8")
     coordinator = (
-        ROOT / "backend/app/infrastructure/redis/coordination.py"
+        ROOT / "packages/shared/audoryn_shared/infrastructure/redis/coordination.py"
     ).read_text(encoding="utf-8")
 
     assert "fetch_http_page(" in managed
@@ -133,13 +128,13 @@ def test_f32_http_first_and_provider_neutral_capacity_backoff_are_durable() -> N
 
 def test_f32_cold_browser_start_has_separate_budget_and_reclaim_path() -> None:
     provider = (
-        ROOT / "backend/app/execution/providers/browser.py"
+        ROOT / "packages/shared/audoryn_shared/execution/providers/browser.py"
     ).read_text(encoding="utf-8")
     runtime = (
-        ROOT / "backend/app/execution/browser/runtime.py"
+        ROOT / "services/execution/audoryn_execution/execution/browser/runtime.py"
     ).read_text(encoding="utf-8")
     settings_source = (
-        ROOT / "backend/app/bootstrap/settings.py"
+        ROOT / "packages/shared/audoryn_shared/bootstrap/settings.py"
     ).read_text(encoding="utf-8")
 
     assert "browser_cold_start_timeout_seconds" in settings_source
@@ -163,9 +158,9 @@ def test_f32_cold_browser_start_has_separate_budget_and_reclaim_path() -> None:
 
 
 def test_f32_retryable_provider_errors_are_bounded_and_requeued() -> None:
-    managed = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    managed = (ROOT / "services/execution/audoryn_execution/runtime/managed.py").read_text(encoding="utf-8")
     settings_source = (
-        ROOT / "backend/app/bootstrap/settings.py"
+        ROOT / "packages/shared/audoryn_shared/bootstrap/settings.py"
     ).read_text(encoding="utf-8")
 
     assert "runtime_provider_retry_limit: int = 2" in settings_source
@@ -181,7 +176,7 @@ def test_f32_retryable_provider_errors_are_bounded_and_requeued() -> None:
 
 
 def test_f32_http_first_bootstrap_is_visible_in_runtime_telemetry() -> None:
-    managed = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    managed = (ROOT / "services/execution/audoryn_execution/runtime/managed.py").read_text(encoding="utf-8")
 
     assert "HTTP-first bootstrap completed" in managed
     assert "HTTP-first bootstrap skipped" in managed

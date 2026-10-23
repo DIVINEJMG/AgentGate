@@ -11,38 +11,39 @@ from playwright.async_api import Browser, BrowserContext, Page
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
-from app.execution.browser.contracts import (
+from audoryn_execution.execution.browser.observation import (
+    MAX_ARIA_SNAPSHOT,
+    MAX_DOM_SNAPSHOT,
+    MAX_ELEMENTS,
+    MAX_VISIBLE_TEXT,
+)
+from audoryn_execution.execution.browser.runtime import BrowserRuntime
+from audoryn_execution.execution.recovery import RecoveryPolicy
+from audoryn_shared.execution.browser.contracts import (
     BrowserDownload,
     BrowserLocator,
     BrowserObservation,
     BrowserSession,
     BrowserVerificationProbe,
 )
-from app.execution.browser.egress import evaluate_browser_egress
-from app.execution.browser.errors import (
+from audoryn_shared.execution.browser.egress import evaluate_browser_egress
+from audoryn_shared.execution.browser.errors import (
     BrowserDetachedFrame,
     BrowserDownloadFailure,
     BrowserElementNotFound,
     BrowserRuntimeLimitExceeded,
     BrowserStaleObservation,
 )
-from app.execution.browser.observation import (
-    MAX_ARIA_SNAPSHOT,
-    MAX_DOM_SNAPSHOT,
-    MAX_ELEMENTS,
-    MAX_VISIBLE_TEXT,
-)
-from app.execution.browser.policy import BrowserDomainPolicy
-from app.execution.browser.runtime import BrowserRuntime
-from app.execution.browser.verification import BrowserVerificationExpectation
-from app.execution.contracts import (
+from audoryn_shared.execution.browser.policy import BrowserDomainPolicy
+from audoryn_shared.execution.browser.verification import BrowserVerificationExpectation
+from audoryn_shared.execution.contracts import (
     ExecutionError,
     ExecutionPreferences,
     ExecutionProviderError,
     ExecutionRequest,
     ResourceDescriptor,
 )
-from app.execution.providers.browser import (
+from audoryn_shared.execution.providers.browser import (
     MAX_ACTION_TIMEOUT_MS,
     MAX_DOWNLOAD_BYTES,
     MAX_NAVIGATION_TIMEOUT_MS,
@@ -50,8 +51,7 @@ from app.execution.providers.browser import (
     PlaywrightBrowserProvider,
     _bounded_int,
 )
-from app.execution.recovery import RecoveryPolicy
-from app.realtime.contracts import REALTIME_EVENT_TYPES
+from audoryn_shared.realtime.contracts import REALTIME_EVENT_TYPES
 
 
 class IsolationPage:
@@ -940,7 +940,7 @@ async def test_browser_provider_can_release_session_by_canonical_id() -> None:
 
 def test_managed_runtime_releases_browser_sessions_on_terminal_runs() -> None:
     root = Path(__file__).resolve().parents[2]
-    managed = (root / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    managed = (root / "services/execution/audoryn_execution/runtime/managed.py").read_text(encoding="utf-8")
 
     assert "async def _close_browser_session(" in managed
     assert "browser_provider.close_session_id" in managed
@@ -954,7 +954,7 @@ async def test_browser_runtime_stays_lazy_before_managed_runtime_traffic() -> No
     assert await provider.warmup() is True
 
     root = Path(__file__).resolve().parents[2]
-    lifecycle = (root / "backend/app/bootstrap/lifecycle.py").read_text(encoding="utf-8")
+    lifecycle = (root / "services/execution/audoryn_execution/service.py").read_text(encoding="utf-8")  # starts execution
     assert "browser_provider.warmup()" not in lifecycle
     assert "browser process will start on first browser action" in lifecycle
     assert "runtime_execution_enabled" in lifecycle
@@ -962,13 +962,13 @@ async def test_browser_runtime_stays_lazy_before_managed_runtime_traffic() -> No
 
 def test_browser_execution_has_bounded_network_and_observation_phases() -> None:
     root = Path(__file__).resolve().parents[2]
-    runtime = (root / "backend/app/execution/browser/runtime.py").read_text(encoding="utf-8")
-    egress = (root / "backend/app/execution/browser/egress.py").read_text(encoding="utf-8")
+    runtime = (root / "services/execution/audoryn_execution/execution/browser/runtime.py").read_text(encoding="utf-8")
+    egress = (root / "packages/shared/audoryn_shared/execution/browser/egress.py").read_text(encoding="utf-8")
     observation = (
-        root / "backend/app/execution/browser/observation.py"
+        root / "services/execution/audoryn_execution/execution/browser/observation.py"
     ).read_text(encoding="utf-8")
     provider = (
-        root / "backend/app/execution/providers/browser.py"
+        root / "packages/shared/audoryn_shared/execution/providers/browser.py"
     ).read_text(encoding="utf-8")
 
     assert "timeout=20_000" in runtime

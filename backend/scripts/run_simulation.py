@@ -73,8 +73,8 @@ def install_fault_injection() -> None:
     `missing_field`: GitHub performs the request, then the rule's `field` is missing from the
     response (an unreadable result after a write).
     Each firing lowers `times`; a rule at 0 is spent."""
-    from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-    from app.execution.providers.native.http import ProviderTransportError
+    from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+    from audoryn_shared.execution.providers.native.http import ProviderTransportError
 
     real_api = ExpandedGitHubProvider.api
 

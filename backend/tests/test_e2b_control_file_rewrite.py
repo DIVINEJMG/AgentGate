@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.bootstrap.settings import settings
-from app.execution.coding.e2b import E2BCodingRuntime
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.execution.coding.e2b import E2BCodingRuntime
 
 
 class Files:

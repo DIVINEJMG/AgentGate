@@ -9,23 +9,23 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from app.application.services.integration_foundation import IntegrationTaskDraft
-from app.bootstrap.settings import Settings
-from app.domain.ai.providers import AIProviderError, AITextRequest
-from app.domain.conversation.intent import WorkerCommandIntent
-from app.domain.workforce.drafts import WorkerDraft
-from app.infrastructure.ai.anthropic_messages import (
+from audoryn_shared.application.services.integration_foundation import IntegrationTaskDraft
+from audoryn_shared.bootstrap.settings import Settings
+from audoryn_shared.domain.ai.providers import AIProviderError, AITextRequest
+from audoryn_shared.domain.conversation.intent import WorkerCommandIntent
+from audoryn_shared.domain.workforce.drafts import WorkerDraft
+from audoryn_shared.infrastructure.ai.anthropic_messages import (
     UNSUPPORTED_KEYWORDS,
     AnthropicMessagesProvider,
     claude_schema,
 )
-from app.infrastructure.ai.connections import (
+from audoryn_shared.infrastructure.ai.connections import (
     DEFAULT_CONNECTIONS,
     route_credential,
     snapshot_connection,
 )
-from app.infrastructure.ai.model_profiles import DEFAULT_PROFILES
-from app.infrastructure.ai.text_routes import transport_for_text_route
+from audoryn_shared.infrastructure.ai.model_profiles import DEFAULT_PROFILES
+from audoryn_shared.infrastructure.ai.text_routes import transport_for_text_route
 
 HAIKU, SONNET = "claude-haiku-5-5", "claude-sonnet-5-5"
 SCHEMA = {"type": "object", "properties": {"answer": {"type": "string", "maxLength": 40}}, "required": ["answer"]}
@@ -206,8 +206,8 @@ def test_routes_pick_the_claude_transport_and_its_own_key() -> None:
 
 @pytest.mark.asyncio
 async def test_a_free_form_schema_goes_through_the_prompt_and_is_still_validated() -> None:
-    from app.application.services.ai_gateway import ProviderAIGateway
-    from app.domain.ai.registry import ModelRegistry, ModelRoute
+    from audoryn_shared.application.services.ai_gateway import ProviderAIGateway
+    from audoryn_shared.domain.ai.registry import ModelRegistry, ModelRoute
 
     open_schema = {"type": "object", "properties": {"arguments": {"type": "object", "additionalProperties": True}},
                    "required": ["arguments"], "additionalProperties": False}
@@ -231,7 +231,7 @@ OR_HAIKU, OR_SONNET = "anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5
 
 
 def openrouter(handler: Any, model: str = OR_HAIKU) -> Any:
-    from app.infrastructure.ai.openrouter_claude import OpenRouterClaudeProvider
+    from audoryn_shared.infrastructure.ai.openrouter_claude import OpenRouterClaudeProvider
 
     conn = DEFAULT_CONNECTIONS["openrouter_claude"].model_copy(update={"enabled": True, "data_allowed": True, "billing_allowed": True})
     return OpenRouterClaudeProvider(name="openrouter_claude", connection=conn, credential="sk-or-test",
@@ -295,7 +295,7 @@ async def test_openrouter_credit_or_key_problems_move_on_to_the_next_model(statu
 
 
 def test_openrouter_routes_use_the_openrouter_key() -> None:
-    from app.infrastructure.ai.openrouter_claude import OpenRouterClaudeProvider
+    from audoryn_shared.infrastructure.ai.openrouter_claude import OpenRouterClaudeProvider
 
     conn = DEFAULT_CONNECTIONS["openrouter_claude"].model_copy(update={"enabled": True, "data_allowed": True, "billing_allowed": True})
     config = Settings.model_construct(openrouter_api_key=SecretStr("sk-or-test"), ai_text_connections={"openrouter_claude": conn})

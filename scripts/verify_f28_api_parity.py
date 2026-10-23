@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
-from app.bootstrap.application import create_application  # noqa: E402
+from app.main import create_application
 
 application = create_application()
 paths = set(application.openapi().get("paths", {}))

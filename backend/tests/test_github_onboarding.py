@@ -11,11 +11,11 @@ from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import github_routes
-from app.bootstrap.settings import settings
-from app.domain.identity.principals import HumanPrincipal
-from app.execution.providers.integration_hooks import CredentialBundle
-from app.execution.providers.native.github.authentication import GitHubAuthentication
-from app.execution.providers.native.http import ProviderTransportError
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.execution.providers.integration_hooks import CredentialBundle
+from audoryn_shared.execution.providers.native.github.authentication import GitHubAuthentication
+from audoryn_shared.execution.providers.native.http import ProviderTransportError
 
 
 @pytest.fixture

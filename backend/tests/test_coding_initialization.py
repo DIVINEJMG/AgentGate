@@ -17,16 +17,16 @@ from uuid import uuid4
 
 import pytest
 
-from app.execution.coding import initialization, service
-from app.execution.coding.bundles import (
+from audoryn_shared.execution.coding import initialization, service
+from audoryn_shared.execution.coding.bundles import (
     BUNDLE_BYTES,
     INITIALIZE_HELPER,
     build_bundles,
     source_manifest,
 )
-from app.execution.coding.e2b import E2BCodingRuntime
-from app.execution.coding.manifest_export import SCAN_SCRIPT
-from app.execution.contracts import ExecutionProviderError
+from audoryn_shared.execution.coding.e2b import E2BCodingRuntime
+from audoryn_shared.execution.coding.manifest_export import SCAN_SCRIPT
+from audoryn_shared.execution.contracts import ExecutionProviderError
 
 
 def snapshot(files):
@@ -259,7 +259,7 @@ def test_bundle_packaging_is_deterministic_and_bounded():
 async def test_e2b_connection_is_reused_and_action_handles_released(monkeypatch):
     from pydantic import SecretStr
 
-    from app.bootstrap.settings import settings
+    from audoryn_shared.bootstrap.settings import settings
     monkeypatch.setattr(settings, "coding_execution_enabled", True)
     monkeypatch.setattr(settings, "e2b_api_key", SecretStr("fixture"))
     monkeypatch.setattr(settings, "coding_template_id", "fixture")

@@ -4,9 +4,9 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.bootstrap.settings import settings
-from app.infrastructure.database import models  # noqa: F401
-from app.infrastructure.database.base import Base
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.infrastructure.database import models  # noqa: F401
+from audoryn_shared.infrastructure.database.base import Base
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_dsn)

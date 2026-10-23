@@ -5,13 +5,13 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.services.worker_site_targets import (
+from audoryn_shared.application.services.worker_site_targets import (
     SiteAssignments,
     apply_tool_selection,
     extract_site_assignments,
 )
-from app.domain.ai.providers import AIProviderError
-from app.domain.workforce.drafts import CapabilityNeed, JobDraft, SiteTargetDraft
+from audoryn_shared.domain.ai.providers import AIProviderError
+from audoryn_shared.domain.workforce.drafts import CapabilityNeed, JobDraft, SiteTargetDraft
 
 
 def proposed_browser_job():

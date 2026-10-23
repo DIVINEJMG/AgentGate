@@ -97,7 +97,7 @@ def reference_endpoints() -> list[Endpoint]:
 
 def python_endpoints() -> list[Endpoint]:
     sys.path.insert(0, str(BACKEND_ROOT))
-    from app.bootstrap.application import create_application
+    from app.main import create_application
 
     application = create_application()
     schema = application.openapi()

@@ -12,11 +12,11 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from app.bootstrap.settings import Settings
-from app.domain.ai.providers import AIProviderError, AITextRequest
-from app.infrastructure.ai.connections import TextConnection
-from app.infrastructure.ai.model_profiles import PlannerModelProfile
-from app.infrastructure.ai.openai_chat import ConfiguredChatProvider
+from audoryn_shared.bootstrap.settings import Settings
+from audoryn_shared.domain.ai.providers import AIProviderError, AITextRequest
+from audoryn_shared.infrastructure.ai.connections import TextConnection
+from audoryn_shared.infrastructure.ai.model_profiles import PlannerModelProfile
+from audoryn_shared.infrastructure.ai.openai_chat import ConfiguredChatProvider
 from scripts import ai_simulator, run_simulation
 
 SIM = {"api_format": "openai_chat", "simulator": True, "base_url": "http://127.0.0.1:8788/v1",
@@ -127,8 +127,8 @@ async def test_a_recorded_scenario_replays_without_a_person(folders: Path) -> No
 
 @pytest.mark.asyncio
 async def test_fault_injection_drops_or_loses_only_the_armed_calls(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-    from app.execution.providers.native.http import ProviderTransportError
+    from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+    from audoryn_shared.execution.providers.native.http import ProviderTransportError
 
     sent: list[str] = []
 

@@ -12,10 +12,10 @@ from app.application.services.conversation_semantics import grounded_reply
 from app.application.services.conversations import ConversationService
 from app.application.services.intent_interpreter import IntentInterpreter
 from app.application.services.reply_claims import unsupported_assertion
-from app.domain.ai.providers import AIGateway, AIInvocationContext, AIProviderError
-from app.domain.conversation.intent import WorkerCommandIntent
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.database.models import ConversationMessage, ConversationThread
+from audoryn_shared.domain.ai.providers import AIGateway, AIInvocationContext, AIProviderError
+from audoryn_shared.domain.conversation.intent import WorkerCommandIntent
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.database.models import ConversationMessage, ConversationThread
 from tests.test_conversation_semantics import selector
 
 

@@ -13,13 +13,13 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import SecretStr
 from sqlalchemy.exc import PendingRollbackError
 
-from app.api.internal import runtime
-from app.bootstrap.settings import Settings, settings
-from app.domain.ai.providers import AIProviderError
-from app.infrastructure.ai import provider as ai_provider
-from app.infrastructure.ai.telemetry import DurableAIInvocationRecorder
-from app.infrastructure.redis.coordination import Lease
-from app.runtime.managed import ManagedRuntimeExecutor, RuntimeStepOutcome
+from audoryn_execution.api.internal import runtime
+from audoryn_execution.runtime.managed import ManagedRuntimeExecutor, RuntimeStepOutcome
+from audoryn_shared.bootstrap.settings import Settings, settings
+from audoryn_shared.domain.ai.providers import AIProviderError
+from audoryn_shared.infrastructure.ai import provider as ai_provider
+from audoryn_shared.infrastructure.ai.telemetry import DurableAIInvocationRecorder
+from audoryn_shared.infrastructure.redis.coordination import Lease, keep_leases
 
 
 def message():
@@ -321,8 +321,8 @@ async def test_preparation_releases_transaction_and_records_separate_ai_duration
 
 @pytest.mark.asyncio
 async def test_invocation_telemetry_uses_separate_committed_sessions(monkeypatch):
-    from app.infrastructure.ai import telemetry
-    from app.infrastructure.database import session as database
+    from audoryn_shared.infrastructure.ai import telemetry
+    from audoryn_shared.infrastructure.database import session as database
 
     sessions = []
 
@@ -360,7 +360,7 @@ async def test_loss_of_lease_cancels_owner_before_overlap(monkeypatch):
     owner = SimpleNamespace(cancel=Mock())
     sleep = AsyncMock()
     monkeypatch.setattr(runtime.asyncio, "sleep", sleep)
-    await runtime._renew_runtime_leases(coordinator, (Lease("work", "token"),), owner)
+    await keep_leases(coordinator, (Lease("work", "token"),), owner)
     owner.cancel.assert_called_once()
 
 
@@ -446,3 +446,36 @@ async def test_continuation_signals_after_release_with_distinct_identity(monkeyp
         payload, cast(Any, coordinator), Lease("work", "token"), Lease("slot", "token")
     )
     assert output["continuationQueued"]
+
+
+async def _track(coroutine) -> asyncio.Task:
+    task = asyncio.create_task(coroutine)
+    runtime._runtime_tasks.add(task)
+    task.add_done_callback(runtime._runtime_tasks.discard)
+    return task
+
+
+@pytest.mark.asyncio
+async def test_shutdown_drain_lets_running_steps_finish_and_cancels_the_rest():
+    quick = await _track(asyncio.sleep(0.05, result="done"))
+    slow = await _track(asyncio.sleep(30))
+
+    await runtime.stop_runtime_tasks(drain_seconds=0.5)
+
+    assert quick.result() == "done"
+    assert slow.cancelled()
+    assert not runtime._runtime_tasks
+
+
+@pytest.mark.asyncio
+async def test_shutdown_without_drain_cancels_at_once_as_before():
+    step = await _track(asyncio.sleep(30))
+
+    await runtime.stop_runtime_tasks()
+
+    assert step.cancelled()
+    assert not runtime._runtime_tasks
+
+
+def test_drain_is_off_by_default():
+    assert Settings.model_fields["runtime_drain_seconds"].default == 0

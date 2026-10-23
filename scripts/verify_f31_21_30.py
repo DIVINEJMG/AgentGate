@@ -11,21 +11,21 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-drafts = read("backend/app/domain/workforce/drafts.py")
-draft_generator = read("backend/app/application/services/worker_draft.py")
-resolver = read("backend/app/application/services/capability_autoresolver.py")
-schedule = read("backend/app/application/services/schedule_inference.py")
-autonomy = read("backend/app/application/services/worker_autonomy.py")
-memory = read("backend/app/application/services/worker_memory.py")
+drafts = read("packages/shared/audoryn_shared/domain/workforce/drafts.py")
+draft_generator = read("packages/shared/audoryn_shared/application/services/worker_draft.py")
+resolver = read("packages/shared/audoryn_shared/application/services/capability_autoresolver.py")
+schedule = read("packages/shared/audoryn_shared/application/services/schedule_inference.py")
+autonomy = read("packages/shared/audoryn_shared/application/services/worker_autonomy.py")
+memory = read("packages/shared/audoryn_shared/application/services/worker_memory.py")
 attachments = read("backend/app/application/services/attachment_ingestion.py")
 commands = read("backend/app/application/services/conversation_commands.py")
 conversation_routes = read("backend/app/api/conversation_routes.py")
-jobs = read("backend/app/api/jobs_routes.py")
-integrations = read("backend/app/api/integration_capability_routes.py")
-managed = read("backend/app/runtime/managed.py")
-models = read("backend/app/infrastructure/database/models.py")
+jobs = read("packages/shared/audoryn_shared/api/jobs_routes.py")
+integrations = read("packages/shared/audoryn_shared/api/integration_capability_routes.py")
+managed = read("services/execution/audoryn_execution/runtime/managed.py")
+models = read("packages/shared/audoryn_shared/infrastructure/database/models.py")
 migration = read("backend/migrations/versions/0008_f31_autonomy.py")
-provider_factory = read("backend/app/infrastructure/ai/provider.py")
+provider_factory = read("packages/shared/audoryn_shared/infrastructure/ai/provider.py")
 tests = read("backend/tests/test_f31_21_30.py")
 
 for token in (
@@ -142,7 +142,7 @@ for token in (
         errors.append(f"F31.28 vision routing is missing: {token}")
 if "nvidia/ising-calibration-1.5-31b" not in provider_factory:
     # Model ID may live in settings/registry factory; verify via source below separately.
-    settings = read("backend/app/bootstrap/settings.py")
+    settings = read("packages/shared/audoryn_shared/bootstrap/settings.py")
     if "nvidia/ising-calibration-1.5-31b" not in settings:
         errors.append("F31.28 default vision model is not Ising behind the vision role")
 

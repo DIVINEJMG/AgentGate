@@ -9,16 +9,16 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.workforce_routes import automatic_agent, create_worker
 from app.application.services.agent_identity import AgentIdentityService
-from app.domain.identity.agents import (
+from app.infrastructure.database.agent_repository import SQLAlchemyAgentRepository
+from audoryn_shared.api.workforce_routes import automatic_agent, create_worker
+from audoryn_shared.domain.identity.agents import (
     AgentCredentialView,
     AgentDomainError,
     AgentIdentityView,
 )
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.database.agent_repository import SQLAlchemyAgentRepository
-from app.infrastructure.database.models import AgentCredential, AgentIdentity
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.database.models import AgentCredential, AgentIdentity
 
 
 class FakeAgentRepository:

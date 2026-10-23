@@ -15,9 +15,10 @@ from uuid import UUID
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.services import content_state, entitlements
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.database.models import AuditEvent
+from app.application.services import content_state
+from audoryn_shared.application.services import entitlements
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.database.models import AuditEvent
 
 DISMISSED_FOR = timedelta(days=7)
 REQUEST_EVERY = timedelta(days=1)

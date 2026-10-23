@@ -1,7 +1,7 @@
 """Bounded conversation evidence; account authority is always resolved afresh."""
 from typing import Any
 
-from app.application.services.worker_memory import contains_secret_material
+from audoryn_shared.application.services.worker_memory import contains_secret_material
 
 
 def integration_request_context(context: dict) -> dict:

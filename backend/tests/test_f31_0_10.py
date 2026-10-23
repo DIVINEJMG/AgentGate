@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 import httpx
 import pytest
 
-from app.application.services.ai_gateway import ProviderAIGateway, UnconfiguredAIGateway
-from app.domain.ai.providers import (
+from audoryn_shared.application.services.ai_gateway import ProviderAIGateway, UnconfiguredAIGateway
+from audoryn_shared.domain.ai.providers import (
     AIInvocationContext,
     AIMediaInput,
     AIProviderError,
@@ -15,9 +15,9 @@ from app.domain.ai.providers import (
     AITextRequest,
     ModelProviderCapabilities,
 )
-from app.domain.ai.registry import ModelRegistry, ModelRoute
-from app.infrastructure.ai.nvidia import NvidiaNimProvider
-from app.infrastructure.database.models import AIInvocation
+from audoryn_shared.domain.ai.registry import ModelRegistry, ModelRoute
+from audoryn_shared.infrastructure.ai.nvidia import NvidiaNimProvider
+from audoryn_shared.infrastructure.database.models import AIInvocation
 
 
 def _registry() -> ModelRegistry:

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from app.bootstrap.settings import settings
+from audoryn_shared.bootstrap.settings import settings
 
 
 @dataclass(frozen=True, slots=True)

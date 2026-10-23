@@ -11,10 +11,10 @@ import pytest
 from sqlalchemy import JSON, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from app.application.services.integration_foundation import IntegrationFoundation
-from app.execution.coding import service
-from app.execution.contracts import ExecutionProviderError
-from app.execution.providers.native.github.actions.coding import ACTIONS
+from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
+from audoryn_shared.execution.coding import service
+from audoryn_shared.execution.contracts import ExecutionProviderError
+from audoryn_shared.execution.providers.native.github.actions.coding import ACTIONS
 
 
 @pytest.mark.parametrize("succeeds", [True, False])

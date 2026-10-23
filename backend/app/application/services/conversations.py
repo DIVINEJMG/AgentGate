@@ -6,26 +6,30 @@ from uuid import UUID
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.services.ai_gateway import ReleasingGateway
 from app.application.services.conversation_commands import (
     ConversationCommandCompiler,
     CrossTenantReferenceError,
 )
 from app.application.services.conversation_context import ConversationContextAssembler
 from app.application.services.intent_interpreter import IntentInterpreter
-from app.domain.ai.providers import AIInvocationContext, AIProviderError
-from app.domain.conversation.intent import CommandReceipt, FailureCategory, WorkerCommandIntent
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.ai.provider import ai_gateway_from_settings
-from app.infrastructure.database.models import (
+from audoryn_shared.application.services.ai_gateway import ReleasingGateway
+from audoryn_shared.domain.ai.providers import AIInvocationContext, AIProviderError
+from audoryn_shared.domain.conversation.intent import (
+    CommandReceipt,
+    FailureCategory,
+    WorkerCommandIntent,
+)
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.ai.provider import ai_gateway_from_settings
+from audoryn_shared.infrastructure.database.models import (
     Artifact,
     ConversationCommand,
     ConversationMessage,
     ConversationThread,
     Worker,
 )
-from app.infrastructure.database.outbox import TransactionalOutbox
-from app.observability.usage import label_usage
+from audoryn_shared.infrastructure.database.outbox import TransactionalOutbox
+from audoryn_shared.observability.usage import label_usage
 
 
 class ConversationService:

@@ -20,26 +20,33 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
-from app.application.services import (
+from audoryn_execution.execution.integration_execution import execute_native_action
+from audoryn_execution.runtime import managed
+from audoryn_execution.runtime.managed import (
+    ManagedRuntimeExecutor,
+    _provider_wait,
+    _waiting_message,
+)
+from audoryn_shared.application.services import (
     integration_credentials,
     integration_events,
     integration_foundation,
 )
-from app.application.services.integration_credentials import CredentialManager, encode_bundle
-from app.application.services.integration_foundation import IntegrationFoundation
-from app.application.services.task_activity import activity_for
-from app.bootstrap.settings import settings
-from app.execution.contracts import ExecutionError, ExecutionProviderError
-from app.execution.integration_execution import execute_native_action
-from app.execution.providers.integration_hooks import CredentialBundle
-from app.execution.providers.native import http as native_http
-from app.execution.providers.native.github import event_routing
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.native.slack import _failure
-from app.execution.providers.registry import ProviderRegistry
-from app.infrastructure.database import models as m
-from app.runtime import managed
-from app.runtime.managed import ManagedRuntimeExecutor, _provider_wait, _waiting_message
+from audoryn_shared.application.services.integration_credentials import (
+    CredentialManager,
+    encode_bundle,
+)
+from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
+from audoryn_shared.application.services.task_activity import activity_for
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.execution.contracts import ExecutionError, ExecutionProviderError
+from audoryn_shared.execution.providers.integration_hooks import CredentialBundle
+from audoryn_shared.execution.providers.native import http as native_http
+from audoryn_shared.execution.providers.native.github import event_routing
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.native.slack import _failure
+from audoryn_shared.execution.providers.registry import ProviderRegistry
+from audoryn_shared.infrastructure.database import models as m
 from scripts.runtime_benchmark import BenchProvider, BenchSession, _aware_sqlite_datetimes
 from tests.test_approvals_phase4 import TABLES
 from tests.test_efficiency_queries import ORG, Database
@@ -425,8 +432,10 @@ async def test_a_refresh_marks_what_the_provider_no_longer_returns(monkeypatch: 
 
 @pytest.mark.asyncio
 async def test_a_vanished_resource_is_named_instead_of_being_chosen(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.application.services.integration_foundation import IntegrationRequirementError
-    from app.domain.integrations.foundation import IntegrationNeed, IntegrationTaskDraft
+    from audoryn_shared.application.services.integration_foundation import (
+        IntegrationRequirementError,
+    )
+    from audoryn_shared.domain.integrations.foundation import IntegrationNeed, IntegrationTaskDraft
 
     foundation = IntegrationFoundation(cast(Any, None))
     catalog = [{"id": "1", "connectionId": "c", "provider": "bench", "externalId": "acme/old", "name": "acme/old",

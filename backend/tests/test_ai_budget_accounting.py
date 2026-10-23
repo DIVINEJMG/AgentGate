@@ -7,12 +7,20 @@ from uuid import uuid4
 import pytest
 
 from app.application.services.conversations import ConversationService
-from app.application.services.ordered_ai import OrderedTextGateway
-from app.bootstrap.settings import Settings
-from app.domain.ai.providers import AIInvocationContext, AIProviderError, AIResponse, AITextRequest
-from app.infrastructure.ai.model_profiles import PlannerModelProfile
-from app.infrastructure.ai.text_routes import AdmittedTextProvider
-from app.infrastructure.ai.workloads import reserve_workload_budgets, settle_workload_budget
+from audoryn_shared.application.services.ordered_ai import OrderedTextGateway
+from audoryn_shared.bootstrap.settings import Settings
+from audoryn_shared.domain.ai.providers import (
+    AIInvocationContext,
+    AIProviderError,
+    AIResponse,
+    AITextRequest,
+)
+from audoryn_shared.infrastructure.ai.model_profiles import PlannerModelProfile
+from audoryn_shared.infrastructure.ai.text_routes import AdmittedTextProvider
+from audoryn_shared.infrastructure.ai.workloads import (
+    reserve_workload_budgets,
+    settle_workload_budget,
+)
 
 
 def coordinator():
@@ -60,7 +68,7 @@ async def test_admission_refunds_unused_reservation_or_reconciles_usage(monkeypa
     redis = coordinator()
     if blocked:
         redis.acquire_slot.side_effect = ["org-slot", None]
-    monkeypatch.setattr("app.infrastructure.ai.text_routes.RedisCoordinator.from_settings", lambda: redis)
+    monkeypatch.setattr("audoryn_shared.infrastructure.ai.text_routes.RedisCoordinator.from_settings", lambda: redis)
     provider = SimpleNamespace(name="fake", capabilities=None, validate_request=lambda **kwargs: None,
         generate_text=AsyncMock(return_value=AIResponse("ok", "fake", "model", usage={"total_tokens": 30})))
     admitted = AdmittedTextProvider(provider, Settings.model_construct(),
@@ -81,7 +89,7 @@ async def test_admission_refunds_unused_reservation_or_reconciles_usage(monkeypa
 @pytest.mark.asyncio
 async def test_cancelled_dispatch_retains_unknown_usage_and_propagates_cancellation(monkeypatch):
     redis = coordinator()
-    monkeypatch.setattr("app.infrastructure.ai.text_routes.RedisCoordinator.from_settings", lambda: redis)
+    monkeypatch.setattr("audoryn_shared.infrastructure.ai.text_routes.RedisCoordinator.from_settings", lambda: redis)
     provider = SimpleNamespace(name="fake", capabilities=None, validate_request=lambda **kwargs: None,
         generate_text=AsyncMock(side_effect=asyncio.CancelledError))
     admitted = AdmittedTextProvider(provider, Settings.model_construct(),

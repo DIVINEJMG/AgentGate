@@ -7,8 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
-from app.infrastructure.database import models  # noqa: F401,E402
-from app.infrastructure.database.base import Base  # noqa: E402
+from audoryn_shared.infrastructure.database import models
+from audoryn_shared.infrastructure.database.base import Base
 
 required_tables = {
     "organizations",

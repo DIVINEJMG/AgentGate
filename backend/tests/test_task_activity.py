@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import asyncpg
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.conversation_routes import task_activity
-from app.application.services.task_activity import (
+from audoryn_shared.application.services.task_activity import (
     activity_for,
     activity_item_query,
     activity_step_query,
@@ -21,9 +21,9 @@ from app.application.services.task_activity import (
     observe_execution_ownership,
     safe_text,
 )
-from app.bootstrap.settings import settings
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.database.models import RunStep
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.database.models import RunStep
 
 
 def test_poll_queries_project_evidence_without_file_bodies_or_objectives():
@@ -155,7 +155,7 @@ async def test_activity_reads_exact_origin_and_only_publishes_selected_evidence(
         step.output["data"]["output"] = None
     elif projected == "null_changes":
         step.output["data"]["output"]["changes"] = None
-    from app.application.services.integration_foundation import IntegrationFoundation
+    from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
 
     monkeypatch.setattr(IntegrationFoundation, "can_use", AsyncMock(return_value=access != "revoked"))
     session = SimpleNamespace(
@@ -203,7 +203,7 @@ async def test_activity_endpoint_denies_cross_tenant_thread():
 
 @pytest.fixture(autouse=True)
 def activity_ownership(monkeypatch):
-    from app.infrastructure.redis.coordination import RedisCoordinator
+    from audoryn_shared.infrastructure.redis.coordination import RedisCoordinator
     coordinator = SimpleNamespace(active_locks=AsyncMock(side_effect=lambda keys: {key: True for key in keys}), close=AsyncMock())
     monkeypatch.setattr(RedisCoordinator, "from_settings", lambda: coordinator)
     return coordinator
@@ -255,7 +255,7 @@ async def test_live_requires_ownership_or_current_scheduled_retry(activity_owner
 
 @pytest.mark.asyncio
 async def test_ownership_read_is_batched_and_never_returns_lease_tokens():
-    from app.infrastructure.redis.coordination import RedisCoordinator
+    from audoryn_shared.infrastructure.redis.coordination import RedisCoordinator
     client = SimpleNamespace(mget=AsyncMock(return_value=["private-owner-token", None]))
     coordinator = RedisCoordinator(cast(Redis, client))
     result = await coordinator.active_locks(["runtime:a:0", "preparation:b:c"])

@@ -2,8 +2,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.infrastructure.auth.passwords import hash_password, verify_password
-from app.infrastructure.auth.session_store import RedisSessionStore
+from audoryn_shared.infrastructure.auth.passwords import hash_password, verify_password
+from audoryn_shared.infrastructure.auth.session_store import RedisSessionStore
 
 
 class FakeRedis:

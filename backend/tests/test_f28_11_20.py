@@ -4,20 +4,20 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.migration_order import assert_migration_order
-from app.domain.identity.principals import AgentPrincipal, HumanPrincipal
-from app.domain.integrations.contracts import (
+from audoryn_shared.application.migration_order import assert_migration_order
+from audoryn_shared.domain.identity.principals import AgentPrincipal, HumanPrincipal
+from audoryn_shared.domain.integrations.contracts import (
     IntegrationManifest,
     IntegrationOperation,
     provider_manifest,
 )
-from app.domain.secrets.vault import require_secret_reference
-from app.domain.security.invariants import (
+from audoryn_shared.domain.secrets.vault import require_secret_reference
+from audoryn_shared.domain.security.invariants import (
     require_execution_allowed,
     require_human_approver,
     require_job_authority,
 )
-from app.observability.context import (
+from audoryn_shared.observability.context import (
     ExecutionContext,
     bind_context,
     reset_context,

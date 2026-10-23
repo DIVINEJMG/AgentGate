@@ -11,31 +11,7 @@ from uuid import UUID
 from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.infrastructure.database.models import (
-    Action,
-    Approval,
-    Artifact,
-    ArtifactAnalysis,
-    CapabilityProfile,
-    ConversationCommand,
-    ConversationMessage,
-    ConversationThread,
-    HumanIdentity,
-    Integration,
-    Job,
-    JobRevision,
-    Memory,
-    Policy,
-    PolicyRevision,
-    Result,
-    ResultVersion,
-    Run,
-    RunStep,
-    Worker,
-    WorkerDirective,
-    WorkforceRole,
-    WorkItem,
-)
+from audoryn_shared.infrastructure.database.models import Action, Approval, Artifact, ArtifactAnalysis, CapabilityProfile, ConversationCommand, ConversationMessage, ConversationThread, HumanIdentity, Integration, Job, JobRevision, Memory, Policy, PolicyRevision, Result, ResultVersion, Run, RunStep, Worker, WorkerDirective, WorkforceRole, WorkItem
 
 MAX_WORKERS = 25
 MAX_JOBS = 30
@@ -368,7 +344,7 @@ class ConversationContextAssembler:
         return [{"id": str(item.id), "text": _clip(item.text, 1200)} for item in rows.all()]
 
     async def _pending_integration_tasks(self, organization_id, thread_id, user_id):
-        from app.bootstrap.settings import settings
+        from audoryn_shared.bootstrap.settings import settings
         if not settings.integration_foundation_enabled or user_id is None:
             return []
         commands = (await self._session.scalars(select(ConversationCommand).where(
@@ -385,9 +361,9 @@ class ConversationContextAssembler:
             .limit(MAX_INTEGRATIONS)
         )
         visible = list(rows.all())
-        from app.bootstrap.settings import settings
+        from audoryn_shared.bootstrap.settings import settings
         if settings.integration_foundation_enabled:
-            from app.application.services.integration_foundation import IntegrationFoundation
+            from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
             foundation = IntegrationFoundation(self._session)
             visible = [item for item in visible if item.provider in {"browser", "web_research"} or
                 (user_id is not None and await foundation.can_use(item.id, organization_id, user_id))]
@@ -480,7 +456,7 @@ class ConversationContextAssembler:
             statement = statement.where(Action.agent_id == worker.agent_identity_id)
         rows = (await self._session.execute(statement)).all()
         if thread_id is not None:
-            from app.application.services.approval_conversation import approval_conversation_id
+            from audoryn_shared.application.services.approval_conversation import approval_conversation_id
             rows = [(approval, action) for approval, action in rows
                     if await approval_conversation_id(self._session, action) == str(thread_id)]
         return [

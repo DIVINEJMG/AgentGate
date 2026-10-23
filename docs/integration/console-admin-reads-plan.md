@@ -176,7 +176,7 @@ datetimes are ISO strings (datetimes in UTC with offset). Tuples are JSON arrays
 The query semantics are the same as Console's former shared-database adapter
 (`Audoryn-Console/backend/app/infrastructure/database/platform_visibility.py`). That file
 is the reference for what each number means. Every table and column it used was checked
-against `backend/app/infrastructure/database/models.py` on 10 October 2026 and exists.
+against `packages/shared/audoryn_shared/infrastructure/database/models.py` on 10 October 2026 and exists.
 Member, integration and worker lists are capped. Console shows the full count from the
 directory item (`member_count`, …), so a capped list is visible as "showing N of M".
 
@@ -206,7 +206,7 @@ Nothing is committed or pushed without your approval.
 
 ### Phase 0: baseline (AgentGate)
 
-- Create a local backend environment the same way CI does (`pip install -e ".[dev]"` in
+- Create a local backend environment the same way CI does (`pip install -e ".[dev,browser]"` in
   a new `backend/.venv`; nothing on this machine has it yet).
 - Run and record: `ruff check app tests migrations`, `pyright`, `pytest`,
   `pytest tests/contract`, and the `scripts/verify_f28_*` architecture checks that CI runs.

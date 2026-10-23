@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
 from scripts.github_inspection_recovery import resume_inspection, validate_recovery
 from scripts.github_scripted_planner import FixtureBlocked, ScriptedPlanner
 from tests.test_github_scripted_workflow import MANIFEST
@@ -40,7 +40,7 @@ def test_recovery_refuses_changed_resource_and_completed_step():
 
 @pytest.mark.parametrize("blocker", [None, "unresolved_write", "authority", "lease", "budget"])
 async def test_recovery_preserves_run_steps_and_audits_explicit_retry(monkeypatch, blocker):
-    from app.application.services.integration_foundation import IntegrationFoundation
+    from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
     item, run, steps, resource = checkpoint()
     original_run = run.id
     authority = AsyncMock(side_effect=PermissionError("revoked") if blocker == "authority" else None)
@@ -85,7 +85,7 @@ async def test_planner_refreshes_legacy_command_evidence_without_repeating_edits
 
 
 async def test_partial_recovery_preserves_completed_command_and_finish(monkeypatch):
-    from app.application.services.integration_foundation import IntegrationFoundation
+    from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
     item, run, steps, resource = checkpoint()
     item.status = run.status = "partial_completion"
     item.payload["runtime"].update(currentStep=3, resultId="previous-result")

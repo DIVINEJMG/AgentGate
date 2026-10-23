@@ -6,11 +6,12 @@ import sys
 from pathlib import Path
 
 from repository_files import repository_files
+from code_paths import Code  # the backend's code, in its three packages (Phase 4)
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 FRONTEND = ROOT / "frontend"
-DOMAIN = BACKEND / "app" / "domain"
+DOMAIN = Code("domain")
 
 errors: list[str] = []
 

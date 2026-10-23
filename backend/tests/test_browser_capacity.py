@@ -7,9 +7,9 @@ from uuid import uuid4
 import pytest
 from playwright.async_api import Browser
 
-from app.execution.browser.errors import BrowserCapacityUnavailable, BrowserOwnershipLost
-from app.execution.browser.runtime import BrowserRuntime
-from app.infrastructure.redis.coordination import Lease, RedisCoordinator
+from audoryn_execution.execution.browser.runtime import BrowserRuntime
+from audoryn_shared.execution.browser.errors import BrowserCapacityUnavailable, BrowserOwnershipLost
+from audoryn_shared.infrastructure.redis.coordination import Lease, RedisCoordinator
 
 
 class FakeCoordinator:

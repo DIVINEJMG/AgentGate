@@ -2,9 +2,13 @@ from uuid import uuid4
 
 import pytest
 
-from app.domain.actions.gateway import ActionGateway, ActionProposal, AuthorizationDecision
-from app.domain.identity.principals import AgentPrincipal, HumanPrincipal
-from app.domain.integrations.contracts import IntegrationExecutionResult
+from audoryn_shared.domain.actions.gateway import (
+    ActionGateway,
+    ActionProposal,
+    AuthorizationDecision,
+)
+from audoryn_shared.domain.identity.principals import AgentPrincipal, HumanPrincipal
+from audoryn_shared.domain.integrations.contracts import IntegrationExecutionResult
 
 
 class Guard:
@@ -124,7 +128,7 @@ async def test_side_effect_requires_stable_idempotency() -> None:
 def test_human_and_agent_auth_schemes_are_disjoint() -> None:
     from fastapi import HTTPException
 
-    from app.api.auth_dependencies import agent_secret, bearer_token
+    from audoryn_shared.api.auth_dependencies import agent_secret, bearer_token
 
     assert bearer_token("Bearer human-session") == "human-session"
     assert agent_secret("Agent agt_sk_abcdefghijklmnopqrstuvwxyz012345") == (

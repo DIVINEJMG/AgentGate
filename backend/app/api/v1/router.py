@@ -6,18 +6,18 @@ from app.api.ai_operations_routes import v1_router as ai_operations_router
 from app.api.billing_routes import v1_router as billing_router
 from app.api.conversation_routes import v1_router as conversation_router
 from app.api.github_routes import router as github_router
-from app.api.governance_routes import v1_router as governance_router
-from app.api.integration_capability_routes import v1_router as integration_router
-from app.api.integration_foundation_routes import router as integration_foundation_router
-from app.api.jobs_routes import v1_router as jobs_router
 from app.api.news_routes import v1_router as news_router
 from app.api.onboarding_routes import router as onboarding_router
 from app.api.organization_routes import v1_router as organization_router
 from app.api.product_ops_routes import v1_router as product_ops_router
 from app.api.runtime_result_routes import v1_router as runtime_result_router
 from app.api.template_routes import v1_router as template_router
-from app.api.workforce_routes import v1_router as workforce_router
 from app.application.queries.system_status import get_system_status
+from audoryn_shared.api.governance_routes import v1_router as governance_router
+from audoryn_shared.api.integration_capability_routes import v1_router as integration_router
+from audoryn_shared.api.integration_foundation_routes import router as integration_foundation_router
+from audoryn_shared.api.jobs_routes import v1_router as jobs_router
+from audoryn_shared.api.workforce_routes import v1_router as workforce_router
 
 router = APIRouter()
 router.include_router(ai_operations_router)

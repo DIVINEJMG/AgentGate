@@ -7,15 +7,15 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from test_github_expanded import request
 
-from app.application.services.task_activity import action_phase
-from app.bootstrap.settings import settings
-from app.domain.actions.gateway import ActionProposal
-from app.execution.contracts import ExecutionProviderError
-from app.execution.provider_executor import UniversalProviderExecutor
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.native.github.transport import GitHubResponse
-from app.execution.providers.native.http import ProviderTransportError
-from app.runtime.managed import ManagedRuntimeExecutor
+from audoryn_execution.execution.provider_executor import UniversalProviderExecutor
+from audoryn_execution.runtime.managed import ManagedRuntimeExecutor
+from audoryn_shared.application.services.task_activity import action_phase
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.actions.gateway import ActionProposal
+from audoryn_shared.execution.contracts import ExecutionProviderError
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.native.github.transport import GitHubResponse
+from audoryn_shared.execution.providers.native.http import ProviderTransportError
 
 SHA = "a" * 40
 
@@ -89,11 +89,11 @@ async def test_dispatched_read_error_reaches_outer_replanning_handler(monkeypatc
     monkeypatch.setattr(settings, "integration_foundation_enabled", True)
     error = ExecutionProviderError(code=code, retryable=False, provider="github",
         operation=operation, correlation_id="test", safe_message="Revision inaccessible")
-    monkeypatch.setattr("app.runtime.managed.ActionGateway", lambda *args: SimpleNamespace(
+    monkeypatch.setattr("audoryn_execution.runtime.managed.ActionGateway", lambda *args: SimpleNamespace(
         execute_request=AsyncMock(side_effect=error)))
     enqueue = AsyncMock()
-    monkeypatch.setattr("app.runtime.managed.TransactionalOutbox", lambda _: SimpleNamespace(enqueue=enqueue))
-    monkeypatch.setattr("app.runtime.managed.notify_integration_work", AsyncMock())
+    monkeypatch.setattr("audoryn_execution.runtime.managed.TransactionalOutbox", lambda _: SimpleNamespace(enqueue=enqueue))
+    monkeypatch.setattr("audoryn_execution.runtime.managed.notify_integration_work", AsyncMock())
     executor = object.__new__(ManagedRuntimeExecutor)
     executor._session = cast(AsyncSession, SimpleNamespace(add=Mock(), flush=AsyncMock(), commit=AsyncMock()))
     executor._provider_executor = cast(UniversalProviderExecutor, SimpleNamespace())

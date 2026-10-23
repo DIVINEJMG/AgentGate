@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from code_paths import Code  # the backend's code, in its three packages (Phase 4)
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = ROOT / "backend" / "app"
+APP = Code()
 
 
 def require(condition: bool, message: str) -> None:
@@ -49,7 +50,8 @@ def main() -> None:
     require("Cross-organization browser session access denied" in runtime, "tenant guard missing")
     require("Cross-worker browser session access denied" in runtime, "worker guard missing")
     require("asyncio.CancelledError" in browser_provider, "browser cancellation cleanup missing")
-    require("ManagedExecutionProvider" in text(APP / "bootstrap" / "lifecycle.py"), "managed provider shutdown hook missing")
+    # The execution service shuts the providers' runtimes down (Phase 4).
+    require("ManagedExecutionProvider" in text(Code("service.py")), "managed provider shutdown hook missing")
     for lifecycle in ("create_session", "resume", "close", "expire", "terminate"):
         require(f"def {lifecycle}" in runtime, f"browser lifecycle method missing: {lifecycle}")
 

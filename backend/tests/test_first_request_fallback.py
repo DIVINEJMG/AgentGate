@@ -8,18 +8,18 @@ from uuid import uuid4
 import pytest
 from pydantic import SecretStr
 
-from app.application.services.ai_gateway import ProviderAIGateway, observe_inference
-from app.application.services.ordered_ai import OrderedTextGateway
-from app.bootstrap.settings import Settings
-from app.domain.ai.providers import (
+from audoryn_shared.application.services.ai_gateway import ProviderAIGateway, observe_inference
+from audoryn_shared.application.services.ordered_ai import OrderedTextGateway
+from audoryn_shared.bootstrap.settings import Settings
+from audoryn_shared.domain.ai.providers import (
     AIInvocationContext,
     AIProviderError,
     AIResponse,
     ModelProviderCapabilities,
 )
-from app.domain.ai.registry import ModelRegistry, ModelRoute
-from app.infrastructure.ai import text_routes
-from app.infrastructure.ai.provider import ai_gateway_from_settings
+from audoryn_shared.domain.ai.registry import ModelRegistry, ModelRoute
+from audoryn_shared.infrastructure.ai import text_routes
+from audoryn_shared.infrastructure.ai.provider import ai_gateway_from_settings
 
 
 def gateway(outputs, calls, role):
@@ -160,7 +160,7 @@ def test_settings_wire_worker_and_chat_fallback_without_changing_vision():
     gateway = ai_gateway_from_settings(config)
     assert isinstance(gateway, OrderedTextGateway)
     # The configured chat order, whatever it is (the owner chooses it in AI_INTERACTIVE_ROUTES).
-    from app.infrastructure.ai.text_routes import snapshot_routes
+    from audoryn_shared.infrastructure.ai.text_routes import snapshot_routes
     assert len(gateway.routes) == len(snapshot_routes(config, "interactive"))
     first = snapshot_routes(config, "interactive")[0]
     assert (gateway.routes[0]["provider"], gateway.routes[0]["model"]) == (first["provider"], first["model"])
@@ -212,8 +212,8 @@ async def test_first_request_budget_blocks_before_transport(monkeypatch):
         release_slot=AsyncMock(),
     )
     monkeypatch.setattr(text_routes.RedisCoordinator, "from_settings", lambda: coordinator)
-    from app.domain.ai.providers import AITextRequest
-    from app.infrastructure.ai.model_profiles import PlannerModelProfile
+    from audoryn_shared.domain.ai.providers import AITextRequest
+    from audoryn_shared.infrastructure.ai.model_profiles import PlannerModelProfile
 
     admitted = text_routes.AdmittedTextProvider(
         provider,
@@ -427,7 +427,7 @@ async def test_overall_timeout_does_not_switch_to_untried_model():
 @pytest.mark.asyncio
 async def test_actual_interpreter_and_worker_drafter_start_with_fallback():
     from app.application.services.intent_interpreter import IntentInterpreter
-    from app.application.services.worker_draft import WorkerDraftGenerator
+    from audoryn_shared.application.services.worker_draft import WorkerDraftGenerator
 
     calls = []
     intent = {"family": "conversation.answer", "arguments": {}}
@@ -474,8 +474,8 @@ async def test_shared_admission_outage_is_not_reported_as_model_outage(monkeypat
         cache_get=AsyncMock(side_effect=ConnectionError("private connection data"))
     )
     monkeypatch.setattr(text_routes.RedisCoordinator, "from_settings", lambda: coordinator)
-    from app.domain.ai.providers import AITextRequest
-    from app.infrastructure.ai.model_profiles import PlannerModelProfile
+    from audoryn_shared.domain.ai.providers import AITextRequest
+    from audoryn_shared.infrastructure.ai.model_profiles import PlannerModelProfile
 
     admitted = text_routes.AdmittedTextProvider(
         provider,

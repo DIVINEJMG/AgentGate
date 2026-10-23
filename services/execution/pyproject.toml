@@ -1,0 +1,32 @@
+[project]
+name = "audoryn-execution"
+version = "26.2.0"
+description = "AgentGate's execution service: task steps, the governed browser, coding sessions, preparations and the QStash callbacks"
+requires-python = ">=3.13"
+# Installed together with packages/shared[coding] (see README.md), which holds the common libraries.
+dependencies = [
+  "playwright>=1.55,<2",  # then: playwright install chromium
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.4,<9", "pytest-asyncio>=1.1,<2"]
+
+[project.scripts]
+audoryn-worker = "audoryn_execution.runtime.worker:main"
+audoryn-scheduler = "audoryn_execution.runtime.scheduler:main"
+audoryn-outbox = "audoryn_execution.runtime.outbox_worker:main"
+
+[tool.setuptools.packages.find]
+include = ["audoryn_execution*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+# The backend's settings, so every package follows one standard.
+[tool.ruff]
+extend = "../../backend/pyproject.toml"
+
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"

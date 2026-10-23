@@ -4,10 +4,14 @@ from uuid import uuid4
 
 import pytest
 
-from app.domain.actions.gateway import ActionGateway, ActionProposal, AuthorizationDecision
-from app.domain.identity.principals import AgentPrincipal
-from app.domain.integrations.contracts import IntegrationExecutionResult
-from app.domain.policies.precedence import PolicyCandidate, resolve_policy_precedence
+from audoryn_shared.domain.actions.gateway import (
+    ActionGateway,
+    ActionProposal,
+    AuthorizationDecision,
+)
+from audoryn_shared.domain.identity.principals import AgentPrincipal
+from audoryn_shared.domain.integrations.contracts import IntegrationExecutionResult
+from audoryn_shared.domain.policies.precedence import PolicyCandidate, resolve_policy_precedence
 
 _CASES = json.loads((Path(__file__).with_name("cases.json")).read_text(encoding="utf-8"))
 

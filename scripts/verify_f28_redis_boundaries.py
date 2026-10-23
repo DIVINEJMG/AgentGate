@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from code_paths import Code  # the backend's code, in its three packages (Phase 4)
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = ROOT / "backend" / "app"
+APP = Code()
 
 forbidden_prefixes = (
     "workers:",

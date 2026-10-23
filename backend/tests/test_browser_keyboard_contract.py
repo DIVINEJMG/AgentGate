@@ -6,11 +6,14 @@ from uuid import uuid4
 import pytest
 from jsonschema import Draft202012Validator
 
-from app.execution.browser.contracts import BrowserLocator
-from app.execution.browser.keyboard import read_only_key, read_only_search_enter
-from app.execution.browser.runtime import BrowserRuntime
-from app.execution.providers.browser import CAPABILITIES
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner, _repeated_ineffective_enter
+from audoryn_execution.execution.browser.keyboard import read_only_key, read_only_search_enter
+from audoryn_execution.execution.browser.runtime import BrowserRuntime
+from audoryn_shared.execution.browser.contracts import BrowserLocator
+from audoryn_shared.execution.providers.browser import CAPABILITIES
+from audoryn_shared.runtime.planner.adaptive import (
+    AdaptiveRuntimePlanner,
+    _repeated_ineffective_enter,
+)
 
 
 def test_schema_rejects_invented_and_cross_resource_pairs() -> None:

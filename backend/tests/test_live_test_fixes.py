@@ -12,20 +12,21 @@ import pytest
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.context.narrator import narrate
-from app.application.services import integration_foundation, integration_tasks
 from app.application.services.conversation_semantics import validate_route_proposal
-from app.application.services.integration_foundation import (
+from app.application.services.reply_claims import unsupported_assertion
+from audoryn_execution.application.context.narrator import narrate
+from audoryn_execution.application.services import integration_tasks
+from audoryn_shared.application.services import integration_foundation
+from audoryn_shared.application.services.integration_foundation import (
     IntegrationFoundation,
     IntegrationRequirementError,
 )
-from app.application.services.reply_claims import unsupported_assertion
-from app.bootstrap.settings import settings
-from app.domain.ai.providers import AIGateway, AIProviderError
-from app.domain.integrations.foundation import IntegrationTaskDraft
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.registry import ProviderRegistry
-from app.infrastructure.database.models import (
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.ai.providers import AIGateway, AIProviderError
+from audoryn_shared.domain.integrations.foundation import IntegrationTaskDraft
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.registry import ProviderRegistry
+from audoryn_shared.infrastructure.database.models import (
     ConversationMessage,
     IntegrationEventSubscription,
     WorkItem,
@@ -179,7 +180,7 @@ def test_only_writes_other_people_can_see_count_as_visible(monkeypatch: pytest.M
 
 @pytest.mark.asyncio
 async def test_every_visible_write_asks_first(monkeypatch: pytest.MonkeyPatch) -> None:  # Q1
-    from app.infrastructure.database.models import Policy, PolicyRevision
+    from audoryn_shared.infrastructure.database.models import Policy, PolicyRevision
     _github_registry(monkeypatch)
     added: list[Any] = []
     session = SimpleNamespace(scalars=AsyncMock(return_value=SimpleNamespace(all=list)), add=added.append, flush=AsyncMock())
@@ -196,7 +197,7 @@ async def test_every_visible_write_asks_first(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_worker_jobs_treat_visible_writes_like_irreversible_actions() -> None:
-    from app.api.jobs_routes import needs_explicit_request
+    from audoryn_shared.api.jobs_routes import needs_explicit_request
     actions = {action.scope: action.descriptor() for action in ExpandedGitHubProvider().actions.values()}
     assert needs_explicit_request(actions[COMMENT])
     assert not needs_explicit_request(actions[READ_ISSUES]) and not needs_explicit_request(actions[EDIT])
@@ -204,8 +205,8 @@ def test_worker_jobs_treat_visible_writes_like_irreversible_actions() -> None:
 
 # --- Judgement checks advise; the AI decides -------------------------------------------------
 
-from app.application.services.ai_gateway import ProviderAIGateway
 from app.application.services.reply_claims import account_state_claim
+from audoryn_shared.application.services.ai_gateway import ProviderAIGateway
 
 
 @pytest.mark.parametrize(("answer", "claims"), [
@@ -231,7 +232,7 @@ def test_a_stale_account_answer_is_sent_back_once_with_the_reason() -> None:
 def test_a_job_that_needs_a_connected_account_is_advised_not_overridden(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.application.services import conversation_semantics
     registry = ProviderRegistry((ExpandedGitHubProvider(),))
-    monkeypatch.setattr("app.execution.bootstrap.execution_provider_registry", lambda: registry)
+    monkeypatch.setattr("audoryn_shared.execution.bootstrap.execution_provider_registry", lambda: registry)
     monkeypatch.setattr(settings, "integration_foundation_enabled", True)
     job = {"family": "job.create", "arguments": {"name": "Summarize new issues",
                                                  "requiredCapabilities": ["github.repository.issues.list"]}}
@@ -303,8 +304,10 @@ def test_chat_sees_how_a_job_actually_runs_not_how_it_was_described(definition: 
 
 @pytest.mark.asyncio
 async def test_a_connection_needing_reconnection_says_so_instead_of_missing_permissions(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.application.services.integration_foundation import IntegrationRequirementError
-    from app.domain.integrations.foundation import IntegrationNeed, IntegrationTaskDraft
+    from audoryn_shared.application.services.integration_foundation import (
+        IntegrationRequirementError,
+    )
+    from audoryn_shared.domain.integrations.foundation import IntegrationNeed, IntegrationTaskDraft
     _github_registry(monkeypatch)
     state = SimpleNamespace(authorization_state="reconnect_required",
                             reason="GitHub installation access changed; rediscover and review affected task bindings.")
@@ -371,9 +374,9 @@ def test_changing_an_existing_job_to_start_on_an_event_is_sent_back_once() -> No
 async def test_continuing_after_a_first_step_question_prepares_the_task(monkeypatch: pytest.MonkeyPatch) -> None:
     # The live test: the question was asked while the request was first read, so no task details
     # existed yet and "Continue task setup" failed with KeyError 'integrationTask'.
-    from app.api import integration_foundation_routes as routes
+    from audoryn_shared.api import integration_foundation_routes as routes
     monkeypatch.setattr(settings, "integration_foundation_enabled", True)
-    monkeypatch.setattr("app.application.services.preparation_ai.restart_exhausted_preparation", AsyncMock(return_value="ready"))
+    monkeypatch.setattr("audoryn_shared.application.services.preparation_ai.restart_exhausted_preparation", AsyncMock(return_value="ready"))
     monkeypatch.setattr(routes.TransactionalOutbox, "enqueue", AsyncMock())
     from tests.test_efficiency_queries import ORG
     user, worker = uuid4(), uuid4()

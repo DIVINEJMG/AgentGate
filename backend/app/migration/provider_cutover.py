@@ -5,7 +5,7 @@ from collections.abc import Iterable
 
 import asyncpg
 
-from app.bootstrap.settings import settings
+from audoryn_shared.bootstrap.settings import settings
 
 TABLE_ORDER = (
     "human_identities",

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy.exc import DBAPIError
 
-from app.runtime.planning_diagnostics import database_planning_error
+from audoryn_execution.runtime.planning_diagnostics import database_planning_error
 
 
 @pytest.mark.parametrize("state,reason,retryable", [

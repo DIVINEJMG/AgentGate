@@ -12,9 +12,9 @@ from pydantic import ValidationError
 from sqlalchemy import select, update
 
 from app.api import billing_routes
-from app.application.services import entitlements as plans
 from app.application.services import usage_resets
-from app.infrastructure.database import models as m
+from audoryn_shared.application.services import entitlements as plans
+from audoryn_shared.infrastructure.database import models as m
 from tests.test_entitlements import give_plan
 from tests.test_plan_prompts import db, fresh_cache, person  # noqa: F401 - fixtures
 

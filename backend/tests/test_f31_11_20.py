@@ -13,22 +13,22 @@ from app.application.services.conversation_commands import ConversationCommandCo
 from app.application.services.conversation_context import ConversationContextAssembler
 from app.application.services.conversations import ConversationService
 from app.application.services.intent_interpreter import IntentInterpreter
-from app.domain.ai.providers import (
+from audoryn_shared.domain.ai.providers import (
     AIInvocationContext,
     AIMediaInput,
     AIModelRole,
     AIProviderError,
     AIResponse,
 )
-from app.domain.conversation.intent import EntityReference, WorkerCommandIntent
-from app.infrastructure.database.models import (
+from audoryn_shared.domain.conversation.intent import EntityReference, WorkerCommandIntent
+from audoryn_shared.infrastructure.database.models import (
     ConversationCommand,
     ConversationMessage,
     ConversationThread,
     Worker,
     WorkerDirective,
 )
-from app.realtime.contracts import REALTIME_EVENT_TYPES
+from audoryn_shared.realtime.contracts import REALTIME_EVENT_TYPES
 
 
 @dataclass
@@ -325,14 +325,14 @@ def test_destructive_and_cross_tenant_safety_paths_exist() -> None:
 
 
 def test_database_schema_migration_switch_defaults_off() -> None:
-    from app.bootstrap.settings import Settings
+    from audoryn_shared.bootstrap.settings import Settings
 
     config = Settings()
     assert config.database_migrate_on_startup is False
 
 
 def test_lifespan_runs_schema_migration_only_behind_feature_flag() -> None:
-    from app.bootstrap import lifecycle
+    from audoryn_shared.bootstrap import lifecycle
 
     source = inspect.getsource(lifecycle)
     assert "settings.database_migrate_on_startup" in source

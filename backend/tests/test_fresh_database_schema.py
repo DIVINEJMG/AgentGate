@@ -8,8 +8,8 @@ from pathlib import Path
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateIndex, CreateTable
 
-from app.infrastructure.database import models  # noqa: F401
-from app.infrastructure.database.base import Base
+from audoryn_shared.infrastructure.database import models  # noqa: F401
+from audoryn_shared.infrastructure.database.base import Base
 
 MIGRATIONS = Path(__file__).resolve().parents[1] / "migrations" / "versions"
 

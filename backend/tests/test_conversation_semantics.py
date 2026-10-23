@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.application.services.ai_gateway import ProviderAIGateway
 from app.application.services.conversation_semantics import (
     grounded_reply,
     ordinary_reply_context,
@@ -14,15 +13,16 @@ from app.application.services.conversation_semantics import (
     validate_route_proposal,
 )
 from app.application.services.intent_interpreter import IntentInterpreter
-from app.application.services.ordered_ai import OrderedTextGateway
-from app.domain.ai.providers import (
+from audoryn_shared.application.services.ai_gateway import ProviderAIGateway
+from audoryn_shared.application.services.ordered_ai import OrderedTextGateway
+from audoryn_shared.domain.ai.providers import (
     AIGateway,
     AIInvocationContext,
     AIProviderError,
     AIResponse,
     ModelProviderCapabilities,
 )
-from app.domain.ai.registry import ModelRegistry, ModelRoute
+from audoryn_shared.domain.ai.registry import ModelRegistry, ModelRoute
 
 
 def selector(outputs, calls):

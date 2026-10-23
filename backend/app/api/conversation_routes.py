@@ -9,9 +9,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_dependencies import organization_principal
-from app.api.product_common import require_permission
-from app.application.services import entitlements
 from app.application.services.attachment_ingestion import (
     AttachmentIngestionService,
     decode_base64_content,
@@ -26,14 +23,17 @@ from app.application.services.conversations import (
     receipt_public,
     thread_public,
 )
-from app.domain.conversation.intent import CommandReceipt
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.ai.provider import ai_gateway_from_settings
-from app.infrastructure.database.models import ConversationMessage
-from app.infrastructure.database.session import database_session
-from app.infrastructure.database.usage_records import record_usage
-from app.observability.frames import app_frames
-from app.observability.usage import Usage, metered
+from audoryn_shared.api.auth_dependencies import organization_principal
+from audoryn_shared.api.product_common import require_permission
+from audoryn_shared.application.services import entitlements
+from audoryn_shared.domain.conversation.intent import CommandReceipt
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.ai.provider import ai_gateway_from_settings
+from audoryn_shared.infrastructure.database.models import ConversationMessage
+from audoryn_shared.infrastructure.database.session import database_session
+from audoryn_shared.infrastructure.database.usage_records import record_usage
+from audoryn_shared.observability.frames import app_frames
+from audoryn_shared.observability.usage import Usage, metered
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -195,8 +195,8 @@ async def task_activity(
     principal: Annotated[HumanPrincipal, Depends(organization_principal)],
     session: Annotated[AsyncSession, Depends(database_session)],
 ) -> dict[str, Any]:
-    from app.application.services.task_activity import conversation_activity
-    from app.infrastructure.database.models import ConversationThread
+    from audoryn_shared.application.services.task_activity import conversation_activity
+    from audoryn_shared.infrastructure.database.models import ConversationThread
 
     require_permission(principal, "workforce.read")
     # Same access boundary as opening the thread, without fetching its entire transcript.

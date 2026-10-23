@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from code_paths import Code  # the backend's code, in its three packages (Phase 4)
 
 ROOT = Path(__file__).resolve().parents[1]
 ACTIVE = (
-    ROOT / "backend" / "app" / "api",
-    ROOT / "backend" / "app" / "application",
-    ROOT / "backend" / "app" / "domain",
+    Code("api"),
+    Code("application"),
+    Code("domain"),
 )
 FORBIDDEN_PROVIDER_IMPORTS = (
     "github",
@@ -35,7 +36,7 @@ for root in ACTIVE:
                         f"{path.relative_to(ROOT)}:{node.lineno} imports provider SDK {name}"
                     )
 
-gateway = (ROOT / "backend" / "app" / "domain" / "actions" / "gateway.py").read_text(
+gateway = Code("domain", "actions", "gateway.py").read_text(
     encoding="utf-8"
 )
 for invariant in (

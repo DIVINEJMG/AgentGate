@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
-from app.application.context.evidence import planner_evidence
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner, completion_check
+from audoryn_shared.application.context.evidence import planner_evidence
+from audoryn_shared.runtime.planner.adaptive import AdaptiveRuntimePlanner, completion_check
 
 OBSERVED = [{"step": 1, "scope": "bench.record.read", "status": "completed", "title": "Read a", "summary": "Record a: 42"},
             {"step": 2, "scope": "bench.record.read", "status": "completed", "title": "Read b", "summary": "Record b: 7"}]

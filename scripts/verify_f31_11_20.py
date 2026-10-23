@@ -11,15 +11,15 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-models = read("backend/app/infrastructure/database/models.py")
+models = read("packages/shared/audoryn_shared/infrastructure/database/models.py")
 migration = read("backend/migrations/versions/0007_f31_conversation.py")
-intent = read("backend/app/domain/conversation/intent.py")
+intent = read("packages/shared/audoryn_shared/domain/conversation/intent.py")
 context = read("backend/app/application/services/conversation_context.py")
 interpreter = read("backend/app/application/services/intent_interpreter.py")
 compiler = read("backend/app/application/services/conversation_commands.py")
 service = read("backend/app/application/services/conversations.py")
 routes = read("backend/app/api/conversation_routes.py")
-realtime = read("backend/app/realtime/contracts.py")
+realtime = read("packages/shared/audoryn_shared/realtime/contracts.py")
 v1 = read("backend/app/api/v1/router.py")
 v2 = read("backend/app/api/v2/router.py")
 tests = read("backend/tests/test_f31_11_20.py")

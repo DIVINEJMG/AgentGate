@@ -5,7 +5,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from app.infrastructure.qstash import provider as qstash_provider
+from audoryn_shared.infrastructure.qstash import provider as qstash_provider
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -53,10 +53,10 @@ def test_qstash_bad_publish_does_not_echo_unstructured_response() -> None:
 
 
 def test_work_queue_exposes_dispatch_health_without_mutating_work_items() -> None:
-    trigger = (ROOT / "backend/app/runtime/qstash_trigger.py").read_text(
+    trigger = (ROOT / "packages/shared/audoryn_shared/runtime/qstash_trigger.py").read_text(
         encoding="utf-8"
     )
-    routes = (ROOT / "backend/app/api/jobs_routes.py").read_text(encoding="utf-8")
+    routes = (ROOT / "packages/shared/audoryn_shared/api/jobs_routes.py").read_text(encoding="utf-8")
     runtime_routes = (
         ROOT / "backend/app/api/runtime_result_routes.py"
     ).read_text(encoding="utf-8")
@@ -123,7 +123,7 @@ def test_runtime_flow_control_limits_callback_delivery_pressure() -> None:
 
 def test_ai_provider_retry_publishes_delayed_runtime_wakeup() -> None:
     runtime_api = (
-        ROOT / "backend/app/api/internal/runtime.py"
+        ROOT / "services/execution/audoryn_execution/api/internal/runtime.py"
     ).read_text(encoding="utf-8")
 
     assert 'reason=f"ai-provider-retry:{int(retry_at.timestamp())}"' in runtime_api
@@ -134,13 +134,13 @@ def test_ai_provider_retry_publishes_delayed_runtime_wakeup() -> None:
 
 def test_runtime_provider_retry_uses_qstash_delay_instead_of_waiting_for_sweep() -> None:
     runtime_api = (
-        ROOT / "backend/app/api/internal/runtime.py"
+        ROOT / "services/execution/audoryn_execution/api/internal/runtime.py"
     ).read_text(encoding="utf-8")
-    trigger = (ROOT / "backend/app/runtime/qstash_trigger.py").read_text(
+    trigger = (ROOT / "packages/shared/audoryn_shared/runtime/qstash_trigger.py").read_text(
         encoding="utf-8"
     )
     queue_provider = (
-        ROOT / "backend/app/infrastructure/qstash/provider.py"
+        ROOT / "packages/shared/audoryn_shared/infrastructure/qstash/provider.py"
     ).read_text(encoding="utf-8")
 
     assert "continuation_delay_seconds" in runtime_api
@@ -150,9 +150,9 @@ def test_runtime_provider_retry_uses_qstash_delay_instead_of_waiting_for_sweep()
 
 
 def test_runtime_continuations_use_distinct_plan_and_execute_dedupe_keys() -> None:
-    managed = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    managed = (ROOT / "services/execution/audoryn_execution/runtime/managed.py").read_text(encoding="utf-8")
     runtime_api = (
-        ROOT / "backend/app/api/internal/runtime.py"
+        ROOT / "services/execution/audoryn_execution/api/internal/runtime.py"
     ).read_text(encoding="utf-8")
 
     assert 'continuation_phase="execute"' in managed

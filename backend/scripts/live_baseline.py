@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import func, select
 
-from app.infrastructure.database.models import (
+from audoryn_shared.infrastructure.database.models import (
     ConversationCommand,
     ConversationMessage,
     Job,
@@ -36,7 +36,7 @@ OUTPUT = Path(__file__).resolve().parents[1] / ".local" / "live-baseline"
 
 
 async def capture(hours: float) -> dict[str, object]:
-    from app.infrastructure.database.session import session_factory
+    from audoryn_shared.infrastructure.database.session import session_factory
 
     since = datetime.now(UTC) - timedelta(hours=hours)
     async with session_factory() as session:

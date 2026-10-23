@@ -7,8 +7,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.api.internal import runtime as runtime_routes
-from app.runtime import outbox_trigger, qstash_trigger
+from audoryn_execution.api.internal import runtime as runtime_routes
+from audoryn_shared.runtime import outbox_trigger, qstash_trigger
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def dispatch(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(qstash_trigger.settings, "runtime_run_local", True)
     monkeypatch.setattr(qstash_trigger.UpstashQStashProvider, "from_settings", classmethod(lambda cls: _Provider()))
     monkeypatch.setattr(qstash_trigger, "_clear_dispatch_health", nothing)
-    monkeypatch.setattr(runtime_routes, "run_here", run_here)
+    monkeypatch.setattr(qstash_trigger, "local_runner", run_here)
     monkeypatch.setattr(outbox_trigger, "serving", True)
     return calls
 

@@ -9,20 +9,20 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from app.bootstrap.settings import settings
-from app.domain.ai.providers import (
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.ai.providers import (
     AIInvocationRecorder,
     AIModelProvider,
     AIProviderError,
     AIResponse,
     AITextRequest,
 )
-from app.domain.ai.registry import ModelRegistry, ModelRoute
-from app.infrastructure.ai.model_profiles import PlannerModelProfile
-from app.infrastructure.ai.openrouter import MODEL_FORMATS, OpenRouterPlannerProvider
-from app.infrastructure.database.models import PlannerAttempt, PlannerDecision
-from app.runtime import smart_planner as module
-from app.runtime.planner.adaptive import AdaptivePlanDecision
+from audoryn_shared.domain.ai.registry import ModelRegistry, ModelRoute
+from audoryn_shared.infrastructure.ai.model_profiles import PlannerModelProfile
+from audoryn_shared.infrastructure.ai.openrouter import MODEL_FORMATS, OpenRouterPlannerProvider
+from audoryn_shared.infrastructure.database.models import PlannerAttempt, PlannerDecision
+from audoryn_shared.runtime import smart_planner as module
+from audoryn_shared.runtime.planner.adaptive import AdaptivePlanDecision
 
 
 class Session:
@@ -459,7 +459,7 @@ async def test_data_handling_and_paid_models_fail_closed():
 
 @pytest.mark.asyncio
 async def test_invalid_json_repairs_share_two_call_budget_then_switch(setup, monkeypatch):
-    from app.domain.ai.providers import ModelProviderCapabilities
+    from audoryn_shared.domain.ai.providers import ModelProviderCapabilities
 
     session, item, run, _ = setup
     monkeypatch.setattr(module, "DurableAIInvocationRecorder", lambda: None)
@@ -564,7 +564,7 @@ async def test_transport_circuit_and_one_recovery_probe(setup):
 
 @pytest.mark.asyncio
 async def test_all_twelve_routes_share_one_ordered_decision(setup, monkeypatch):
-    from app.bootstrap.settings import Settings
+    from audoryn_shared.bootstrap.settings import Settings
     config = Settings.model_construct()
     monkeypatch.setattr(settings, "ai_complex_routes", config.smart_planner_routes)
     monkeypatch.setattr(settings, "smart_planner_model_profiles", {})
@@ -719,8 +719,8 @@ async def test_local_admission_is_organization_scoped_and_never_calls_model(setu
 @pytest.mark.asyncio
 @pytest.mark.parametrize("expired,category", [(True, "timeout"), (False, "cancelled")])
 async def test_cancelled_inference_records_timing_without_swallowing_cancellation(expired, category):
-    from app.application.services.ai_gateway import ProviderAIGateway
-    from app.domain.ai.providers import ModelProviderCapabilities
+    from audoryn_shared.application.services.ai_gateway import ProviderAIGateway
+    from audoryn_shared.domain.ai.providers import ModelProviderCapabilities
     recorder = SimpleNamespace(start=AsyncMock(return_value=uuid4()), finish=AsyncMock())
     provider = SimpleNamespace(name="test", capabilities=ModelProviderCapabilities(), generate_text=AsyncMock(side_effect=asyncio.CancelledError))
     gateway = ProviderAIGateway(

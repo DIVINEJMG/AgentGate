@@ -1,0 +1,35 @@
+{
+  "description": "The messages the core API and the shared code send to the execution service (architecture plan, Phase 4). Producers: backend/tests/test_message_contracts.py. Consumers: services/execution/tests/test_message_contracts.py. Change this file, both sides and their tests together.",
+  "messages": {
+    "runtime.execute": {
+      "route": "/internal/v1/runtime/execute",
+      "required": ["organization_id", "work_item_id"],
+      "optional": ["expected_step", "reason"],
+      "example": {"organization_id": "00000000-0000-4000-8000-000000000001", "work_item_id": "00000000-0000-4000-8000-000000000002", "expected_step": 3, "reason": "continuation-plan"}
+    },
+    "runtime.schedule_due": {
+      "route": "/internal/v1/runtime/schedule-due",
+      "required": ["organization_id", "job_id", "due"],
+      "optional": [],
+      "example": {"organization_id": "00000000-0000-4000-8000-000000000001", "job_id": "00000000-0000-4000-8000-000000000003", "due": "2026-10-22T09:00:00+00:00"}
+    },
+    "integrations.process": {
+      "route": "/internal/v1/integrations/process",
+      "required": ["organization_id"],
+      "optional": ["command_id", "event_id", "job_id"],
+      "topics": {
+        "integration.task.prepare": ["organization_id", "command_id"],
+        "integration.worker.prepare": ["organization_id", "job_id"],
+        "integration.event.received": ["organization_id", "event_id"]
+      },
+      "example": {"organization_id": "00000000-0000-4000-8000-000000000001", "command_id": "00000000-0000-4000-8000-000000000004"}
+    },
+    "web_research.execute": {
+      "route": "/internal/v1/web-research/execute",
+      "required": ["organization_id", "command_id"],
+      "optional": [],
+      "topics": {"web.research.queued": ["organization_id", "command_id"]},
+      "example": {"organization_id": "00000000-0000-4000-8000-000000000001", "command_id": "00000000-0000-4000-8000-000000000004"}
+    }
+  }
+}

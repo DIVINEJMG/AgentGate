@@ -13,10 +13,10 @@ from sqlalchemy.orm import Session
 
 from app.api import organization_routes
 from app.application.services import onboarding
-from app.domain.identity.permissions import permissions_for_role
-from app.domain.identity.principals import HumanPrincipal
-from app.execution.providers.registry import ProviderRegistry
-from app.infrastructure.database import models as m
+from audoryn_shared.domain.identity.permissions import permissions_for_role
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.execution.providers.registry import ProviderRegistry
+from audoryn_shared.infrastructure.database import models as m
 from scripts.runtime_benchmark import BenchProvider, BenchSession, _aware_sqlite_datetimes
 from tests.test_approvals_phase4 import TABLES
 from tests.test_efficiency_queries import ORG, Database

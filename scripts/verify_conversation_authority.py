@@ -17,15 +17,15 @@ for path in conversation_files:
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             module = node.module or ""
-            if module.startswith("app.execution"):
+            if module.startswith("audoryn_shared.execution"):
                 errors.append(
                     f"{path.relative_to(ROOT)} imports execution provider code directly: {module}"
                 )
-            if module.startswith("app.integrations"):
+            if module.startswith("audoryn_shared.integrations"):
                 errors.append(
                     f"{path.relative_to(ROOT)} imports integration provider code directly: {module}"
                 )
-            if module == "app.infrastructure.database.models":
+            if module == "audoryn_shared.infrastructure.database.models":
                 names = {alias.name for alias in node.names}
                 forbidden = {
                     "IntegrationCredential",

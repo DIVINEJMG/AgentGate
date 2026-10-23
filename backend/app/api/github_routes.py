@@ -16,23 +16,23 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_dependencies import organization_principal
-from app.api.product_common import require_permission
-from app.application.services import entitlements
-from app.application.services.integration_credentials import decode_bundle, encode_bundle
-from app.application.services.integration_foundation import IntegrationFoundation
-from app.bootstrap.settings import settings
-from app.domain.identity.principals import HumanPrincipal
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.native.http import ProviderTransportError
-from app.infrastructure.database.models import (
+from audoryn_shared.api.auth_dependencies import organization_principal
+from audoryn_shared.api.product_common import require_permission
+from audoryn_shared.application.services import entitlements
+from audoryn_shared.application.services.integration_credentials import decode_bundle, encode_bundle
+from audoryn_shared.application.services.integration_foundation import IntegrationFoundation
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.native.http import ProviderTransportError
+from audoryn_shared.infrastructure.database.models import (
     ExternalAuthIdentity,
     GitHubInstallationBinding,
     GitHubOnboarding,
     OrganizationMembership,
 )
-from app.infrastructure.database.session import database_session
-from app.infrastructure.secrets.integration_crypto import (
+from audoryn_shared.infrastructure.database.session import database_session
+from audoryn_shared.infrastructure.secrets.integration_crypto import (
     IntegrationCipherError,
     decrypt_integration_secret,
     encrypt_integration_secret,
@@ -124,7 +124,7 @@ async def coding_status(
 ):
     enabled()
     require_permission(principal, "jobs.read")
-    from app.infrastructure.database.models import (
+    from audoryn_shared.infrastructure.database.models import (
         CodingCommand,
         CodingSession,
         IntegrationResource,
@@ -192,10 +192,14 @@ async def cancel_coding(
 ):
     enabled()
     require_permission(principal, "jobs.run")
-    from app.execution.coding.e2b import E2BCodingRuntime
-    from app.execution.coding.service import export, release_unused_budget
-    from app.infrastructure.database.models import CodingSession, IntegrationResource, WorkItem
-    from app.infrastructure.redis.coordination import RedisCoordinator
+    from audoryn_shared.execution.coding.e2b import E2BCodingRuntime
+    from audoryn_shared.execution.coding.service import export, release_unused_budget
+    from audoryn_shared.infrastructure.database.models import (
+        CodingSession,
+        IntegrationResource,
+        WorkItem,
+    )
+    from audoryn_shared.infrastructure.redis.coordination import RedisCoordinator
 
     item = await session.get(WorkItem, work_item_id)
     if not item or item.organization_id != organization_id:
@@ -209,7 +213,7 @@ async def cancel_coding(
             )
         )
     ).all()
-    from app.execution.providers.integration_hooks import HookUnavailable
+    from audoryn_shared.execution.providers.integration_hooks import HookUnavailable
 
     try:
         runtime = E2BCodingRuntime()
@@ -287,8 +291,8 @@ async def coding_diff(
     import json
     from types import SimpleNamespace
 
-    from app.execution.coding.service import load_artifact
-    from app.infrastructure.database.models import CodingSession, IntegrationResource
+    from audoryn_shared.execution.coding.service import load_artifact
+    from audoryn_shared.infrastructure.database.models import CodingSession, IntegrationResource
 
     row = await session.get(CodingSession, session_id)
     if not row or row.organization_id != organization_id or row.work_item_id != work_item_id:
@@ -324,7 +328,7 @@ async def authorize(
     if connection_id is None:
         await entitlements.require_room(session, organization_id, "connections.max")
     if connection_id:
-        from app.api.integration_foundation_routes import owned
+        from audoryn_shared.api.integration_foundation_routes import owned
 
         await owned(session, organization_id, connection_id, principal)
         binding = await session.scalar(

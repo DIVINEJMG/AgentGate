@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
-from app.bootstrap.settings import settings
-from app.infrastructure.qstash.verifier import QStashSignatureVerifier
 from app.migration.provider_cutover import migrate, shadow_verify
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.infrastructure.qstash.verifier import QStashSignatureVerifier
 
 router = APIRouter(prefix="/internal/v1/migration", tags=["internal-migration"])
 

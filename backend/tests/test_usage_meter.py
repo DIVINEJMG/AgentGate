@@ -14,15 +14,21 @@ from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.api.internal import runtime
-from app.application.services.ai_gateway import observe_inference
-from app.bootstrap.settings import settings
-from app.domain.ai.providers import AIInvocationContext, AIProviderError, AIResponse
-from app.infrastructure.database import models as m
-from app.infrastructure.database import usage_records
-from app.infrastructure.qstash.provider import UpstashQStashProvider
-from app.infrastructure.redis.coordination import Lease
-from app.observability.usage import MeteredRedis, Usage, label_usage, meter_database, metered
+from audoryn_execution.api.internal import runtime
+from audoryn_shared.application.services.ai_gateway import observe_inference
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.ai.providers import AIInvocationContext, AIProviderError, AIResponse
+from audoryn_shared.infrastructure.database import models as m
+from audoryn_shared.infrastructure.database import usage_records
+from audoryn_shared.infrastructure.qstash.provider import UpstashQStashProvider
+from audoryn_shared.infrastructure.redis.coordination import Lease
+from audoryn_shared.observability.usage import (
+    MeteredRedis,
+    Usage,
+    label_usage,
+    meter_database,
+    metered,
+)
 
 
 def test_database_statements_and_written_rows_count_only_inside_a_meter() -> None:
@@ -42,7 +48,7 @@ def test_database_statements_and_written_rows_count_only_inside_a_meter() -> Non
 
 @pytest.mark.asyncio
 async def test_tasks_count_into_the_meter_that_started_them_and_meters_do_not_nest() -> None:
-    from app.observability.usage import count_qstash_message
+    from audoryn_shared.observability.usage import count_qstash_message
 
     with metered() as outer:
         count_qstash_message()
@@ -110,7 +116,7 @@ async def test_usage_is_saved_as_one_row_and_saving_never_raises(monkeypatch: py
 
     engine = create_engine("sqlite://", poolclass=StaticPool)
     m.Base.metadata.create_all(engine, tables=[cast(Any, m.UsageRecord.__table__)])
-    from app.infrastructure.database import session as session_module
+    from audoryn_shared.infrastructure.database import session as session_module
 
     monkeypatch.setattr(session_module, "session_factory", lambda: BenchSession(Session(engine)))
     monkeypatch.setattr(settings, "usage_records_enabled", True)
@@ -196,7 +202,7 @@ async def test_usage_report_totals_by_kind_and_work_item(monkeypatch: pytest.Mon
 
     engine = create_engine("sqlite://", poolclass=StaticPool)
     m.Base.metadata.create_all(engine, tables=[cast(Any, m.UsageRecord.__table__)])
-    from app.infrastructure.database import session as session_module
+    from audoryn_shared.infrastructure.database import session as session_module
 
     monkeypatch.setattr(session_module, "session_factory", lambda: BenchSession(Session(engine)))
     organization_id, item = uuid4(), uuid4()

@@ -5,19 +5,22 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from app.application.services.ai_gateway import ProviderAIGateway
-from app.bootstrap.settings import Settings
-from app.domain.ai.providers import AIProviderError, AITextRequest
-from app.domain.ai.registry import ModelRegistry, ModelRoute
-from app.infrastructure.ai.connections import (
+from audoryn_shared.application.services.ai_gateway import ProviderAIGateway
+from audoryn_shared.bootstrap.settings import Settings
+from audoryn_shared.domain.ai.providers import AIProviderError, AITextRequest
+from audoryn_shared.domain.ai.registry import ModelRegistry, ModelRoute
+from audoryn_shared.infrastructure.ai.connections import (
     DEFAULT_CONNECTIONS,
     route_account_name,
     route_credential,
     snapshot_connection,
 )
-from app.infrastructure.ai.model_profiles import DEFAULT_PROFILES
-from app.infrastructure.ai.openai_chat import ConfiguredChatProvider, groq_strict_compatible
-from app.infrastructure.ai.text_routes import snapshot_routes, transport_for_text_route
+from audoryn_shared.infrastructure.ai.model_profiles import DEFAULT_PROFILES
+from audoryn_shared.infrastructure.ai.openai_chat import (
+    ConfiguredChatProvider,
+    groq_strict_compatible,
+)
+from audoryn_shared.infrastructure.ai.text_routes import snapshot_routes, transport_for_text_route
 from scripts.benchmark_ai_common import CANDIDATES
 
 STRICT = {
@@ -240,7 +243,7 @@ def test_hf_auto_model_routing_and_unapproved_billing_are_blocked():
 
 @pytest.mark.asyncio
 async def test_new_connection_fallback_uses_existing_ordered_selector():
-    from app.application.services.ordered_ai import OrderedTextGateway
+    from audoryn_shared.application.services.ordered_ai import OrderedTextGateway
 
     routes = [
         {"provider": "groq", "model": "qwen/qwen3.8-27b"},
@@ -307,8 +310,8 @@ async def test_transport_identity_is_persisted_by_invocation_recorder():
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.domain.ai.providers import AIInvocationContext
-    from app.infrastructure.ai.telemetry import (
+    from audoryn_shared.domain.ai.providers import AIInvocationContext
+    from audoryn_shared.infrastructure.ai.telemetry import (
         SQLAlchemyAIInvocationRecorder,
         TransportInvocationRecorder,
     )
@@ -318,7 +321,7 @@ async def test_transport_identity_is_persisted_by_invocation_recorder():
     route = snapshot_connection(
         {"provider": "groq", "model": "qwen/qwen3.8-27b"}, Settings.model_construct()
     )
-    from app.infrastructure.ai.connections import transport_identity
+    from audoryn_shared.infrastructure.ai.connections import transport_identity
 
     recorder = TransportInvocationRecorder(
         SQLAlchemyAIInvocationRecorder(cast(AsyncSession, session)), transport_identity(route)

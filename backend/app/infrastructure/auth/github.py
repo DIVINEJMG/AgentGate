@@ -14,8 +14,8 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.infrastructure.auth.service import normalize_email
-from app.infrastructure.database.models import (
+from audoryn_shared.infrastructure.auth.service import normalize_email
+from audoryn_shared.infrastructure.database.models import (
     ExternalAuthIdentity,
     GitHubAuthFlow,
     GitHubOnboarding,

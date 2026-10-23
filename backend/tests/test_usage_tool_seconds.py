@@ -14,12 +14,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from test_f30_0_10 import FakeBrowserRuntime, request_for
 
-from app.bootstrap.settings import settings
-from app.execution.coding import service as coding
-from app.execution.providers.browser import PlaywrightBrowserProvider
-from app.infrastructure.database import models as m
-from app.infrastructure.database import usage_records
-from app.observability.usage import Usage, browser_time, count_tool_seconds, metered
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.execution.coding import service as coding
+from audoryn_shared.execution.providers.browser import PlaywrightBrowserProvider
+from audoryn_shared.infrastructure.database import models as m
+from audoryn_shared.infrastructure.database import usage_records
+from audoryn_shared.observability.usage import Usage, browser_time, count_tool_seconds, metered
 
 
 @pytest.mark.asyncio
@@ -103,7 +103,7 @@ def _database(monkeypatch: pytest.MonkeyPatch, *tables: Any) -> Any:
 
     engine = create_engine("sqlite://", poolclass=StaticPool)
     m.Base.metadata.create_all(engine, tables=[cast(Any, table.__table__) for table in tables])
-    from app.infrastructure.database import session as session_module
+    from audoryn_shared.infrastructure.database import session as session_module
 
     monkeypatch.setattr(session_module, "session_factory", lambda: BenchSession(Session(engine)))
     return engine

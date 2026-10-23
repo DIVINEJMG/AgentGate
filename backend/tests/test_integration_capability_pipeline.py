@@ -5,17 +5,17 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.services.integration_foundation import (
+from audoryn_shared.application.services.integration_foundation import (
     IntegrationFoundation,
     IntegrationRequirementError,
 )
-from app.application.services.integration_worker_readiness import reconcile_worker_job
-from app.bootstrap.settings import settings
-from app.domain.ai.providers import AIProviderError
-from app.domain.integrations.foundation import IntegrationNeed, IntegrationTaskDraft
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.registry import ProviderRegistry
-from app.infrastructure.database.models import JobRevision, WorkItem
+from audoryn_shared.application.services.integration_worker_readiness import reconcile_worker_job
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.ai.providers import AIProviderError
+from audoryn_shared.domain.integrations.foundation import IntegrationNeed, IntegrationTaskDraft
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.registry import ProviderRegistry
+from audoryn_shared.infrastructure.database.models import JobRevision, WorkItem
 
 
 def fake_session(**kwargs) -> Any:
@@ -30,7 +30,7 @@ def github(monkeypatch):
     monkeypatch.setattr(settings, "coding_template_id", "test-only")
     monkeypatch.setattr("importlib.util.find_spec", lambda name: object())
     provider = ExpandedGitHubProvider()
-    monkeypatch.setattr("app.application.services.integration_foundation.execution_provider_registry",
+    monkeypatch.setattr("audoryn_shared.application.services.integration_foundation.execution_provider_registry",
         lambda: ProviderRegistry((provider,)))
     return provider
 
@@ -175,7 +175,7 @@ async def test_existing_incomplete_grant_is_rebuilt_without_mutating_old_revisio
 
 @pytest.mark.asyncio
 async def test_planner_excludes_revoked_connection_with_execution_reason(github, monkeypatch):
-    from app.runtime import managed
+    from audoryn_execution.runtime import managed
     monkeypatch.setattr(settings, "integration_foundation_enabled", True)
     monkeypatch.setattr(managed, "_catalog", AsyncMock(return_value={"resources": []}))
     org, rid, wid = uuid4(), uuid4(), uuid4()
@@ -194,7 +194,7 @@ async def test_planner_excludes_revoked_connection_with_execution_reason(github,
 
 @pytest.mark.asyncio
 async def test_resource_refresh_queues_saved_chat_and_current_worker_preparation(monkeypatch):
-    from app.infrastructure.database.outbox import TransactionalOutbox
+    from audoryn_shared.infrastructure.database.outbox import TransactionalOutbox
     org, user, job_id, command_id = uuid4(), uuid4(), uuid4(), uuid4()
     session = fake_session(scalars=AsyncMock(side_effect=[
         SimpleNamespace(all=lambda: [SimpleNamespace(id=command_id)]),

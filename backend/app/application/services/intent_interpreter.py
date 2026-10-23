@@ -4,16 +4,16 @@ import json
 import logging
 from typing import Any
 
-from app.application.context.conversation import compact_context
-from app.application.context.sections import Section, assemble
 from app.application.services.conversation_semantics import (
     REPLY_RULES,
     reply_facts,
     without_repeated_replies,
 )
-from app.application.services.integration_foundation import available_event_triggers
-from app.domain.ai.providers import AIGateway, AIInvocationContext
-from app.domain.conversation.intent import WorkerCommandIntent
+from audoryn_shared.application.context.conversation import compact_context
+from audoryn_shared.application.context.sections import Section, assemble
+from audoryn_shared.application.services.integration_foundation import available_event_triggers
+from audoryn_shared.domain.ai.providers import AIGateway, AIInvocationContext
+from audoryn_shared.domain.conversation.intent import WorkerCommandIntent
 
 
 class IntentInterpreter:

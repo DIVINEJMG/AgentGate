@@ -16,11 +16,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.api import billing_routes
-from app.application.services import entitlements as plans
 from app.application.services import plan_prompts
-from app.bootstrap.settings import settings
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.database import models as m
+from audoryn_shared.application.services import entitlements as plans
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.database import models as m
 from scripts.runtime_benchmark import BenchSession, _aware_sqlite_datetimes
 from tests.test_entitlements import TABLES, give_plan
 
@@ -38,7 +38,7 @@ def fresh_cache() -> Iterator[None]:
 def db(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     engine = create_engine("sqlite://", poolclass=StaticPool)
     m.Base.metadata.create_all(engine, tables=[cast(Any, table.__table__) for table in PROMPT_TABLES])
-    from app.infrastructure.database import session as session_module
+    from audoryn_shared.infrastructure.database import session as session_module
 
     monkeypatch.setattr(session_module, "session_factory", lambda: BenchSession(Session(engine)))
     monkeypatch.setattr(settings, "entitlements_enforcement", True)

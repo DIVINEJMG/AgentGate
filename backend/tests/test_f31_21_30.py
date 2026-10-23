@@ -17,33 +17,25 @@ from app.application.services.attachment_ingestion import (
     AttachmentIngestionService,
     decode_base64_content,
 )
-from app.application.services.browser_origin_authority import (
+from audoryn_execution.runtime.managed import ManagedRuntimeExecutor
+from audoryn_shared.application.services.browser_origin_authority import (
     browser_integration_autonomy_suitable,
     browser_integration_origins,
     explicit_http_origins,
 )
-from app.application.services.capability_autoresolver import SemanticCapabilityResolver
-from app.application.services.schedule_inference import compile_schedule
-from app.application.services.worker_draft import WorkerDraftGenerator
-from app.application.services.worker_memory import contains_secret_material
-from app.domain.ai.providers import (
+from audoryn_shared.application.services.capability_autoresolver import SemanticCapabilityResolver
+from audoryn_shared.application.services.schedule_inference import compile_schedule
+from audoryn_shared.application.services.worker_draft import WorkerDraftGenerator
+from audoryn_shared.application.services.worker_memory import contains_secret_material
+from audoryn_shared.domain.ai.providers import (
     AIInvocationContext,
     AIMediaInput,
     AIModelRole,
     AIResponse,
 )
-from app.domain.workforce.drafts import (
-    CapabilityNeed,
-    ScheduleDraft,
-    WorkerDraft,
-)
-from app.infrastructure.database.models import (
-    ArtifactAnalysis,
-    Integration,
-    Memory,
-)
-from app.runtime.managed import ManagedRuntimeExecutor
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
+from audoryn_shared.domain.workforce.drafts import CapabilityNeed, ScheduleDraft, WorkerDraft
+from audoryn_shared.infrastructure.database.models import ArtifactAnalysis, Integration, Memory
+from audoryn_shared.runtime.planner.adaptive import AdaptiveRuntimePlanner
 
 
 @dataclass
@@ -777,7 +769,8 @@ def test_managed_runtime_planner_has_memory_and_stop_after_next_run_support() ->
 
 
 def test_existing_worker_job_create_uses_generic_browser_origin_provisioning() -> None:
-    from app.application.services import browser_origin_authority, conversation_commands
+    from app.application.services import conversation_commands
+    from audoryn_shared.application.services import browser_origin_authority
 
     compiler = inspect.getsource(conversation_commands.ConversationCommandCompiler)
     authority = inspect.getsource(browser_origin_authority)
@@ -803,7 +796,7 @@ def test_existing_worker_job_create_uses_generic_browser_origin_provisioning() -
 def test_ai_runtime_exposes_only_autonomy_suitable_browser_resources(monkeypatch) -> None:
     """A browser resource must stay within the job's authorized origins; for a job the AI created it
     must also be suitable for autonomous use."""
-    from app.runtime import managed
+    from audoryn_execution.runtime import managed
 
     suitable = {"value": False}
     monkeypatch.setattr(managed, "browser_integration_autonomy_suitable", lambda integration, origins: suitable["value"])
@@ -819,7 +812,7 @@ def test_ai_runtime_exposes_only_autonomy_suitable_browser_resources(monkeypatch
 
 
 def test_managed_browser_origins_default_to_lean_visual_loading() -> None:
-    from app.application.services import browser_origin_authority
+    from audoryn_shared.application.services import browser_origin_authority
 
     source = inspect.getsource(browser_origin_authority)
     assert '"loadVisualResources": "false"' in source
@@ -827,7 +820,7 @@ def test_managed_browser_origins_default_to_lean_visual_loading() -> None:
 
 
 def test_worker_autonomy_uses_existing_authority_and_governance_services() -> None:
-    from app.application.services.worker_autonomy import WorkerAutonomyService
+    from audoryn_shared.application.services.worker_autonomy import WorkerAutonomyService
 
     source = inspect.getsource(WorkerAutonomyService)
     assert "WorkerDraftGenerator" in source
@@ -844,7 +837,7 @@ def test_worker_autonomy_uses_existing_authority_and_governance_services() -> No
 
 
 def test_golden_qq_scenario_contract_is_represented_without_scope_invention() -> None:
-    from app.application.services import capability_autoresolver, worker_autonomy
+    from audoryn_shared.application.services import capability_autoresolver, worker_autonomy
 
     autonomy_source = inspect.getsource(worker_autonomy)
     resolver_source = inspect.getsource(capability_autoresolver)
@@ -858,7 +851,7 @@ def test_golden_qq_scenario_contract_is_represented_without_scope_invention() ->
 
 
 def test_worker_draft_requires_explicit_human_intent_for_per_action_approval() -> None:
-    from app.application.services.worker_draft import (
+    from audoryn_shared.application.services.worker_draft import (
         _enforce_human_approval_intent,
         _explicit_approval_requested,
     )
@@ -915,7 +908,7 @@ def test_worker_draft_requires_explicit_human_intent_for_per_action_approval() -
 
 
 def test_managed_worker_creation_uses_standing_authority_for_granted_scopes() -> None:
-    from app.api import jobs_routes
+    from audoryn_shared.api import jobs_routes
 
     source = inspect.getsource(jobs_routes._provision_managed_job_authority)
 
@@ -927,7 +920,7 @@ def test_managed_worker_creation_uses_standing_authority_for_granted_scopes() ->
 
 
 def test_managed_authority_preserves_only_recorded_standing_grants() -> None:
-    from app.api.jobs_routes import _standing_scopes_from_managed_allow_revision
+    from audoryn_shared.api.jobs_routes import _standing_scopes_from_managed_allow_revision
 
     selectors = {
         "scopes": ["browser.element.press_key", "browser.page.read"],

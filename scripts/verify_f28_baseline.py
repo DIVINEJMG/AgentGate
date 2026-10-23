@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from code_paths import Code  # the backend's code, in its three packages (Phase 4)
 
 ROOT = Path(__file__).resolve().parents[1]
-PYPROJECT = (ROOT / "backend" / "pyproject.toml").read_text(encoding="utf-8")
+# The libraries are declared once, in the shared package (Phase 4); the test tools with the core.
+PYPROJECT = " ".join((ROOT / folder / "pyproject.toml").read_text(encoding="utf-8")
+                      for folder in ("packages/shared", "backend"))
 FRONTEND_PACKAGE = (ROOT / "frontend" / "package.json").read_text(encoding="utf-8")
 
 required_python = (
@@ -29,7 +32,7 @@ if missing_frontend:
     raise SystemExit(f"F28 technology baseline missing frontend dependencies: {missing_frontend}")
 
 legacy_hits: list[str] = []
-for path in (ROOT / "backend" / "app").rglob("*.py"):
+for path in Code().rglob("*.py"):
     text = path.read_text(encoding="utf-8")
     if re.search(r"(^|\s)(from|import)\s+@?appdeploy\b", text, re.MULTILINE):
         legacy_hits.append(str(path.relative_to(ROOT)))

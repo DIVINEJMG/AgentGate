@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import func, select
 
-from app.infrastructure.database.models import UsageRecord
+from audoryn_shared.infrastructure.database.models import UsageRecord
 
 COUNTERS = ("qstash_messages", "db_statements", "db_rows", "redis_commands", "ai_calls", "ai_failed_calls",
             "ai_tokens_in", "ai_tokens_out", "duration_ms")
@@ -31,7 +31,7 @@ def _table(header: list[str], rows: list[list[object]]) -> str:
 
 
 async def report(hours: float, top: int) -> str:
-    from app.infrastructure.database.session import session_factory
+    from audoryn_shared.infrastructure.database.session import session_factory
 
     since = datetime.now(UTC) - timedelta(hours=hours)
     sums = [func.sum(getattr(UsageRecord, name)) for name in COUNTERS]

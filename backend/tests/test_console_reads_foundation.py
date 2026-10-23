@@ -15,21 +15,21 @@ from jsonschema import Draft202012Validator
 from pydantic import SecretStr
 from referencing import Registry, Resource
 
-from app.application.console_reads.config import load_config
 from app.application.console_reads.guard import (
     ConsoleReadsRuntime,
     InvalidParameters,
     console_reads_runtime,
     serve,
 )
-from app.application.console_reads.signing import (
+from app.main import app
+from audoryn_shared.application.console_reads.config import load_config
+from audoryn_shared.application.console_reads.signing import (
     ReplayStoreUnavailable,
     ServiceKey,
     ServiceRequestRejected,
     sign,
     verify_read_request,
 )
-from app.main import app
 
 CONTRACT_DIR = Path(__file__).resolve().parents[2] / "docs" / "integration" / "console-reads"
 SCHEMA = json.loads((CONTRACT_DIR / "contract.v1.json").read_text(encoding="utf-8"))

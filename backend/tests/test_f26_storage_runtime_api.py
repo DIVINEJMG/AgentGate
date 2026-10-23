@@ -5,10 +5,10 @@ import pytest
 
 from app.api.adapters.system_status import serialize_v1, serialize_v2
 from app.application.queries.system_status import get_system_status
-from app.domain.artifacts.storage import ObjectStorage
-from app.domain.jobs.queue import ClaimedWorkItem
-from app.infrastructure.storage.provider import UnconfiguredObjectStorage
-from app.runtime.executor import UnconfiguredRuntimeExecutor
+from audoryn_execution.runtime.executor import UnconfiguredRuntimeExecutor
+from audoryn_shared.domain.artifacts.storage import ObjectStorage
+from audoryn_shared.domain.jobs.queue import ClaimedWorkItem
+from audoryn_shared.infrastructure.storage.provider import UnconfiguredObjectStorage
 
 
 def test_v1_and_v2_are_adapters_over_one_canonical_status() -> None:

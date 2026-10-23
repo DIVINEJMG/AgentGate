@@ -20,16 +20,16 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.api.internal import console_entitlements as channel
-from app.application import console_entitlements as signing
-from app.application.console_reads import signing as reads_signing
-from app.application.console_reads.signing import (
+from audoryn_shared.application import console_entitlements as signing
+from audoryn_shared.application.console_reads import signing as reads_signing
+from audoryn_shared.application.console_reads.signing import (
     ReplayStoreUnavailable,
     ServiceKey,
     ServiceRequestRejected,
 )
-from app.application.services import entitlements as plans
-from app.infrastructure.database import models as m
-from app.infrastructure.database.session import database_session
+from audoryn_shared.application.services import entitlements as plans
+from audoryn_shared.infrastructure.database import models as m
+from audoryn_shared.infrastructure.database.session import database_session
 from scripts.runtime_benchmark import BenchSession, _aware_sqlite_datetimes
 
 VECTOR = json.loads((Path(__file__).resolve().parents[2] / "docs/integration/console-entitlements/signing-vector.json")
@@ -62,6 +62,23 @@ class MemoryGuard:
     async def wait_seconds(self, *, key_id: str, limit: int, now: int) -> int | None:
         self.hits += 1
         return 30 if self.limit_after is not None and self.hits > self.limit_after else None
+
+
+class MemoryRedis:
+    """The traffic-limit store's two Redis calls: GET, and the set-if-newer script."""
+
+    def __init__(self) -> None:
+        self.values: dict[str, str] = {}
+
+    async def get(self, key: str) -> str | None:
+        return self.values.get(key)
+
+    async def eval(self, _script: str, _keys: int, key: str, version: int, document: str) -> list[int]:
+        held = json.loads(self.values[key])["version"] if key in self.values else None
+        if held is not None and held >= version:
+            return [0, held]
+        self.values[key] = document
+        return [1, version]
 
 
 def test_the_shared_vector_signs_the_same_on_both_sides() -> None:
@@ -146,11 +163,11 @@ def api(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     async def session() -> Any:
         yield BenchSession(Session(engine))
 
-    from app.infrastructure.database import session as session_module
+    from audoryn_shared.infrastructure.database import session as session_module
 
     monkeypatch.setattr(session_module, "session_factory", lambda: BenchSession(Session(engine)))
     config, guard = signing.load_config(settings()), MemoryGuard()
-    runtime = channel.ChannelRuntime(config=config, guard=cast(Any, guard), clock=lambda: NOW)
+    runtime = channel.ChannelRuntime(config=config, guard=cast(Any, guard), clock=lambda: NOW, redis=MemoryRedis())
     app = FastAPI()
     app.include_router(channel.router)
     app.dependency_overrides[database_session] = session
@@ -193,6 +210,23 @@ def test_snapshots_apply_newest_first_and_report_what_is_applied(api: Any) -> No
                 document(organization, 0)):
         refused = api.call("POST", "/snapshots", bad)
         assert refused.status_code == 400 and refused.json()["error"]["code"] == "invalid"
+
+
+def test_traffic_limits_are_kept_newest_first_for_the_gateway(api: Any) -> None:
+    def limits(version: int, **changes: Any) -> dict[str, Any]:
+        return {"version": version, "mode": "report",
+                "policies": {"general": {"rules": [{"key": "ip", "limit": 900, "window_seconds": 60}]}}, **changes}
+
+    results = [api.call("POST", "/traffic-limits", limits(version)).json()["data"] for version in (2, 1, 3)]
+    assert [(item["result"], item["appliedVersion"]) for item in results] == [
+        ("applied", 2), ("stale", 2), ("applied", 3)]
+    stored = json.loads(api.runtime.redis.values["audoryn:gateway:policies"])
+    assert stored["version"] == 3 and stored["policies"]["general"]["rules"][0]["limit"] == 900
+    assert api.call("GET", "/status").json()["data"]["trafficLimitsVersion"] == 3
+    for bad in (limits(4, mode="loud"), limits(0), {**limits(4), "extra": 1}):
+        refused = api.call("POST", "/traffic-limits", bad)
+        assert refused.status_code == 400 and refused.json()["error"]["code"] == "invalid"
+    assert api.call("POST", "/traffic-limits", limits(5), scope=signing.READ_SCOPE).status_code == 401
 
 
 def test_the_template_is_versioned_like_snapshots(api: Any) -> None:

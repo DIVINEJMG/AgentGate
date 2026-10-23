@@ -7,22 +7,22 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_dependencies import organization_principal
-from app.api.jobs_routes import create_job, job_public
-from app.api.product_common import not_found, require_permission
-from app.api.workforce_routes import (
+from audoryn_shared.api.auth_dependencies import organization_principal
+from audoryn_shared.api.jobs_routes import create_job, job_public
+from audoryn_shared.api.product_common import not_found, require_permission
+from audoryn_shared.api.workforce_routes import (
     create_role,
     create_worker,
     role_public,
     worker_public,
 )
-from app.domain.identity.principals import HumanPrincipal
-from app.infrastructure.database.models import (
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.infrastructure.database.models import (
     CapabilityProfile,
     Integration,
     WorkforceRole,
 )
-from app.infrastructure.database.session import database_session
+from audoryn_shared.infrastructure.database.session import database_session
 
 v1_router = APIRouter(tags=["templates"])
 v2_router = APIRouter(tags=["templates"])

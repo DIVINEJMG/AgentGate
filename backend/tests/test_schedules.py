@@ -14,12 +14,12 @@ from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.api import jobs_routes
-from app.api.internal import runtime
-from app.bootstrap.settings import settings
-from app.infrastructure.database import models as m
-from app.infrastructure.database.base import Base
-from app.runtime import schedule_wake
+from audoryn_execution.api.internal import runtime
+from audoryn_shared.api import jobs_routes
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.infrastructure.database import models as m
+from audoryn_shared.infrastructure.database.base import Base
+from audoryn_shared.runtime import schedule_wake
 from scripts.runtime_benchmark import BenchSession, _aware_sqlite_datetimes
 
 NOW = datetime(2026, 10, 13, 9, 0, 30, tzinfo=UTC)

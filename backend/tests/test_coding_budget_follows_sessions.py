@@ -12,10 +12,10 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
-from app.bootstrap.settings import settings
-from app.execution.coding import service
-from app.execution.contracts import ExecutionProviderError
-from app.infrastructure.database import models as m
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.execution.coding import service
+from audoryn_shared.execution.contracts import ExecutionProviderError
+from audoryn_shared.infrastructure.database import models as m
 from scripts.runtime_benchmark import BenchSession, _aware_sqlite_datetimes
 from tests.test_approvals_phase4 import TABLES
 from tests.test_efficiency_queries import ORG, Database

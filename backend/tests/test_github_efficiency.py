@@ -6,14 +6,14 @@ from uuid import uuid4
 
 import pytest
 
-from app.execution.providers.native.github.provider import ExpandedGitHubProvider
-from app.execution.providers.native.github.transport import GitHubHTTPClient
+from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
+from audoryn_shared.execution.providers.native.github.transport import GitHubHTTPClient
 from tests.test_github_expanded import ScriptedHTTP, request
 
 
 @pytest.mark.asyncio
 async def test_api_only_reads_never_start_coding_runtime(monkeypatch):
-    from app.execution.coding import service
+    from audoryn_shared.execution.coding import service
     coding = AsyncMock(side_effect=AssertionError("API read must not use E2B"))
     monkeypatch.setattr(service, "execute_coding_action", coding)
     provider = ExpandedGitHubProvider(ScriptedHTTP([{"full_name": "owner/repo", "default_branch": "main"}]))
@@ -72,8 +72,8 @@ async def test_http_connection_scope_reuses_then_closes_client():
     ("repository.metadata.read", 90, "gmail"), ("repository.metadata.read", 90, "slack"),
 ])
 async def test_initialization_has_separate_timeout_and_matching_slots(monkeypatch, operation, budget, connection):
-    from app.bootstrap.settings import settings
-    from app.execution import integration_execution
+    from audoryn_execution.execution import integration_execution
+    from audoryn_shared.bootstrap.settings import settings
     monkeypatch.setattr(settings, "coding_initialization_seconds", 600)
     monkeypatch.setattr(integration_execution, "initialization_budget", AsyncMock(return_value=600))
     observed = []
@@ -100,9 +100,9 @@ async def test_initialization_has_separate_timeout_and_matching_slots(monkeypatc
 async def test_saved_initialization_deadline_bounds_retry_and_expiry(monkeypatch):
     from datetime import UTC, datetime, timedelta
 
-    from app.execution import integration_execution
-    from app.execution.contracts import ExecutionProviderError
-    from app.infrastructure.database import session as database
+    from audoryn_execution.execution import integration_execution
+    from audoryn_shared.execution.contracts import ExecutionProviderError
+    from audoryn_shared.infrastructure.database import session as database
     provider = ExpandedGitHubProvider(ScriptedHTTP([]))
     req = request(provider, "repository.workspace.open", {"sha": "a" * 40})
     value = [(datetime.now(UTC) + timedelta(seconds=40)).isoformat(), "bundle_transfer", "creating"]

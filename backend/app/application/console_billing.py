@@ -21,9 +21,9 @@ from uuid import UUID
 
 import httpx
 
-from app.application.console_entitlements import sign
-from app.application.console_reads.config import decode_secret
-from app.application.console_reads.signing import ServiceKey
+from audoryn_shared.application.console_entitlements import sign
+from audoryn_shared.application.console_reads.config import decode_secret
+from audoryn_shared.application.console_reads.signing import ServiceKey
 
 logger = logging.getLogger("audoryn.console_billing")
 

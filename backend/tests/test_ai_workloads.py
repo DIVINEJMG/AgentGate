@@ -13,20 +13,27 @@ import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 
-from app.application.services.ai_gateway import ProviderAIGateway
-from app.application.services.ordered_ai import OrderedTextGateway
-from app.application.services.preparation_ai import DurablePreparationGateway, PreparationObserver
-from app.bootstrap.settings import Settings, settings
-from app.domain.ai.providers import AIProviderError, AIResponse, ModelProviderCapabilities
-from app.domain.ai.registry import ModelRegistry, ModelRoute
-from app.infrastructure.ai.provider import ai_gateway_from_settings
-from app.infrastructure.ai.text_routes import snapshot_routes, text_routes
-from app.infrastructure.ai.workloads import (
+from audoryn_shared.application.services.ai_gateway import ProviderAIGateway
+from audoryn_shared.application.services.ordered_ai import OrderedTextGateway
+from audoryn_shared.application.services.preparation_ai import (
+    DurablePreparationGateway,
+    PreparationObserver,
+)
+from audoryn_shared.bootstrap.settings import Settings, settings
+from audoryn_shared.domain.ai.providers import (
+    AIProviderError,
+    AIResponse,
+    ModelProviderCapabilities,
+)
+from audoryn_shared.domain.ai.registry import ModelRegistry, ModelRoute
+from audoryn_shared.infrastructure.ai.provider import ai_gateway_from_settings
+from audoryn_shared.infrastructure.ai.text_routes import snapshot_routes, text_routes
+from audoryn_shared.infrastructure.ai.workloads import (
     acquire_account_slot,
     acquire_workload_slot,
     reserve_workload_budgets,
 )
-from app.infrastructure.database.models import PlannerDecision
+from audoryn_shared.infrastructure.database.models import PlannerDecision
 
 
 def test_ranked_lists_catalog_and_legacy_vision():
@@ -159,7 +166,7 @@ class Session:
 
 @pytest.fixture
 def preparation(monkeypatch):
-    from app.application.services import preparation_ai as module
+    from audoryn_shared.application.services import preparation_ai as module
 
     coordinator = SimpleNamespace(
         acquire_lock=AsyncMock(return_value=object()),
@@ -393,7 +400,7 @@ async def test_shared_account_also_reserves_chat_capacity():
 async def test_held_slots_are_short_lived_and_renewed_until_released(monkeypatch):
     """A slot lives SLOT_TTL_SECONDS in Redis and is renewed while held, so one left by a process
     that stopped mid-call frees itself quickly instead of after the call's whole limit."""
-    from app.infrastructure.ai import workloads
+    from audoryn_shared.infrastructure.ai import workloads
 
     monkeypatch.setattr(workloads, "SLOT_TTL_SECONDS", 0.03)
     ttls, renewed = [], []

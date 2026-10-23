@@ -18,7 +18,7 @@ def test_every_action_record_carries_the_full_policy_shape(recorded) -> None:
     from types import SimpleNamespace
     from uuid import uuid4
 
-    from app.api.governance_routes import _action_record
+    from audoryn_shared.api.governance_routes import _action_record
 
     action = SimpleNamespace(id=uuid4(), organization_id=uuid4(), agent_id=uuid4(), resource_id="r", scope="s",
                              status="held", idempotency_key="k", created_at=datetime.now(UTC),
@@ -45,8 +45,8 @@ async def test_an_unreadable_result_after_a_write_is_uncertain_not_failed(after_
     values."""
     from uuid import uuid4
 
-    from app.execution.contracts import ExecutionProviderError
-    from app.execution.providers.native.github.provider import ExpandedGitHubProvider
+    from audoryn_shared.execution.contracts import ExecutionProviderError
+    from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
     from tests.test_github_expanded import ScriptedHTTP, request
 
     item = uuid4()
@@ -70,7 +70,7 @@ async def test_a_merge_is_confirmed_by_github_saying_merged() -> None:
     but could never be confirmed. Merged at the approved head is the proof; missing extras are not."""
     from uuid import uuid4
 
-    from app.execution.providers.native.github.provider import ExpandedGitHubProvider
+    from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
     from tests.test_github_expanded import ScriptedHTTP, request
 
     item = uuid4()
@@ -88,8 +88,8 @@ async def test_a_merge_at_another_head_is_still_not_confirmed() -> None:
     mismatch, never a success."""
     from uuid import uuid4
 
-    from app.execution.contracts import ExecutionProviderError
-    from app.execution.providers.native.github.provider import ExpandedGitHubProvider
+    from audoryn_shared.execution.contracts import ExecutionProviderError
+    from audoryn_shared.execution.providers.native.github.provider import ExpandedGitHubProvider
     from tests.test_github_expanded import ScriptedHTTP, request
 
     item = uuid4()
@@ -102,7 +102,7 @@ async def test_a_merge_at_another_head_is_still_not_confirmed() -> None:
 
 
 def test_a_write_counts_as_sent_only_when_it_changes_github() -> None:
-    from app.execution.providers.native.github.provider import _changes_github
+    from audoryn_shared.execution.providers.native.github.provider import _changes_github
 
     assert not _changes_github("GET", "/repos/o/r", None)
     assert not _changes_github("POST", "/graphql", {"query": "query { viewer { login } }"})
@@ -128,8 +128,8 @@ def _stream(finish: str | None):
 ])
 async def test_a_cut_off_answer_records_how_it_ended(finish, code, reason) -> None:
     """F33: the finish reason is recorded as a fixed code."""
-    from app.domain.ai.providers import AIProviderError
-    from app.infrastructure.ai.streaming import collect_response
+    from audoryn_shared.domain.ai.providers import AIProviderError
+    from audoryn_shared.infrastructure.ai.streaming import collect_response
 
     with pytest.raises(AIProviderError) as raised:
         await collect_response(_stream(finish), model="m")
@@ -145,13 +145,13 @@ async def test_only_a_dropped_answer_is_asked_again_of_the_same_model(finish, ca
     from unittest.mock import AsyncMock
     from uuid import uuid4
 
-    from app.domain.ai.providers import (
+    from audoryn_shared.domain.ai.providers import (
         AIProviderError,
         AIResponse,
         AITextRequest,
         ModelProviderCapabilities,
     )
-    from app.runtime.smart_planner import CountedProvider
+    from audoryn_shared.runtime.smart_planner import CountedProvider
 
     cut = AIProviderError("invalid_provider_response", "cut", retryable=False,
                           rejection_reason="truncated_output" if finish == "length" else "incomplete_output",
@@ -178,7 +178,7 @@ async def test_only_a_dropped_answer_is_asked_again_of_the_same_model(finish, ca
 ])
 def test_an_empty_read_says_what_was_empty(scope, output, said) -> None:
     """F32: the three empty reads of the merge task no longer all read "Found nothing"."""
-    from app.application.context.narrator import narrate
+    from audoryn_execution.application.context.narrator import narrate
 
     assert narrate(scope, output) == said
 
@@ -187,7 +187,11 @@ def _page(url: str, *, login: bool):
     from datetime import UTC, datetime
     from uuid import uuid4
 
-    from app.execution.browser.contracts import BrowserElement, BrowserForm, BrowserObservation
+    from audoryn_shared.execution.browser.contracts import (
+        BrowserElement,
+        BrowserForm,
+        BrowserObservation,
+    )
 
     def field(ref, kind):
         return BrowserElement(ref=ref, tag="input", role="textbox", name=ref, text="", element_type=kind, value=None,
@@ -219,7 +223,7 @@ class _ProbeRuntime:
 
     async def navigate(self, session_id, **kwargs):
         if self.blocked:
-            from app.execution.browser.policy import (
+            from audoryn_shared.execution.browser.policy import (
                 BrowserNavigationBlocked,
                 BrowserNavigationDecision,
             )
@@ -240,8 +244,8 @@ class _ProbeRuntime:
 async def _probe(runtime, *, credential=None, sign_in=False, start="https://portal.example.com/login"):
     from uuid import uuid4
 
-    from app.execution.browser.policy import BrowserDomainPolicy
-    from app.execution.browser.probe import probe_connection
+    from audoryn_shared.execution.browser.policy import BrowserDomainPolicy
+    from audoryn_shared.execution.browser.probe import probe_connection
 
     policy = BrowserDomainPolicy.from_configuration({"allowedOrigins": "https://portal.example.com"})
     return await probe_connection(runtime, organization_id=uuid4(), policy=policy, start_url=start,
@@ -294,8 +298,8 @@ async def test_a_connection_check_saves_what_it_found(monkeypatch) -> None:
     from unittest.mock import AsyncMock
     from uuid import uuid4
 
-    from app.api import integration_capability_routes as routes
-    from app.execution.contracts import ProviderHealth
+    from audoryn_shared.api import integration_capability_routes as routes
+    from audoryn_shared.execution.contracts import ProviderHealth
 
     stored = {"displayName": "Portal", "startUrl": "https://portal.example.com", "healthMessage": "validated"}
     integration = SimpleNamespace(id=uuid4(), organization_id=uuid4(), provider="browser", status="connected",
@@ -320,7 +324,7 @@ async def test_a_connection_check_saves_what_it_found(monkeypatch) -> None:
 
 def test_a_login_is_described_by_its_field_names_only() -> None:
     """F35: planning and drafting see which fields a login stores, never the values."""
-    from app.execution.browser.credentials import (
+    from audoryn_shared.execution.browser.credentials import (
         BrowserAuthenticationFailure,
         BrowserCredentialBundle,
         login_field_names,
@@ -339,7 +343,7 @@ def test_a_login_is_described_by_its_field_names_only() -> None:
 @pytest.mark.parametrize(("keys", "corrected"), [(["username", "password"], False), (["email", "password"], True)])
 def test_the_planner_binds_only_stored_login_fields(keys, corrected) -> None:
     """F35: a sign-in naming a field the login does not store is corrected at planning time."""
-    from app.runtime.planner.adaptive import Proposal, RuleContext, _login_fields
+    from audoryn_shared.runtime.planner.adaptive import Proposal, RuleContext, _login_fields
 
     tool = {"scope": "browser.auth.login", "loginFields": ["username", "password"]}
     proposal = Proposal.of({"decision": "act", "scope": "browser.auth.login", "resourceId": "r",
@@ -355,7 +359,7 @@ def test_the_planner_binds_only_stored_login_fields(keys, corrected) -> None:
 @pytest.mark.asyncio
 async def test_a_browser_connection_records_its_login_fields() -> None:
     """F35: connecting records the field names in the connection's settings."""
-    from app.execution.bootstrap import browser_provider
+    from audoryn_shared.execution.bootstrap import browser_provider
 
     with_login = await browser_provider.discover_resources(
         configuration={"startUrl": "https://portal.example.com/login"},
@@ -377,7 +381,7 @@ async def test_a_submit_that_opens_a_page_is_observed_once_it_loads(started, com
 
     from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
-    from app.execution.browser.runtime import _SubmitWatch
+    from audoryn_execution.execution.browser.runtime import _SubmitWatch
 
     loop = asyncio.get_running_loop()
 
@@ -419,7 +423,7 @@ def test_one_time_codes_match_the_rfc(algorithm, secret, at, code) -> None:
     """F36: codes follow RFC 6238, from an otpauth:// link (and a plain base32 key for SHA1)."""
     import base64
 
-    from app.execution.browser.credentials import one_time_code
+    from audoryn_shared.execution.browser.credentials import one_time_code
 
     key = base64.b32encode(secret).decode().rstrip("=")
     link = f"otpauth://totp/Site:ada?secret={key}&algorithm={algorithm}&digits=8&period=30"
@@ -429,7 +433,7 @@ def test_one_time_codes_match_the_rfc(algorithm, secret, at, code) -> None:
 
 def test_a_stored_otp_secret_is_offered_as_the_current_code_never_typed() -> None:
     """F36: the secret is bound as oneTimeCode, which types the current code."""
-    from app.execution.browser.credentials import (
+    from audoryn_shared.execution.browser.credentials import (
         BrowserAuthenticationFailure,
         BrowserCredentialBundle,
         login_field_names,
@@ -447,7 +451,7 @@ def test_a_stored_otp_secret_is_offered_as_the_current_code_never_typed() -> Non
 
 
 def _box(ref, element_type, name, field_name=None):
-    from app.execution.browser.contracts import BrowserElement
+    from audoryn_shared.execution.browser.contracts import BrowserElement
 
     return BrowserElement(ref=ref, tag="input", role="textbox", name=name, text="", element_type=element_type,
                           value=None, checked=None, selected=None, disabled=False, href=None,
@@ -458,7 +462,7 @@ def _form_page(*elements):
     from datetime import UTC, datetime
     from uuid import uuid4
 
-    from app.execution.browser.contracts import BrowserForm, BrowserObservation
+    from audoryn_shared.execution.browser.contracts import BrowserForm, BrowserObservation
 
     form = BrowserForm(ref="f1", action="/login", method="post",
                        field_refs=tuple(element.ref for element in elements), submit_refs=())
@@ -469,7 +473,7 @@ def _form_page(*elements):
 
 def test_the_sign_in_finds_a_code_box_on_the_form_or_the_next_form_page() -> None:
     """F36: a code box is known by its name or label, on the login form or a page of its own."""
-    from app.execution.browser.probe import code_field, login_form
+    from audoryn_shared.execution.browser.probe import code_field, login_form
 
     together = login_form(_form_page(_box("u", "email", "Email"), _box("p", "password", "Password"),
                                 _box("c", "text", "Authentication code", "otp")))
@@ -492,10 +496,12 @@ async def test_drafting_is_told_which_browser_connections_hold_a_login(with_logi
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.application.services.capability_autoresolver import SemanticCapabilityResolver
-    from app.domain.ai.providers import AIInvocationContext
-    from app.domain.workforce.drafts import CapabilityNeed
-    from app.infrastructure.database.models import Integration
+    from audoryn_shared.application.services.capability_autoresolver import (
+        SemanticCapabilityResolver,
+    )
+    from audoryn_shared.domain.ai.providers import AIInvocationContext
+    from audoryn_shared.domain.workforce.drafts import CapabilityNeed
+    from audoryn_shared.infrastructure.database.models import Integration
 
     origin = "https://portal.example.com"
     integration = Integration(id=uuid4(), organization_id=uuid4(), provider="browser", display_name="Portal",
@@ -536,7 +542,7 @@ async def test_drafting_is_told_which_browser_connections_hold_a_login(with_logi
 async def test_a_pages_own_requests_follow_the_blocked_sites_and_private_network_rules(monkeypatch) -> None:
     """F39: scripts, styles, fetch and WebSockets are refused for blocked sites and private
     addresses; other sites a page loads from stay allowed; each host is looked up once."""
-    from app.execution.browser import egress
+    from audoryn_shared.execution.browser import egress
 
     looked_up: list[str] = []
     real = egress.evaluate_browser_egress
@@ -568,7 +574,7 @@ async def test_a_result_lists_the_files_its_run_downloaded() -> None:
     """F41: a run's downloads (not its screenshots) are listed on the result, to open there."""
     from uuid import uuid4
 
-    from app.runtime.managed import ManagedRuntimeExecutor
+    from audoryn_execution.runtime.managed import ManagedRuntimeExecutor
 
     download, screenshot = uuid4(), uuid4()
     rows = [(screenshot, {"kind": "browser_screenshot", "name": "page.png"}),
@@ -598,8 +604,8 @@ async def test_a_browser_task_from_chat_runs_as_a_one_time_job(monkeypatch) -> N
 
     from app.application.services import conversation_commands as commands
     from app.application.services.conversation_commands import ConversationCommandCompiler
-    from app.bootstrap.settings import settings
-    from app.domain.conversation.intent import WorkerCommandIntent
+    from audoryn_shared.bootstrap.settings import settings
+    from audoryn_shared.domain.conversation.intent import WorkerCommandIntent
 
     monkeypatch.setattr(settings, "integration_foundation_enabled", True)
     compiler = ConversationCommandCompiler.__new__(ConversationCommandCompiler)
@@ -662,7 +668,7 @@ async def test_a_browser_task_from_chat_runs_as_a_one_time_job(monkeypatch) -> N
 
 def test_only_a_browser_provider_routes_to_the_browser() -> None:
     from app.application.services.conversation_commands import _is_browser_task
-    from app.domain.conversation.intent import WorkerCommandIntent
+    from audoryn_shared.domain.conversation.intent import WorkerCommandIntent
 
     def intent(arguments):
         return WorkerCommandIntent(family="integration.execute", arguments=arguments)
@@ -681,7 +687,7 @@ async def test_preparation_never_asks_for_an_account_the_person_did_not_name(ins
     request that never named it is asked what to use instead."""
     from types import SimpleNamespace
 
-    from app.application.services.integration_foundation import (
+    from audoryn_shared.application.services.integration_foundation import (
         IntegrationFoundation,
         IntegrationRequirementError,
     )
@@ -704,8 +710,8 @@ async def test_a_one_time_job_is_queued_only_once(monkeypatch) -> None:
 
     from fastapi import HTTPException
 
-    from app.api import jobs_routes
-    from app.bootstrap.settings import settings
+    from audoryn_shared.api import jobs_routes
+    from audoryn_shared.bootstrap.settings import settings
 
     monkeypatch.setattr(settings, "integration_foundation_enabled", True)
 
@@ -754,7 +760,7 @@ def test_a_connection_the_person_set_up_replaces_agentgates_own_for_the_same_sit
     sites (and the run may use it); otherwise it stays."""
     from types import SimpleNamespace
 
-    from app.runtime.managed import _superseded_managed_browsers
+    from audoryn_execution.runtime.managed import _superseded_managed_browsers
 
     def connection(config):
         return SimpleNamespace(provider="browser", config=config)
@@ -783,7 +789,7 @@ def test_a_connection_the_person_set_up_replaces_agentgates_own_for_the_same_sit
 def test_a_browser_step_says_what_it_did_not_how_many_results(scope, output, said) -> None:
     """F44: a browser step was narrated as "Found 6 results" (its event list counted); a download
     now names its file and id so a later step can use it."""
-    from app.application.context.narrator import narrate
+    from audoryn_execution.application.context.narrator import narrate
 
     assert narrate(scope, output) == said
 
@@ -791,8 +797,8 @@ def test_a_browser_step_says_what_it_did_not_how_many_results(scope, output, sai
 def test_a_login_secret_is_never_sent_in_a_web_address() -> None:
     """F45: any request carrying a typed secret in its address, plain or encoded, is refused; a
     form's missing method no longer refuses the login. Names (username, email) are not secrets."""
-    from app.execution.browser.credentials import BrowserCredentialBundle
-    from app.execution.browser.runtime import _carries_secret
+    from audoryn_execution.execution.browser.runtime import _carries_secret
+    from audoryn_shared.execution.browser.credentials import BrowserCredentialBundle
 
     assert BrowserCredentialBundle.is_secret("password") and BrowserCredentialBundle.is_secret("oneTimeCode")
     assert BrowserCredentialBundle.is_secret("pin") and BrowserCredentialBundle.is_secret("apiToken")

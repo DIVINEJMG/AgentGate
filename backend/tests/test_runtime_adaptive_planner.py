@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from app.domain.ai.providers import (
+from audoryn_execution.runtime.managed import _attach_observation_id
+from audoryn_shared.domain.ai.providers import (
     AIInvocationContext,
     AIMediaInput,
     AIModelRole,
     AIResponse,
 )
-from app.runtime.managed import _attach_observation_id
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
+from audoryn_shared.runtime.planner.adaptive import AdaptiveRuntimePlanner
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -1281,10 +1281,10 @@ def test_runtime_injects_observation_id_into_nested_browser_locators() -> None:
 
 def test_browser_scroll_contract_accepts_semantic_boundaries() -> None:
     browser_provider = (
-        ROOT / "backend/app/execution/providers/browser.py"
+        ROOT / "packages/shared/audoryn_shared/execution/providers/browser.py"
     ).read_text(encoding="utf-8")
     browser_runtime = (
-        ROOT / "backend/app/execution/browser/runtime.py"
+        ROOT / "services/execution/audoryn_execution/execution/browser/runtime.py"
     ).read_text(encoding="utf-8")
 
     assert '"enum": ["top", "bottom"]' in browser_provider
@@ -1293,10 +1293,10 @@ def test_browser_scroll_contract_accepts_semantic_boundaries() -> None:
 
 def test_browser_execution_preserves_current_observation_for_locator_actions() -> None:
     runtime = (
-        ROOT / "backend/app/execution/browser/runtime.py"
+        ROOT / "services/execution/audoryn_execution/execution/browser/runtime.py"
     ).read_text(encoding="utf-8")
     provider = (
-        ROOT / "backend/app/execution/providers/browser.py"
+        ROOT / "packages/shared/audoryn_shared/execution/providers/browser.py"
     ).read_text(encoding="utf-8")
 
     assert "async def current_observation(" in runtime
@@ -1385,7 +1385,7 @@ async def test_adaptive_planner_rejects_repeat_scroll_without_new_actionable_sta
 
 
 def test_planner_observation_prioritizes_form_refs_before_page_prose() -> None:
-    from app.application.context.evidence import browser_evidence
+    from audoryn_shared.application.context.evidence import browser_evidence
 
     observation = {
         "formDetails": [{"fieldRefs": ["e9"], "submitRefs": []}],

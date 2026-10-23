@@ -2,9 +2,9 @@ from typing import Annotated
 
 from fastapi import Header, HTTPException, status
 
-from app.domain.identity.errors import AuthenticationError
-from app.domain.identity.principals import HumanPrincipal
 from app.infrastructure.auth.provider import SessionIdentityProvider
+from audoryn_shared.domain.identity.errors import AuthenticationError
+from audoryn_shared.domain.identity.principals import HumanPrincipal
 
 _identity_provider = SessionIdentityProvider()
 

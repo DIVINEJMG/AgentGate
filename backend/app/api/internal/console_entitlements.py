@@ -4,6 +4,7 @@
 - ``POST /snapshots``: apply one organisation's plan (newer versions only).
 - ``POST /template``: replace the plan new workspaces start on.
 - ``POST /usage-resets``: give workspaces a usage reset, applied now or banked (phase 6).
+- ``POST /traffic-limits``: the Audoryn Gateway's traffic limits (architecture plan, phase 1e).
 - ``GET /status``: organisations, paged by id, with the plan applied and this period's usage, so
   the Console can confirm delivery, show usage and find new workspaces.
 
@@ -27,7 +28,9 @@ from pydantic import ValidationError
 from sqlalchemy import select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.console_entitlements import (
+from app.application import gateway_limits
+from app.application.services import usage_resets
+from audoryn_shared.application.console_entitlements import (
     READ_SCOPE,
     WRITE_SCOPE,
     ChannelGuard,
@@ -35,16 +38,18 @@ from app.application.console_entitlements import (
     load_config,
     verify_request,
 )
-from app.application.console_reads.signing import ReplayStoreUnavailable, ServiceRequestRejected
-from app.application.services import entitlements as plans
-from app.application.services import usage_resets
-from app.infrastructure.database.models import (
+from audoryn_shared.application.console_reads.signing import (
+    ReplayStoreUnavailable,
+    ServiceRequestRejected,
+)
+from audoryn_shared.application.services import entitlements as plans
+from audoryn_shared.infrastructure.database.models import (
     EntitlementTemplate,
     Organization,
     OrganizationEntitlement,
     OrganizationUsage,
 )
-from app.infrastructure.database.session import database_session
+from audoryn_shared.infrastructure.database.session import database_session
 
 router = APIRouter(prefix="/internal/console/entitlements/v1", include_in_schema=False)
 logger = logging.getLogger("audoryn.console_entitlements")
@@ -71,18 +76,20 @@ class ChannelRuntime:
     config: EntitlementsChannelConfig
     guard: ChannelGuard | None = None
     clock: Callable[[], float] = time.time
+    redis: Any = None  # the guard's client, also holding the gateway's traffic limits
 
 
 @lru_cache
 def _runtime_from_settings() -> ChannelRuntime:
-    from app.bootstrap.settings import settings
+    from audoryn_shared.bootstrap.settings import settings
 
     config = load_config(settings)
     if not config.enabled:
         return ChannelRuntime(config=config)
     from redis.asyncio import Redis
 
-    return ChannelRuntime(config=config, guard=ChannelGuard(Redis.from_url(settings.redis_dsn, decode_responses=True)))
+    guard = ChannelGuard(Redis.from_url(settings.redis_dsn, decode_responses=True))
+    return ChannelRuntime(config=config, guard=guard, redis=guard.client)
 
 
 def channel_runtime() -> ChannelRuntime:
@@ -177,6 +184,16 @@ async def grant_usage_reset(request: Request, runtime: Runtime, session: Session
     return await _serve(request, runtime, operation="usage_reset", scope=WRITE_SCOPE, handle=handle)
 
 
+@router.post("/traffic-limits")
+async def apply_traffic_limits(request: Request, runtime: Runtime) -> JSONResponse:
+    from audoryn_shared.bootstrap.settings import settings
+
+    async def handle(body: bytes, _: dict[str, str]) -> object:
+        return await gateway_limits.apply(runtime.redis, settings.gateway_redis_prefix, body)
+
+    return await _serve(request, runtime, operation="traffic_limits", scope=WRITE_SCOPE, handle=handle)
+
+
 @router.get("/status")
 async def status(request: Request, runtime: Runtime, session: Session) -> JSONResponse:
     async def handle(_: bytes, query: dict[str, str]) -> object:
@@ -186,7 +203,11 @@ async def status(request: Request, runtime: Runtime, session: Session) -> JSONRe
         limit = int(query.get("limit") or 100)
         if not 1 <= limit <= STATUS_PAGE_MAX:
             raise ValueError("limit out of range")
-        return await _status_page(session, after, limit)
+        from audoryn_shared.bootstrap.settings import settings
+
+        page = await _status_page(session, after, limit)
+        page["trafficLimitsVersion"] = await gateway_limits.applied_version(runtime.redis, settings.gateway_redis_prefix)
+        return page
 
     return await _serve(request, runtime, operation="status", scope=READ_SCOPE, handle=handle)
 

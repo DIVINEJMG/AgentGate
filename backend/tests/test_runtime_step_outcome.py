@@ -7,9 +7,9 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.jobs_routes import work_item_public
 from app.api.runtime_result_routes import _step_public, _step_v2
-from app.infrastructure.database.models import RunStep, WorkItem
+from audoryn_shared.api.jobs_routes import work_item_public
+from audoryn_shared.infrastructure.database.models import RunStep, WorkItem
 
 
 @pytest.mark.parametrize("runtime", [None, [], "invalid", {}, {"providerRetryAt": "later"}])

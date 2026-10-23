@@ -9,12 +9,12 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.jobs_routes import _trigger_failure_reason
 from app.application.services.conversation_commands import CrossTenantReferenceError
 from app.application.services.conversations import ConversationService
 from app.application.services.intent_interpreter import IntentInterpreter
-from app.bootstrap.settings import Settings
-from app.domain.ai.providers import (
+from audoryn_shared.api.jobs_routes import _trigger_failure_reason
+from audoryn_shared.bootstrap.settings import Settings
+from audoryn_shared.domain.ai.providers import (
     AIGateway,
     AIInvocationContext,
     AIMediaInput,
@@ -22,9 +22,9 @@ from app.domain.ai.providers import (
     AIProviderError,
     AIResponse,
 )
-from app.domain.conversation.intent import CommandReceipt
-from app.domain.identity.principals import HumanPrincipal
-from app.runtime.planner.adaptive import AdaptiveRuntimePlanner
+from audoryn_shared.domain.conversation.intent import CommandReceipt
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.runtime.planner.adaptive import AdaptiveRuntimePlanner
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -210,7 +210,7 @@ def test_cross_tenant_conversation_scope_is_rejected() -> None:
         service._require_org(principal, other_organization)
 
 def test_runtime_checkpoints_planning_before_governed_action_delivery() -> None:
-    source = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    source = (ROOT / "services/execution/audoryn_execution/runtime/managed.py").read_text(encoding="utf-8")
     assert "settings.runtime_planner_timeout_seconds" in source
     assert "Planning exceeded its configured time budget." in source
     assert "Next governed action planned and queued for execution." in source
@@ -222,8 +222,8 @@ def test_runtime_checkpoints_planning_before_governed_action_delivery() -> None:
 def test_runtime_provider_outage_waits_instead_of_failing_task() -> None:
     from datetime import UTC, datetime
 
-    from app.api.internal.runtime import _planning_wait
-    from app.domain.ai.providers import AIProviderError
+    from audoryn_execution.api.internal.runtime import _planning_wait
+    from audoryn_shared.domain.ai.providers import AIProviderError
 
     now = datetime.now(UTC)
     state, _, count, retry_at = _planning_wait(AIProviderError("provider_unavailable", "x", retryable=True), 0, preparing=False, now=now)
@@ -253,7 +253,7 @@ def test_external_context_is_explicitly_marked_untrusted() -> None:
     conversation = (
         ROOT / "backend/app/application/services/conversation_context.py"
     ).read_text(encoding="utf-8")
-    runtime = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    runtime = (ROOT / "services/execution/audoryn_execution/runtime/managed.py").read_text(encoding="utf-8")
     attachments = (
         ROOT / "backend/app/application/services/attachment_ingestion.py"
     ).read_text(encoding="utf-8")
@@ -323,9 +323,9 @@ def test_nvidia_defaults_remain_preconfigured_without_a_secret() -> None:
 
 
 def test_completed_runtime_publishes_live_result_into_conversation() -> None:
-    runtime = (ROOT / "backend/app/runtime/managed.py").read_text(encoding="utf-8")
+    runtime = (ROOT / "services/execution/audoryn_execution/runtime/managed.py").read_text(encoding="utf-8")
     delivery = (
-        ROOT / "backend/app/application/services/live_results.py"
+        ROOT / "services/execution/audoryn_execution/application/services/live_results.py"
     ).read_text(encoding="utf-8")
     assert "append_live_result_message(" in runtime
     assert '"presentation": "live_result"' in delivery

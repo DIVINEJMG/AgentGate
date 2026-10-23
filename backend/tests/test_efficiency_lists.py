@@ -14,7 +14,14 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
-from app.api.governance_routes import (
+from app.api.runtime_result_routes import (
+    _memories_public,
+    _memory_record,
+    _result_details,
+    _result_record,
+)
+from audoryn_execution.runtime.preparation_worker import RECOVERY_BUSY_SECONDS, next_recovery_delay
+from audoryn_shared.api.governance_routes import (
     _action_record,
     _actions_public,
     _incident_record,
@@ -22,14 +29,7 @@ from app.api.governance_routes import (
     _policies_public,
     _policy_record,
 )
-from app.api.runtime_result_routes import (
-    _memories_public,
-    _memory_record,
-    _result_details,
-    _result_record,
-)
-from app.infrastructure.database import models as m
-from app.runtime.preparation_worker import RECOVERY_BUSY_SECONDS, next_recovery_delay
+from audoryn_shared.infrastructure.database import models as m
 from tests.test_efficiency_queries import NOW, ORG, Database, _all
 
 TABLES = [m.AgentIdentity, m.Worker, m.Job, m.Run, m.Action, m.Approval, m.Policy, m.PolicyRevision,
@@ -180,7 +180,7 @@ def test_recovery_waits_long_when_idle_and_wakes_for_scheduled_retries(started: 
 
 
 def test_the_idle_pace_lets_neon_suspend_the_compute() -> None:
-    from app.bootstrap.settings import Settings
+    from audoryn_shared.bootstrap.settings import Settings
 
     # Neon suspends a compute after five minutes without queries; the default must exceed that.
     assert Settings.model_fields["preparation_recovery_idle_seconds"].default > 300

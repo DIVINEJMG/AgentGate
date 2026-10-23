@@ -8,10 +8,10 @@ from uuid import uuid4
 
 import pytest
 
-from app.execution.browser.contracts import BrowserLocator
-from app.execution.browser.credentials import BrowserCredentialBundle
-from app.execution.browser.policy import BrowserDomainPolicy
-from app.execution.browser.runtime import ACTION_SETTLE_MAX_SECONDS, BrowserRuntime
+from audoryn_execution.execution.browser.runtime import ACTION_SETTLE_MAX_SECONDS, BrowserRuntime
+from audoryn_shared.execution.browser.contracts import BrowserLocator
+from audoryn_shared.execution.browser.credentials import BrowserCredentialBundle
+from audoryn_shared.execution.browser.policy import BrowserDomainPolicy
 
 SITE = "https://app.test"
 PAGES = {

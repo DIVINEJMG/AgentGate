@@ -11,12 +11,10 @@ from pydantic import ValidationError
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.governance_routes import (
-    _create_policy,
-    _update_policy,
-    policy_status_v1,
-)
-from app.api.jobs_routes import (
+from app.api.runtime_result_routes import retry_item_v1
+from app.application.services.attachment_ingestion import AttachmentIngestionService
+from audoryn_shared.api.governance_routes import _create_policy, _update_policy, policy_status_v1
+from audoryn_shared.api.jobs_routes import (
     _provision_managed_job_authority,
     cancel_item,
     create_job,
@@ -26,39 +24,36 @@ from app.api.jobs_routes import (
     save_trigger_config,
     update_job,
 )
-from app.api.product_common import require_permission
-from app.api.runtime_result_routes import retry_item_v1
-from app.api.workforce_routes import (
-    delete_worker_v1,
-    set_worker_status,
-    update_worker,
-)
-from app.application.services.attachment_ingestion import AttachmentIngestionService
-from app.application.services.browser_origin_authority import (
+from audoryn_shared.api.product_common import require_permission
+from audoryn_shared.api.workforce_routes import delete_worker_v1, set_worker_status, update_worker
+from audoryn_shared.application.services.browser_origin_authority import (
     ensure_managed_browser_origins,
     explicit_http_origins,
 )
-from app.application.services.capability_autoresolver import SemanticCapabilityResolver
-from app.application.services.grounding import grounded_in
-from app.application.services.web_research import configured_sources, web_research_destination
-from app.application.services.worker_autonomy import WorkerAutonomyService
-from app.application.services.worker_memory import (
+from audoryn_shared.application.services.capability_autoresolver import SemanticCapabilityResolver
+from audoryn_shared.application.services.grounding import grounded_in
+from audoryn_shared.application.services.web_research import (
+    configured_sources,
+    web_research_destination,
+)
+from audoryn_shared.application.services.worker_autonomy import WorkerAutonomyService
+from audoryn_shared.application.services.worker_memory import (
     WorkerMemoryService,
     contains_secret_material,
 )
-from app.application.services.worker_site_targets import AmbiguousSiteTarget
-from app.bootstrap.settings import settings
-from app.domain.ai.providers import AIGateway, AIInvocationContext, AIProviderError
-from app.domain.conversation.intent import (
+from audoryn_shared.application.services.worker_site_targets import AmbiguousSiteTarget
+from audoryn_shared.bootstrap.settings import settings
+from audoryn_shared.domain.ai.providers import AIGateway, AIInvocationContext, AIProviderError
+from audoryn_shared.domain.conversation.intent import (
     PENDING_COMMAND_STATUSES,
     CommandReceipt,
     CommandReference,
     EntityReference,
     WorkerCommandIntent,
 )
-from app.domain.identity.principals import HumanPrincipal
-from app.domain.workforce.drafts import CapabilityNeed
-from app.infrastructure.database.models import (
+from audoryn_shared.domain.identity.principals import HumanPrincipal
+from audoryn_shared.domain.workforce.drafts import CapabilityNeed
+from audoryn_shared.infrastructure.database.models import (
     Artifact,
     ConversationCommand,
     ConversationMessage,
@@ -75,7 +70,7 @@ from app.infrastructure.database.models import (
     WorkerDirective,
     WorkItem,
 )
-from app.infrastructure.database.outbox import TransactionalOutbox
+from audoryn_shared.infrastructure.database.outbox import TransactionalOutbox
 
 # What a request may name as the tool for a website task.
 BROWSER_PROVIDERS = frozenset({"browser", "web", "website", "chrome"})
@@ -429,7 +424,9 @@ class ConversationCommandCompiler:
             task.pop("draft", None)
             pending.payload = {**pending.payload, "integrationTask": task}
             pending.status = "accepted"
-            from app.application.services.preparation_ai import restart_exhausted_preparation
+            from audoryn_shared.application.services.preparation_ai import (
+                restart_exhausted_preparation,
+            )
             retry_state = await restart_exhausted_preparation(self._session, pending)
             await TransactionalOutbox(self._session).enqueue(topic="integration.task.prepare",
                 aggregate_type="conversation_command", aggregate_id=str(pending.id),
@@ -445,9 +442,7 @@ class ConversationCommandCompiler:
         if _is_browser_task(intent):
             return await self._run_browser_task(organization_id=organization_id, principal=principal,
                 thread=thread, source_message=source_message, worker=worker, command=command)
-        from app.application.services.integration_request_context import (
-            integration_request_context,
-        )
+        from app.application.services.integration_request_context import integration_request_context
         command.payload = {**command.payload, "integrationTask": {
             "instruction": source_message.content, "workerId": str(worker.id),
             "threadId": str(thread.id), "messageId": str(source_message.id),
@@ -993,7 +988,9 @@ class ConversationCommandCompiler:
         if not provider:
             raise CommandResolutionError("Which integration do you need?")
         if settings.integration_foundation_enabled and provider not in {"browser", "web_research"}:
-            from app.application.services.integration_foundation import IntegrationFoundation
+            from audoryn_shared.application.services.integration_foundation import (
+                IntegrationFoundation,
+            )
             resources = [row for row in await IntegrationFoundation(self._session).catalog(
                 organization_id, principal.user_id) if row["provider"] == provider]
             account = str(intent.arguments.get("account") or "").casefold()
