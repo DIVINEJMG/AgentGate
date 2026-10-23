@@ -809,5 +809,5 @@ Further splits, a dedicated queue or read replicas, only when metrics show the n
 | 2 Core copies | **done locally** (2026-10-22); one copy runs steps until Phase 3 (browser sessions) |
 | 3 Execution process | **done locally** (2026-10-22); all four route groups switch together (see Phase 3) |
 | 4 Execution service + images | **done locally** (2026-10-22); three packages, three Containerfiles (not built: no Docker), gateway keep-alive fix |
-| 5 Production rollout | **step 1 done** (2026-10-23): Phases 0–4 run on Oracle unchanged in behaviour, proven by a real task; results in the [Oracle handoff](../deploy/oracle-handoff-scale-plan.md#phase-5-step-1-deploy-phases-04-as-they-are-behaviour-unchanged). Next: a staging copy for testing changes before users get them (own Neon branch, own Upstash Redis), then the drain, gateway, copies, execution process and limits |
+| 5 Production rollout | **steps 1–2 done** (2026-10-23): Phases 0–4 on Oracle, then the gateway in front of AgentGate behind nginx (trusted-proxy fix first). Step 3 (the drain) ready; then the execution service, a second copy, limits. Staging comes after. Commands and results in the [Oracle handoff](../deploy/oracle-handoff-scale-plan.md) |
 | 6 By the numbers | not started |

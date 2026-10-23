@@ -14,8 +14,8 @@ internet ─ nginx (TLS) ─ 127.0.0.1:8000 audoryn-gateway ─┬─ 127.0.0.1:
 | Step (Phase 5) | Services | Image |
 |---|---|---|
 | 1 (done) | `audoryn-api` on 8000, `SERVICE_ROLE=all` | `backend/Containerfile` |
-| 2 | `audoryn-gateway` on 8000; `audoryn-api` on 8101, still `all` | + `services/gateway/Containerfile` |
-| 3 | the drain: a longer stop timeout, `RUNTIME_DRAIN_SECONDS` | unchanged |
+| 2 (done) | `audoryn-gateway` on 8000; `audoryn-api` on 8101, still `all` | + `services/gateway/Containerfile` |
+| 3 | the drain: `RUNTIME_DRAIN_SECONDS=120`, stop timeout 150 s (until step 4, a restart during a step blocks users up to ~2 min) | unchanged |
 | 4 | `audoryn-execution` on 8201; `audoryn-api` becomes `api` | `backend/Containerfile.api`, `services/execution/Containerfile` |
 | 5 | a second core copy on 8102 | unchanged |
 | 6 | limits `report`, then `enforce`; CORS and security headers at the gateway | unchanged |
