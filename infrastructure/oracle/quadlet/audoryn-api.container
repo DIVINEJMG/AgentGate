@@ -1,6 +1,10 @@
-# AgentGate behind the gateway (Phase 5, step 2): the same image and role as before (SERVICE_ROLE=all),
-# on the host network at 127.0.0.1:8101. Only the gateway calls it, so only loopback is trusted for
-# the forwarded caller and scheme. Installed by copying into ~/.config/containers/systemd/.
+# AgentGate behind the gateway: the same image and role as before (SERVICE_ROLE=all), on the host
+# network at 127.0.0.1:8101. Only the gateway calls it, so only loopback is trusted for the forwarded
+# caller and scheme. Installed by copying into ~/.config/containers/systemd/.
+#
+# Stopping (Phase 5, step 3): uvicorn closes its port, waits up to 20 s for open requests, then running
+# steps get RUNTIME_DRAIN_SECONDS (120, in audoryn.env) to finish. Podman waits 150 s before killing
+# it, systemd 180 s. A step still running then is cancelled and the sweep resumes it.
 [Unit]
 Description=Audoryn API
 Wants=network-online.target
@@ -11,13 +15,15 @@ Image=localhost/audoryn-api:latest
 ContainerName=audoryn-api
 EnvironmentFile=/etc/audoryn/audoryn.env
 Network=host
-Exec=uvicorn app.main:app --host 127.0.0.1 --port 8101 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Exec=uvicorn app.main:app --host 127.0.0.1 --port 8101 --proxy-headers --forwarded-allow-ips=127.0.0.1 --timeout-graceful-shutdown 20
 ShmSize=1g
+StopTimeout=150
 
 [Service]
 Restart=always
 RestartSec=5
 TimeoutStartSec=120
+TimeoutStopSec=180
 
 [Install]
 WantedBy=default.target

@@ -621,3 +621,135 @@ podman logs --since 5m audoryn-api 2>&1 | grep -E "Traceback|ERROR|startup compl
 ### Rollback (only with your confirmation)
 
 `podman tag "$(cat "$HOME/agentgate-rollback.tag")" localhost/audoryn-api:latest`, then block F.
+
+## Phase 5, step 3: the drain
+
+**Goal:** a restart lets running steps finish (up to 120 s) instead of cutting them off after podman's default 10 s.
+
+**What changes:**
+- `RUNTIME_DRAIN_SECONDS=120` in `/etc/audoryn/audoryn.env`.
+- `infrastructure/oracle/quadlet/audoryn-api.container`:
+  - uvicorn waits at most 20 s for open requests (`--timeout-graceful-shutdown 20`), so a long stream can't eat into the steps' time;
+  - podman waits 150 s before killing the container (`StopTimeout=150`), and systemd waits 180 s (`TimeoutStopSec=180`).
+
+**The cost, accepted on 2026-10-23:** until the execution service has its own container (step 4), AgentGate is one container. A restart while a step runs means up to about 2 minutes of `502` for users while it drains. A restart with no step running stays at about 20 s. From step 4 the drain happens in the execution container only.
+
+**Unchanged:** the images, the gateway, nginx, the database.
+
+### AgentGate VM (`130.61.104.247`)
+
+**A. Read-only inspection**
+
+```bash
+cd /opt/audoryn/AgentGate && git branch --show-current && git status --short && git fetch origin main && printf 'Current: %s\nRemote:  %s\n' "$(git rev-parse HEAD)" "$(git rev-parse origin/main)"
+systemctl --user is-active audoryn-api.service audoryn-gateway.service
+printf 'RUNTIME_DRAIN_SECONDS: %s line(s)\n' "$(sudo grep -cE '^\s*RUNTIME_DRAIN_SECONDS=' /etc/audoryn/audoryn.env)"
+podman inspect audoryn-api --format 'stop timeout now: {{.Config.StopTimeout}}'
+```
+
+- **Expected:** branch `main`, a clean tree, `Remote` = the merge SHA, `active` twice, `0 line(s)`, `stop timeout now: 10`.
+
+**B. Fast-forward**
+
+```bash
+cd /opt/audoryn/AgentGate && if [ "$(git branch --show-current)" != main ] || [ -n "$(git status --porcelain)" ]; then echo 'STOP: wrong branch or dirty working tree'; else OLD="$(git rev-parse HEAD)" && git pull --ff-only origin main && printf 'Before: %s\nAfter:  %s\n' "$OLD" "$(git rev-parse HEAD)" && git -c core.pager=cat diff --name-only "$OLD" HEAD -- backend packages services infrastructure; fi
+```
+
+- **Expected:** only `infrastructure/oracle/quadlet/audoryn-api.container` is listed, so no image rebuild (there is no block C).
+
+**D. The setting, and backups of the env and service files**
+
+```bash
+sudo python3 - <<'PY'
+from pathlib import Path
+from datetime import datetime
+import os, shutil, tempfile
+
+VALUES = {"RUNTIME_DRAIN_SECONDS": "120"}
+p = Path('/etc/audoryn/audoryn.env')
+if not p.is_file():
+    raise SystemExit('STOP: env file missing')
+lines = p.read_text().splitlines(keepends=True)
+for name in VALUES:
+    found = [l for l in lines if l.strip() and not l.lstrip().startswith('#') and '=' in l and l.split('=', 1)[0].strip() == name]
+    if found:
+        raise SystemExit(f'STOP: {name} already present ({len(found)} times); no changes made')
+if lines and not lines[-1].endswith('\n'):
+    lines[-1] += '\n'
+lines += ['# Phase 5 step 3: the drain, added ' + datetime.now().strftime('%Y-%m-%d') + '\n']
+lines += [f'{name}={value}\n' for name, value in VALUES.items()]
+backup = p.with_name(p.name + '.backup-drain-' + datetime.now().strftime('%Y%m%d-%H%M%S'))
+shutil.copy2(p, backup)
+fd, temp = tempfile.mkstemp(prefix='.audoryn.env.', dir=p.parent)
+try:
+    with os.fdopen(fd, 'w') as f:
+        f.write(''.join(lines)); f.flush(); os.fsync(f.fileno())
+    st = p.stat()
+    os.chown(temp, st.st_uid, st.st_gid); os.chmod(temp, st.st_mode & 0o7777); os.replace(temp, p)
+except Exception:
+    if os.path.exists(temp):
+        os.unlink(temp)
+    raise
+print('Backup:', backup)
+print('Added:', ', '.join(VALUES))
+PY
+Q="$HOME/.config/containers/systemd" && B="$HOME/audoryn-api.container.backup-$(date +%Y%m%d-%H%M%S)" && cp -a "$Q/audoryn-api.container" "$B" && echo "$B" > "$HOME/audoryn-api.container.backup" && echo "Service file backup: $B"
+```
+
+- **Expected:** `Backup: /etc/audoryn/audoryn.env.backup-drain-...`, then `Added: RUNTIME_DRAIN_SECONDS`, then the service file backup path.
+
+**E. Read-only checks**
+
+```bash
+QUADLET_UNIT_DIRS=/opt/audoryn/AgentGate/infrastructure/oracle/quadlet /usr/libexec/podman/quadlet -dryrun -user 2>&1 | grep -E "error|Error|warning|stop-timeout|timeout-graceful|TimeoutStopSec" | grep -v "^#"
+podman run --rm -i --env-file /etc/audoryn/audoryn.env localhost/audoryn-api:latest python -c "from audoryn_shared.bootstrap.settings import settings; print('drain seconds:', settings.runtime_drain_seconds)"
+```
+
+- **Expected:**
+  - the API's start line includes `--stop-timeout 150` and `--timeout-graceful-shutdown 20`, and `TimeoutStopSec=180` is present, with no errors;
+  - `drain seconds: 120`.
+
+**F. Apply (one quick restart: the running container still has the old 10 s timeout)**
+
+```bash
+cd /opt/audoryn/AgentGate && cp infrastructure/oracle/quadlet/audoryn-api.container "$HOME/.config/containers/systemd/" && systemctl --user daemon-reload && systemctl --user restart audoryn-api.service
+sleep 20
+systemctl --user is-active audoryn-api.service audoryn-gateway.service
+podman inspect audoryn-api --format 'stop timeout: {{.Config.StopTimeout}}'
+podman exec audoryn-api python -c "from audoryn_shared.bootstrap.settings import settings; print('drain seconds:', settings.runtime_drain_seconds)"
+curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
+podman logs --since 2m audoryn-api 2>&1 | grep -E "Traceback|ERROR|startup complete"
+```
+
+- **Expected:** `active` twice, `stop timeout: 150`, `drain seconds: 120`, ready, `startup complete`, and no `Traceback` or `ERROR`.
+
+### Proof: a restart during a running task
+
+1. At audoryn.vercel.app, start a task that takes a while: the RED-folder coding task, or a browser task.
+2. While it shows as running, restart and time it:
+
+   ```bash
+   time systemctl --user restart audoryn-api.service
+   podman logs --since 5m audoryn-api 2>&1 | grep -E "Draining|Cancelled|startup complete"
+   ```
+
+   - **Expected:**
+     - `Draining 1 running step(s) for up to 120s` before the restart, and no `Cancelled`;
+     - the restart takes as long as the step needed (at most about 2.5 minutes);
+     - the task finishes normally after the restart.
+3. **What users saw meanwhile:**
+
+   ```bash
+   podman logs --since 10m audoryn-gateway 2>&1 | python3 /opt/audoryn/AgentGate/infrastructure/oracle/gateway_report.py
+   ```
+
+   - The `502`s fall only inside the restart window: the cost described above, until step 4.
+
+### Rollback (only with your confirmation)
+
+```bash
+sudo cp -a "$(ls -t /etc/audoryn/audoryn.env.backup-drain-* | head -1)" /etc/audoryn/audoryn.env
+cp -a "$(cat "$HOME/audoryn-api.container.backup")" "$HOME/.config/containers/systemd/audoryn-api.container" && systemctl --user daemon-reload && systemctl --user restart audoryn-api.service
+sleep 20
+curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
+```
