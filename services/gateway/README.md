@@ -9,7 +9,7 @@ The single public entry point in front of AgentGate's services. We build and run
 | The route table and choosing a copy for each request | Authentication, permissions |
 | Health checks, draining copies, failover | Plan limits and entitlements |
 | Correlation ids (`X-Correlation-ID`) and one access log line per request | QStash signature checks |
-| `X-Forwarded-For` / `X-Forwarded-Proto` (set here, never taken from callers) | Everything about the request's meaning |
+| `X-Forwarded-For` / `X-Forwarded-Proto` (set here; taken only from a trusted proxy, see below) | Everything about the request's meaning |
 | Traffic limits (1c), CORS and security headers (1d) | |
 
 ## Pass-through (Phase 1a)
@@ -72,7 +72,7 @@ GATEWAY_ADMIN_TOKEN=... python -m audoryn_gateway.rollout --restart "sudo system
 
 ### Admin controls
 
-These are only reachable from the same machine (`127.0.0.1` / `::1`) with `X-Gateway-Admin-Token`. They are switched off when `GATEWAY_ADMIN_TOKEN` is unset. Any other caller gets the ordinary 404, so the controls aren't visible from outside.
+These are only reachable from the same machine (`127.0.0.1` / `::1`) with `X-Gateway-Admin-Token`. Behind a trusted proxy, a request is judged by the caller the proxy names, so a request that came in through nginx is never "from this machine". They are switched off when `GATEWAY_ADMIN_TOKEN` is unset. Any other caller gets the ordinary 404, so the controls aren't visible from outside.
 
 | Request | Effect |
 |---|---|
@@ -161,6 +161,7 @@ Both are **off by default**, so replies are exactly as before.
 | `GATEWAY_MAX_CONNECTIONS` | `200` | Pooled connections |
 | `GATEWAY_UPSTREAM_KEEPALIVE_SECONDS` | `3` | Idle connections to the copies; keep it below their keep-alive (uvicorn: 5 s) |
 | `GATEWAY_KEEP_ALIVE_SECONDS` | `75` | Idle connections from callers; keep it above the idle timeout of whatever sits in front |
+| `GATEWAY_TRUSTED_PROXIES` | empty | Addresses of the proxy in front (on Oracle `127.0.0.1`, nginx). From these only, the caller's address is the last `X-Forwarded-For` entry and the scheme is `X-Forwarded-Proto`. Empty: no forwarding header is believed |
 | `GATEWAY_ADMIN_TOKEN` | unset (admin off) | Never commit it, never log it |
 | `GATEWAY_REDIS_URL` | unset | Limit counters and shared drains. Unset: limits off, drains kept per process |
 | `GATEWAY_REDIS_PREFIX` | `audoryn:gateway` | Starts every key, so environments sharing a Redis never mix (local proofs used `audoryn:gateway-sim`) |
@@ -191,7 +192,11 @@ Every backend process needs the same `INTERNAL_CALL_KEY_ID` and `INTERNAL_CALL_K
 
 The frontend (5173) and the QStash callbacks in `.env.sim` already point at `localhost:8000`. The rest of the stack is in [docs/testing/ai-simulation.md](../../docs/testing/ai-simulation.md).
 
-The gateway runs uvicorn with `proxy_headers=False`, so callers can't set their own forwarding headers. Shutting it down waits up to 30 seconds for open requests to finish.
+The gateway runs uvicorn with `proxy_headers=False`, so callers can't set their own forwarding headers.
+
+## Behind nginx (Oracle)
+
+Nginx terminates TLS and calls the gateway on `127.0.0.1:8000`. With `GATEWAY_TRUSTED_PROXIES=127.0.0.1` the gateway passes on the caller nginx saw and `https`. Without it, the core would rebuild `http://` URLs: QStash signatures (signed over the `https://` URL) and OAuth callbacks would fail, and every caller would share one address for the limits. The image is `services/gateway/Containerfile`; the service files are in [infrastructure/oracle](../../infrastructure/oracle/README.md). Shutting it down waits up to 30 seconds for open requests to finish.
 
 ## Tests
 

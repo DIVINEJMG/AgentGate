@@ -26,7 +26,7 @@ from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed, InvalidHandshake, InvalidStatus
 
 from audoryn_gateway.edge import at_the_edge
-from audoryn_gateway.headers import correlation_id, downstream_response, upstream_request
+from audoryn_gateway.headers import caller, correlation_id, downstream_response, upstream_request
 from audoryn_gateway.limits import Limiter, policy_for
 from audoryn_gateway.pools import Copy, Pools
 from audoryn_gateway.routes import pool_for
@@ -55,6 +55,7 @@ class Gateway:
                                settings.redis_prefix)
         self._client: httpx.AsyncClient | None = None
         self._counting: set[asyncio.Task[object]] = set()
+        self._trusted = frozenset(settings.trusted_proxies)
 
     async def __call__(self, scope: Scope, receive: Any, send: Any) -> None:
         if scope["type"] == "http":
@@ -95,27 +96,32 @@ class Gateway:
                 follow_redirects=False, trust_env=False)
         return self._client
 
+    def _caller(self, scope: Scope) -> tuple[str | None, str]:
+        client = scope.get("client")
+        return caller(client[0] if client else None, scope["scheme"], scope["headers"], self._trusted)
+
     async def _http(self, scope: Scope, receive: Any, send: Any) -> None:
         started = time.perf_counter()
         correlation = correlation_id(scope["headers"])
         path = scope["path"]
+        ip, scheme = self._caller(scope)
         if path == "/health/gateway":
             await _reply(send, 200, self._health(), correlation)
             return
         if path.startswith("/gateway/admin/"):
-            await self._admin(scope, send, correlation)
+            await self._admin(scope, send, correlation, ip)
             return
         pool = pool_for(path)
         if pool is None:  # the same answer the core gives a path it doesn't serve
             await _reply(send, 404, {"detail": "Not Found"}, correlation)
             _log(scope, 404, 0, started, correlation, None)
             return
-        refused, retry_after, cap = await self._admit(scope)
+        refused, retry_after, cap = await self._admit(scope, ip)
         if refused:
             await _reply(send, refused, {"detail": _FAILURES[refused]}, correlation, retry_after)
             _log(scope, refused, 0, started, correlation, None)
             return
-        headers = upstream_request(scope["headers"], client=_ip(scope), scheme=scope["scheme"], correlation=correlation)
+        headers = upstream_request(scope["headers"], client=ip, scheme=scheme, correlation=correlation)
         has_body = any(name in (b"content-length", b"transfer-encoding") for name, _ in scope["headers"])
         body = _body(receive, cap) if has_body else None
         copy, status, sent, failure = self.pools.choose(pool), 502, 0, None
@@ -153,7 +159,8 @@ class Gateway:
         finally:
             _log(scope, status, sent, started, correlation, copy)
 
-    async def _admit(self, scope: Scope, websocket: bool = False) -> tuple[int | None, int | None, int | None]:
+    async def _admit(self, scope: Scope, ip: str | None,
+                     websocket: bool = False) -> tuple[int | None, int | None, int | None]:
         """The route group's limits: the status to refuse with (or None), its Retry-After, and the
         body cap to hold a body without Content-Length to (or None)."""
         policy = policy_for(scope.get("method", "GET"), scope["path"], websocket)
@@ -164,7 +171,7 @@ class Gateway:
                                        "path": scope["path"], "rule": f"body {int(length)} bytes"}, separators=(",", ":")))
             if mode == "enforce":
                 return 413, None, None
-        check = self.limiter.check(policy, ip=_ip(scope), token=_token(scope), path=scope["path"])
+        check = self.limiter.check(policy, ip=ip, token=_token(scope), path=scope["path"])
         if mode != "enforce":
             # Report mode refuses nothing, so the request doesn't wait for Redis: it is counted alongside.
             task = asyncio.create_task(check)
@@ -182,14 +189,14 @@ class Gateway:
         return {"status": "ok", "service": "audoryn-gateway", "pools": pools,
                 "limits": {"mode": self.limiter.mode, "consoleVersion": self.limiter.console_version}}
 
-    async def _admin(self, scope: Scope, send: Any, correlation: str) -> None:
+    async def _admin(self, scope: Scope, send: Any, correlation: str, ip: str | None) -> None:
         """Lists, drains and restores copies; from this machine, with the admin token. Anything
-        else gets the 404 an unknown path gets, so the controls aren't visible from outside."""
+        else gets the 404 an unknown path gets, so the controls aren't visible from outside. A
+        request through the proxy is judged by its caller, not by the proxy's loopback address."""
         token = self.settings.admin_token
         given = dict(scope["headers"]).get(b"x-gateway-admin-token", b"").decode("latin-1")
-        client = scope.get("client")
         parts = scope["path"].removeprefix("/gateway/admin/").strip("/").split("/")
-        allowed = (token is not None and client is not None and client[0] in _LOOPBACK
+        allowed = (token is not None and ip in _LOOPBACK
                    and hmac.compare_digest(given, token.get_secret_value()))
         if allowed and scope["method"] == "GET" and parts == ["copies"]:
             copies = [{**copy.as_dict(), "pools": self.pools.pools_of(copy)} for copy in self.pools.all()]
@@ -214,14 +221,14 @@ class Gateway:
         correlation = correlation_id(scope["headers"])
         await receive()  # websocket.connect
         pool = pool_for(scope["path"])
-        refused, _, _ = await self._admit(scope, websocket=True) if pool else (None, None, None)
+        ip, scheme = self._caller(scope)
+        refused, _, _ = await self._admit(scope, ip, websocket=True) if pool else (None, None, None)
         if refused:
             await send({"type": "websocket.close", "code": 1008})  # a refused handshake (403)
             _log(scope, refused, 0, started, correlation, None)
             return
         names = {name.decode("latin-1").lower(): value.decode("latin-1") for name, value in upstream_request(
-            scope["headers"], client=_ip(scope), scheme="https" if scope["scheme"] == "wss" else "http",
-            correlation=correlation)}
+            scope["headers"], client=ip, scheme=scheme, correlation=correlation)}
         copy, status, upstream = (self.pools.choose(pool) if pool else None), 502, None
         for attempt in (1, 2):
             if copy is None:
@@ -262,11 +269,6 @@ def _may_retry(error: httpx.HTTPError, method: str, has_body: bool) -> bool:
 
 class _TooLarge(Exception):
     """A body without Content-Length passed its route group's cap."""
-
-
-def _ip(scope: Scope) -> str | None:
-    client = scope.get("client")
-    return client[0] if client else None
 
 
 def _token(scope: Scope) -> str | None:

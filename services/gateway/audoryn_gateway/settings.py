@@ -2,6 +2,7 @@
 (docs/plans/architecture-scale-plan.md, section 7)."""
 from __future__ import annotations
 
+import ipaddress
 import json
 from typing import Annotated
 
@@ -38,6 +39,10 @@ class GatewaySettings(BaseSettings):
     health_timeout_seconds: float = Field(default=5, gt=0, le=60)
     unhealthy_after: int = Field(default=2, ge=1, le=20)
     healthy_after: int = Field(default=2, ge=1, le=20)
+    # Addresses of the proxies in front of the gateway (nginx, which terminates TLS): from these
+    # only, the caller's address and scheme are taken from X-Forwarded-For and X-Forwarded-Proto.
+    # Empty: the gateway is the edge and believes no forwarding header.
+    trusted_proxies: Annotated[list[str], NoDecode] = Field(default_factory=list)
     # Drains and restores copies from this machine only (`/gateway/admin/...`). Unset turns it off.
     admin_token: SecretStr | None = None
     # Shared by every gateway copy: the limit counters and the copies an admin drained. Unset keeps
@@ -66,7 +71,7 @@ class GatewaySettings(BaseSettings):
     def policies(self) -> dict[str, Policy]:
         return {**DEFAULT_POLICIES, **self.limit_policies}
 
-    @field_validator("core_upstreams", "execution_upstreams", "cors_allowed_origins", mode="before")
+    @field_validator("core_upstreams", "execution_upstreams", "cors_allowed_origins", "trusted_proxies", mode="before")
     @classmethod
     def _split(cls, value: object) -> object:
         """A JSON list or a comma-separated list, as the core reads its own CORS_ALLOWED_ORIGINS."""
@@ -75,3 +80,8 @@ class GatewaySettings(BaseSettings):
         if value.strip().startswith("["):
             return json.loads(value)
         return [part.strip() for part in value.split(",") if part.strip()]
+
+    @field_validator("trusted_proxies")
+    @classmethod
+    def _addresses(cls, value: list[str]) -> list[str]:
+        return [str(ipaddress.ip_address(address)) for address in value]  # a typo fails at start-up

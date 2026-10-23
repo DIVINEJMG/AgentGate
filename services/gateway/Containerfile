@@ -1,0 +1,27 @@
+# The Audoryn Gateway (architecture plan, Phase 5): the only entry point in front of the core API
+# copies and the execution service. Its libraries are the backend's. Build from the repository root:
+#   podman build -f services/gateway/Containerfile .
+# Settings come from GATEWAY_* variables (services/gateway/README.md). Behind nginx on the same
+# machine, set GATEWAY_TRUSTED_PROXIES=127.0.0.1.
+FROM python:3.13-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app/services/gateway
+
+COPY services/gateway/pyproject.toml ./pyproject.toml
+COPY services/gateway/audoryn_gateway ./audoryn_gateway
+
+RUN pip install --upgrade pip \
+    && pip install .
+
+RUN useradd --create-home --uid 10001 audoryn
+
+USER audoryn
+
+EXPOSE 8000
+
+# Loopback by default: the host network on Oracle, where nginx calls it on 127.0.0.1.
+CMD ["python", "-m", "audoryn_gateway", "--host", "127.0.0.1", "--port", "8000"]

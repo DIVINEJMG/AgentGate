@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Iterator
 
 import httpx
 import pytest
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed, InvalidStatus
+
+from audoryn_gateway.app import Gateway
+from audoryn_gateway.headers import caller
+from audoryn_gateway.settings import GatewaySettings
+from tests.conftest import ADMIN, Server
 
 
 async def _send(port: int, method: str, path: str, headers: list[tuple[str, str]] | None = None,
@@ -110,3 +116,61 @@ async def test_access_log_never_contains_the_query_string(gateway_port: int, cap
 
     assert any('"path":"/api/v1/echo"' in line and '"status":200' in line for line in lines)
     assert not any("secret" in line for line in lines)
+
+
+@pytest.fixture
+def behind_nginx(cores: list[Server]) -> Iterator[int]:
+    """A gateway as on Oracle: nginx on the same machine terminates TLS and calls it on loopback."""
+    server = Server(Gateway(GatewaySettings(
+        core_upstreams=[cores[0].url], trusted_proxies=["127.0.0.1"], admin_token=ADMIN)))  # type: ignore[arg-type]
+    yield server.port
+    server.stop()
+
+
+# What nginx sends: `X-Forwarded-For $proxy_add_x_forwarded_for` (whatever the caller sent, then the
+# caller's real address) and `X-Forwarded-Proto $scheme`.
+NGINX = [("x-forwarded-for", "6.6.6.6, 203.0.113.9"), ("x-forwarded-proto", "https"), ("x-real-ip", "203.0.113.9")]
+
+
+async def test_behind_nginx_the_core_sees_the_real_caller_over_https(behind_nginx: int):
+    headers = (await _send(behind_nginx, "GET", "/api/v1/echo", NGINX)).json()["headers"]
+
+    # The address nginx appended, never the one the caller wrote in front of it; and https, so the
+    # core rebuilds the https URL that QStash signed and that OAuth callbacks are built from.
+    assert headers["x-forwarded-for"] == "203.0.113.9"
+    assert headers["x-forwarded-proto"] == "https"
+
+
+async def test_behind_nginx_a_direct_call_on_this_machine_is_still_itself(behind_nginx: int):
+    headers = (await _send(behind_nginx, "GET", "/api/v1/echo")).json()["headers"]
+
+    assert headers["x-forwarded-for"] == "127.0.0.1"
+    assert headers["x-forwarded-proto"] == "http"
+
+
+async def test_behind_nginx_the_admin_controls_answer_only_on_this_machine(behind_nginx: int):
+    token = [("x-gateway-admin-token", ADMIN)]
+
+    through_nginx = await _send(behind_nginx, "GET", "/gateway/admin/copies", NGINX + token)
+    on_the_machine = await _send(behind_nginx, "GET", "/gateway/admin/copies", token)
+
+    assert through_nginx.status_code == 404  # from the internet, even with the token
+    assert on_the_machine.status_code == 200
+
+
+async def test_behind_nginx_websockets_reach_the_core_as_the_real_caller(behind_nginx: int):
+    async with connect(f"ws://127.0.0.1:{behind_nginx}/ws/v1/echo?access_token=good",
+                       additional_headers=NGINX) as socket:
+        await socket.send("hi")
+        assert await socket.recv() == "a:hi"
+
+
+@pytest.mark.parametrize(("client", "scheme", "headers", "expected"), [
+    ("10.0.0.5", "http", [(b"x-forwarded-for", b"1.2.3.4"), (b"x-forwarded-proto", b"https")], ("10.0.0.5", "http")),
+    ("127.0.0.1", "wss", [], ("127.0.0.1", "https")),
+    ("127.0.0.1", "http", [(b"x-forwarded-for", b"203.0.113.9, 127.0.0.1"), (b"x-forwarded-proto", b"gopher")],
+     ("203.0.113.9", "http")),
+])
+def test_only_a_trusted_proxy_is_believed(client: str, scheme: str, headers: list[tuple[bytes, bytes]],
+                                          expected: tuple[str, str]):
+    assert caller(client, scheme, headers, frozenset({"127.0.0.1"})) == expected
