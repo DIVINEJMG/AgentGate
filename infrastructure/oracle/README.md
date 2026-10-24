@@ -21,7 +21,7 @@ The core copies are instances of one template, `audoryn-api@.container`, named b
 | 3 (done) | the drain: `RUNTIME_DRAIN_SECONDS=120`, stop timeout 150 s (until step 4, a restart during a step blocks users up to ~2 min) | unchanged |
 | 4 (done) | `audoryn-execution` on 8201 (steps, browser, drain); `audoryn-api` becomes `api` (no steps, quick restarts); an internal call key in `audoryn.env` | `localhost/audoryn-core` (`backend/Containerfile.api`), `localhost/audoryn-execution` (`services/execution/Containerfile`); `audoryn-api:latest` kept for rollback |
 | 5 (done) | the core becomes the template `audoryn-api@.container`: copies on 8101 and 8102, both in `GATEWAY_CORE_UPSTREAMS` | unchanged |
-| 6 | limits `report` (then `enforce`, after a few days of real traffic); CORS and security headers at the gateway, the core's `CORS_ENABLED=false` | unchanged |
+| 6 (done) | limits `enforce`; CORS and security headers at the gateway, the core's `CORS_ENABLED=false` | unchanged |
 
 **Why the host network:**
 - With rootless podman's own network (pasta), a container may not see nginx as `127.0.0.1`. The gateway trusts nginx's forwarded headers only from `127.0.0.1`.

@@ -1230,3 +1230,17 @@ curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
 ```
 
 The core copies get their CORS back first, then the gateway restarts without it, so there is again never a moment without CORS. The limits go back to `off`.
+
+### Result (2026-10-24): done, limits enforced the same day
+
+- F ended in `ALL PASS`. The caller-address check passed: through nginx the admin controls answered `404` for `10.0.0.125`, so the gateway counts real callers, not nginx's `127.0.0.1`.
+- One `access-control-allow-origin: https://audoryn.vercel.app`, and the three security headers.
+- Report mode reached no limit, so the owner chose `enforce` at once rather than after a few days: `GATEWAY_LIMITS_MODE=enforce` in `gateway.env` (backup `gateway.env.backup-enforce-20261024-105138`), then a gateway restart. Proof: 30 sign-in attempts from the VM's address got `422`, the 31st and 32nd `429`.
+- `check_services.py` now expects `enforce`.
+- **Back to report** if a real user is ever refused wrongly:
+
+  ```bash
+  sudo cp -a "$(ls -t /etc/audoryn/gateway.env.backup-enforce-* | head -1)" /etc/audoryn/gateway.env && systemctl --user restart audoryn-gateway.service
+  ```
+
+Phase 5 is complete: nginx → gateway (limits, CORS, security headers) → two core copies and the execution service.
