@@ -16,14 +16,15 @@ PUBLIC = "https://130.61.104.247/health/ready"
 CONTAINERS = {
     "audoryn-gateway": {"unit": "audoryn-gateway", "port": 8000},
     **{f"audoryn-api-{port}": {"unit": f"audoryn-api@{port}", "port": port, "role": "api",
-                               "call_url": "http://127.0.0.1:8000"} for port in (8101, 8102)},
+                               "call_url": "http://127.0.0.1:8000", "cors": False} for port in (8101, 8102)},
     "audoryn-execution": {"unit": "audoryn-execution", "port": 8201, "role": "execution", "drain": 120},
 }
-# How many copies each of the gateway's pools must have in rotation.
+# How many copies each of the gateway's pools must have in rotation, and the gateway's limits mode.
 POOLS = {"core": 2, "execution": 1}
+LIMITS_MODE = "report"
 SETTINGS = ("import json; from audoryn_shared.bootstrap.settings import settings as s; print(json.dumps({"
             "'role': s.service_role, 'call_url': s.execution_call_url, 'key': s.internal_call_key_secret is not None, "
-            "'drain': s.runtime_drain_seconds}))")
+            "'drain': s.runtime_drain_seconds, 'cors': s.cors_enabled}))")
 failures = 0
 
 
@@ -64,6 +65,9 @@ def main() -> None:
             if "call_url" in want:
                 report(settings.get("call_url") == want["call_url"], f"{name} sends due steps to the gateway",
                        settings.get("call_url"))
+            if "cors" in want:
+                report(settings.get("cors") is want["cors"], "the gateway answers CORS, not " + name,
+                       settings.get("cors"))
             if "drain" in want:
                 report(settings.get("drain") == want["drain"], f"{name} drains {want['drain']} s", settings.get("drain"))
             status, _ = fetch(f"http://127.0.0.1:{want['port']}/health/ready")
@@ -73,6 +77,8 @@ def main() -> None:
     for pool, copies in POOLS.items():
         rotation = pools.get(pool, {}).get("inRotation", 0)
         report(rotation == copies, f"gateway {pool} pool has {copies} in rotation", rotation)
+    mode = health.get("limits", {}).get("mode") if isinstance(health, dict) else None
+    report(mode == LIMITS_MODE, f"gateway limits mode is {LIMITS_MODE}", mode)
     status, _ = fetch(PUBLIC)
     report(status == 200, "ready over HTTPS through nginx and the gateway", status)
     print(f"\n{'ALL PASS' if not failures else f'{failures} FAILED'}")

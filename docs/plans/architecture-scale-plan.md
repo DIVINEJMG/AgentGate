@@ -809,5 +809,5 @@ Further splits, a dedicated queue or read replicas, only when metrics show the n
 | 2 Core copies | **done locally** (2026-10-22); one copy runs steps until Phase 3 (browser sessions) |
 | 3 Execution process | **done locally** (2026-10-22); all four route groups switch together (see Phase 3) |
 | 4 Execution service + images | **done locally** (2026-10-22); three packages, three Containerfiles (not built: no Docker), gateway keep-alive fix |
-| 5 Production rollout | **steps 1–4 done** (2026-10-23): Phases 0–4 on Oracle, the gateway in front of AgentGate behind nginx (trusted-proxy fix first), the drain, and the execution service in its own container. Step 5 (a second core copy, the core as one template) ready; then limits. Staging comes after. Commands and results in the [Oracle handoff](../deploy/oracle-handoff-scale-plan.md) |
+| 5 Production rollout | **steps 1–5 done** (2026-10-23): Phases 0–4 on Oracle, the gateway in front of AgentGate behind nginx (trusted-proxy fix first), the drain, the execution service in its own container, and two core copies (one template, deploys without downtime). Step 6 (limits in report, CORS and security headers at the gateway) ready; enforce after a few days of report. Staging comes after. Commands and results in the [Oracle handoff](../deploy/oracle-handoff-scale-plan.md) |
 | 6 By the numbers | not started |

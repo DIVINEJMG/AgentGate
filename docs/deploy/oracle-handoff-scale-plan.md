@@ -1082,3 +1082,151 @@ curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
 ```
 
 After the rollback, one core copy (`audoryn-api` on 8101) serves people again, as in step 4.
+
+### Result (2026-10-23): done
+
+F ended in `ALL PASS`, which also confirmed step 4: the execution service, the internal call key in both core copies, and each pool in rotation. A core restart with `restart_core.sh` while the app was in use: no errors.
+
+## Phase 5, step 6: traffic limits (report) and the edge at the gateway
+
+**What changes:**
+- **Limits in `report` mode:** the gateway counts every request against its route group's limits (`services/gateway/audoryn_gateway/limits.py`, or the Console's document once one is saved) and logs a `gateway.limit` line for each one that *would* be refused. Nobody is refused. After a few days of real traffic, `gateway_report.py` shows which limits were reached; then we choose `enforce`, adjusting any limit real use reaches.
+- **CORS at the gateway:** the gateway answers CORS with the core's own rules and origins, and the core stops (`CORS_ENABLED=false`). The order makes this safe: the gateway switches on first, and while the core still answers too, the gateway's headers replace the core's, so a browser never sees them twice (checked locally against Starlette's middleware). Then the core copies restart one at a time with CORS off.
+- **Security headers at the gateway:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, each only when the reply has none. No HSTS: the public address is an IP, and browsers ignore HSTS there.
+
+**Env changes:**
+- `gateway.env`: `GATEWAY_LIMITS_MODE=report` (was `off`); new `GATEWAY_CORS_ENABLED=true`, `GATEWAY_CORS_ALLOWED_ORIGINS` (copied from `audoryn.env`'s `CORS_ALLOWED_ORIGINS`), `GATEWAY_SECURITY_HEADERS=true`.
+- `audoryn.env`: new `CORS_ENABLED=false`. The execution service has no CORS, so this affects only the core copies.
+
+**Unchanged:** the images (no build), nginx, the database, the Console, Vercel and the laptop.
+
+**Downtime in F:** a few seconds while the gateway restarts. The core copies then restart one at a time with no downtime.
+
+### AgentGate VM (`130.61.104.247`)
+
+**A. Read-only inspection, and the caller-address check**
+
+```bash
+cd /opt/audoryn/AgentGate && git branch --show-current && git status --short && git fetch origin main && printf 'Current: %s\nRemote:  %s\n' "$(git rev-parse HEAD)" "$(git rev-parse origin/main)"
+curl -s http://127.0.0.1:8000/health/gateway; echo
+for k in GATEWAY_LIMITS_MODE GATEWAY_CORS_ENABLED GATEWAY_CORS_ALLOWED_ORIGINS GATEWAY_SECURITY_HEADERS GATEWAY_HSTS_SECONDS; do printf '%s: %s line(s)\n' "$k" "$(sudo grep -cE "^\s*$k=" /etc/audoryn/gateway.env)"; done
+printf 'CORS_ENABLED: %s line(s)\n' "$(sudo grep -cE '^\s*CORS_ENABLED=' /etc/audoryn/audoryn.env)"
+sudo grep -E '^\s*CORS_ALLOWED_ORIGINS=' /etc/audoryn/audoryn.env
+sudo nginx -T 2>/dev/null | grep -iE 'add_header|access-control' || echo 'nginx adds no headers'
+T="$(sudo sed -n 's/^GATEWAY_ADMIN_TOKEN=//p' /etc/audoryn/gateway.env)" && IP="$(hostname -I | awk '{print $1}')" && printf 'admin, direct: %s | admin, through nginx from %s: %s\n' "$(curl -s -o /dev/null -w '%{http_code}' -H "x-gateway-admin-token: $T" http://127.0.0.1:8000/gateway/admin/copies)" "$IP" "$(curl -sk -o /dev/null -w '%{http_code}' -H "x-gateway-admin-token: $T" "https://$IP/gateway/admin/copies")"; unset T
+```
+
+- **Expected:**
+  - branch `main`, a clean tree, `Remote` = the merge SHA;
+  - the gateway's health: `"limits":{"mode":"off","consoleVersion":null}`. If `consoleVersion` is a number, the Console's document sets the mode instead of the env file: send me the output;
+  - `GATEWAY_LIMITS_MODE: 1 line(s)` and the others `0 line(s)`; `CORS_ENABLED: 0 line(s)`;
+  - one `CORS_ALLOWED_ORIGINS=` line that includes `https://audoryn.vercel.app` (origins are not secret);
+  - `nginx adds no headers`. Otherwise send me the lines: nginx's headers would come twice;
+  - **the caller-address check:** `admin, direct: 200` and `admin, through nginx …: 404`. With the right token, the admin controls still refuse a caller that is not this machine's loopback, so the gateway sees the real caller behind nginx, not nginx's `127.0.0.1`. The per-IP limits depend on this. If the second number is `200`, **stop** and send me the output.
+
+**B. Fast-forward**
+
+```bash
+cd /opt/audoryn/AgentGate && if [ "$(git branch --show-current)" != main ] || [ -n "$(git status --porcelain)" ]; then echo 'STOP: wrong branch or dirty working tree'; else OLD="$(git rev-parse HEAD)" && git pull --ff-only origin main && printf 'Before: %s\nAfter:  %s\n' "$OLD" "$(git rev-parse HEAD)" && git -c core.pager=cat diff --name-only "$OLD" HEAD -- backend packages services infrastructure; fi
+```
+
+- **Expected:** only `infrastructure/oracle/README.md`, `check_services.py` and `gateway_report.py`. Nothing to build.
+
+**D. The env changes, with backups**
+
+```bash
+sudo python3 - <<'PY'
+from pathlib import Path
+from datetime import datetime
+import os, shutil, tempfile
+
+def live(lines, name):
+    return [i for i, l in enumerate(lines) if l.strip() and not l.lstrip().startswith('#') and '=' in l and l.split('=', 1)[0].strip() == name]
+
+def write(p, lines):
+    backup = p.with_name(p.name + '.backup-edge-' + datetime.now().strftime('%Y%m%d-%H%M%S'))
+    shutil.copy2(p, backup)
+    fd, temp = tempfile.mkstemp(prefix='.' + p.name + '.', dir=p.parent)
+    try:
+        with os.fdopen(fd, 'w') as f:
+            f.write(''.join(lines)); f.flush(); os.fsync(f.fileno())
+        st = p.stat()
+        os.chown(temp, st.st_uid, st.st_gid); os.chmod(temp, st.st_mode & 0o7777); os.replace(temp, p)
+    except Exception:
+        if os.path.exists(temp):
+            os.unlink(temp)
+        raise
+    print('Backup:', backup)
+
+core, gateway = Path('/etc/audoryn/audoryn.env'), Path('/etc/audoryn/gateway.env')
+c, g = core.read_text().splitlines(keepends=True), gateway.read_text().splitlines(keepends=True)
+origins = live(c, 'CORS_ALLOWED_ORIGINS')
+mode = live(g, 'GATEWAY_LIMITS_MODE')
+if len(origins) != 1 or not c[origins[0]].split('=', 1)[1].strip():
+    raise SystemExit('STOP: CORS_ALLOWED_ORIGINS is missing or repeated in audoryn.env; no changes made')
+if len(mode) != 1 or g[mode[0]].split('=', 1)[1].strip() != 'off':
+    raise SystemExit('STOP: GATEWAY_LIMITS_MODE is not exactly one line with off; no changes made')
+for lines, path, names in ((g, gateway, ('GATEWAY_CORS_ENABLED', 'GATEWAY_CORS_ALLOWED_ORIGINS', 'GATEWAY_SECURITY_HEADERS')), (c, core, ('CORS_ENABLED',))):
+    for name in names:
+        if live(lines, name):
+            raise SystemExit(f'STOP: {name} already in {path}; no changes made')
+for lines in (c, g):
+    if lines and not lines[-1].endswith('\n'):
+        lines[-1] += '\n'
+g[mode[0]] = 'GATEWAY_LIMITS_MODE=report\n'
+g += [f'# Phase 5 step 6: CORS and security headers at the gateway, added {datetime.now():%Y-%m-%d}\n',
+      'GATEWAY_CORS_ENABLED=true\n',
+      'GATEWAY_CORS_ALLOWED_ORIGINS=' + c[origins[0]].split('=', 1)[1].strip() + '\n',
+      'GATEWAY_SECURITY_HEADERS=true\n']
+c += [f'# Phase 5 step 6: the gateway answers CORS, added {datetime.now():%Y-%m-%d}\n', 'CORS_ENABLED=false\n']
+write(gateway, g)
+write(core, c)
+print('gateway.env: limits report, CORS on, security headers on | audoryn.env: CORS_ENABLED=false')
+PY
+```
+
+- **Expected:** two `Backup:` lines and the summary line. Nothing running has changed yet.
+
+**F. Switch: the gateway first, then the core copies one at a time**
+
+```bash
+systemctl --user restart audoryn-gateway.service && for i in $(seq 30); do curl -sf http://127.0.0.1:8000/health/gateway >/dev/null && echo 'gateway up' && break; sleep 2; done && bash /opt/audoryn/AgentGate/infrastructure/oracle/restart_core.sh
+sleep 10
+python3 /opt/audoryn/AgentGate/infrastructure/oracle/check_services.py
+```
+
+- **Expected:** `gateway up`, both core copies `back in rotation`, then `ALL PASS`, including `the gateway answers CORS, not audoryn-api-8101` (and 8102) and `gateway limits mode is report`. If anything says `STOP` or `FAIL`, send me the output.
+
+### Proof
+
+1. **In the browser:** at audoryn.vercel.app, sign in, open a conversation and send a message. Everything must work as before. A CORS mistake shows at once: the app could not reach AgentGate at all.
+2. **On the VM:**
+
+   ```bash
+   O='https://audoryn.vercel.app' && curl -sk -i -X OPTIONS https://130.61.104.247/api/v1/organizations -H "Origin: $O" -H 'Access-Control-Request-Method: POST' | grep -iE '^HTTP|^access-control-allow-origin'
+   curl -sk -D - -o /dev/null https://130.61.104.247/health/ready -H "Origin: $O" | grep -iE '^(access-control-allow-origin|x-content-type-options|x-frame-options|referrer-policy)'
+   podman logs --since 15m audoryn-gateway 2>&1 | python3 /opt/audoryn/AgentGate/infrastructure/oracle/gateway_report.py
+   ```
+
+   - **Expected:**
+     - the preflight: `HTTP/1.1 200` and one `access-control-allow-origin: https://audoryn.vercel.app`;
+     - the reply: **exactly one** `access-control-allow-origin` line, and the three security headers;
+     - the report: no `5xx`, and `limits reached: 0` (or a few `report` lines: nobody was refused).
+
+### After a few days: report → enforce
+
+```bash
+podman logs --since 72h audoryn-gateway 2>&1 | python3 /opt/audoryn/AgentGate/infrastructure/oracle/gateway_report.py
+```
+
+The `limits reached` section lists each limit that real traffic reached, by group and rule. Send it to me. If none was reached by normal use, we switch to `enforce`; any limit that was reached gets raised first. The switch is either the Console's traffic-limits setting (mode `enforce`) or `GATEWAY_LIMITS_MODE=enforce` in `gateway.env` with a gateway restart.
+
+### Rollback (only with your confirmation)
+
+```bash
+sudo cp -a "$(ls -t /etc/audoryn/gateway.env.backup-edge-* | head -1)" /etc/audoryn/gateway.env && sudo cp -a "$(ls -t /etc/audoryn/audoryn.env.backup-edge-* | head -1)" /etc/audoryn/audoryn.env && bash /opt/audoryn/AgentGate/infrastructure/oracle/restart_core.sh && systemctl --user restart audoryn-gateway.service
+sleep 15
+curl -sS --max-time 20 https://130.61.104.247/health/ready; echo
+```
+
+The core copies get their CORS back first, then the gateway restarts without it, so there is again never a moment without CORS. The limits go back to `off`.
