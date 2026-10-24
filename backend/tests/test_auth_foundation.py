@@ -3,6 +3,10 @@ from uuid import uuid4
 import pytest
 
 from audoryn_shared.infrastructure.auth.passwords import hash_password, verify_password
+from audoryn_shared.infrastructure.auth.service import (
+    AuthenticationFailure,
+    LocalAuthenticationService,
+)
 from audoryn_shared.infrastructure.auth.session_store import RedisSessionStore
 
 
@@ -19,7 +23,7 @@ class FakeRedis:
         return True
 
     async def get(self, key):
-        return self.values.get(key)
+        return self.values.get(key, self.counters.get(key))
 
     async def delete(self, key):
         self.values.pop(key, None)
@@ -69,3 +73,15 @@ async def test_failed_login_counter_is_bounded_in_redis() -> None:
     assert await store.record_failed_login("user@example.com") == 2
     await store.clear_failed_login("user@example.com")
     assert await store.record_failed_login("user@example.com") == 1
+
+
+@pytest.mark.asyncio
+async def test_a_locked_account_is_refused_before_its_password_is_checked() -> None:
+    store = RedisSessionStore(FakeRedis(), ttl_seconds=3600)  # type: ignore[arg-type]
+    for _ in range(10):
+        await store.record_failed_login("user@example.com")
+    assert await store.failed_logins("User@Example.com".lower()) == 10
+    # No database: the lockout answers first, so even the right password never reaches it.
+    service = LocalAuthenticationService(None, store)  # type: ignore[arg-type]
+    with pytest.raises(AuthenticationFailure, match="Too many failed sign-in attempts"):
+        await service.login(email=" User@Example.com ", password="the-right-password")

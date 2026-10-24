@@ -1244,3 +1244,74 @@ The core copies get their CORS back first, then the gateway restarts without it,
   ```
 
 Phase 5 is complete: nginx → gateway (limits, CORS, security headers) → two core copies and the execution service.
+
+## Escalating limits and sign-in lockout (2026-10-24)
+
+**What changes:**
+- **Gateway, penalties:** a rule can escalate. Each time it is exceeded, its key is blocked for the next tier's time, and a tier can lower the limit. After the last tier the strikes start over. IP rules never escalate (an office shares one address).
+- **Gateway, `account` key:** sign-in and sign-up are counted per account (the email in the body) and caller IP together, so one person's failed tries never lock out colleagues behind the same address, and nobody can lock a victim out from elsewhere.
+- **New defaults** (the Console can override each):
+  - sign-in: 15 per 5 minutes per account; then a 5-minute block and 10 per 5 minutes; then 2 hours; then 24 hours; then it starts over. The IP rule rises to 100 per 5 minutes and never escalates;
+  - sessions and organizations: blocks of 1 minute, then 15 minutes, then 1 hour, forgotten after an hour without a strike.
+- **Core, lockout fix:** after 10 wrong passwords for an email, sign-in was refused only for *wrong* passwords; a right guess still got in. The lockout is now checked first.
+- **Console:** accepts `penalties` and the `account` key in `gateway_traffic_limits` (Audoryn-Console PR).
+
+**Unchanged:** the database (no migration), the env files, nginx, Vercel and the laptop.
+
+**Order:** AgentGate first, then the Console, then save the new document in the Console. An old gateway ignores a document it cannot read (keeping the last good one), and the old Console refuses to save it, so no order breaks anything.
+
+### AgentGate VM (`130.61.104.247`)
+
+**B. Fast-forward (saves the old SHA for the rollback tags)**
+
+```bash
+cd /opt/audoryn/AgentGate && if [ "$(git branch --show-current)" != main ] || [ -n "$(git status --porcelain)" ]; then echo 'STOP: wrong branch or dirty working tree'; else OLD="$(git rev-parse HEAD)" && echo "$OLD" > "$HOME/agentgate-rollback.sha" && git pull --ff-only origin main && printf 'Before: %s\nAfter:  %s\n' "$OLD" "$(git rev-parse HEAD)" && git -c core.pager=cat diff --name-only "$OLD" HEAD -- backend packages services infrastructure; fi
+```
+
+- **Expected:** the gateway's `limits.py`, `app.py`, README and tests; the core's `auth/service.py`, `auth/session_store.py` and a test; `infrastructure/oracle/` files. No migration.
+
+**C. Tag the rollback images (dated), then build the gateway and the core (about 6 minutes)**
+
+```bash
+cd /opt/audoryn/AgentGate && S="rollback-$(cut -c1-7 "$HOME/agentgate-rollback.sha")-$(date +%Y%m%d)" && if podman image exists "localhost/audoryn-gateway:$S" || podman image exists "localhost/audoryn-core:$S"; then echo "STOP: $S already exists"; else podman tag localhost/audoryn-gateway:latest "localhost/audoryn-gateway:$S" && podman tag localhost/audoryn-core:latest "localhost/audoryn-core:$S" && echo "$S" > "$HOME/agentgate-rollback.tag" && echo "Rollback tags: $S" && podman build -f services/gateway/Containerfile -t localhost/audoryn-gateway:latest . && podman build -f backend/Containerfile.api -t localhost/audoryn-core:latest . && echo 'built'; fi
+```
+
+**F. Switch: the gateway (a few seconds), then the core copies one at a time (no downtime)**
+
+```bash
+systemctl --user restart audoryn-gateway.service && for i in $(seq 30); do curl -sf http://127.0.0.1:8000/health/gateway >/dev/null && echo 'gateway up' && break; sleep 2; done && bash /opt/audoryn/AgentGate/infrastructure/oracle/restart_core.sh
+sleep 10
+python3 /opt/audoryn/AgentGate/infrastructure/oracle/check_services.py
+```
+
+- **Expected:** `gateway up`, both core copies back in rotation, `ALL PASS`. The execution image is not rebuilt: nothing it runs changed.
+
+**Proof (from the VM's own address, so nobody else is blocked):**
+
+```bash
+IP="$(hostname -I | awk '{print $1}')" && for i in $(seq 16); do curl -sk -o /dev/null -w '%{http_code} ' -X POST "https://$IP/api/v2/auth/login" -H 'Content-Type: application/json' -d '{"email":"lockout-test@example.com","password":"x"}'; done; echo; curl -sk -o /dev/null -w 'another account: %{http_code}\n' -X POST "https://$IP/api/v2/auth/login" -H 'Content-Type: application/json' -d '{"email":"other-test@example.com","password":"x"}'
+curl -sk -D - -o /dev/null -X POST "https://$IP/api/v2/auth/login" -H 'Content-Type: application/json' -d '{"email":"lockout-test@example.com","password":"x"}' | grep -iE '^(HTTP|retry-after)'
+```
+
+- **Expected:** fifteen `401` (or `422`), then `429`; `another account: 401`; then `429` with `retry-after` of about 300 (the first tier's 5 minutes). The test account's block ends by itself.
+
+### Console VM (`130.61.172.186`)
+
+Run Console blocks A, B, C, E and F from Phase 5 step 1 (above), with this Console merge SHA. E's second line must print the module name. Then save the new `gateway_traffic_limits` document in the Console. Within 10 seconds, the gateway's health shows its version:
+
+```bash
+curl -s http://127.0.0.1:8000/health/gateway; echo
+```
+
+on the AgentGate VM: `"limits":{"mode":"enforce","consoleVersion":<the version the Console shows>}`.
+
+### Rollback (only with your confirmation)
+
+- **The limits only:** save `{"mode": null, "policies": {}}` in the Console. The gateway goes back to its own defaults.
+- **The images:**
+
+  ```bash
+  S="$(cat "$HOME/agentgate-rollback.tag")" && podman tag "localhost/audoryn-gateway:$S" localhost/audoryn-gateway:latest && podman tag "localhost/audoryn-core:$S" localhost/audoryn-core:latest && systemctl --user restart audoryn-gateway.service && bash /opt/audoryn/AgentGate/infrastructure/oracle/restart_core.sh
+  ```
+
+  Restore the Console document without `penalties` and `account` first: the old gateway cannot read them and would keep its last good policies.

@@ -78,6 +78,9 @@ class LocalAuthenticationService:
             normalized_email = normalize_email(email)
         except RegistrationFailure as exc:
             raise AuthenticationFailure("Invalid email or password.") from exc
+        # Checked before the password, so a right guess during the lockout is refused too.
+        if await self._sessions.failed_logins(normalized_email) >= 10:
+            raise AuthenticationFailure("Too many failed sign-in attempts. Try again later.")
 
         identity = await self._session.scalar(
             select(HumanIdentity).where(HumanIdentity.email == normalized_email)

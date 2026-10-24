@@ -40,6 +40,7 @@ _WEBSOCKET_HEADERS = frozenset({"authorization", "cookie", "x-correlation-id", "
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _NOT_SENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 _LOOPBACK = frozenset({"127.0.0.1", "::1"})
+_ACCOUNT_BODY_BYTES = 64 * 1024  # a sign-in body is far smaller; a larger one is streamed, uncounted by account
 
 
 class Gateway:
@@ -116,14 +117,23 @@ class Gateway:
             await _reply(send, 404, {"detail": "Not Found"}, correlation)
             _log(scope, 404, 0, started, correlation, None)
             return
-        refused, retry_after, cap = await self._admit(scope, ip)
+        has_body = any(name in (b"content-length", b"transfer-encoding") for name, _ in scope["headers"])
+        body: bytes | AsyncIterator[bytes] | None = None
+        account = None
+        length = dict(scope["headers"]).get(b"content-length", b"")
+        if (length.isdigit() and int(length) <= _ACCOUNT_BODY_BYTES
+                and self.limiter.counts_accounts(policy_for(scope["method"], path))):
+            # The account rule counts the email a sign-in names, so its small body is read first.
+            body = b"".join([chunk async for chunk in _body(receive)])
+            account = _account(body)
+        refused, retry_after, cap = await self._admit(scope, ip, account=account)
         if refused:
             await _reply(send, refused, {"detail": _FAILURES[refused]}, correlation, retry_after)
             _log(scope, refused, 0, started, correlation, None)
             return
         headers = upstream_request(scope["headers"], client=ip, scheme=scheme, correlation=correlation)
-        has_body = any(name in (b"content-length", b"transfer-encoding") for name, _ in scope["headers"])
-        body = _body(receive, cap) if has_body else None
+        if body is None and has_body:
+            body = _body(receive, cap)
         copy, status, sent, failure = self.pools.choose(pool), 502, 0, None
         try:
             for attempt in (1, 2):
@@ -159,8 +169,8 @@ class Gateway:
         finally:
             _log(scope, status, sent, started, correlation, copy)
 
-    async def _admit(self, scope: Scope, ip: str | None,
-                     websocket: bool = False) -> tuple[int | None, int | None, int | None]:
+    async def _admit(self, scope: Scope, ip: str | None, websocket: bool = False,
+                     account: str | None = None) -> tuple[int | None, int | None, int | None]:
         """The route group's limits: the status to refuse with (or None), its Retry-After, and the
         body cap to hold a body without Content-Length to (or None)."""
         policy = policy_for(scope.get("method", "GET"), scope["path"], websocket)
@@ -171,7 +181,7 @@ class Gateway:
                                        "path": scope["path"], "rule": f"body {int(length)} bytes"}, separators=(",", ":")))
             if mode == "enforce":
                 return 413, None, None
-        check = self.limiter.check(policy, ip=ip, token=_token(scope), path=scope["path"])
+        check = self.limiter.check(policy, ip=ip, token=_token(scope), path=scope["path"], account=account)
         if mode != "enforce":
             # Report mode refuses nothing, so the request doesn't wait for Redis: it is counted alongside.
             task = asyncio.create_task(check)
@@ -265,6 +275,15 @@ def _may_retry(error: httpx.HTTPError, method: str, has_body: bool) -> bool:
     any reply. A POST that may have arrived is never sent twice; QStash retries its own deliveries."""
     return isinstance(error, _NOT_SENT) or (
         method in _SAFE_METHODS and not has_body and isinstance(error, httpx.TransportError))
+
+
+def _account(body: bytes) -> str | None:
+    """The email a sign-in body names, as the core normalises it; None when it names none."""
+    try:
+        email = json.loads(body).get("email")
+    except (ValueError, AttributeError, RecursionError):
+        return None
+    return email.strip().lower() if isinstance(email, str) and email.strip() else None
 
 
 class _TooLarge(Exception):

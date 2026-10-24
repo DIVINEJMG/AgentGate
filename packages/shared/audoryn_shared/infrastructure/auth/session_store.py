@@ -56,6 +56,9 @@ class RedisSessionStore:
     async def revoke(self, token: str) -> None:
         await self._redis.delete(self._key(token))
 
+    async def failed_logins(self, email: str) -> int:
+        return int(await self._redis.get(f"auth:failed:{hashlib.sha256(email.encode('utf-8')).hexdigest()}") or 0)
+
     async def record_failed_login(self, email: str) -> int:
         key = f"auth:failed:{hashlib.sha256(email.encode('utf-8')).hexdigest()}"
         count = int(await self._redis.incr(key))
