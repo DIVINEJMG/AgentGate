@@ -55,9 +55,13 @@ python3 /opt/audoryn/AgentGate/infrastructure/oracle/check_services.py
 podman logs --since 60m audoryn-gateway 2>&1 | python3 /opt/audoryn/AgentGate/infrastructure/oracle/gateway_report.py
 ```
 
-## Deploying new core code
+## Deploying
 
-After building a new `localhost/audoryn-core:latest`, restart the core copies one at a time. People are served throughout: the next copy restarts only once the gateway has the first back in rotation.
+New code is deployed by the pipeline ([docs/deploy/pipeline.md](../../docs/deploy/pipeline.md)): GitHub calls `deploy.sh`, which builds what changed, switches with the restarts below, checks with `check_services.py`, and rolls back by itself when a check fails. `bash deploy.sh status` shows what this VM runs.
+
+### By hand: new core code
+
+When deploying by hand, after building a new `localhost/audoryn-core:latest`, restart the core copies one at a time. People are served throughout: the next copy restarts only once the gateway has the first back in rotation.
 
 ```bash
 bash /opt/audoryn/AgentGate/infrastructure/oracle/restart_core.sh

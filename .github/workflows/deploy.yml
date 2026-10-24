@@ -1,0 +1,153 @@
+name: Deploy
+
+# Staging follows main: every push to main that passes CI is deployed there. Production gets only a
+# commit that is already running on staging, when someone runs this workflow for production (and,
+# with the environment's required reviewer, approves it). Each deploy migrates that environment's
+# database from here, then calls the VM's deploy script over SSH. After production, the `production`
+# branch moves to the commit production runs, and Vercel deploys the web app from that branch
+# (docs/deploy/pipeline.md).
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Where to deploy
+        type: choice
+        options: [staging, production]
+        required: true
+      action:
+        description: deploy a commit, or roll back to the one before
+        type: choice
+        options: [deploy, rollback]
+        default: deploy
+      commit:
+        description: "Full commit to deploy (empty: the one running on staging)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    # Only CI runs for pushes to main, never for pull requests (this repository is public), and only
+    # once staging is set up: the repository variable DEPLOY_STAGING is "true".
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (vars.DEPLOY_STAGING == 'true' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    permissions:
+      deployments: read
+    outputs:
+      environment: ${{ steps.plan.outputs.environment }}
+      action: ${{ steps.plan.outputs.action }}
+      commit: ${{ steps.plan.outputs.commit }}
+    steps:
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PUSHED: ${{ github.event.workflow_run.head_sha }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          ACTION: ${{ inputs.action }}
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = workflow_run ]; then
+            printf 'environment=staging\naction=deploy\ncommit=%s\n' "$PUSHED" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The commits staging ran after a deploy that passed its checks, newest first: recorded by
+          # the release job below as "staging-verified" (GitHub's own records hold the workflow's
+          # commit, not always the deployed one).
+          staged() {
+            gh api "repos/$GITHUB_REPOSITORY/deployments?environment=staging-verified&per_page=50" --jq '.[].sha'
+          }
+          if [ "$ACTION" = rollback ]; then
+            printf 'environment=%s\naction=rollback\ncommit=\n' "$ENVIRONMENT" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$COMMIT" ]; then
+            [ "$ENVIRONMENT" = production ] || { echo "::error::Give the commit to deploy to staging."; exit 1; }
+            COMMIT="$(staged | awk 'NR == 1')"  # awk reads it all: no broken pipe under pipefail
+            [ -n "$COMMIT" ] || { echo "::error::Nothing has been deployed to staging yet."; exit 1; }
+          fi
+          [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Give the full 40-character commit."; exit 1; }
+          if [ "$ENVIRONMENT" = production ] && ! staged | grep -x "$COMMIT" >/dev/null; then
+            echo "::error::$COMMIT has not been deployed to staging successfully; production gets only what staging proved."
+            exit 1
+          fi
+          printf 'environment=%s\naction=deploy\ncommit=%s\n' "$ENVIRONMENT" "$COMMIT" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # the production branch
+      deployments: write  # the record of what staging runs (staging-verified)
+    # The environment holds this target's secrets; production can require an approval here.
+    environment: ${{ needs.plan.outputs.environment }}
+    concurrency:
+      group: deploy-${{ needs.plan.outputs.environment }}
+      cancel-in-progress: false
+    timeout-minutes: 75
+    env:
+      ACTION: ${{ needs.plan.outputs.action }}
+      COMMIT: ${{ needs.plan.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.ACTION == 'deploy'
+        with:
+          ref: ${{ env.COMMIT }}
+      - uses: actions/setup-python@v5
+        if: env.ACTION == 'deploy'
+        with:
+          python-version: "3.13"
+      # Migrations run here, never on the VM. They run before the new code starts, so each one must
+      # also work with the code that is running (add first, remove in a later release).
+      - name: Migrate the database
+        if: env.ACTION == 'deploy'
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python -m pip install --quiet --upgrade pip
+          pip install --quiet -e ../packages/shared -e .
+          echo "Before: $(alembic current 2>/dev/null | tail -n 1)"
+          alembic upgrade head
+          echo "After:  $(alembic current 2>/dev/null | tail -n 1)"
+      - name: Deploy on the VM
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The key may run only the VM's deploy script, which reads this command.
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes -o ServerAliveInterval=30 "opc@$HOST" "$ACTION $COMMIT" | tee deploy.log
+      # The commit the VM now runs (after a deploy or a rollback), as its deploy script reported it.
+      - name: Record what runs now
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ needs.plan.outputs.environment }}
+        run: |
+          set -euo pipefail
+          running="$(grep -oE "deployed [0-9a-f]{40} to $TARGET" deploy.log | tail -n 1 | cut -d' ' -f2)"
+          [ -n "$running" ] || { echo "::error::The deploy did not report its commit."; exit 1; }
+          if [ "$TARGET" = staging ]; then
+            id="$(printf '{"ref":"%s","environment":"staging-verified","auto_merge":false,"required_contexts":[],"production_environment":false}' "$running" |
+              gh api "repos/$GITHUB_REPOSITORY/deployments" --input - --jq .id)"
+            gh api "repos/$GITHUB_REPOSITORY/deployments/$id/statuses" -f state=success --silent
+            echo "Staging runs $running: it may be promoted to production."
+          else
+            # The web app follows the API: Vercel deploys production from this branch.
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/production" -f sha="$running" -F force=true --silent ||
+              gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/heads/production -f sha="$running" --silent
+            echo "Production runs $running; the production branch points at it for Vercel."
+          fi
