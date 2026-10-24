@@ -240,7 +240,7 @@
 }
 .ws-app .cf-chat-canvas { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 760px) {
-  .ws-app .cf-chat-canvas { grid-template-rows: 186px minmax(0, 1fr) auto auto; }
+  .ws-app .cf-chat-canvas { grid-template-rows: auto minmax(0, 1fr) auto auto; }  /* the chat list folds into the header */
   .ws-app .cf-back { top: 14px; }
   .ws-app .cf-identity { top: 14px; right: 16px; max-width: calc(100% - 72px); }
   .ws-app .cf-identity strong { font-size: 15px; }

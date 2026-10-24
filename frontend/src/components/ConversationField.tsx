@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent, type RefObject } from 'react';
-import { ArrowLeft, Check, ChevronRight, FileUp, Paperclip, Plus, Search, Send, ShieldCheck, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, FileUp, Paperclip, Plus, Search, Send, ShieldCheck, X } from 'lucide-react';
 import type { ApprovalRecord } from '../lib/approvalApi';
 import { approvalExplanation } from '../lib/approvalApi';
 import type { ConversationMessage, ConversationReceipt, ConversationThread } from '../lib/conversationApi';
@@ -63,6 +63,8 @@ export default function ConversationField(props: Props) {
   }
   const [arcOffset, setArcOffset] = useState(0);
   const [historyQuery, setHistoryQuery] = useState('');
+  // Phones only: the chat list folds into the header and opens over the transcript (the CSS hides the toggle elsewhere).
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [position, setPosition] = useState({ progress: 0, size: 1 });
   const historyRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
@@ -73,6 +75,7 @@ export default function ConversationField(props: Props) {
   const filteredThreads = useMemo(() => workerThreads.filter(item => item.title.toLowerCase().includes(historyQuery.trim().toLowerCase())), [workerThreads, historyQuery]);
   const chat = Boolean(workerId);
   const activeThread = workerThreads.find(item => item.id === threadId);
+  useEffect(() => setHistoryOpen(false), [workerId, threadId]);
   const activity = useTaskActivity(props.organizationId, threadId, props.apiVersion);
   const activeTasks = activity.snapshot?.tasks.filter(isActivityActive) ?? [];
   const savedTasks = activity.snapshot?.tasks.filter(task => !isActivityActive(task)) ?? [];
@@ -173,13 +176,15 @@ export default function ConversationField(props: Props) {
       </div>}
     </div>
     <div className="cf-chat-canvas" aria-hidden={!chat}>
-      <header className="cf-chat-header">
+      <header className={'cf-chat-header' + (historyOpen ? ' is-open' : '')} onKeyDown={event => { if (event.key === 'Escape' && historyOpen) setHistoryOpen(false); }}>
         <div className="cf-identity"><span className={'cf-identity-disc ' + hues[Math.max(0, workers.findIndex(item => item.id === workerId)) % hues.length]}>{worker ? initials(worker.name) : ''}</span><div><strong>{worker?.name}</strong><small>{worker?.department || 'AI worker'} · {worker?.status}</small></div></div>
-        <div className="cf-history">
+        <button type="button" className="cf-history-toggle" aria-expanded={historyOpen} aria-controls="cf-history" onClick={() => setHistoryOpen(open => !open)} title={activeThread?.title}>Chats<ChevronDown size={16}/></button>
+        <div className="cf-history" id="cf-history">
           <label className="cf-history-search"><Search size={17} strokeWidth={1.7}/><span className="sr-only">Search chat history</span><input value={historyQuery} onChange={event => setHistoryQuery(event.target.value)} placeholder="Search chats"/></label>
           <div className="cf-history-row"><button type="button" className="cf-new-chat" onClick={onNewThread} disabled={!worker || busy} aria-label="Start a new chat" title="New chat"><Plus size={20} strokeWidth={1.6}/></button><div className="cf-history-strip" ref={historyRef} aria-label="Chat history">{filteredThreads.map(item => <button type="button" key={item.id} className={item.id === threadId ? 'is-active' : ''} onClick={() => onThread(item.id)} disabled={busy} title={item.title}>{item.title}</button>)}{filteredThreads.length === 0 && <span className="cf-no-history">{historyQuery ? 'No matching chats' : 'No earlier chats'}</span>}</div><button type="button" className="cf-history-next" onClick={() => historyRef.current?.scrollBy({ left: 230, behavior: 'smooth' })} aria-label="Scroll chat history right"><ChevronRight size={19}/></button></div>
         </div>
       </header>
+      {historyOpen && <button type="button" className="cf-history-dismiss" aria-label="Close chats" onClick={() => setHistoryOpen(false)}/>}
       <div className="cf-transcript-wrap">
         <div id="cf-transcript" className="cf-transcript" ref={timeline} role="log" aria-label="Conversation messages" aria-live="polite" onScroll={syncPosition}>
           <div className="cf-transcript-inner">
