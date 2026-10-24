@@ -6,11 +6,13 @@ Needs only the host's python3, podman and ss. Exit status 1 when any check fails
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import urllib.request
 
-PUBLIC = "https://130.61.104.247/health/ready"
+# This VM's public address (deploy.sh exports it from /etc/audoryn/deploy.env); production by default.
+PUBLIC = os.environ.get("AUDORYN_PUBLIC_URL", "https://130.61.104.247").rstrip("/") + "/health/ready"
 # Each container: its service, its port, the role it must run, and what its settings must say. The core
 # copies are instances of one template, named by their port (quadlet/audoryn-api@.container).
 CONTAINERS = {
