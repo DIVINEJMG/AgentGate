@@ -114,3 +114,11 @@
 @media (max-width: 860px) { .up-banners { padding: 0 18px; } }
 @media (max-width: 520px) { .up-meter { display: none; } .up-modal-meter .up-meter { display: block; } .up-modal-foot { flex-direction: column-reverse; } }
 @media (prefers-reduced-motion: reduce) { .up-banner, .up-modal[open] { animation: none; } .up-meter i { transition: none; } }
+/* Phones and tablets, in a conversation: the scene has a fixed height, so a banner in the flow would
+   push the composer off the screen. It floats over the top of the chat instead, and can be dismissed. */
+@media (max-width: 860px) {
+  .ws-main:has(> .cf-scene) { position: relative; }
+  .ws-main:has(> .cf-scene) > .up-banners { position: absolute; top: 60px; right: 0; left: 0; z-index: 8; margin: 0; padding: 0 10px; pointer-events: none; }
+  .ws-main:has(> .cf-scene) > .up-banners > .up-banner { box-shadow: 0 10px 24px rgba(0, 0, 0, .25); pointer-events: auto; }
+  .ws-main:has(.cf-chat-header.is-open) > .up-banners { display: none; }  /* the open chat list lies on top */
+}
