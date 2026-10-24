@@ -90,10 +90,10 @@ Every request belongs to one route group ([`limits.py`](audoryn_gateway/limits.p
 
 | Group | Requests | Default rules | Body cap |
 |---|---|---|---|
-| `auth` | POST sign-in, sign-up, GitHub sign-in start and exchange | 30 per 5 min per IP. **Fails closed** | 64 KiB |
-| `upload` | POST `…/attachments` | 60/min per session, 120/min per IP | 16 MiB (attachments are at most 10 MiB, about 13.4 MiB as base64) |
-| `write` | other POST/PUT/PATCH/DELETE | 600/min per IP, 240/min per session, 1,200/min per organization | 2 MiB |
-| `general` | GET/HEAD/OPTIONS | 1,200/min per IP, 600/min per session | 2 MiB |
+| `auth` | POST sign-in, sign-up, GitHub sign-in start and exchange | 15 per 5 min per account, escalating (below); 100 per 5 min per IP. **Fails closed** | 64 KiB |
+| `upload` | POST `…/attachments` | 60/min per session (escalating), 120/min per IP | 16 MiB (attachments are at most 10 MiB, about 13.4 MiB as base64) |
+| `write` | other POST/PUT/PATCH/DELETE | 600/min per IP, 240/min per session and 1,200/min per organization (both escalating) | 2 MiB |
+| `general` | GET/HEAD/OPTIONS | 1,200/min per IP, 600/min per session (escalating) | 2 MiB |
 | `realtime` | WebSocket connects | 60/min per IP | none |
 | `internal` | QStash callbacks, the Console channel, provider webhooks (all signed, checked by the service) | no rate rule | 8 MiB |
 | none | `/health/*` | never limited | |
@@ -104,8 +104,26 @@ The defaults are starting values. `report` mode shows real traffic against them 
 - **per IP:** the caller's address as the gateway sees it. Callers can't set it.
 - **per session:** an HMAC fingerprint of the bearer token, or of the WebSocket's `access_token`. The token itself never reaches Redis or the logs.
 - **per organization:** the organization id in the path.
+- **per account:** the email a sign-in or sign-up body names (trimmed and lower-cased, as the core does), together with the caller's IP. Only bodies of at most 64 KiB with a `Content-Length` are read for it, before the request goes on unchanged. Neither the email nor the password is logged or stored: only an HMAC fingerprint reaches Redis.
 
 Counting uses fixed windows in Redis, one round trip per request for all of its rules.
+
+**Penalties** make a rule stricter each time it is exceeded (`penalties` on a rule):
+
+```json
+{"key": "account", "limit": 15, "window_seconds": 300,
+ "penalties": {"tiers": [{"block_seconds": 300, "limit": 10}, {"block_seconds": 7200, "limit": 10}, {"block_seconds": 86400}],
+               "reset_after_seconds": 86400}}
+```
+
+- The 1st time over the limit blocks the key for the 1st tier's `block_seconds`; the 2nd time for the 2nd tier's, and so on. While blocked, every request of that key gets `429` with `Retry-After` set to the time left.
+- A tier's `limit`, when set, replaces the rule's limit from that strike on (15, then 10).
+- After the last tier's block the strikes start over, as they do after `reset_after_seconds` without a new strike.
+- **IP rules never escalate**: an office shares one address. Only session, organization and account keys are blocked for long, so one person's or one account's abuse never locks out colleagues.
+- Defaults: sign-in 5 min → 2 h → 24 h with the limit lowered to 10; sessions and organizations 1 min → 15 min → 1 h, forgotten after an hour without a strike.
+- Under `report`, the strikes and blocks are counted and logged (`"rule": "... blocked 300s"`) but nothing is refused.
+
+The core keeps its own lockout too: after 10 wrong passwords for an email within 15 minutes, it refuses that email's sign-in, even with the right password, until the window ends.
 
 **Modes** (`GATEWAY_LIMITS_MODE`, or `mode` per group):
 
@@ -128,7 +146,7 @@ Counting uses fixed windows in Redis, one round trip per request for all of its 
 **Set in the Console (Phase 1e):**
 - The Console's platform-configuration key `gateway_traffic_limits` holds a document in the same shape: `{"mode": ..., "policies": {<group>: {...}}}`, with the version numbered by the Console.
 - AgentGate keeps it in Redis at `<GATEWAY_REDIS_PREFIX>:policies`, and every gateway reads it every `GATEWAY_POLICY_REFRESH_SECONDS` (10).
-- A group it names replaces that group's setting here, and its `mode` replaces `GATEWAY_LIMITS_MODE`.
+- A group it names replaces that group's setting here **entirely**: copy every rule, cap and flag you want to keep. Its `mode` replaces `GATEWAY_LIMITS_MODE`.
 - An invalid document is ignored (one warning) and a missing one changes nothing: the last good policies stay.
 - `/health/gateway` shows `limits.mode` and `limits.consoleVersion`.
 

@@ -8,10 +8,20 @@ from collections import Counter
 
 import httpx
 import pytest
+from pydantic import ValidationError
 from redis.asyncio import Redis
 
-from audoryn_gateway.app import Gateway, _token
-from audoryn_gateway.limits import DEFAULT_POLICIES, Limiter, Policy, Rule, policy_for
+from audoryn_gateway.app import Gateway, _account, _token
+from audoryn_gateway.limits import (
+    DEFAULT_POLICIES,
+    Limiter,
+    Penalties,
+    Policy,
+    PolicyDocument,
+    Rule,
+    Tier,
+    policy_for,
+)
 from audoryn_gateway.settings import GatewaySettings
 from tests.conftest import ADMIN, Server
 
@@ -214,3 +224,78 @@ async def test_without_redis_the_console_document_is_not_read():
     limiter = Limiter(None, b"s", DEFAULT_POLICIES, "report")
     await limiter.refresh()
     assert limiter.console_version is None and limiter.mode == "report"
+
+
+def test_ip_rules_never_escalate():
+    with pytest.raises(ValidationError, match="never apply to ip"):
+        Rule(key="ip", limit=1, window_seconds=60, penalties=Penalties(tiers=[Tier(block_seconds=60)]))
+
+
+def test_the_default_sign_in_ladder_counts_accounts_not_addresses():
+    ip, account = DEFAULT_POLICIES["auth"].rules
+    assert (ip.key, ip.limit, ip.penalties) == ("ip", 100, None)
+    assert (account.key, account.limit, account.window_seconds) == ("account", 15, 300)
+    assert account.penalties is not None
+    assert [(tier.block_seconds, tier.limit) for tier in account.penalties.tiers] == [
+        (300, 10), (7200, 10), (86_400, None)]
+
+
+def test_a_console_document_can_set_penalties():
+    document = PolicyDocument.model_validate_json(
+        '{"version":1,"mode":null,"policies":{"auth":{"rules":[{"key":"account","limit":15,"window_seconds":300,'
+        '"penalties":{"tiers":[{"block_seconds":300,"limit":10},{"block_seconds":86400}],'
+        '"reset_after_seconds":86400}}]}}}')
+    assert document.policies["auth"].rules[0].penalties.tiers[0].limit == 10  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize(("body", "account"), [
+    (b'{"email": " User@Example.com ", "password": "x"}', "user@example.com"),
+    (b'{"password": "x"}', None), (b'{"email": 5}', None), (b"[1]", None), (b"not json", None), (bytes([255]), None),
+])
+def test_the_account_is_the_email_a_body_names(body: bytes, account: str | None):
+    assert _account(body) == account
+
+
+@needs_redis
+async def test_penalties_block_longer_each_time_then_start_over():
+    client = Redis.from_url(REDIS or "", socket_timeout=3, socket_connect_timeout=3)
+    ladder = Penalties(tiers=[Tier(block_seconds=1, limit=1), Tier(block_seconds=2)], reset_after_seconds=60)
+    policies = {**DEFAULT_POLICIES, "write": Policy(rules=[Rule(key="session", limit=2, window_seconds=3600,
+                                                                penalties=ladder)])}
+    limiter = Limiter(client, b"s", policies, "enforce", prefix=f"audoryn:gateway-test:{uuid.uuid4().hex[:16]}")
+
+    async def tries(count: int, token: str = "one") -> list[int]:
+        """200 when let through, else the seconds the block has left."""
+        decisions = [await limiter.check("write", ip="10.0.0.1", token=token, path="/x") for _ in range(count)]
+        return [decision.retry_after() if decision.refuse else 200 for decision in decisions]
+
+    try:
+        assert await tries(4) == [200, 200, 1, 1]  # over the limit: blocked 1 s, and still blocked
+        assert await tries(1, token="two") == [200]  # another session is not
+        await asyncio.sleep(1.1)
+        assert await tries(2) == [200, 2]  # the first tier's stricter limit (1), then the last block: 2 s
+        await asyncio.sleep(2.1)
+        assert await tries(3) == [200, 200, 1]  # after the last tier, the ladder starts over
+    finally:
+        await client.aclose()
+
+
+@needs_redis
+async def test_sign_in_attempts_count_per_account_and_address(cores: list[Server]):
+    ladder = {"tiers": [{"block_seconds": 60}]}
+    server = _gateway(cores, "enforce", policies={"auth": {"rules": [
+        {"key": "ip", "limit": 100, "window_seconds": 300},
+        {"key": "account", "limit": 2, "window_seconds": 300, "penalties": ladder}]}})
+
+    async def sign_in(email: str) -> int:
+        async with httpx.AsyncClient(timeout=30) as client:
+            reply = await client.post(f"http://127.0.0.1:{server.port}/api/v2/auth/login",
+                                      json={"email": email, "password": "x"})
+        return reply.status_code
+
+    try:
+        assert [await sign_in("a@example.com") for _ in range(3)] == [404, 404, 429]  # 404: the stand-in core
+        assert await sign_in(" A@Example.com") == 429  # the same account, as the core normalises it
+        assert await sign_in("b@example.com") == 404  # another account from the same address is not blocked
+    finally:
+        server.stop()
