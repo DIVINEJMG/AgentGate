@@ -21,7 +21,7 @@ CONTAINERS = {
 }
 # How many copies each of the gateway's pools must have in rotation, and the gateway's limits mode.
 POOLS = {"core": 2, "execution": 1}
-LIMITS_MODE = "report"
+LIMITS_MODE = "enforce"
 SETTINGS = ("import json; from audoryn_shared.bootstrap.settings import settings as s; print(json.dumps({"
             "'role': s.service_role, 'call_url': s.execution_call_url, 'key': s.internal_call_key_secret is not None, "
             "'drain': s.runtime_drain_seconds, 'cors': s.cors_enabled}))")
