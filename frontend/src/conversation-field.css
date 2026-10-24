@@ -122,7 +122,7 @@
 .cf-live-result-actions button { padding: 6px 10px; border: 1px solid #9ab4a0; border-radius: 5px; background: #fff; color: #24543a; font: inherit; font-size: 11px; cursor: pointer; }
 .cf-live-result-actions button:hover:not(:disabled) { border-color: #6f9679; background: #f6faf5; }
 .cf-live-result-actions button:disabled { opacity: .5; cursor: not-allowed; }
-.cf-message time { color: #98a69a; font-size: 10px; }.cf-message-file { display: flex; align-items: center; gap: 6px; margin-top: 9px; color: #668270; font-size: 11px; }
+.cf-message time { color: #98a69a; font-size: 10px; }
 .cf-response-pending { display: flex; flex-direction: row-reverse; align-items: flex-start; gap: 11px; align-self: flex-end; animation: cf-arrive .28s both; }
 .cf-response-pending .cf-message-avatar { background: #e4eee4; color: #3f7650; }
 .cf-response-pending-bubble { display: flex; align-items: center; gap: 14px; min-height: 42px; padding: 10px 15px; border: 1px solid #dce9dd; border-radius: 13px 13px 3px 13px; background: #eaf2e9; color: #4b6953; font-size: 11px; }
@@ -146,7 +146,7 @@
 .cf-composer:focus-within { border-color: #8aaf92; box-shadow: 0 0 0 3px #a5c9aa42,0 7px 25px #263d2910; }
 .cf-composer-line { display: flex; align-items: center; gap: 8px; }.cf-composer-line textarea { flex: 1; min-width: 0; min-height: 38px; max-height: 104px; padding: 10px 6px; resize: none; overflow-y: auto; border: 0; outline: 0; background: transparent; color: #20372b; font-size: 13px; line-height: 1.4; }.cf-composer-line textarea::placeholder { color: #98a69b; }
 .cf-attach,.cf-send { display: grid; flex: none; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 11px; cursor: pointer; }.cf-attach { background: transparent; color: #375945; }.cf-attach:hover { background: #edf3ec; }.cf-send { background: #173f2a; color: #fff; }.cf-send:hover:not(:disabled) { background: #286c42; }.cf-send:disabled { opacity: .45; cursor: not-allowed; }
-.cf-composer-caption { display: flex; justify-content: center; align-items: center; gap: 5px; padding: 2px 0 0; color: #9dad9f; font-size: 9px; }.cf-composer-files { display: flex; gap: 5px; flex-wrap: wrap; padding: 3px 5px 6px; }.cf-composer-files>span { display: flex; align-items: center; gap: 5px; max-width: 180px; padding: 3px 6px; border-radius: 4px; background: #eaf0e8; color: #476951; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.cf-composer-files button { display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.cf-composer-caption { display: flex; justify-content: center; align-items: center; gap: 5px; padding: 2px 0 0; color: #9dad9f; font-size: 9px; }
 @keyframes cf-arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes cf-response-pulse { 0%,65%,100% { opacity: .35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 @keyframes cf-integration-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }

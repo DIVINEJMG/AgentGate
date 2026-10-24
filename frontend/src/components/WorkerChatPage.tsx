@@ -165,7 +165,7 @@ export default function WorkerChatPage({ organization, apiVersion, initialWorker
       const references: Array<Record<string, unknown>> = [];
       for (const file of files) {
         const uploaded = await uploadConversationAttachment(apiVersion, organization.id, activeThreadId, { name: file.name, mediaType: mediaType(file), contentBase64: await base64(file), question: draft.trim() || `Review this file for ${worker.name}.` });
-        references.push({ id: uploaded.artifact.id, name: uploaded.artifact.name, mediaType: uploaded.artifact.mediaType, analysisId: uploaded.analysis.id });
+        references.push({ id: uploaded.artifact.id, name: uploaded.artifact.name, mediaType: uploaded.artifact.mediaType, sizeBytes: uploaded.artifact.sizeBytes, analysisId: uploaded.analysis.id });
       }
       const content = draft.trim() || 'Review the attached file and explain what matters.';
       setResponsePhase('responding');

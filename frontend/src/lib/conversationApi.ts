@@ -159,7 +159,7 @@ export async function uploadConversationAttachment(
     input,
   );
   return unwrap<{
-    artifact: { id: string; name: string; mediaType: string; category: string | null };
+    artifact: { id: string; name: string; mediaType: string; sizeBytes: number; category: string | null };
     analysis: { id: string; status: string; findings: Record<string, unknown> };
   }>(version, response);
 }

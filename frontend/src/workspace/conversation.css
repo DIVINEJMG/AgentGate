@@ -91,7 +91,6 @@
 .ws-app .cf-reply-head strong { color: var(--ws-text); font-size: 13.5px; font-weight: 600; }
 .ws-app .cf-message-avatar { flex: 0 0 24px; width: 24px; height: 24px; background: hsl(var(--hue, 150) var(--ws-avatar-c) var(--ws-avatar-l)); color: hsl(var(--hue, 150) 45% var(--cf-ink-l)); font-size: 10px; font-weight: 600; }
 .ws-app .cf-message.is-worker .cf-message-body { width: auto; padding: 0 0 0 32px; border-radius: 0; background: none; color: var(--ws-text); font-size: 14.5px; line-height: 1.7; }
-.ws-app .cf-message-file { color: var(--ws-text-3); font-size: 12px; }
 
 /* Governance outcome chips on a reply. */
 .ws-app .cf-gov { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11.5px; font-weight: 500; }
@@ -218,7 +217,6 @@
 .ws-app .cf-send:disabled { opacity: .35; }
 .ws-app :is(.cf-attach, .cf-send):focus-visible { outline: 2px solid var(--ws-focus); outline-offset: 2px; }
 .ws-app .cf-composer-caption { color: var(--ws-text-3); font-size: 11px; }
-.ws-app .cf-composer-files > span { background: var(--ws-s2); color: var(--ws-text-2); }
 
 @media (max-width: 760px) {
   .ws-app .cf-transcript-inner { padding-right: 18px; }
@@ -249,3 +247,36 @@
   .ws-app .cf-composer { margin-bottom: 10px; }
 }
 .ws-app .cf-composer-line textarea::placeholder { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* ---------- Attachments (AttachmentCard): one card per file, in the composer and in messages.
+   The type shows as a coloured tile (a thumbnail for a picked image), then the name and the size.
+   In the composer each card has its own remove button; in a message the card opens the file. ---------- */
+.ws-app .cf-composer-files { display: flex; gap: 8px; padding: 4px 4px 8px; overflow-x: auto; scrollbar-width: thin; }
+.ws-app .cf-message-files { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ws-app .cf-file { --file-tone: var(--ws-text-3); display: flex; flex: 0 0 auto; align-items: center; gap: 8px; width: 236px; max-width: 100%; min-height: 54px; padding: 7px 8px 7px 7px; border: 1px solid var(--ws-line); border-radius: 10px; background: var(--ws-surface); color: var(--ws-text); }
+.ws-app .cf-file[data-tone="pdf"] { --file-tone: #e5484d; }
+.ws-app .cf-file[data-tone="image"] { --file-tone: #8e4ec6; }
+.ws-app .cf-file[data-tone="sheet"] { --file-tone: #30a46c; }
+.ws-app .cf-file[data-tone="code"] { --file-tone: #3e63dd; }
+.ws-app .cf-file[data-tone="text"] { --file-tone: var(--ws-text-2); }
+.ws-app .cf-file.is-openable { transition: border-color .15s ease, background .15s ease; }
+.ws-app .cf-file.is-openable:hover { border-color: var(--ws-line-strong); background: var(--ws-s2); }
+.ws-app .cf-file-open { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ws-app .cf-file-open:focus-visible { border-radius: 6px; outline: 2px solid var(--ws-focus); outline-offset: 4px; }
+.ws-app .cf-file-icon { display: grid; flex: none; place-items: center; width: 38px; height: 38px; overflow: hidden; border-radius: 8px; background: color-mix(in srgb, var(--file-tone) 15%, var(--ws-surface)); color: var(--file-tone); }
+.ws-app .cf-file-icon img { width: 100%; height: 100%; object-fit: cover; }
+.ws-app .cf-file-text { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.ws-app .cf-file-text strong { overflow: hidden; color: var(--ws-text); font-size: 13px; font-weight: 500; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.ws-app .cf-file-text small { color: var(--ws-text-3); font-size: 11.5px; line-height: 1.3; }
+.ws-app .cf-file-remove { display: grid; flex: none; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: var(--ws-s3); color: var(--ws-text-2); cursor: pointer; }
+.ws-app .cf-file-remove:hover, .ws-app .cf-file-remove:focus-visible { background: color-mix(in srgb, var(--ws-danger) 18%, var(--ws-surface)); color: var(--ws-danger); }
+.ws-app .cf-file-remove:focus-visible { outline: 2px solid var(--ws-focus); outline-offset: 2px; }
+.ws-app .cf-file-spinner { flex: none; margin: 0 6px; color: var(--ws-text-3); animation: cf-file-spin 1s linear infinite; }
+@keyframes cf-file-spin { to { transform: rotate(360deg); } }
+.ws-app :is(.cf-file-problem, .cf-file-error) { display: block; margin: 0 6px 6px; color: var(--ws-danger); font-size: 12px; }
+.ws-app .cf-file-error { margin: 8px 0 0; }
+.ws-app .cf-composer.is-dragging { outline: 2px dashed var(--ws-focus); outline-offset: 3px; }
+@media (max-width: 760px) {
+  .ws-app .cf-file { width: 210px; min-height: 56px; }
+  .ws-app .cf-file-remove { width: 32px; height: 32px; }  /* a thumb-sized target */
+}
